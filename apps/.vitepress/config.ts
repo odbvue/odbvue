@@ -25,6 +25,10 @@ export default defineConfig({
       ],
       '/guide': [
         {
+          text: 'Apps',
+          items: [{ text: 'Setting up VueJs', link: '/guide/apps/setting-up-vuejs' }],
+        },
+        {
           text: 'Wiki',
           items: [
             { text: 'Setting up VitePress', link: '/guide/wiki/setting-up-vitepress' },
