@@ -1,18 +1,19 @@
 ---
-# https://vitepress.dev/reference/default-theme-home-page
 layout: home
 
 hero:
   name: "OdbVue"
-  text: "Take Ownership of Your Future"
-  tagline: My great project tagline
+  text: Take Ownership of Your Future
+  image:
+    src: ./logo.svg
+    alt: OdbVue
   actions:
-    - theme: brand
-      text: Markdown Examples
-      link: /markdown-examples
     - theme: alt
-      text: API Examples
-      link: /api-examples
+      text: Introduction
+      link: /introduction
+    - theme: brand
+      text: Guide
+      link: /guide
 
 features:
   - title: Feature A

@@ -1,29 +1,50 @@
 import { defineConfig } from 'vitepress'
+import videoPlugin from './markdown-it-video'
 
-// https://vitepress.dev/reference/site-config
 export default defineConfig({
-  srcDir: '..\\wiki',
+  srcDir: '../wiki',
 
   title: 'OdbVue',
   description: 'Take Ownership of Your Future',
+  head: [['link', { rel: 'icon', href: '/favicon.ico' }]],
   themeConfig: {
-    // https://vitepress.dev/reference/default-theme-config
+    logo: '/logo.svg',
+
     nav: [
       { text: 'Home', link: '/' },
-      { text: 'Examples', link: '/markdown-examples' },
+      { text: 'Introduction', link: '/introduction' },
+      { text: 'Guide', link: '/guide' },
     ],
 
-    sidebar: [
-      {
-        text: 'Examples',
-        items: [
-          { text: 'Markdown Examples', link: '/markdown-examples' },
-          { text: 'Runtime API Examples', link: '/api-examples' },
-        ],
-      },
-    ],
+    sidebar: {
+      '/introduction': [
+        {
+          text: 'Introduction',
+          items: [{ text: 'What is OdbVue?', link: '/introduction' }],
+        },
+      ],
+      '/guide': [
+        {
+          text: 'Wiki',
+          items: [
+            { text: 'Setting up VitePress', link: '/guide/wiki/setting-up-vitepress' },
+            { text: 'VitePress configuration', link: '/guide/wiki/vitepress-configuration' },
+            { text: 'Custom Markdown Extensions', link: '/guide/wiki/custom-markdown' },
+          ],
+        },
+      ],
+    },
 
-    socialLinks: [{ icon: 'github', link: 'https://github.com/vuejs/vitepress' }],
+    search: {
+      provider: 'local',
+    },
+    socialLinks: [{ icon: 'github', link: 'https://github.com/odbvue/odbvue' }],
+  },
+
+  markdown: {
+    config: (md) => {
+      md.use(videoPlugin)
+    },
   },
 
   vite: {
