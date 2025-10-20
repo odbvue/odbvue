@@ -36,6 +36,19 @@ export default defineConfig({
             { text: 'Custom Markdown Extensions', link: '/guide/wiki/custom-markdown' },
           ],
         },
+        {
+          text: 'Infrastructure',
+          items: [
+            {
+              text: 'Oracle Cloud',
+              collapsed: true,
+              items: [
+                { text: 'Overview', link: '/guide/i13e/overview' },
+                { text: 'Sign up', link: '/guide/i13e/signup' },
+              ],
+            },
+          ],
+        },
       ],
     },
 
