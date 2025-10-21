@@ -48,12 +48,13 @@ export default defineConfig({
         {
           text: 'Infrastructure',
           items: [
+            { text: 'Local development', link: '/guide/i13e/local-development' },
             {
               text: 'Oracle Cloud',
               collapsed: true,
               items: [
-                { text: 'Overview', link: '/guide/i13e/overview' },
-                { text: 'Sign up', link: '/guide/i13e/signup' },
+                { text: 'Overview', link: '/guide/i13e/oci/overview' },
+                { text: 'Sign up', link: '/guide/i13e/oci/signup' },
               ],
             },
           ],

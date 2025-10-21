@@ -4,9 +4,7 @@
 
 ### Step 1: Start Registration
 
-Navigate to [cloud.oracle.com](https://cloud.oracle.com) and click **Sign Up for Free Tier**.
-
-![Oracle Cloud Sign Up Page]()
+Navigate to [cloud.oracle.com](https://cloud.oracle.com) and click **Sign Up for Free Tier** or **Start for free**.
 
 ### Step 2: Enter Account Details
 
@@ -16,8 +14,6 @@ Fill in the required information:
 - Email address
 
 Verify your email by clicking the link sent to your inbox.
-
-![Account Details Form]()
 
 ### Step 3: Configure Account Settings
 
@@ -29,33 +25,42 @@ Complete your account setup:
 > [!TIP]
 > Choose a region closest to your location for optimal performance. This cannot be changed later.
 
-![Account Configuration]()
-
 ### Step 4: Enter Personal Information
 
 Provide your address and contact details.
 
-![Address Information]()
+### Step 5: Payment Verification
 
-### Step 5: Phone Verification
+Oracle Cloud requires credit or debit card information for identity verification purposes. This is a standard security measure to prevent fraud and abuse.
+
+**Important points about payment verification:**
+- Your card will NOT be charged during the Free Tier trial period
+- You receive **$300 USD in free credits** valid for 30 days
+- You also get **Always Free services** that never expire
+- You will NOT be charged after the trial unless you explicitly upgrade to a Pay As You Go account
+- Accepted payment methods include major credit cards and debit cards
+
+> [!NOTE]
+> Oracle uses payment information only for verification. Your account will remain free unless you choose to upgrade to a paid account. After the 30-day trial, you can continue using Always Free services indefinitely without any charges.
+
+### Step 6: Phone Verification
 
 Enter your mobile number with the correct country code and verify via SMS code.
 
-![Phone Verification]()
-
-### Step 6: Accept Terms
+### Step 7: Accept Terms
 
 Review and accept the Oracle Cloud Free Tier terms and conditions, then click **Start My Free Trial**.
 
-![Terms and Conditions]()
-
-### Step 7: Account Activation
+### Step 8: Account Activation
 
 Your account is created immediately. You'll receive:
 - Welcome email with sign-in credentials
 - Confirmation email when all services are provisioned (typically within minutes)
+- $300 USD in free cloud credits (valid for 30 days)
+- Access to Always Free services (unlimited time)
 
-![Account Activation Confirmation]()
+> [!TIP]
+> After 30 days, you can continue using Always Free services at no cost, or upgrade to a Pay As You Go account to access additional services. You will only be charged if you explicitly choose to upgrade.
 
 ## Security Setup
 
@@ -68,8 +73,6 @@ For enhanced security, enable 2FA immediately after account creation:
 3. Enable **Multi-Factor Authentication (MFA)**
 4. Use the **Oracle Mobile Authenticator** app (available on iOS and Android) or any TOTP-compatible authenticator app
 5. Scan the QR code and enter the verification code
-
-![2FA Setup]()
 
 > [!WARNING]
 > Always enable 2FA to protect your Oracle Cloud account from unauthorized access.
@@ -89,14 +92,10 @@ To add another user with full administrative privileges:
    - Optionally check **Use email address as the username**
 7. Click **Create**
 
-![Create User]()
-
 8. After user creation, click **Groups** from the left menu
 9. Click on the **Administrators** group
 10. Click **Add user to group**
 11. Select the newly created user and click **Add**
-
-![Add User to Administrators Group]()
 
 12. The new user will receive an email with activation instructions
 13. They must set their password and enable 2FA upon first sign-in
