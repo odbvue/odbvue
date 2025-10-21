@@ -1,0 +1,64 @@
+# Default Configuration Values
+# These are the baseline defaults that can be overridden in environment-specific configs
+
+# OCI Configuration
+oci:
+  region: "eu-frankfurt-1"
+  profile: "DEFAULT"
+  
+# ATP Database Defaults
+atp:
+  # Free tier configuration (suitable for development/testing)
+  free_tier:
+    cpu_core_count: 1
+    data_storage_tbs: 1
+    license_model: "LICENSE_INCLUDED"
+    is_free_tier: true
+    is_auto_scaling_enabled: false
+    db_version: "19c"
+    
+  # Paid tier configuration (suitable for production)
+  paid_tier:
+    cpu_core_count: 2
+    data_storage_tbs: 1
+    license_model: "LICENSE_INCLUDED"
+    is_free_tier: false
+    is_auto_scaling_enabled: true
+    is_data_guard_enabled: true
+    db_version: "19c"
+    maintenance_schedule_type: "REGULAR"
+
+# Security defaults
+security:
+  # IP whitelist settings
+  development_ips: null  # Allow all IPs for development
+  
+  # Password requirements
+  password_policy:
+    min_length: 12
+    max_length: 30
+    require_uppercase: true
+    require_lowercase: true  
+    require_numeric: true
+    require_special: true
+
+# Naming conventions
+naming:
+  project_prefix: "OdbVue"
+  separator: "-"
+  max_db_name_length: 14
+  
+# Tags that will be applied to all resources
+default_tags:
+  Project: "OdbVue"
+  CreatedBy: "terraform"
+  ManagedBy: "infrastructure-team"
+
+# Backup and maintenance
+backup:
+  retention_days: 30
+  automated_backup: true
+  
+maintenance:
+  preferred_schedule: "REGULAR"
+  notification_email: null  # Set per environment
