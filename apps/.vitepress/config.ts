@@ -14,6 +14,7 @@ export default defineConfig({
       { text: 'Home', link: '/' },
       { text: 'Introduction', link: '/introduction' },
       { text: 'Guide', link: '/guide' },
+      { text: 'Features', link: '/features' },
     ],
 
     sidebar: {
@@ -24,6 +25,14 @@ export default defineConfig({
         },
       ],
       '/guide': [
+        {
+          text: 'Getting Started',
+          items: [
+            { text: 'Overview', link: '/guide' },
+            { text: 'Prerequisites', link: '/guide/prerequisites' },
+            { text: 'Getting started', link: '/guide/getting-started' },
+          ],
+        },
         {
           text: 'Apps',
           items: [{ text: 'Setting up VueJs', link: '/guide/apps/setting-up-vuejs' }],
@@ -48,6 +57,12 @@ export default defineConfig({
               ],
             },
           ],
+        },
+      ],
+      '/features': [
+        {
+          text: 'Features',
+          items: [{ text: 'Overview', link: '/features' }],
         },
       ],
     },
