@@ -24,8 +24,8 @@ variable "cpu_core_count" {
   type        = number
   default     = 1
   validation {
-    condition     = var.cpu_core_count >= 1 && var.cpu_core_count <= 128
-    error_message = "CPU core count must be between 1 and 128."
+    condition     = var.cpu_core_count >= 0 && var.cpu_core_count <= 128
+    error_message = "CPU core count must be between 0 (for Always Free) and 128."
   }
 }
 

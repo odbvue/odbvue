@@ -1,11 +1,11 @@
 # Test Environment Configuration
 
 # --- Non-sensitive defaults (edit these) ---
-region                  = "eu-frankfurt-1"
-compartment_ocid        = "ocid1.tenancy.oc1..aaaaaaaady5lphy6q426xcstqyoz6w24c4vk34iynobqm6bfu5fu45v7dcjq"
+region                  = "eu-stockholm-1"
+compartment_ocid        = "ocid1.tenancy.oc1..aaaaaaaaqq6caf32ecspmq3gunerzx6f3hrldykufeggxnark467nidnfnhq"
 db_name                 = "OdbVue"
 display_name            = "OdbVue"
-cpu_core_count          = 1
+cpu_core_count          = 0
 data_storage_tbs        = 1
 license_model           = "LICENSE_INCLUDED"  # Required for free tier
 db_version              = "19c"
