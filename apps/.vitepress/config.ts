@@ -55,6 +55,7 @@ export default defineConfig({
               items: [
                 { text: 'Overview', link: '/guide/i13e/oci/overview' },
                 { text: 'Sign up', link: '/guide/i13e/oci/signup' },
+                { text: 'Manage', link: '/guide/i13e/oci/manage' },
               ],
             },
           ],
