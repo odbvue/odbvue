@@ -6,7 +6,9 @@
 	"scripts": {
 		"status": "tsx scripts/status.ts",
 		"deploy-atp": "tsx scripts/deploy-atp.ts",
-		"download-wallet": "tsx scripts/download-wallet.ts"
+		"deploy-web": "tsx scripts/deploy-web.ts",
+		"download-wallet": "tsx scripts/download-wallet.ts",
+		"check-availability": "tsx scripts/check-availability.ts"
 	},
 	"dependencies": {
 		"oci-sdk": "^2.119.1",

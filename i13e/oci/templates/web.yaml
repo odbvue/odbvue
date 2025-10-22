@@ -1,0 +1,58 @@
+# OCI Web Deployment Configuration
+compartment_id: "ocid1.compartment.oc1..your_compartment_id"
+domain: "example.com"  # Your domain (will create *.domain.com subdomains)
+
+# Compute Instance Configuration
+compute:
+  display_name: "web-server"
+  shape: "VM.Standard.E4.Flex"
+  shape_config:
+    ocpus: 1
+    memory_in_gbs: 16
+  availability_domain: "AD-1"
+  image_id: "ocid1.image.oc1..oracle_linux_8"  # Oracle Linux 8
+  boot_volume_size_in_gbs: 50
+
+# Network Configuration
+network:
+  vcn_display_name: "web-vcn"
+  vcn_cidr_block: "10.0.0.0/16"
+  subnet_display_name: "web-subnet"
+  subnet_cidr_block: "10.0.1.0/24"
+  internet_gateway_display_name: "web-igw"
+  
+  # Route Table Configuration (automatically managed)
+  # The deployment script will automatically add this rule to the default route table:
+  # - destination: "0.0.0.0/0" → internet_gateway
+  # This ensures your compute instances can communicate with the internet
+
+# Security Configuration
+security:
+  security_list_display_name: "web-security-list"
+  ingress_rules:
+    - protocol: "6"  # TCP
+      source: "0.0.0.0/0"
+      source_port_range_min: null
+      source_port_range_max: null
+      destination_port_range_min: 22
+      destination_port_range_max: 22
+      description: "SSH access"
+    - protocol: "6"  # TCP
+      source: "0.0.0.0/0"
+      source_port_range_min: null
+      source_port_range_max: null
+      destination_port_range_min: 80
+      destination_port_range_max: 80
+      description: "HTTP access"
+    - protocol: "6"  # TCP
+      source: "0.0.0.0/0"
+      source_port_range_min: null
+      source_port_range_max: null
+      destination_port_range_min: 443
+      destination_port_range_max: 443
+      description: "HTTPS access"
+
+# SSH Configuration
+ssh:
+  public_key_file: "odbvue_vm.pub"  # Public key for VM access
+  private_key_file: "odbvue_vm"     # Private key for deployment tasks
