@@ -347,11 +347,18 @@ async function main() {
             console.log('resources: []');
             console.log('total_count: 0');
         } else {
+            // Get compartment info for output
+            const compartments = await getAllCompartments();
+            
             // Create YAML structure
             const yamlOutput = {
                 tenancy_id: tenantId,
                 profile: profile,
                 discovery_time: new Date().toISOString(),
+                compartments: compartments.map(comp => ({
+                    name: comp.name,
+                    id: comp.id
+                })),
                 resources: {} as Record<string, any>,
                 summary: {
                     total_count: 0,

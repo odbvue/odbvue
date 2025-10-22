@@ -1,15 +1,15 @@
 {
-	"name": "oci-resource-lister",
+	"name": "i13e-oci",
 	"version": "1.0.0",
-	"description": "OCI Resource Discovery Tool",
+	"description": "OCI Automation Scripts",
 	"main": "scripts/status.ts",
 	"scripts": {
 		"status": "tsx scripts/status.ts",
-		"build": "tsc",
-		"dev": "tsx watch scripts/status.ts"
+		"deploy-atp": "tsx scripts/deploy-atp.ts"
 	},
 	"dependencies": {
-		"oci-sdk": "^2.119.1"
+		"oci-sdk": "^2.119.1",
+		"yaml": "^2.3.0"
 	},
 	"devDependencies": {
 		"@types/node": "^20.0.0",
