@@ -1,0 +1,19 @@
+{
+	"name": "oci-resource-lister",
+	"version": "1.0.0",
+	"description": "OCI Resource Discovery Tool",
+	"main": "scripts/status.ts",
+	"scripts": {
+		"status": "tsx scripts/status.ts",
+		"build": "tsc",
+		"dev": "tsx watch scripts/status.ts"
+	},
+	"dependencies": {
+		"oci-sdk": "^2.119.1"
+	},
+	"devDependencies": {
+		"@types/node": "^20.0.0",
+		"tsx": "^4.0.0",
+		"typescript": "^5.0.0"
+	}
+}
