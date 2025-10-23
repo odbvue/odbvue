@@ -57,7 +57,17 @@ export default defineConfig({
                 { text: 'SSL Certificates', link: '/guide/i13e/assets/ssl-certificates' },
               ],
             },
-            { text: 'Local development', link: '/guide/i13e/local-development' },
+            {
+              text: 'Local development',
+              collapsed: true,
+              items: [
+                {
+                  text: 'Development environment',
+                  link: '/guide/i13e/local-development/development-environment.md',
+                },
+                { text: 'Local database', link: '/guide/i13e/local-development/local-database.md' },
+              ],
+            },
             {
               text: 'Oracle Cloud',
               collapsed: true,
