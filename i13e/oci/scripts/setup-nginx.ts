@@ -151,15 +151,40 @@ http {
         root ${siteConfig.remote_path};
         index index.html index.htm;
 
-        # Handle Vue.js router
-        location / {
-            try_files $uri $uri/ /index.html;
+        # HTML files - no cache, always fresh
+        location ~* \\.html?$ {
+            add_header Cache-Control "public, max-age=0, must-revalidate";
+            try_files $uri $uri/ =404;
         }
 
-        # Static assets with cache
-        location ~* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-            expires 1y;
-            add_header Cache-Control "public, immutable";
+        # JavaScript modules - must be served with correct MIME type
+        location ~* \\.js$ {
+            add_header Cache-Control "public, max-age=31536000, immutable";
+            add_header X-Content-Type-Options "nosniff";
+            types { application/javascript js; }
+        }
+
+        # CSS files with cache
+        location ~* \\.css$ {
+            add_header Cache-Control "public, max-age=31536000, immutable";
+            add_header X-Content-Type-Options "nosniff";
+            types { text/css css; }
+        }
+
+        # Font files with long cache
+        location ~* \\.(woff|woff2|ttf|eot|otf)$ {
+            add_header Cache-Control "public, max-age=31536000, immutable";
+            add_header Access-Control-Allow-Origin "*";
+        }
+
+        # Image files with cache
+        location ~* \\.(png|jpg|jpeg|gif|ico|svg)$ {
+            add_header Cache-Control "public, max-age=31536000, immutable";
+        }
+
+        # Handle VitePress SPA routing - serve index.html for all unknown routes
+        location / {
+            try_files $uri $uri/ /index.html;
         }
 
         # Security

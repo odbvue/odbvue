@@ -48,6 +48,18 @@ class SiteDeployment {
   constructor(configFile: string) {
     const configContent = fs.readFileSync(configFile, 'utf8');
     this.config = yamlParse(configContent) as WebServerConfig;
+    
+    // Validate required configuration sections
+    if (!this.config.access) {
+      throw new Error('Missing required "access" section in configuration. Expected: access.ip and access.user');
+    }
+    if (!this.config.ssh) {
+      throw new Error('Missing required "ssh" section in configuration. Expected: ssh.private_key_file');
+    }
+    if (!this.config.sites) {
+      throw new Error('Missing required "sites" section in configuration. The configuration appears to be an OCI infrastructure template, not a web server deployment configuration.');
+    }
+    
     this.sshKeyPath = path.resolve(path.dirname(configFile), this.config.ssh.private_key_file);
   }
 
@@ -218,26 +230,73 @@ class SiteDeployment {
 
 // Main execution
 function showUsage() {
-  console.log('Usage: node deploy-sites.js <web-server.yaml> [command] [site-name]');
+  console.log('Usage: deploy-sites [options] [command] [site-name]');
+  console.log('');
+  console.log('Options:');
+  console.log('  -c, --config <path>      Path to OCI config directory or file');
+  console.log('  -p, --profile <name>     OCI profile name (default: DEFAULT)');
+  console.log('  -f, --file <path>        Path to web server YAML configuration file');
   console.log('');
   console.log('Commands:');
   console.log('  deploy [site-name]  Deploy all sites or specific site');
   console.log('  status             Show server and deployment status');
   console.log('');
+  console.log('Note: The configuration file must include the following sections:');
+  console.log('  - domain: Your domain name');
+  console.log('  - access: SSH access configuration (ip, user)');
+  console.log('  - ssh: SSH key paths (private_key_file, public_key_file)');
+  console.log('  - sites: Sites to deploy with local/remote paths and subdomains');
+  console.log('  - deployment: Deployment options (backup_existing, restart_service, verify_ssl)');
+  console.log('');
   console.log('Examples:');
-  console.log('  node deploy-sites.js web-server.yaml deploy');
-  console.log('  node deploy-sites.js web-server.yaml deploy apps');
-  console.log('  node deploy-sites.js web-server.yaml status');
+  console.log('  pnpm deploy-sites -c ./.oci/ -p ODBVUE -f ./templates/web-odbvue.yaml deploy');
+  console.log('  pnpm deploy-sites -c ./.oci/ -p ODBVUE -f ./templates/web-odbvue.yaml deploy apps');
+  console.log('  pnpm deploy-sites -c ./.oci/ -p ODBVUE -f ./templates/web-odbvue.yaml status');
 }
 
-if (process.argv.length < 3) {
+// Parse arguments
+function parseArgs() {
+  const args = process.argv.slice(2);
+  const options: Record<string, string> = {};
+  const positional: string[] = [];
+  
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    
+    if (arg.startsWith('-')) {
+      const key = arg.replace(/^--?/, '');
+      const nextArg = args[i + 1];
+      
+      if (nextArg && !nextArg.startsWith('-')) {
+        options[key] = nextArg;
+        i++;
+      } else {
+        options[key] = 'true';
+      }
+    } else {
+      positional.push(arg);
+    }
+  }
+  
+  return { options, positional };
+}
+
+const { options, positional } = parseArgs();
+
+// Resolve config file path
+let configFile: string;
+
+if (options.f || options.file) {
+  configFile = path.resolve(options.f || options.file);
+} else if (positional.length > 0 && !['deploy', 'status'].includes(positional[0])) {
+  configFile = path.resolve(positional[0]);
+} else {
   showUsage();
   process.exit(1);
 }
 
-const configFile = process.argv[2];
-const command = process.argv[3] || 'deploy';
-const siteName = process.argv[4];
+const command = positional.find(arg => ['deploy', 'status'].includes(arg)) || 'deploy';
+const siteName = positional.find(arg => !['deploy', 'status'].includes(arg) && arg !== configFile);
 
 if (!fs.existsSync(configFile)) {
   console.error(`❌ Configuration file not found: ${configFile}`);

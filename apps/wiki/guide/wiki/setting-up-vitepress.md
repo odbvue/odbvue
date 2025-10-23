@@ -23,7 +23,7 @@ pnpm vitepress init
 │  ./
 │
 ◇  Where should VitePress look for your markdown files?
-│  ../wiki
+│  ./wiki
 │
 ◇  Site title:
 │  OdbVue
@@ -69,26 +69,7 @@ This will create all vitepress configuration in `./apps/.vitpress/`, but the doc
   globalIgnores(['**/dist/**', '**/dist-ssr/**', '**/coverage/**', '**/cache/**']),
 ```
 
-6. Add build dependencies to vitepress configuration `./apps/.vitepress/config.ts`
-
-```ts{7-13}
-import { defineConfig } from 'vitepress'
-
-// https://vitepress.dev/reference/site-config
-export default defineConfig({
-  //existing configuration
-
-  vite: {
-    build: {
-      rollupOptions: {
-        external: ['vue/server-renderer','vue']
-      }
-    },
-  },
-})  
-```
-
-7. For now disable linting errors in theme customization `./apps/.vitepress/theme/index.ts`
+6. For now disable linting errors in theme customization `./apps/.vitepress/theme/index.ts`
 
 ```ts{14}
 // https://vitepress.dev/guide/custom-theme
