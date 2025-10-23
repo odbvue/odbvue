@@ -4,8 +4,72 @@
 // Process @[prezi](preziID)
 // Process @[osf](guid)
 
+interface VideoOptions {
+  [key: string]: any;
+  url: (service: string, videoID: string, url: string, options: VideoOptions) => string;
+  youtube: {
+    width: string;
+    height: string;
+    nocookie: boolean;
+    parameters?: { [key: string]: any };
+  };
+  vimeo: {
+    width: number;
+    height: number;
+  };
+  vine: {
+    width: number;
+    height: number;
+    embed: string;
+  };
+  prezi: {
+    width: number;
+    height: number;
+  };
+  osf: {
+    width: string;
+    height: string;
+  };
+}
+
+interface MarkdownIt {
+  helpers: {
+    parseLinkLabel: (state: any, start: number, disableNested: boolean) => number;
+  };
+  utils: {
+    escapeHtml: (str: string) => string;
+  };
+  renderer: {
+    rules: { [key: string]: any };
+  };
+  inline: {
+    ruler: {
+      before: (beforeName: string, ruleName: string, rule: any) => void;
+    };
+    State: any;
+    tokenize: (state: any) => void;
+  };
+}
+
+interface State {
+  src: string;
+  pos: number;
+  level: number;
+  md: MarkdownIt;
+  env: any;
+  service?: string;
+  push: (type: string, tag: string) => Token;
+}
+
+interface Token {
+  videoID: string;
+  service: string;
+  url: string;
+  level: number;
+}
+
 const ytRegex = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/
-function youtubeParser(url) {
+function youtubeParser(url: string): string {
   const match = url.match(ytRegex)
   return match && match[7].length === 11 ? match[7] : url
 }
@@ -13,19 +77,19 @@ function youtubeParser(url) {
 const vimeoRegex =
   /https?:\/\/(?:www\.|player\.)?vimeo.com\/(?:channels\/(?:\w+\/)?|groups\/([^/]*)\/videos\/|album\/(\d+)\/video\/|)(\d+)(?:$|\/|\?)/
 
-function vimeoParser(url) {
+function vimeoParser(url: string): string {
   const match = url.match(vimeoRegex)
   return match && typeof match[3] === 'string' ? match[3] : url
 }
 
 const vineRegex = /^http(?:s?):\/\/(?:www\.)?vine\.co\/v\/([a-zA-Z0-9]{1,13}).*/
-function vineParser(url) {
+function vineParser(url: string): string {
   const match = url.match(vineRegex)
   return match && match[1].length === 11 ? match[1] : url
 }
 
 const preziRegex = /^https:\/\/prezi.com\/(.[^/]+)/
-function preziParser(url) {
+function preziParser(url: string): string {
   const match = url.match(preziRegex)
   return match ? match[1] : url
 }
@@ -33,15 +97,15 @@ function preziParser(url) {
 // TODO: Write regex for staging and local servers.
 const mfrRegex =
   /^http(?:s?):\/\/(?:www\.)?mfr\.osf\.io\/render\?url=http(?:s?):\/\/osf\.io\/([a-zA-Z0-9]{1,5})\/\?action=download/
-function mfrParser(url) {
+function mfrParser(url: string): string {
   const match = url.match(mfrRegex)
   return match ? match[1] : url
 }
 
 const EMBED_REGEX = /@\[([a-zA-Z].+)]\([\s]*(.*?)[\s]*[)]/im
 
-function videoEmbed(md, options) {
-  function videoReturn(state, silent) {
+function videoEmbed(md: MarkdownIt, options: VideoOptions) {
+  function videoReturn(state: State, silent: boolean): boolean {
     let token
     let videoID
     const theState = state
@@ -110,8 +174,8 @@ function videoEmbed(md, options) {
   return videoReturn
 }
 
-function extractVideoParameters(url) {
-  const parameterMap = new Map()
+function extractVideoParameters(url: string): Map<string, string> {
+  const parameterMap = new Map<string, string>()
   const params = url.replace(/&amp;/gi, '&').split(/[#?&]/)
 
   if (params.length > 1) {
@@ -124,13 +188,13 @@ function extractVideoParameters(url) {
   return parameterMap
 }
 
-function videoUrl(service, videoID, url, options) {
+function videoUrl(service: string, videoID: string, url: string, options: VideoOptions): string {
   switch (service) {
     case 'youtube': {
       const parameters = extractVideoParameters(url)
       if (options.youtube.parameters) {
         Object.keys(options.youtube.parameters).forEach((key) => {
-          parameters.set(key, options.youtube.parameters[key])
+          parameters.set(key, options.youtube.parameters![key])
         })
       }
 
@@ -142,12 +206,14 @@ function videoUrl(service, videoID, url, options) {
         const timeParts = timeParameter.match(/[0-9]+/g)
         let j = 0
 
-        while (timeParts.length > 0) {
-          startTime += Number(timeParts.pop()) * Math.pow(60, j)
+        if (timeParts) {
+          while (timeParts.length > 0) {
+            startTime += Number(timeParts.pop()) * Math.pow(60, j)
 
-          j += 1
+            j += 1
+          }
         }
-        parameters.set('start', startTime)
+        parameters.set('start', startTime.toString())
         parameters.delete('t')
       }
 
@@ -184,8 +250,8 @@ function videoUrl(service, videoID, url, options) {
   }
 }
 
-function tokenizeVideo(md, options) {
-  function tokenizeReturn(tokens, idx) {
+function tokenizeVideo(md: MarkdownIt, options: VideoOptions) {
+  function tokenizeReturn(tokens: Token[], idx: number): string {
     const videoID = md.utils.escapeHtml(tokens[idx].videoID)
     const service = md.utils.escapeHtml(tokens[idx].service).toLowerCase()
     const checkUrl =
@@ -224,21 +290,21 @@ function tokenizeVideo(md, options) {
 
     return videoID === ''
       ? ''
-      : '<span class="embed-responsive embed-responsive-16by9"><iframe class="embed-responsive-item ' +
+      : '<iframe class="' +
           service +
           '-player" type="text/html" width="' +
           options[service].width +
           '" height="' +
           options[service].height +
-          '" src="' +
+          '" style="aspect-ratio: 16/9; width: 100%; max-width: 100%; border: 0; display: block; margin: 1em auto;" src="' +
           options.url(service, videoID, tokens[idx].url, options) +
-          '"></iframe></span>'
+          '"></iframe>'
   }
 
   return tokenizeReturn
 }
 
-const defaults = {
+const defaults: VideoOptions = {
   url: videoUrl,
   youtube: { width: '100%', height: '100%', nocookie: false },
   vimeo: { width: 500, height: 281 },
@@ -247,17 +313,15 @@ const defaults = {
   osf: { width: '100%', height: '100%' },
 }
 
-export default function (md, options) {
-  let theOptions = options
+export default function (md: MarkdownIt, options?: Partial<VideoOptions>) {
+  let theOptions: VideoOptions = { ...defaults }
   const theMd = md
-  if (theOptions) {
-    Object.keys(defaults).forEach(function checkForKeys(key) {
-      if (typeof theOptions[key] === 'undefined') {
-        theOptions[key] = defaults[key]
+  if (options) {
+    Object.keys(options).forEach(function checkForKeys(key) {
+      if (typeof (options as any)[key] !== 'undefined') {
+        (theOptions as any)[key] = (options as any)[key]
       }
     })
-  } else {
-    theOptions = defaults
   }
   theMd.renderer.rules.video = tokenizeVideo(theMd, theOptions)
   theMd.inline.ruler.before('emphasis', 'video', videoEmbed(theMd, theOptions))

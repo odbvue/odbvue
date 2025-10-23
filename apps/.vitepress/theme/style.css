@@ -137,19 +137,3 @@
   --docsearch-primary-color: var(--vp-c-brand-1) !important;
 }
 
-/**
- * Markdown Extension: Responsive Video
- * -------------------------------------------------------------------------- */
-
-.embed-responsive-16by9 {
-  padding-top: 56.25%;
-  position: relative;
-  display: block;
-}
-
-.embed-responsive-item {
-  position: absolute;
-  top: 0;
-  left: 0;
-  border: 0px;
-}

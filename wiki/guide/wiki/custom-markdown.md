@@ -10,24 +10,7 @@ Here is an example of how to embed a YouTube video using custom markdown. Use th
 <<< ../../../apps/.vitepress/markdown-it-video.ts
 :::
 
-2. Append classes to `/apps/.vitepress/theme/style.css`
-
-```css
-.embed-responsive-16by9 {
-  padding-top: 56.25%;
-  position: relative;
-  display: block;
-}
-
-.embed-responsive-item {
-  position: absolute;
-  top: 0;
-  left: 0;
-  border: 0px;
-}
-```
-
-3. Include extension in `/apps/.vitepress/config.ts`
+2. Include extension in `/apps/.vitepress/config.ts`
 
 ```ts{2,8-12}
 import { defineConfig } from "vitepress"
@@ -46,6 +29,6 @@ export default defineConfig({
 
 ```
 
-4. Enjoy
+3. Enjoy
 
 @[youtube](mSd9nmPM7Vg)
