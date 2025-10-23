@@ -6,8 +6,8 @@ Here is an example of how to embed a YouTube video using custom markdown. Use th
 
 1. Create markdown extension
 
-::: details `./apps/.vitepress/markdown-it-video.ts`
-<<< ../../../apps/.vitepress/markdown-it-video.ts
+::: details `./.vitepress/markdown-it-video.ts`
+<<< ../../../.vitepress/markdown-it-video.ts
 :::
 
 2. Include extension in `/apps/.vitepress/config.ts`

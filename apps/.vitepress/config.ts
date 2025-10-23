@@ -2,7 +2,7 @@ import { defineConfig } from 'vitepress'
 import videoPlugin from './markdown-it-video'
 
 export default defineConfig({
-  srcDir: '../wiki',
+  srcDir: './wiki',
 
   title: 'OdbVue',
   description: 'Take Ownership of Your Future',
@@ -78,14 +78,6 @@ export default defineConfig({
   markdown: {
     config: (md) => {
       md.use(videoPlugin)
-    },
-  },
-
-  vite: {
-    build: {
-      rollupOptions: {
-        external: ['vue/server-renderer', 'vue'],
-      },
     },
   },
 })
