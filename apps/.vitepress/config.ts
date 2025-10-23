@@ -48,6 +48,15 @@ export default defineConfig({
         {
           text: 'Infrastructure',
           items: [
+            { text: 'Architecture', link: '/guide/i13e/architecture' },
+            {
+              text: 'Assets',
+              collapsed: true,
+              items: [
+                { text: 'Domain name', link: '/guide/i13e/assets/domain-name' },
+                { text: 'SSL Certificates', link: '/guide/i13e/assets/ssl-certificates' },
+              ],
+            },
             { text: 'Local development', link: '/guide/i13e/local-development' },
             {
               text: 'Oracle Cloud',

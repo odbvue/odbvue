@@ -5,67 +5,67 @@
 // Process @[osf](guid)
 
 interface VideoOptions {
-  [key: string]: any;
-  url: (service: string, videoID: string, url: string, options: VideoOptions) => string;
+  [key: string]: any
+  url: (service: string, videoID: string, url: string, options: VideoOptions) => string
   youtube: {
-    width: string;
-    height: string;
-    nocookie: boolean;
-    parameters?: { [key: string]: any };
-  };
+    width: string
+    height: string
+    nocookie: boolean
+    parameters?: { [key: string]: any }
+  }
   vimeo: {
-    width: number;
-    height: number;
-  };
+    width: number
+    height: number
+  }
   vine: {
-    width: number;
-    height: number;
-    embed: string;
-  };
+    width: number
+    height: number
+    embed: string
+  }
   prezi: {
-    width: number;
-    height: number;
-  };
+    width: number
+    height: number
+  }
   osf: {
-    width: string;
-    height: string;
-  };
+    width: string
+    height: string
+  }
 }
 
 interface MarkdownIt {
   helpers: {
-    parseLinkLabel: (state: any, start: number, disableNested: boolean) => number;
-  };
+    parseLinkLabel: (state: any, start: number, disableNested: boolean) => number
+  }
   utils: {
-    escapeHtml: (str: string) => string;
-  };
+    escapeHtml: (str: string) => string
+  }
   renderer: {
-    rules: { [key: string]: any };
-  };
+    rules: { [key: string]: any }
+  }
   inline: {
     ruler: {
-      before: (beforeName: string, ruleName: string, rule: any) => void;
-    };
-    State: any;
-    tokenize: (state: any) => void;
-  };
+      before: (beforeName: string, ruleName: string, rule: any) => void
+    }
+    State: any
+    tokenize: (state: any) => void
+  }
 }
 
 interface State {
-  src: string;
-  pos: number;
-  level: number;
-  md: MarkdownIt;
-  env: any;
-  service?: string;
-  push: (type: string, tag: string) => Token;
+  src: string
+  pos: number
+  level: number
+  md: MarkdownIt
+  env: any
+  service?: string
+  push: (type: string, tag: string) => Token
 }
 
 interface Token {
-  videoID: string;
-  service: string;
-  url: string;
-  level: number;
+  videoID: string
+  service: string
+  url: string
+  level: number
 }
 
 const ytRegex = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/
@@ -319,7 +319,7 @@ export default function (md: MarkdownIt, options?: Partial<VideoOptions>) {
   if (options) {
     Object.keys(options).forEach(function checkForKeys(key) {
       if (typeof (options as any)[key] !== 'undefined') {
-        (theOptions as any)[key] = (options as any)[key]
+        ;(theOptions as any)[key] = (options as any)[key]
       }
     })
   }
