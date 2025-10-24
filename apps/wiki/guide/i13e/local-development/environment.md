@@ -6,7 +6,7 @@ This is recommended toolset for OdbVue projects. Main concept - all in one singl
 
 Minimal setup: 4 CPU cores, 8Gb RAM.
 
-Optimal resources - to run local database: 8 CPU cores, 16Gb RAM. 
+Optimal resources - to run development database in local container: 8 CPU cores, 16Gb RAM. 
 
 ## Tools
 

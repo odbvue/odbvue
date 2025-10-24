@@ -6,26 +6,60 @@ Local web server environment using Podman and Nginx. Serves static site content 
 
 - **Podman** installed (Windows: WSL2 + Podman, Linux/Mac: Podman)
 
-## Configuration
+## Prepare environment
 
-### Adjust Port
+### Step 1. Create static initial `./html/index.html`
 
-Edit `compose.yaml`:
-```yaml
-ports:
-  - "8080:80"    # Change first number to desired host port (e.g., "3000:80")
-```
+::: details `./html/index.html`
+<<<../../../../../i13e/local/web/html/index.html
+:::
 
-### Adjust Container Name
+### Step 2. Create Nginx configuration file
 
-Edit `compose.yaml`:
-```yaml
-container_name: odbvue-web    # Change to desired name
-```
+::: details  `./nginx.conf`
+<<<../../../../../i13e/local/web/nginx.conf {ini}
+:::
+
+### Step 3. Create Dockerfile
+
+::: details `./Dockerfile`
+<<<../../../../../i13e/local/web/Dockerfile
+:::
+
+### Step 4. Create Compose file
+
+::: details `./compose.yaml`
+<<<../../../../../i13e/local/web/compose.yaml
+:::
+
+> [!NOTE]
+> You can adjust other port than 8080 if needed, or if running multiple web servers
+
+### Step 5. Create Empty folder `./releases` and add it to Git ignore
+
+::: details `./.gitignore`
+<<<../../../../../i13e/local/web/.gitignore {ini}
+:::
 
 ## Usage
 
+### Scripts
+
+::: details `./build.sh`
+<<<../../../../../i13e/local/web/build.sh
+:::
+
+::: details `./deploy.sh`
+<<<../../../../../i13e/local/web/deploy.sh
+:::
+
+::: details `./remove.sh`
+<<<../../../../../i13e/local/web/remove.sh
+:::
+
 ### Build & Run
+
+Start container with web server:
 
 ```bash
 ./build.sh
@@ -57,20 +91,11 @@ Deploy website content to the running container:
 
 ### Stop and Remove
 
+Remove container with web server:
+
 ```bash
 ./remove.sh [container-name]
 ```
-
-## Files
-
-| File | Purpose |
-|------|---------|
-| `compose.yaml` | Podman Compose configuration |
-| `Dockerfile` | Multi-stage Nginx Alpine build |
-| `nginx.conf` | Nginx server config (SPA routing, security headers) |
-| `build.sh` | Start container |
-| `remove.sh` | Stop and remove container |
-| `deploy.sh` | Deploy new release |
 
 ## Troubleshooting
 

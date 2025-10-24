@@ -23,9 +23,7 @@ WALLET_PASSWORD="MySecurePass123#"
 
 Create `./Dockerfile` (with capital D):
 
-```dockerfile
-FROM container-registry.oracle.com/database/adb-free:latest-23ai
-```
+<<<../../../../../i13e/local/db/Dockerfile
 
 This pulls from [Oracle Container Registry](https://container-registry.oracle.com/ords/ocr/ba/database). As of mid 2025:
 - `:latest` = Oracle 19c
@@ -35,26 +33,7 @@ This pulls from [Oracle Container Registry](https://container-registry.oracle.co
 
 Create `./compose.yaml`:
 
-```yaml
-services:
-  odbvue-db:
-    build:
-      context: .
-    container_name: odbvue-db-dev
-    ports:
-      - "1521:1521"
-      - "1522:1522"
-      - "8443:8443"
-      - "27017:27017"
-    environment:
-      WORKLOAD_TYPE: ${WORKLOAD_TYPE:-ATP}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-      WALLET_PASSWORD: ${WALLET_PASSWORD}
-    cap_add:
-      - SYS_ADMIN
-    devices:
-      - "/dev/fuse:/dev/fuse"
-```
+<<<../../../../../i13e/local/db/compose.yaml
 
 > [!NOTE]
 > If running several databases locally, adjust different ports or use only one at the time
@@ -81,7 +60,7 @@ If all is good, the Oracle Rest Data Services landing page will be up and runnin
 
 From VS Code using [Oracle SQL Developer Extension for VSCode](https://marketplace.visualstudio.com/items?itemName=Oracle.sql-developer)
 
-1. Get the wallet file 
+### Step 1. Get the wallet file 
 
 ```bash
 podman cp myapp-oracle-db-dev:/u01/app/oracle/wallets/tls_wallet ./tls_wallet
@@ -92,6 +71,6 @@ And zip all the contents into `./wallet.zip`
 > [!WARNING]
 > Make sure that `*.zip` are gitignored
 
-2. Set up connection with Connection type as `Cloud Wallet` and choose created zip file.
+### Step 2. Set up connection with Connection type as `Cloud Wallet` and choose created zip file.
 
-![Connect to Database](./local-database.png)
+![Connect to Database](./database.png)

@@ -61,12 +61,10 @@ export default defineConfig({
               text: 'Local development',
               collapsed: true,
               items: [
-                {
-                  text: 'Development environment',
-                  link: '/guide/i13e/local-development/development-environment.md',
-                },
-                { text: 'Local database', link: '/guide/i13e/local-development/local-database.md' },
-                { text: 'Local web', link: '/guide/i13e/local-development/local-web.md' },
+                { text: 'Environment', link: '/guide/i13e/local-development/environment.md' },
+                { text: 'Podman Containers', link: '/guide/i13e/local-development/podman.md' },
+                { text: 'Local database', link: '/guide/i13e/local-development/database.md' },
+                { text: 'Local web', link: '/guide/i13e/local-development/web.md' },
               ],
             },
             {
