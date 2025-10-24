@@ -66,6 +66,7 @@ export default defineConfig({
                   link: '/guide/i13e/local-development/development-environment.md',
                 },
                 { text: 'Local database', link: '/guide/i13e/local-development/local-database.md' },
+                { text: 'Local web', link: '/guide/i13e/local-development/local-web.md' },
               ],
             },
             {
