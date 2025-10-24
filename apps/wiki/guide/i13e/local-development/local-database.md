@@ -2,35 +2,45 @@
 
 ## Prerequisites
 
-Either Docker or Podman installed. Will use Podman, but it should work the same for Docker. For MS Windows it will require Setting up Windows Subsystem for Linux first.
+- Docker or Podman installed (guide uses Podman, but Docker works the same)
+- Recommended: 4+ CPU cores and 8GB RAM for smooth development
 
-And to have smooth developer experience - at least 4 CPU cores and 8Gb of RAM should be available.
+## Prepare environment
 
-## Launch Database
+### Step 1. Create `.env` file
 
-1. Create `./.env` file with passwords for Oracle Database.
+Create `.env` with passwords for Oracle Database:
 
 ```ini
-ADMIN_PASSWORD=myStrongAdmPassword2025
-WALLET_PASSWORD=myStrongWltPassword2025
+ADMIN_PASSWORD="MySecurePass123#"
+WALLET_PASSWORD="MySecurePass123#"
 ```
 
-2. Create `./Dockerfile` (with capital `D`)
+> [!WARNING]
+> Always make sure that `.env` are gitignored
+
+### Step 2. Create `Dockerfile`
+
+Create `./Dockerfile` (with capital D):
 
 ```dockerfile
 FROM container-registry.oracle.com/database/adb-free:latest-23ai
 ```
 
-It will pull image from [Oracle Container Registry](https://container-registry.oracle.com/ords/ocr/ba/database). As of mid 2025, the `:latest` will get 19c while `:latest-23ai` will get all the goodies of out of the box AI capabilities in Oracle Database.
+This pulls from [Oracle Container Registry](https://container-registry.oracle.com/ords/ocr/ba/database). As of mid 2025:
+- `:latest` = Oracle 19c
+- `:latest-23ai` = Oracle 23ai with built-in AI capabilities
 
-3. Create `./compose.yaml`
+### Step 3. Create `compose.yaml`
+
+Create `./compose.yaml`:
 
 ```yaml
 services:
-  oracle-db:
+  odbvue-db:
     build:
       context: .
-    container_name: myapp-oracle-db-dev
+    container_name: odbvue-db-dev
     ports:
       - "1521:1521"
       - "1522:1522"
@@ -46,13 +56,18 @@ services:
       - "/dev/fuse:/dev/fuse"
 ```
 
-4. Run command to build and create container
+> [!NOTE]
+> If running several databases locally, adjust different ports or use only one at the time
+
+## Launch database
+
+### Step 1. Run command to build and create container
 
 ```bash
 podman compose up -d --build
 ```
 
-5. Wait until installation finishes. It can take a while.
+### Step 2. Wait until installation finishes. It can take a while.
 
 Progress can be monitored from command line. 
 
@@ -69,10 +84,13 @@ From VS Code using [Oracle SQL Developer Extension for VSCode](https://marketpla
 1. Get the wallet file 
 
 ```bash
-podman cp myapp-oracle-db-dev:/u01/app/oracle/wallets/tls_wallet ./wallets/myapp
+podman cp myapp-oracle-db-dev:/u01/app/oracle/wallets/tls_wallet ./tls_wallet
 ```
 
-And zip all the contents into `./wallets/myapp/wallet.zip`
+And zip all the contents into `./wallet.zip`
+
+> [!WARNING]
+> Make sure that `*.zip` are gitignored
 
 2. Set up connection with Connection type as `Cloud Wallet` and choose created zip file.
 
