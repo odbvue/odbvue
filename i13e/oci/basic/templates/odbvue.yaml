@@ -1,0 +1,63 @@
+# Compartment Configuration, if not specified, the default compartment of the tenancy will be used.
+# compartmentId: ocid1.tenancy.oc1..aaaa.. 
+
+# Autonomous Database Configuration
+autonomousDatabase:
+  dbName: "odbvue2"
+  displayName: "odbvue-adb"
+  adminPassword: "MySecurePass123#"
+  walletPassword: "MySecurePass123#"
+  cpuCoreCount: 1
+  dataStorageSizeInTBs: 1
+  dbWorkload: "OLTP"
+  isFreeTier: true
+  isAutoScalingEnabled: false
+  licenseModel: "LICENSE_INCLUDED"
+#  whitelistedIps:
+#    - "0.0.0.0/0"
+
+# Compute Instance Configuration
+compute:
+  display_name: "odbvue-web-server"
+  shape: "VM.Standard.E3.Flex"  # x86-64 AMD EPYC, good fallback
+  shape_config:
+    ocpus: 1
+    memory_in_gbs: 16  # x86 shape memory ratio
+  availability_domain: "VWhU:EU-STOCKHOLM-1-AD-1"
+  image_id: "ocid1.image.oc1.eu-stockholm-1.aaaaaaaae5bn2sptrsl7btkmk3eyzhhs6glq2iplgmjkxwq2rvgz4zc7wtma"  # Oracle-Linux-8.10-2025.09.16-0
+  boot_volume_size_in_gbs: 50
+
+# Network Configuration
+network:
+  vcn_display_name: "odbvue-web-vcn"
+  vcn_cidr_block: "10.0.0.0/16"
+  subnet_display_name: "odbvue-web-subnet"
+  subnet_cidr_block: "10.0.1.0/24"
+  internet_gateway_display_name: "odbvue-web-igw"
+
+# Security Configuration
+security:
+  security_list_display_name: "odbvue-web-security-list"
+  ingress_rules:
+    - protocol: "6"  # TCP
+      source: "0.0.0.0/0"
+      source_port_range_min: null
+      source_port_range_max: null
+      destination_port_range_min: 22
+      destination_port_range_max: 22
+      description: "SSH access"
+    - protocol: "6"  # TCP
+      source: "0.0.0.0/0"
+      source_port_range_min: null
+      source_port_range_max: null
+      destination_port_range_min: 80
+      destination_port_range_max: 80
+      description: "HTTP access"
+    - protocol: "6"  # TCP
+      source: "0.0.0.0/0"
+      source_port_range_min: null
+      source_port_range_max: null
+      destination_port_range_min: 443
+      destination_port_range_max: 443
+      description: "HTTPS access"
+

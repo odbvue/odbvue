@@ -1,0 +1,9 @@
+# Local OCI Configuration and Credentials
+.oci/
+
+# Node modules
+node_modules/
+
+# Wallet files
+wallets/
+*.zip

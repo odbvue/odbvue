@@ -1,0 +1,15 @@
+{
+	"scripts": {
+		"oci:status": "tsx oci-get-status.ts",
+		"oci:adb": "tsx oci-manage-adb.ts"
+	},
+	"dependencies": {
+		"@types/js-yaml": "^4.0.9",
+		"@types/node": "^24.9.1",
+		"js-yaml": "^4.1.0",
+		"oci-sdk": "^2.119.1"
+	},
+	"devDependencies": {
+		"tsx": "^4.20.6"
+	}
+}
