@@ -1,14 +1,88 @@
-# Manage OCI - Basic
+﻿# OCI Terraform Basic Setup
 
-This setup is suited for basic infrastructure - several Database and Compute instances, no load balancing.
+## Topology
 
-## Prepare environment
+```
+┌─ Compartment: odbvue-test ─────────────────────────────────────────────────┐
+│                                                                            │
+│  ┌─ VCN: 10.0.0.0/24 ──────────────────────────────────────────────────┐   │
+│  │  ┌─ Public Subnet: 10.0.0.0/24 ─────────────────────────────────┐   │   │
+│  │  │                                                              │   │   │
+│  │  │  ┌─ Compute Instance ────────────────────────────────────┐   │   │   │
+│  │  │  │  Shape: VM.Standard.E5.Flex                           │   │   │   │
+│  │  │  │  OCPUs: 1, Memory: 4GB                                │   │   │   │
+│  │  │  │  Image: Oracle Linux 9                                │   │   │   │
+│  │  │  │  Display Name: odbvue-web                             │   │   │   │
+│  │  │  │                                                       │   │   │   │
+│  │  │  │  Attached VNIC (primary)                              │   │   │   │
+│  │  │  │  └─ Private IP: 10.0.0.x (DHCP)                       │   │   │   │
+│  │  │  │  └─ Public IP: Reserved                               │   │   │   │
+│  │  │  │  └─ NSG: odbvue-nsg-web                               │   │   │   │
+│  │  │  │                                                       │   │   │   │
+│  │  │  │  INGRESS Rules:                                       │   │   │   │
+│  │  │  │    • TCP 80 (HTTP): 0.0.0.0/0                         │   │   │   │
+│  │  │  │    • TCP 443 (HTTPS): 0.0.0.0/0                       │   │   │   │
+│  │  │  │    • TCP 22 (SSH): 0.0.0.0/0                          │   │   │   │
+│  │  │  │                                                       │   │   │   │
+│  │  │  │  EGRESS Rules:                                        │   │   │   │
+│  │  │  │    • All protocols: 0.0.0.0/0 (all)                   │   │   │   │
+│  │  │  └───────────────────────────────────────────────────────┘   │   │   │
+│  │  │                                                              │   │   │
+│  │  │  ┌─ Internet Gateway (igw) ──────────────────────────────┐   │   │   │
+│  │  │  │  Routes all 0.0.0.0/0 outbound                        │   │   │   │
+│  │  │  └───────────────────────────────────────────────────────┘   │   │   │
+│  │  │                                                              │   │   │
+│  │  └──────────────────────────────────────────────────────────────┘   │   │
+│  │                                                                     │   │
+│  │  Route Table: odbvue-rt                                             │   │
+│  │    • Destination: 0.0.0.0/0 → IGW                                   │   │
+│  │                                                                     │   │
+│  │  DHCP Options: DNS-Options                                          │   │
+│  │    • Domain Name Server: VcnLocalPlusInternet                       │   │
+│  │    • Search Domain: vcn.oraclevcn.com                               │   │
+│  │                                                                     │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                            │
+│  ┌─ Autonomous Database (ADB) ─────────────────────────────────────────┐   │
+│  │  Display Name: odbvue-adb                                           │   │
+│  │  Workload Type: OLTP (default)                                      │   │
+│  │  CPU Count: 1 (Always Free eligible)                                │   │
+│  │  Storage: 1 TB (Always Free eligible)                               │   │
+│  │  Backup: Automatic (7 days retention)                               │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                            │
+│  ┌─ Email Delivery (Optional) ──────────────────────────────────────────┐  │
+│  │  Service: Email Delivery                                             │  │
+│  │  SMTP Endpoint: email-smtp.{region}.oci.oraclecloud.com:587          │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                            │
+│  ┌─ Object Storage ─────────────────────────────────────────────────────┐  │
+│  │  Bucket: odbvue-bucket                                               │  │
+│  │  Tier: Standard                                                      │  │
+│  │  Versioning: Enabled (optional)                                      │  │
+│  └───────────────────────────────────────────────────── ────────────────┘  │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+```
 
-### Step 1. Configure Credentials
+> [!Note]
+> This setup allows SSH connections (port 22) from anywhere. For production environments either limit to whitelisted IP addresses or use Oracle Bastion.
 
-1. Create `./.oci/` directory
-2. Save your private key files as `./.oci/{keyname}.pem`
-3. Create `./.oci/config` with your profile:
+## Prepare Environment
+
+### Step 1. Get OCI Config
+
+1. Create `./.oci/` directory in Home directory.
+
+2. Login to the OCI Console.
+
+3. Click your **User icon** → **User Settings**.
+
+4. Go to **Tokens and keys** → **Add API Key** → **Generate key pair in console**.
+
+5. **Download the private key** → save as ~/.oci/default_key.pem.
+
+6. **Copy and save details** to  `./.oci/config`.
 
 ```ini
 [DEFAULT]
@@ -41,34 +115,77 @@ key_file=~/.oci/prod_key.pem
 > [!NOTE] 
 > Use Linux-style paths in `key_file` even on Windows.
 
----
+### Step 2. Generate SSH Key
 
-### Todo
+```bash
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/odbvue -N ""
+```
+Keys will be saved to `~/.ssh`.
 
-<<< ./.gitignore
+### Step 3. Install Terraform
 
-pnpm install oci-sdk
-pnpm add @types/node
-pnpm add -D tsx
-pnpm approve-builds
-pnpm add js-yaml @types/js-yaml
+[Install Terraform](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli)
 
-config.yaml
+For Windows:
 
-[!NOTE] Secrets
+```powershell
+winget install HashiCorp.Terraform
+```
 
-./args.ts
-./provider.ts
-./config.ts
+After installation check that it works:
 
-oci-get-status.ts -p DEFAULT
+```bash
+terraform -v
+```
 
-oci-manage-adb.ts -p DEFAULT -w ./templates/odbvue.yaml -a list
-oci-manage-adb.ts -p DEFAULT -w ./templates/odbvue.yaml -a plan
-oci-manage-adb.ts -p DEFAULT -w ./templates/odbvue.yaml -a apply
-oci-manage-adb.ts -p DEFAULT -w ./templates/odbvue.yaml -a destroy
-oci-manage-adb.ts -p DEFAULT -w ./templates/odbvue.yaml -a wallet -o ./wallets/odbvue.zip
+### Step 4. Configure terraform.tfvars
 
-package.json scripts 
----
+Copy `terraform.tfvars.example` to `terraform.tfvars` and update with your values.
 
+## Usage
+
+### Initial setup (once)
+
+```bash
+cd terraform
+terraform init
+```
+
+### Apply changes to infrastructure
+
+```bash
+terraform plan
+```
+
+```bash
+terraform apply
+```
+
+### Destroy everything (if needed)
+
+```bash
+terraform destroy
+```
+
+## Terraform files
+
+Terraform files:
+- **provider.tf** - Configures OCI provider with authentication profile and region
+- **versions.tf** - Specifies Terraform and provider version requirements
+- **variables.tf** - Input variables for OCI profile, region, credentials, ADB, email, and resource names
+- **oci_config.tf** - Deprecated (use variables.tf)
+- **compartment.tf** - Creates or retrieves OCI compartment "odbvue-test"
+- **networking.tf** - VCN, Internet Gateway, route tables, DHCP options, subnet, and NSG with firewall rules
+- **compute.tf** - Oracle Linux 9 VM instance with NGINX, SSH configuration, and cloud-init setup
+- **public_ip.tf** - Reserves and attaches public IP to compute instance
+- **adb.tf** - Autonomous Database (Always Free), wallet generation and download
+- **email.tf** - Optional Email Delivery approved sender (if `var.email_sender` set)
+- **objectstorage.tf** - Object Storage bucket with restricted access
+- **outputs.tf** - Exports instance IPs, ADB connection info, and storage hints
+- **terraform.tfvars** - Configuration file with sensitive values (not in version control)
+- **terraform.tfvars.example** - Template showing required variables
+- **terraform.tfstate** - Terraform state file (auto-managed)
+- **terraform.tfstate.backup** - State file backup
+
+> [!NOTE] 
+> Make sure that `.gitignore` exists and prevents secrets and terraform state from being submitted to git.

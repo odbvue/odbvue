@@ -1,119 +1,249 @@
-# Manage OCI
+# OCI Terraform Basic Setup
 
-This guide will provide how to manage Oracle Cloud Infrastructure (OCI) resources remotely using Terraform (Infrastructure as a code) 
+This setup will create and manage changes for a separate Compartment with single Autonomous Database, Public IP Address, Publicly Accessible Web server with Nginx and static site, Object storage and Email sending capabilities for OCI Free Tier. 
+
+## Concepts
+
+**OCI** - Oracle Cloud Infrastructure: a cloud platform providing compute, storage, networking, and database services.
+
+**Compartment** - A logical container in OCI that organizes and isolates cloud resources. All OCI resources (compute, storage, databases) belong to a compartment. Compartments enable resource organization, access control through Identity and Access Management (IAM), and cost tracking and billing.
+
+**Infrastructure as Code** - Version-controlled automation that defines cloud resources (compute instances, networks, databases) in configuration files instead of manual setup.
+
+**Terraform** - An open-source IaC tool that defines resources declaratively and manages their lifecycle across cloud providers.
+
+## Topology
+
+```
+┌─ Compartment: odbvue-test ─────────────────────────────────────────────────┐
+│                                                                            │
+│  ┌─ VCN: 10.0.0.0/24 ──────────────────────────────────────────────────┐   │
+│  │  ┌─ Public Subnet: 10.0.0.0/24 ─────────────────────────────────┐   │   │
+│  │  │                                                              │   │   │
+│  │  │  ┌─ Compute Instance ────────────────────────────────────┐   │   │   │
+│  │  │  │  Shape: VM.Standard.E5.Flex                           │   │   │   │
+│  │  │  │  OCPUs: 1, Memory: 4GB                                │   │   │   │
+│  │  │  │  Image: Oracle Linux 9                                │   │   │   │
+│  │  │  │  Display Name: odbvue-web                             │   │   │   │
+│  │  │  │                                                       │   │   │   │
+│  │  │  │  Attached VNIC (primary)                              │   │   │   │
+│  │  │  │  └─ Private IP: 10.0.0.x (DHCP)                       │   │   │   │
+│  │  │  │  └─ Public IP: Reserved                               │   │   │   │
+│  │  │  │  └─ NSG: odbvue-nsg-web                               │   │   │   │
+│  │  │  │                                                       │   │   │   │
+│  │  │  │  INGRESS Rules:                                       │   │   │   │
+│  │  │  │    • TCP 80 (HTTP): 0.0.0.0/0                         │   │   │   │
+│  │  │  │    • TCP 443 (HTTPS): 0.0.0.0/0                       │   │   │   │
+│  │  │  │    • TCP 22 (SSH): 0.0.0.0/0                          │   │   │   │
+│  │  │  │                                                       │   │   │   │
+│  │  │  │  EGRESS Rules:                                        │   │   │   │
+│  │  │  │    • All protocols: 0.0.0.0/0 (all)                   │   │   │   │
+│  │  │  └───────────────────────────────────────────────────────┘   │   │   │
+│  │  │                                                              │   │   │
+│  │  │  ┌─ Internet Gateway (igw) ──────────────────────────────┐   │   │   │
+│  │  │  │  Routes all 0.0.0.0/0 outbound                        │   │   │   │
+│  │  │  └───────────────────────────────────────────────────────┘   │   │   │
+│  │  │                                                              │   │   │
+│  │  └──────────────────────────────────────────────────────────────┘   │   │
+│  │                                                                     │   │
+│  │  Route Table: odbvue-rt                                             │   │
+│  │    • Destination: 0.0.0.0/0 → IGW                                   │   │
+│  │                                                                     │   │
+│  │  DHCP Options: DNS-Options                                          │   │
+│  │    • Domain Name Server: VcnLocalPlusInternet                       │   │
+│  │    • Search Domain: vcn.oraclevcn.com                               │   │
+│  │                                                                     │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                            │
+│  ┌─ Autonomous Database (ADB) ─────────────────────────────────────────┐   │
+│  │  Display Name: odbvue-adb                                           │   │
+│  │  Workload Type: OLTP (default)                                      │   │
+│  │  CPU Count: 1 (Always Free eligible)                                │   │
+│  │  Storage: 1 TB (Always Free eligible)                               │   │
+│  │  Backup: Automatic (7 days retention)                               │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                            │
+│  ┌─ Email Delivery (Optional) ──────────────────────────────────────────┐  │
+│  │  Service: Email Delivery                                             │  │
+│  │  SMTP Endpoint: email-smtp.{region}.oci.oraclecloud.com:587          │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                            │
+│  ┌─ Object Storage ─────────────────────────────────────────────────────┐  │
+│  │  Bucket: odbvue-bucket                                               │  │
+│  │  Tier: Standard                                                      │  │
+│  │  Versioning: Enabled (optional)                                      │  │
+│  └───────────────────────────────────────────────────── ────────────────┘  │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+> [!WARNING]
+> This setup allows SSH connections (port 22) from anywhere. For production environments either limit to whitelisted IP addresses or use Oracle Bastion.
 
 ## Prerequisites
 
-1. OCI account
+OCI Account.
 
-2. Podman installed on local machine
+## Prepare Environment
 
-## Common setup
+### Step 1. Get OCI Config
 
-Before deploying any OCI resources (ATP, Compute, etc.), you must set up access configuration to connect to OCI.
+1. Create `./.oci/` directory in Home directory.
 
-### Step 1: Get your OCI API key
+2. Login to the OCI Console.
 
-1. Log in to Oracle Cloud Console
-2. Click your profile icon (top right) → **User Settings**
-3. Under **Tokens and keys**, click **Add API Key**
-4. Select **Generate API Key Pair** and **download the private key file** (save it somewhere safe, e.g., `~/.oci/oci_api_key.pem`)
-5. Press **Add** and copy the configuration file preview that appears
+3. Click your **User icon** → **User Settings**.
 
-### Step 2: Configure OCI credentials
+4. Go to **Tokens and keys** → **Add API Key** → **Generate key pair in console**.
 
-1. Create the directory: `mkdir ".oci"` (in the `i13e/oci/` directory)
-2. Create a file: `.oci/config`
-3. Copy your private key file to `.oci/oci_api_key.pem`
-4. Paste the configuration from Step 1 into the config file
-5. **Important**: Update the `key_file` path to use the container path format shown below
+5. **Download the private key** → save as ~/.oci/default_key.pem.
 
-> [!WARNING]
-> Make sure that the `.oci/` directory is git-ignored for security.
+6. **Copy and save details** to  `./.oci/config`.
 
-#### Example config file:
-```
+```ini
 [DEFAULT]
-user=ocid1.user.oc1..aaaa...
-fingerprint=aa:bb:cc:...
-tenancy=ocid1.tenancy.oc1..aaaa...
+user=ocid1.user.oc1..aaaa1234
+fingerprint=12:34:56:78:90:ab:cd:ef
+tenancy=ocid1.tenancy.oc1..aaaa1234
+region=us-ashburn-1
+key_file=~/.oci/default_key.pem
+```
+
+> [!NOTE]
+> If there are multiple tenancies, all can be put in a single file.
+
+```ini
+[TEST]
+user=ocid1.user.oc1..bbbb5678
+fingerprint=ab:cd:ef:12:34:56:78:90
+tenancy=ocid1.tenancy.oc1..bbbb5678
 region=eu-frankfurt-1
-key_file=/root/.oci/oci_api_key.pem
+key_file=~/.oci/test_key.pem
+
+[PROD]
+user=ocid1.user.oc1..cccc9012
+fingerprint=56:78:90:ab:cd:ef:12:34
+tenancy=ocid1.tenancy.oc1..cccc9012
+region=ap-singapore-1
+key_file=~/.oci/prod_key.pem
 ```
 
-> [!TIP] 
-> Even on Windows, use the Linux-style path `/root/.oci/oci_api_key.pem` for the `key_file` setting. This is because the OCI CLI runs inside a Linux container where your local `.oci` directory is mounted to `/root/.oci`. Do not use quotes around the path.
+> [!NOTE] 
+> Use Linux-style paths in `key_file` even on Windows.
 
-All scripts are located in `./i13e/oci/scripts/` folder and must be run from `./i13e/oci/`. Append `bash` when running on Windows.  
+### Step 2. Generate SSH Key
 
-## List resources
-
-List resources using the default profile:
 ```bash
-./scripts/list.sh
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/odbvue -N ""
+```
+Keys will be saved to `~/.ssh`.
+
+### Step 3. Install Terraform
+
+[Install Terraform](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli)
+
+For Windows:
+
+```powershell
+winget install HashiCorp.Terraform
 ```
 
-List resources using a specific profile:
+After installation check that it works:
+
 ```bash
-./scripts/list.sh PRODUCTION
+terraform -v
 ```
 
-## Deploy ATP Database
+### Step 4. Configure terraform.tfvars
 
-### Variables
+Copy `terraform.tfvars.example` to `terraform.tfvars` and update with your values.
 
-Before deploying, **Create sensitive variables file** for each environment, e.g. for test `terraform/environments/test/terraform.tfvars.local`:
+## Usage
 
-```
-admin_password    = "YourSecurePassword123!"
-wallet_password   = "YourWalletPassword123!"
-```
-Password Requirements:
-- Must be 12-30 characters long
-- Must contain at least 1 uppercase letter
-- Must contain at least 1 lowercase letter  
-- Must contain at least 1 numeric character
-- Must contain at least 1 special character
+### Initial setup (once)
 
-> [!WARNING]
-> Make sure that the `*.local` is always git-ignored for security.
-
-### Deploy ATP Database (All Platforms)
-
-**Initialize Terraform (first time only):**
 ```bash
-./scripts/deploy-atp.sh -e test -a init
-./scripts/deploy-atp.sh -e prod -a init
+cd terraform
+terraform init
 ```
 
-**Plan deployment (preview changes):**
+### Apply changes to infrastructure
+
 ```bash
-./scripts/deploy-atp.sh -e test -a plan
-./scripts/deploy-atp.sh -e prod -a plan
+terraform plan
 ```
 
-**Deploy database:**
 ```bash
-./scripts/deploy-atp.sh -e test -a apply -y
-./scripts/deploy-atp.sh -e prod -a apply -y
+terraform apply
 ```
 
-**Destroy database (auto-approve, skip confirmation):**
+> [!NOTE]
+> On succesful Autonomous Database modification Wallet will be automatically downloaded to `./wallets/` folder. Make sure that the folder exists.
+
+### Destroy everything (if needed)
+
 ```bash
-./scripts/deploy-atp.sh -e test -a destroy -y
-./scripts/deploy-atp.sh -e prod -a destroy -y
+terraform destroy
 ```
 
-**View outputs:**
-```bash
-./scripts/deploy-atp.sh -e test -a output
-```
+## Terraform files
 
-**Download wallet:**
-```bash
-./scripts/download-atp-wallet.sh -e test -o ~/.wallets/odbvue-test-wallet.zip
-./scripts/download-atp-wallet.sh -e prod -o ~/.wallets/odbvue-prod-wallet.zip
-```
+::: details `provider.tf` - Configures OCI provider with authentication profile and region
+<<< ../../../../../i13e/oci/basic/terraform/provider.tf
+:::
 
-> [!WARNING]
-> Make sure that the `.wallets/` and `*.zip` are git-ignored for security.
+::: details `versions.tf` - Specifies Terraform and provider version requirements
+<<< ../../../../../i13e/oci/basic/terraform/versions.tf
+:::
+
+::: details `variables.tf` - Input variables for OCI profile, region, credentials, ADB, email, and resource names
+<<< ../../../../../i13e/oci/basic/terraform/variables.tf
+:::
+
+::: details `oci_config.tf` - Deprecated (use variables.tf)
+<<< ../../../../../i13e/oci/basic/terraform/oci_config.tf
+:::
+
+::: details `compartment.tf` - Creates or retrieves OCI compartment "odbvue-test"
+<<< ../../../../../i13e/oci/basic/terraform/compartment.tf
+:::
+
+::: details `networking.tf` - VCN, Internet Gateway, route tables, DHCP options, subnet, and NSG with firewall rules
+<<< ../../../../../i13e/oci/basic/terraform/networking.tf
+:::
+
+::: details `compute.tf` - Oracle Linux 9 VM instance with NGINX, SSH configuration, and cloud-init setup
+<<< ../../../../../i13e/oci/basic/terraform/compute.tf
+:::
+
+::: details `public_ip.tf` - Reserves and attaches public IP to compute instance
+<<< ../../../../../i13e/oci/basic/terraform/public_ip.tf
+:::
+
+::: details `adb.tf` - Autonomous Database (Always Free), wallet generation and download
+<<< ../../../../../i13e/oci/basic/terraform/adb.tf
+:::
+
+::: details `email.tf` - Optional Email Delivery approved sender (if `var.email_sender` set)
+<<< ../../../../../i13e/oci/basic/terraform/email.tf
+:::
+
+::: details `objectstorage.tf` - Object Storage bucket with restricted access
+<<< ../../../../../i13e/oci/basic/terraform/objectstorage.tf
+:::
+
+::: details `outputs.tf` - Exports instance IPs, ADB connection info, and storage hints
+<<< ../../../../../i13e/oci/basic/terraform/outputs.tf
+:::
+
+::: details `terraform.tfvars.example` - Template showing required variables
+<<< ../../../../../i13e/oci/basic/terraform/terraform.tfvars.example {tfvars}
+:::
+
+> [!NOTE] 
+> Make sure that `.gitignore` exists and prevents secrets and terraform state from being submitted to git.
+
+::: details `.gitignore`
+<<< ../../../../../i13e/oci/basic/.gitignore {ini}
+:::
+

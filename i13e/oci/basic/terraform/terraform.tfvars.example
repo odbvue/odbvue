@@ -1,0 +1,20 @@
+# terraform.tfvars.example
+# Copy this file to terraform.tfvars and fill in your actual values
+# DO NOT commit terraform.tfvars to git
+
+# OCI Profile to use from ~/.oci/config (DEFAULT, ODBVUE, etc.)
+tenancy_ocid = "ocid1.tenancy.oc1..aaaaaaaa..."
+oci_profile = "DEFAULT"
+region = "eu-frankfurt-1"
+
+# Required: ADB Admin Password
+# Must meet OCI password policy:
+#   - 9-30 characters
+#   - At least 1 uppercase, 1 lowercase, 1 digit, 1 special char (!@#$%^&*)
+adb_admin_password = "MyS3cur3P@ss123!"
+
+# ADB Wallet Password
+adb_wallet_password = "MyWallet@Pass123!"
+
+# Email sender
+email_sender = "admin@odbvue.com"
