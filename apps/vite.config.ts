@@ -6,6 +6,7 @@ import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import VueRouter from 'unplugin-vue-router/vite'
 import Markdown from 'unplugin-vue-markdown/vite'
+import Vuetify from 'vite-plugin-vuetify'
 
 async function extractMetaFromMarkdown(absolutePath: string): Promise<Record<string, unknown> | null> {
   try {
@@ -48,6 +49,7 @@ export default defineConfig({
       include: [/\.vue$/, /\.md$/]
     }),
     vueDevTools(),
+    Vuetify(),
   ],
   resolve: {
     alias: {
