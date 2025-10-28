@@ -77,6 +77,13 @@ export default defineConfig({
                 { text: 'Deploy', link: '/guide/i13e/oci/deploy' },
               ],
             },
+            {
+              text: 'CI/CD',
+              collapsed: true,
+              items: [
+                { text: 'Branching Strategies', link: '/guide/i13e/cicd/branching-strategies' },
+              ],
+            },
           ],
         },
       ],
