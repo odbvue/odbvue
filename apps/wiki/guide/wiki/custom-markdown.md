@@ -4,6 +4,13 @@ VitePress uses **Markdown IT** for markdown rendering and it allows many [Markdo
 
 Here is an example of how to embed a YouTube video using custom markdown. Use the following syntax: `@[youtube](YOUR_VIDEO_ID)`. This will ensure the video is scaled correctly.
 
+0. Install markdown-it
+
+```bash
+pnpm i --save-dev markdown-it
+pnpm i --save-dev @types/markdown-it
+```
+
 1. Create markdown extension
 
 ::: details `./.vitepress/markdown-it-video.ts`

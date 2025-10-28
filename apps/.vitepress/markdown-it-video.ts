@@ -4,6 +4,11 @@
 // Process @[prezi](preziID)
 // Process @[osf](guid)
 
+import type MarkdownIt from 'markdown-it'
+import type { PluginWithOptions } from 'markdown-it'
+
+type MarkdownItInstance = MarkdownIt
+
 interface VideoOptions {
   [key: string]: unknown
   url: (service: string, videoID: string, url: string, options: VideoOptions) => string
@@ -32,49 +37,27 @@ interface VideoOptions {
   }
 }
 
-interface MarkdownIt {
-  helpers: {
-    parseLinkLabel: (state: State, start: number, disableNested: boolean) => number
-  }
-  utils: {
-    escapeHtml: (str: string) => string
-  }
-  renderer: {
-    rules: {
-      [key: string]: (
-        md: MarkdownIt,
-        options: VideoOptions,
-      ) => (tokens: Token[], idx: number) => string
-    }
-  }
-  inline: {
-    ruler: {
-      before: (
-        beforeName: string,
-        ruleName: string,
-        rule: (state: State, silent: boolean) => boolean,
-      ) => void
-    }
-    State: new (service: string, md: MarkdownIt, env: unknown, tokens: Token[]) => State
-    tokenize: (state: State) => void
-  }
-}
-
 interface State {
   src: string
   pos: number
   level: number
-  md: MarkdownIt
+  md: MarkdownItInstance
   env: unknown
   service?: string
-  push: (type: string, tag: string) => Token
+  push: (type: string, tag: string, nesting: number) => Token
+  posMax: number
+  tokens: Token[]
 }
 
 interface Token {
-  videoID: string
-  service: string
-  url: string
+  videoID?: string
+  service?: string
+  url?: string
   level: number
+  type: string
+  tag: string
+  nesting: number
+  [key: string]: unknown
 }
 
 const ytRegex = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/
@@ -113,7 +96,7 @@ function mfrParser(url: string): string {
 
 const EMBED_REGEX = /@\[([a-zA-Z].+)]\([\s]*(.*?)[\s]*[)]/im
 
-function videoEmbed(md: MarkdownIt, options: VideoOptions) {
+function videoEmbed(md: MarkdownItInstance, options: VideoOptions) {
   function videoReturn(state: State, silent: boolean): boolean {
     let token
     let videoID
@@ -157,6 +140,7 @@ function videoEmbed(md: MarkdownIt, options: VideoOptions) {
     }
 
     const serviceStart = oldPos + 2
+    // @ts-expect-error - state is compatible with StateInline at runtime
     const serviceEnd = md.helpers.parseLinkLabel(state, oldPos + 1, false)
 
     //
@@ -169,7 +153,7 @@ function videoEmbed(md: MarkdownIt, options: VideoOptions) {
       const newState = new theState.md.inline.State(service, theState.md, theState.env, [])
       newState.md.inline.tokenize(newState)
 
-      token = theState.push('video', '')
+      token = theState.push('video', '', 1)
       token.videoID = videoID
       token.service = service
       token.url = match[2]
@@ -259,10 +243,10 @@ function videoUrl(service: string, videoID: string, url: string, options: VideoO
   }
 }
 
-function tokenizeVideo(md: MarkdownIt, options: VideoOptions) {
+function tokenizeVideo(md: MarkdownItInstance, options: VideoOptions) {
   function tokenizeReturn(tokens: Token[], idx: number): string {
-    const videoID = md.utils.escapeHtml(tokens[idx].videoID)
-    const service = md.utils.escapeHtml(tokens[idx].service).toLowerCase()
+    const videoID = md.utils.escapeHtml(tokens[idx].videoID || '')
+    const service = md.utils.escapeHtml(tokens[idx].service || '').toLowerCase()
     const checkUrl =
       /http(?:s?):\/\/(?:www\.)?[a-zA-Z0-9-:.]{1,}\/render(?:\/)?[a-zA-Z0-9.&;?=:%]{1,}url=http(?:s?):\/\/[a-zA-Z0-9 -:.]{1,}\/[a-zA-Z0-9]{1,5}\/\?[a-zA-Z0-9.=:%]{1,}/
     let num
@@ -308,7 +292,7 @@ function tokenizeVideo(md: MarkdownIt, options: VideoOptions) {
           // @ts-expect-error options is of type unknown
           options[service].height +
           '" style="aspect-ratio: 16/9; width: 100%; max-width: 100%; border: 0; display: block; margin: 1em auto;" src="' +
-          options.url(service, videoID, tokens[idx].url, options) +
+          options.url(service, videoID, tokens[idx].url || '', options) +
           '"></iframe>'
   }
 
@@ -324,9 +308,11 @@ const defaults: VideoOptions = {
   osf: { width: '100%', height: '100%' },
 }
 
-export default function (md: MarkdownIt, options?: Partial<VideoOptions>) {
+const videoPlugin: PluginWithOptions<Partial<VideoOptions>> = (
+  md: MarkdownItInstance,
+  options?: Partial<VideoOptions>,
+) => {
   const theOptions: VideoOptions = { ...defaults }
-  const theMd = md
   if (options) {
     Object.keys(options).forEach(function checkForKeys(key) {
       if (typeof (options as Record<string, unknown>)[key] !== 'undefined') {
@@ -334,7 +320,10 @@ export default function (md: MarkdownIt, options?: Partial<VideoOptions>) {
       }
     })
   }
-  // @ts-expect-error type mismatch between function signatures
-  theMd.renderer.rules.video = tokenizeVideo(theMd, theOptions)
-  theMd.inline.ruler.before('emphasis', 'video', videoEmbed(theMd, theOptions))
+  // @ts-expect-error - types are compatible at runtime
+  md.renderer.rules.video = tokenizeVideo(md, theOptions)
+  // @ts-expect-error - types are compatible at runtime
+  md.inline.ruler.before('emphasis', 'video', videoEmbed(md, theOptions))
 }
+
+export default videoPlugin
