@@ -1,5 +1,17 @@
 # GitHub Actions# Git
 
+## Quick Release
+
+Shorthand script to deploy new release:
+
+```bash
+./scripts/release.sh -v 0.1.9 - m "Release v0.1.9 - Odoroki"
+```
+
+::: details `./apps/scripts/release.sh`
+<<< ../../../../scripts/release.sh
+:::
+
 ## Overview
 
 ### What is GitHub Actions?
