@@ -1,0 +1,5 @@
+{
+  "sandbox.title": "Sandbox",
+  "sandbox.description": "Un bac à sable pour tester les fonctionnalités i18n dans une application Vue.",
+  "welcome.message": "Welcome message"
+}

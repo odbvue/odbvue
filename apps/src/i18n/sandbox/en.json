@@ -1,0 +1,5 @@
+{
+  "sandbox.title": "Sandbox",
+  "sandbox.description": "A sandbox for testing i18n features in a Vue application.",
+  "welcome.message": "Welcome message"
+}

@@ -1,5 +1,6 @@
 import { fileURLToPath, URL } from 'node:url'
 import { promises as fs } from 'node:fs'
+import path from 'node:path'
 
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
@@ -7,6 +8,8 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 import VueRouter from 'unplugin-vue-router/vite'
 import Markdown from 'unplugin-vue-markdown/vite'
 import Vuetify from 'vite-plugin-vuetify'
+import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
+import { i18nDevPlugin}  from './src/plugins/i18n-dev'
 
 async function extractMetaFromMarkdown(absolutePath: string): Promise<Record<string, unknown> | null> {
   try {
@@ -48,8 +51,12 @@ export default defineConfig({
     vue({
       include: [/\.vue$/, /\.md$/]
     }),
-    vueDevTools(),
     Vuetify(),
+    VueI18nPlugin({
+      include: path.resolve(__dirname, './src/i18n/**')
+    }),
+    i18nDevPlugin(),
+    vueDevTools(),
   ],
   resolve: {
     alias: {
