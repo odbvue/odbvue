@@ -1,6 +1,6 @@
 {
-  "name": "apps",
-  "version": "0.0.0",
+  "name": "odbvue",
+  "version": "0.1.6",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,6 +8,8 @@
   },
   "scripts": {
     "dev": "vite",
+    "prebuild": "pnpm version patch --no-git-tag-version",
+    "prewiki:build": "pnpm version patch --no-git-tag-version",
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "test:unit": "vitest",

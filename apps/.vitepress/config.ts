@@ -82,6 +82,7 @@ export default defineConfig({
               collapsed: true,
               items: [
                 { text: 'Branching Strategies', link: '/guide/i13e/cicd/branching-strategies' },
+                { text: 'GitHub Actions', link: '/guide/i13e/cicd/github-actions' },
               ],
             },
           ],
