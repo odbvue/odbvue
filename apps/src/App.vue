@@ -15,6 +15,7 @@
   <router-view />
   <br />
   <br />
+  <test-component />
   <p>{{ t('welcome.message') }}</p>
 </template>
 

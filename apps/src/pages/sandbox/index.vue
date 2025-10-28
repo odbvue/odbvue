@@ -1,6 +1,8 @@
 <template>
   <v-card :style="cardBackground">
-    <v-card-title><v-icon icon="$mdiHome" />{{ t('sandbox.title') }}</v-card-title>
+    <v-card-title
+      ><v-icon icon="$mdiHome" /><v-icon icon="$mdiHeart" />{{ t('sandbox.title') }}</v-card-title
+    >
     <v-card-text>{{ t('sandbox.description') }}</v-card-text>
     <v-card-actions>
       <v-btn @click="console.log('Primary!')" color="primary">Primary</v-btn>
@@ -11,10 +13,6 @@
 </template>
 
 <script setup lang="ts">
-import { useCardBackground } from '@/composables/ui'
-import { useI18n } from 'vue-i18n'
-import { useSettingsStore } from '@/stores/settings'
-
 const cardBackground = useCardBackground('#0000ff')
 const { t } = useI18n()
 const settings = useSettingsStore()
