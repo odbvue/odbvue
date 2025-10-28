@@ -210,19 +210,55 @@ export default createVuetify({
 ...
 ```
 
+## Custom Styling
+
+Likely not needed at all, but still an option in some rare cases. 
+
+1. Create `@/themes/index.css`
+
+```css
+div.markdown-body h1 {
+  margin-bottom: 24px;
+}
+
+div.markdown-body h2 {
+  margin-top: 8px;
+  margin-bottom: 16px;
+}
+
+div.markdown-body h3 {
+  margin-top: 8px;
+  margin-bottom: 12px;
+}
+
+div.markdown-body ul {
+  margin-bottom: 8px;
+}
+
+div.markdown-body li {
+  margin-left: 24px;
+}
+
+div.markdown-body p {
+  margin-bottom: 8px;
+}
+
+div.markdown-body hr {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+```
+
+2. Import in `@/main.ts`
+
+```ts
+import './themes/index.css'
+//
+```
+
 ## Cherries
 
 It is always nice to add some small nuance that differentiates your app from others. Here is an example to provide customized background style.
-
-
-
-
-
-
-
-
-
-
 
 1. Create a new composable `@\composables\ui.ts` for enhanced UI features
 
