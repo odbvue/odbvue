@@ -5,13 +5,13 @@
 // Process @[osf](guid)
 
 interface VideoOptions {
-  [key: string]: any
+  [key: string]: unknown
   url: (service: string, videoID: string, url: string, options: VideoOptions) => string
   youtube: {
     width: string
     height: string
     nocookie: boolean
-    parameters?: { [key: string]: any }
+    parameters?: { [key: string]: string }
   }
   vimeo: {
     width: number
@@ -34,20 +34,20 @@ interface VideoOptions {
 
 interface MarkdownIt {
   helpers: {
-    parseLinkLabel: (state: any, start: number, disableNested: boolean) => number
+    parseLinkLabel: (state: State, start: number, disableNested: boolean) => number
   }
   utils: {
     escapeHtml: (str: string) => string
   }
   renderer: {
-    rules: { [key: string]: any }
+    rules: { [key: string]: (md: MarkdownIt, options: VideoOptions) => (tokens: Token[], idx: number) => string }
   }
   inline: {
     ruler: {
-      before: (beforeName: string, ruleName: string, rule: any) => void
+      before: (beforeName: string, ruleName: string, rule: (state: State, silent: boolean) => boolean) => void
     }
-    State: any
-    tokenize: (state: any) => void
+    State: new (service: string, md: MarkdownIt, env: unknown, tokens: Token[]) => State
+    tokenize: (state: State) => void
   }
 }
 
@@ -56,7 +56,7 @@ interface State {
   pos: number
   level: number
   md: MarkdownIt
-  env: any
+  env: unknown
   service?: string
   push: (type: string, tag: string) => Token
 }
@@ -194,7 +194,7 @@ function videoUrl(service: string, videoID: string, url: string, options: VideoO
       const parameters = extractVideoParameters(url)
       if (options.youtube.parameters) {
         Object.keys(options.youtube.parameters).forEach((key) => {
-          parameters.set(key, options.youtube.parameters![key])
+          parameters.set(key, options.youtube.parameters![key] as string)
         })
       }
 
@@ -314,12 +314,12 @@ const defaults: VideoOptions = {
 }
 
 export default function (md: MarkdownIt, options?: Partial<VideoOptions>) {
-  let theOptions: VideoOptions = { ...defaults }
+  const theOptions: VideoOptions = { ...defaults }
   const theMd = md
   if (options) {
     Object.keys(options).forEach(function checkForKeys(key) {
-      if (typeof (options as any)[key] !== 'undefined') {
-        ;(theOptions as any)[key] = (options as any)[key]
+      if (typeof (options as Record<string, unknown>)[key] !== 'undefined') {
+        ;(theOptions as Record<string, unknown>)[key] = (options as Record<string, unknown>)[key]
       }
     })
   }
