@@ -48,8 +48,10 @@ jobs:
         run: |
           mkdir -p build-artifacts/apps
           mkdir -p build-artifacts/wiki
+          mkdir -p build-artifacts/main
           cp -r apps/dist/* build-artifacts/apps/ || true
           cp -r apps/.vitepress/dist/* build-artifacts/wiki/ || true
+          cp -r main/* build-artifacts/main/ || true
       
       - name: Upload reorganized artifacts
         uses: actions/upload-artifact@v4
@@ -87,40 +89,42 @@ jobs:
       - name: Copy deployment scripts to remote
         run: |
           scp -i ~/.ssh/deploy_key -r i13e/oci/basic/scripts/* \
-            ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:~/deploy/
+            ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:/tmp/deploy-scripts/
       
       - name: Copy built artifacts to remote
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "mkdir -p ~/build-artifacts/apps ~/build-artifacts/wiki"
-          scp -i ~/.ssh/deploy_key -r build-artifacts/apps/* ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:~/build-artifacts/apps/
-          scp -i ~/.ssh/deploy_key -r build-artifacts/wiki/* ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:~/build-artifacts/wiki/
+          DEPLOY_DIR="/tmp/deployer-artifacts"
+          ssh -i ~/.ssh/deploy_key ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "mkdir -p $DEPLOY_DIR/apps $DEPLOY_DIR/wiki $DEPLOY_DIR/main"
+          scp -i ~/.ssh/deploy_key -r build-artifacts/apps/* ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:$DEPLOY_DIR/apps/
+          scp -i ~/.ssh/deploy_key -r build-artifacts/wiki/* ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:$DEPLOY_DIR/wiki/
+          scp -i ~/.ssh/deploy_key -r build-artifacts/main/* ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:$DEPLOY_DIR/main/
       
-      - name: Create sites.yaml with correct paths
+      - name: Create sites.yaml with correct absolute paths
         run: |
           cat > /tmp/sites.yaml << 'EOF'
           sites:
             - site_name: "main"
               domain: "odbvue.com"
               remote_path: "/var/www/main/"
-              local_path: "~/build-artifacts/main"
+              local_path: "/tmp/deployer-artifacts/main"
             - site_name: "apps"
               domain: "apps.odbvue.com"
               remote_path: "/var/www/apps/"
-              local_path: "~/build-artifacts/apps"
+              local_path: "/tmp/deployer-artifacts/apps"
             - site_name: "wiki"
               domain: "wiki.odbvue.com"
               remote_path: "/var/www/wiki/"
-              local_path: "~/build-artifacts/wiki"
+              local_path: "/tmp/deployer-artifacts/wiki"
           ssl:
             cert_file: "./.ssl/STAR.odbvue.com.crt"
             key_file: "./.ssl/STAR.odbvue.com_key.txt"
             ca_bundle_file: "./.ssl/STAR.odbvue.com.ca-bundle"
           EOF
-          scp -i ~/.ssh/deploy_key /tmp/sites.yaml ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:~/deploy/sites.yaml
+          scp -i ~/.ssh/deploy_key /tmp/sites.yaml ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:/tmp/deploy-scripts/sites.yaml
       
       - name: Execute deployment
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "cd ~/deploy && bash deploy.sh 2>&1"
+          ssh -i ~/.ssh/deploy_key ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "cd /tmp/deploy-scripts && bash deploy.sh 2>&1"
       
       - name: Verify deployment
         run: |
