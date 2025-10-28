@@ -31,4 +31,10 @@ export default defineConfigWithVueTs(
     files: ['e2e/**/*.{test,spec}.{js,ts,jsx,tsx}'],
   },
   skipFormatting,
+  {
+    files: ['src/pages/**/*.vue'],
+    rules: {
+      'vue/multi-word-component-names': 'off',
+    },
+  },
 )

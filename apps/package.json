@@ -1,6 +1,6 @@
 {
   "name": "odbvue",
-  "version": "0.1.14",
+  "version": "0.1.16",
   "private": true,
   "type": "module",
   "engines": {
@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "pinia": "^3.0.3",
+    "unplugin-vue-markdown": "^29.2.0",
     "vue": "^3.5.22",
     "vue-router": "^4.5.1"
   },
@@ -46,6 +47,7 @@
     "npm-run-all2": "^8.0.4",
     "prettier": "3.6.2",
     "typescript": "~5.9.0",
+    "unplugin-vue-router": "^0.16.0",
     "vite": "npm:rolldown-vite@latest",
     "vite-plugin-vue-devtools": "^8.0.2",
     "vitepress": "2.0.0-alpha.12",

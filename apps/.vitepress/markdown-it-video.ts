@@ -40,11 +40,20 @@ interface MarkdownIt {
     escapeHtml: (str: string) => string
   }
   renderer: {
-    rules: { [key: string]: (md: MarkdownIt, options: VideoOptions) => (tokens: Token[], idx: number) => string }
+    rules: {
+      [key: string]: (
+        md: MarkdownIt,
+        options: VideoOptions,
+      ) => (tokens: Token[], idx: number) => string
+    }
   }
   inline: {
     ruler: {
-      before: (beforeName: string, ruleName: string, rule: (state: State, silent: boolean) => boolean) => void
+      before: (
+        beforeName: string,
+        ruleName: string,
+        rule: (state: State, silent: boolean) => boolean,
+      ) => void
     }
     State: new (service: string, md: MarkdownIt, env: unknown, tokens: Token[]) => State
     tokenize: (state: State) => void
@@ -293,8 +302,10 @@ function tokenizeVideo(md: MarkdownIt, options: VideoOptions) {
       : '<iframe class="' +
           service +
           '-player" type="text/html" width="' +
+          // @ts-expect-error options is of type unknown
           options[service].width +
           '" height="' +
+          // @ts-expect-error options is of type unknown
           options[service].height +
           '" style="aspect-ratio: 16/9; width: 100%; max-width: 100%; border: 0; display: block; margin: 1em auto;" src="' +
           options.url(service, videoID, tokens[idx].url, options) +
@@ -323,6 +334,7 @@ export default function (md: MarkdownIt, options?: Partial<VideoOptions>) {
       }
     })
   }
+  // @ts-expect-error type mismatch between function signatures
   theMd.renderer.rules.video = tokenizeVideo(theMd, theOptions)
   theMd.inline.ruler.before('emphasis', 'video', videoEmbed(theMd, theOptions))
 }
