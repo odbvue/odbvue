@@ -91,9 +91,9 @@ jobs:
       
       - name: Copy built artifacts to remote
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "mkdir -p ~/build-artifacts"
-          scp -i ~/.ssh/deploy_key -r build-artifacts/apps/dist/* ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:~/build-artifacts/apps/
-          scp -i ~/.ssh/deploy_key -r build-artifacts/wiki/dist/* ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:~/build-artifacts/wiki/
+          ssh -i ~/.ssh/deploy_key ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "mkdir -p ~/build-artifacts/apps ~/build-artifacts/wiki"
+          scp -i ~/.ssh/deploy_key -r build-artifacts/apps/* ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:~/build-artifacts/apps/
+          scp -i ~/.ssh/deploy_key -r build-artifacts/wiki/* ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:~/build-artifacts/wiki/
       
       - name: Create sites.yaml with correct paths
         run: |
