@@ -5,18 +5,17 @@
     <v-card-actions>
       <v-btn @click="console.log('Primary!')" color="primary">Primary</v-btn>
       <v-btn @click="console.log('Secondary!')" color="secondary">Secondary</v-btn>
-      <v-btn @click="theme.toggle()">Toggle theme</v-btn>
+      <v-btn @click="settings.themeToggle()">Toggle theme</v-btn>
     </v-card-actions>
   </v-card>
 </template>
 
 <script setup lang="ts">
-import { useTheme } from 'vuetify'
 import { useCardBackground } from '@/composables/ui'
-
 import { useI18n } from 'vue-i18n'
-const { t } = useI18n()
+import { useSettingsStore } from '@/stores/settings'
 
-const theme = useTheme()
 const cardBackground = useCardBackground('#0000ff')
+const { t } = useI18n()
+const settings = useSettingsStore()
 </script>
