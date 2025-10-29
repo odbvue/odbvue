@@ -55,6 +55,7 @@ declare global {
   const toValue: typeof import('vue').toValue
   const triggerRef: typeof import('vue').triggerRef
   const unref: typeof import('vue').unref
+  const useAppStore: typeof import('./src/stores/index').useAppStore
   const useAttrs: typeof import('vue').useAttrs
   const useCardBackground: typeof import('./src/composables/ui').useCardBackground
   const useCssModule: typeof import('vue').useCssModule

@@ -69,6 +69,7 @@ Add logo `./apps/public/logo.sv` and change default layout.
 
 #### `@/layouts/DefaultLayout.vue`
 
+::: details source
 ```vue
 <template>
   <v-app>
@@ -131,3 +132,138 @@ const pages = ref([
 ])
 </script>
 ```
+:::
+
+## Settings
+
+1. Create new main Application store - container for all application level stores
+
+#### `@/stores/index.ts`
+
+```ts
+import { defineStore, acceptHMRUpdate } from 'pinia'
+
+export const useAppStore = defineStore('app', () => {
+  const getSettings = () => useSettingsStore()
+
+  return { settings: getSettings() }
+})
+
+if (import.meta.hot) {
+  import.meta.hot.accept(acceptHMRUpdate(useSettingsStore, import.meta.hot))
+}
+```
+
+2. Enhance Settings store with locale and size capabilities
+
+#### `@/stores/settings.ts`
+
+::: details source
+<<<../../../src/stores/settings.ts
+:::
+
+3. Add Setting capabilities im application 
+
+#### `@/layouts/DefaultLayout.vue`
+
+::: details source
+```vue
+<template>
+    <!-- -->
+    <v-app-bar>
+      <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
+      <v-toolbar-title>{{ title }}</v-toolbar-title>
+      <v-btn v-if="mobile">
+        <v-icon :icon="'$mdiDotsVertical'"></v-icon>
+        <v-menu activator="parent">
+          <v-list>
+            <v-list-item link prepend-icon="$mdiMenuLeft">
+              <v-list-item-title>
+                <v-icon icon="$mdiEyePlusOutline"></v-icon>
+              </v-list-item-title>
+              <v-menu submenu activator="parent">
+                <v-list>
+                  <v-list-item
+                    link
+                    v-for="item in app.settings.fontSizes"
+                    :key="item"
+                    :value="item"
+                    @click="app.settings.setFontSize(item)"
+                  >
+                    <v-list-item-title> {{ item }}% </v-list-item-title>
+                  </v-list-item>
+                </v-list>
+              </v-menu>
+            </v-list-item>
+            <v-list-item link prepend-icon="$mdiMenuLeft">
+              <v-list-item-title>
+                {{ app.settings.locale }}
+              </v-list-item-title>
+              <v-menu submenu activator="parent">
+                <v-list>
+                  <v-list-item
+                    link
+                    v-for="item in app.settings.locales"
+                    :key="item"
+                    :value="item"
+                    @click="app.settings.setLocale(item)"
+                  >
+                    <v-list-item-title>
+                      {{ item }}
+                    </v-list-item-title>
+                  </v-list-item>
+                </v-list>
+              </v-menu>
+            </v-list-item>
+            <v-list-item
+              link
+              prepend-icon="app.settings.themeIcon"
+              @click="app.settings.toggleTheme()"
+            >
+              <v-list-item-title>
+                <v-icon :icon="app.settings.themeIcon"></v-icon>
+              </v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
+      </v-btn>
+      <v-menu v-if="!mobile">
+        <template #activator="{ props }">
+          <v-btn variant="text" v-bind="props" prepend-icon="$mdiEyePlusOutline"></v-btn>
+        </template>
+        <v-list>
+          <v-list-item v-for="(item, i) in app.settings.fontSizes" :key="i" :value="i">
+            <v-list-item-title @click="app.settings.setFontSize(item)"
+              >{{ item }}%</v-list-item-title
+            >
+          </v-list-item>
+        </v-list>
+      </v-menu>
+      <v-menu v-if="!mobile">
+        <template #activator="{ props }">
+          <v-btn variant="text" v-bind="props">{{ app.settings.locale }}</v-btn>
+        </template>
+        <v-list>
+          <v-list-item v-for="(item, i) in app.settings.locales" :key="i" :value="i">
+            <v-list-item-title @click="app.settings.setLocale(item)">{{ item }}</v-list-item-title>
+          </v-list-item>
+        </v-list>
+      </v-menu>
+      <v-btn
+        v-if="!mobile"
+        variant="text"
+        :prepend-icon="app.settings.themeIcon"
+        @click="app.settings.toggleTheme()"
+      ></v-btn>
+    </v-app-bar>
+    <!-- -->
+</template>
+
+<script setup lang="ts">
+// ..
+const { mobile } = useDisplay()
+const app = useAppStore()
+// ..
+</script>
+```
+:::

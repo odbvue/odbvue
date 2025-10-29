@@ -6,18 +6,32 @@
 
 import {
 	mdiCog,
+	mdiDotsVertical,
+	mdiEarth,
+	mdiEyePlusOutline,
 	mdiGithub,
 	mdiHeart,
 	mdiHome,
 	mdiInformation,
-	mdiMinus
+	mdiMenuLeft,
+	mdiMinus,
+	mdiTranslate,
+	mdiWeatherNight,
+	mdiWeatherSunny
 } from "@mdi/js"
 
 export default {
   mdiCog,
+  mdiDotsVertical,
+  mdiEarth,
+  mdiEyePlusOutline,
   mdiGithub,
   mdiHeart,
   mdiHome,
   mdiInformation,
+  mdiMenuLeft,
   mdiMinus,
+  mdiTranslate,
+  mdiWeatherNight,
+  mdiWeatherSunny,
 }

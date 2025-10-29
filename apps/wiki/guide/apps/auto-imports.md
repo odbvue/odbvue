@@ -79,7 +79,7 @@ This will create file `auto-imports.d.ts` containing auto imports for:
     <v-card-actions>
       <v-btn @click="console.log('Primary!')" color="primary">Primary</v-btn>
       <v-btn @click="console.log('Secondary!')" color="secondary">Secondary</v-btn>
-      <v-btn @click="settings.themeToggle()">Toggle theme</v-btn>
+      <v-btn @click="settings.toggleTheme()">Toggle theme</v-btn>
     </v-card-actions>
   </v-card>
 </template>

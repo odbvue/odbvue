@@ -36,20 +36,25 @@ import { useTheme } from 'vuetify'
 export const useSettingsStore = defineStore(
   'settings',
   () => {
-    const setTheme = useTheme()
-
-    const theme = ref(setTheme.global.current.value.dark ? 'dark' : 'light')
-
+    const themeManager = useTheme()
+    const themes = computed(() => Object.keys(themeManager.themes.value))
+    const theme = ref(themeManager.global.name.value)
+    function toggleTheme() {
+      theme.value = theme.value === 'dark' ? 'light' : 'dark'
+    }
     watch(theme, (newTheme) => {
-      setTheme.change(newTheme)
+      if (!themes.value.includes(newTheme)) {
+        console.warn(`[Settings Store] Invalid theme: ${newTheme}`)
+        const firstTheme = themes.value[0]
+        if (firstTheme) {
+          theme.value = firstTheme
+        }
+        return
+      }
+      themeManager.change(newTheme)
     })
 
-    function themeToggle() {
-      theme.value = theme.value === 'light' ? 'dark' : 'light'
-      setTheme.change(theme.value)
-    }
-
-    return { theme, themeToggle }
+    return { theme, themes, toggleTheme }
   },
   {
     storage: {
@@ -74,7 +79,7 @@ if (import.meta.hot) {
     <v-card-actions>
       <v-btn @click="console.log('Primary!')" color="primary">Primary</v-btn>
       <v-btn @click="console.log('Secondary!')" color="secondary">Secondary</v-btn>
-      <v-btn @click="settings.themeToggle()">Toggle theme</v-btn>
+      <v-btn @click="settings.toggleTheme()">Toggle theme</v-btn>
     </v-card-actions>
   </v-card>
 </template>
