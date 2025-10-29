@@ -1,25 +1,48 @@
 <template>
-  <router-link to="/">Home</router-link>
+  <component :is="LayoutComponent">
+    <RouterView />
+  </component>
+  <RouterLink to="/">Home</RouterLink>
   |
-  <router-link to="/about">About</router-link>
+  <RouterLink to="/about">About</RouterLink>
   |
-  <router-link to="/sandbox">Sandbox</router-link>
-  <br />
-  <br />
-  <v-radio-group inline v-model="locale" :label="t('choose.language')">
-    <v-radio label="en" value="en"></v-radio>
-    <v-radio label="fr" value="fr"></v-radio>
-  </v-radio-group>
-  <br />
-  <br />
-  <router-view />
-  <br />
-  <br />
-  <test-component />
-  <p>{{ t('welcome.message') }}</p>
+  <RouterLink to="/sandbox">Sandbox</RouterLink>
 </template>
 
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-const { locale, t } = useI18n()
+import { useRoute } from 'vue-router'
+import { computed, defineAsyncComponent } from 'vue'
+
+const layoutModules = import.meta.glob('./layouts/*.vue')
+
+function extractName(path: string) {
+  return path
+    .split('/')
+    .pop()
+    ?.replace(/\.\w+$/, '')
+    .replace(/Layout$/i, '')
+    .toLowerCase()
+}
+
+const availableLayouts: Record<string, () => Promise<Record<string, unknown>>> = {}
+for (const path in layoutModules) {
+  const name = extractName(path)
+  if (name) {
+    availableLayouts[name] = layoutModules[path] as () => Promise<Record<string, unknown>>
+  }
+}
+
+const route = useRoute()
+
+const LayoutComponent = computed(() => {
+  const name = (route.meta?.layout as string) || 'default'
+  const key = name.toLowerCase()
+
+  const loader = availableLayouts[key]
+  if (!loader) {
+    throw new Error(`[Layout] Missing layout: ${name}`)
+  }
+
+  return defineAsyncComponent(loader)
+})
 </script>

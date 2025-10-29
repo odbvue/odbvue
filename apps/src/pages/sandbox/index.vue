@@ -12,7 +12,19 @@
   </v-card>
 </template>
 
+<route>
+  { meta: { layout: 'fullscreen' } }
+</route>
+
 <script setup lang="ts">
+/*
+definePage({
+  meta: {
+    layout: 'fullscreen',
+  },
+})
+*/
+
 const cardBackground = useCardBackground('#0000ff')
 const { t } = useI18n()
 const settings = useSettingsStore()
