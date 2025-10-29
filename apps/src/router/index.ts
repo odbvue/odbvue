@@ -15,6 +15,13 @@ router.beforeEach(async (to) => {
   return true
 })
 
+router.afterEach((to) => {
+  const live = document.getElementById('route-announcer')
+  if (!live) return
+  const page = typeof to.meta?.title === 'string' ? to.meta.title : 'Page'
+  live.textContent = `${page} loaded`
+})
+
 if (import.meta.hot) {
   handleHotUpdate(router)
 }

@@ -503,7 +503,9 @@ app.use(createHead())
 // ...
 ```
 
-4. Modify router `@/router/index.ts` to enable dynamic page title
+4. Modify Router to enable dynamic page title
+
+#### `@/router/index.ts`
 
 ```ts
 //...
@@ -567,4 +569,41 @@ function focusMain() {
 ```
 :::
 
+### Route Announcer
 
+A route announcer is a hidden live region that tells screen-reader users when the view changes in your SPA - since there’s no full page reload to trigger announcements automatically.
+
+1. Add Route Announcer to Default Layout, before `<v-main>`
+
+#### `@/layouts/DefaultLayout.vue`
+
+```vue{2,6-13}
+    <v-main class="ma-4" id="main" tabindex="-1">
+      <div id="route-announcer" aria-live="polite" class="sr-only"></div>
+
+<! -- -->
+
+.sr-only {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+</style>
+```
+
+2. Att to Router
+
+#### `@/router/index.ts`
+
+```ts
+// ...
+router.afterEach((to) => {
+  const live = document.getElementById('route-announcer')
+  if (!live) return
+  const page = typeof to.meta?.title === 'string' ? to.meta.title : 'Page'
+  live.textContent = `${page} loaded`
+})
+// ...
+```

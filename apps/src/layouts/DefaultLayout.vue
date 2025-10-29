@@ -107,6 +107,7 @@
       ></v-btn>
     </v-app-bar>
     <v-main class="ma-4" id="main" tabindex="-1">
+      <div id="route-announcer" aria-live="polite" class="sr-only"></div>
       <v-breadcrumbs :items="app.navigation.breadcrumbs">
         <template v-slot:title="{ item, index }">
           <v-breadcrumbs-item
@@ -161,16 +162,28 @@ function focusMain() {
 <style scoped>
 .skip-link {
   position: absolute;
-  left: 0.5rem; top: 0.5rem;
-  padding: .5rem .75rem;
+  left: 0.5rem;
+  top: 0.5rem;
+  padding: 0.5rem 0.75rem;
   background: white;
-  border-radius: .375rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  border-radius: 0.375rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transform: translateY(-150%);
-  transition: transform .15s ease;
+  transition: transform 0.15s ease;
   z-index: 1000;
 }
 .skip-link:focus {
   transform: translateY(0);
+}
+.sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 </style>
