@@ -4,7 +4,7 @@
       <v-container>
         <v-row>
           <v-col cols="4">
-            <v-img eager class="rounded-lg border-thin" alt="OdbVue" src="./logo.svg"> </v-img>
+            <v-img eager class="rounded-lg border-thin" :alt="title" src="./logo.svg"> </v-img>
           </v-col>
         </v-row>
       </v-container>
@@ -22,7 +22,7 @@
     </v-navigation-drawer>
     <v-app-bar>
       <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
-      <v-toolbar-title>OdbVue</v-toolbar-title>
+      <v-toolbar-title>{{ title }}</v-toolbar-title>
     </v-app-bar>
     <v-main class="ma-4">
       <slot />
@@ -50,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { version } from '../../package.json'
+import { version, title } from '../../package.json'
 const drawer = ref(false)
 const pages = ref([
   { title: 'Home', icon: '$mdiHome', path: '/' },

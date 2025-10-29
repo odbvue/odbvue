@@ -52,7 +52,18 @@ This section will guide through creating a set of core features and a default la
 </script>
 ```
 
-3. Modify default layout
+3. Add title to json package
+
+#### `./apps/package.json`
+
+```json
+{
+  "name": "odbvue",
+  "title" : "OdbVue",
+  // ...
+```
+
+4. Modify default layout
 
 Add logo `./apps/public/logo.sv` and change default layout.
 
@@ -65,7 +76,7 @@ Add logo `./apps/public/logo.sv` and change default layout.
       <v-container>
         <v-row>
           <v-col cols="4">
-            <v-img eager class="rounded-lg border-thin" alt="OdbVue" src="./logo.svg"> </v-img>
+            <v-img eager class="rounded-lg border-thin" :alt="title" src="./logo.svg"> </v-img>
           </v-col>
         </v-row>
       </v-container>
@@ -83,7 +94,7 @@ Add logo `./apps/public/logo.sv` and change default layout.
     </v-navigation-drawer>
     <v-app-bar>
       <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
-      <v-toolbar-title>OdbVue</v-toolbar-title>
+      <v-toolbar-title>{{ title }}</v-toolbar-title>
     </v-app-bar>
     <v-main class="ma-4">
       <slot />
@@ -111,7 +122,7 @@ Add logo `./apps/public/logo.sv` and change default layout.
 </template>
 
 <script setup lang="ts">
-import { version } from '../../package.json'
+import { version, title } from '../../package.json'
 const drawer = ref(false)
 const pages = ref([
   { title: 'Home', icon: '$mdiHome', path: '/' },
