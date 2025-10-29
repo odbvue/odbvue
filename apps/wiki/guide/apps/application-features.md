@@ -607,3 +607,33 @@ router.afterEach((to) => {
 })
 // ...
 ```
+
+### Focus Management
+
+Focus management ensures that after navigation in a SPA, keyboard and screen-reader users start at the new page’s main heading — just like a full page load. It improves orientation and makes tabbing predictable.
+
+1. Add Focus Management feature to Router
+
+#### `@/router/index.ts`
+
+```ts{10-17}
+// ...
+router.afterEach(async (to) => {
+  // Update live region for screen readers
+  const live = document.getElementById('route-announcer')
+  const page = typeof to.meta?.title === 'string' ? to.meta.title : 'Page'
+  if (live) {
+    live.textContent = '' // clear to re-trigger
+    setTimeout(() => (live.textContent = `${page} loaded`), 30)
+  }
+  // Wait for new view to render, then move focus to first heading
+  await nextTick()
+  const heading = document.querySelector('main h1') as HTMLElement | null
+  if (heading) {
+    heading.setAttribute('tabindex', '-1')
+    heading.focus({ preventScroll: true })
+    heading.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+})
+// ...
+```

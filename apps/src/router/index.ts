@@ -15,11 +15,22 @@ router.beforeEach(async (to) => {
   return true
 })
 
-router.afterEach((to) => {
+router.afterEach(async (to) => {
+  // Update live region for screen readers
   const live = document.getElementById('route-announcer')
-  if (!live) return
   const page = typeof to.meta?.title === 'string' ? to.meta.title : 'Page'
-  live.textContent = `${page} loaded`
+  if (live) {
+    live.textContent = '' // clear to re-trigger
+    setTimeout(() => (live.textContent = `${page} loaded`), 30)
+  }
+  // Wait for new view to render, then move focus to first heading
+  await nextTick()
+  const heading = document.querySelector('main h1') as HTMLElement | null
+  if (heading) {
+    heading.setAttribute('tabindex', '-1')
+    heading.focus({ preventScroll: true })
+    heading.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 })
 
 if (import.meta.hot) {
