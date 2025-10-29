@@ -458,3 +458,64 @@ const app = useAppStore()
 </script>
 ```
 :::
+
+## Accessibility
+
+### Dynamic page titles
+
+Updating the page title makes SPAs accessible and clear — screen readers announce the new page, browser tabs show the right name, and users always know where they are.
+
+1. Install [Unhead](https://unhead.unjs.io/) to enable manipulation of page head data.
+
+```bash
+pnpm install @unhead/vue
+```
+
+2. Modify Vite Config to add Unhead to auto imports
+
+#### `./vite.config.ts`
+
+```ts{2,10}
+// ...
+import { unheadVueComposablesImports } from '@unhead/vue'
+// ...
+export default defineConfig({
+  plugins: [
+// ...
+    AutoImport({
+      imports: [
+//...
+        unheadVueComposablesImports,
+//...
+      ],
+    })
+  ],
+})
+```
+
+3. Create `unhead` instance in `@/main.ts`
+
+```ts
+// ...
+import { createHead } from '@unhead/vue/client'
+// ...
+app.use(createHead())
+// ...
+```
+
+4. Modify router `@/router/index.ts` to enable dynamic page title
+
+```ts
+//...
+import { title } from '../../package.json'
+//...
+router.beforeEach(async (to) => {
+  const appTitle = title || 'OdbVue'
+  const pageTitle = useNavigationStore().title(to.path)
+  const documentTitle = pageTitle ? `${appTitle} - ${pageTitle}` : appTitle
+  useHead({ title: documentTitle })
+  return true
+})
+// ...
+```
+

@@ -1,6 +1,6 @@
 {
   "name": "odbvue",
-  "title" : "OdbVue",
+  "title": "OdbVue",
   "version": "0.1.24",
   "private": true,
   "type": "module",
@@ -27,6 +27,7 @@
     "@erlihs/pinia-plugin-storage": "^1.1.1",
     "@intlify/unplugin-vue-i18n": "^11.0.1",
     "@mdi/js": "^7.4.47",
+    "@unhead/vue": "^2.0.19",
     "pinia": "^3.0.3",
     "unplugin-vue-markdown": "^29.2.0",
     "vue": "^3.5.22",
