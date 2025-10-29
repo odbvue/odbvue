@@ -43,6 +43,7 @@ export default defineConfig({
             { text: 'State Management', link: '/guide/apps/state-management' },
             { text: 'Auto imports', link: '/guide/apps/auto-imports' },
             { text: 'Layouts', link: '/guide/apps/layouts' },
+            { text: 'Application Features', link: '/guide/apps/application-features' },
           ],
         },
         {
