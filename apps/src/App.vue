@@ -2,11 +2,6 @@
   <component :is="LayoutComponent">
     <RouterView />
   </component>
-  <RouterLink to="/">Home</RouterLink>
-  |
-  <RouterLink to="/about">About</RouterLink>
-  |
-  <RouterLink to="/sandbox">Sandbox</RouterLink>
 </template>
 
 <script setup lang="ts">
