@@ -519,3 +519,52 @@ router.beforeEach(async (to) => {
 // ...
 ```
 
+### Skip Link
+
+A skip link is a keyboard-visible anchor shown at the very top of the page that lets users jump straight to the main content (bypassing repeated navigation, headers, etc.). It appears when focused (e.g., by pressing Tab), and when activated it moves focus into `<main>` so keyboard and screen-reader users can start interacting with the content immediately.
+
+1. Add Skip Link in Default Layout
+
+#### `@/layouts/DefaultLayout.vue`
+
+::: details source
+```vue{2,4,11-35}
+    <!-- -->
+    <v-main class="ma-4" id="main" tabindex="-1">
+      <!-- -->
+      <a class="skip-link" href="#main" @click.prevent="focusMain">Skip to content</a>
+      <slot />
+    </v-main>
+    <!-- -->
+
+<script setup lang="ts">
+// ...
+function focusMain() {
+  const el = document.getElementById('main')
+  if (el) {
+    el.focus({ preventScroll: true })
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+}
+</script>
+
+<style scoped>
+.skip-link {
+  position: absolute;
+  left: 0.5rem; top: 0.5rem;
+  padding: .5rem .75rem;
+  background: white;
+  border-radius: .375rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  transform: translateY(-150%);
+  transition: transform .15s ease;
+  z-index: 1000;
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
+</style>
+```
+:::
+
+
