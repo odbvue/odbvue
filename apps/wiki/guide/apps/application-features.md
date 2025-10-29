@@ -267,3 +267,194 @@ const app = useAppStore()
 </script>
 ```
 :::
+
+## Navigation
+
+1. Create a new store for populating navigation menu and breadcrumbs.
+
+#### `@/stores/navigation.ts `
+
+::: details source
+```ts
+import { defineStore, acceptHMRUpdate } from 'pinia'
+import { useRouter, useRoute } from 'vue-router'
+
+export const useNavigationStore = defineStore('navigation', () => {
+  const routes = useRouter().getRoutes()
+  const route = useRoute()
+
+  const allPages = routes.map((route) => {
+    return {
+      path: route.path,
+      level: route.path == '/' ? 0 : route.path.split('/').length - 1,
+      children:
+        routes.find((r) => r.path.includes(route.path) && r.path !== route.path) !== undefined,
+      title:
+        route.meta?.title?.toString() ||
+        route.path
+          .split('/')
+          .at(-1)
+          ?.split('-')
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ') ||
+        '',
+      description: route.meta?.description?.toString() || '',
+      icon: (route.meta?.icon as string) || '$mdiMinus',
+      color: (route.meta?.color as string) || '',
+      role: (route.meta?.role as string) || '',
+    }
+  })
+
+  const title = computed(() => (path: string) => {
+    const page = allPages.find((page) => page.path === path)
+    return page ? page.title : ''
+  })
+
+  const breadcrumbs = computed(() => {
+    const paths = ['', ...route.path.split('/').filter(Boolean)].map((_, i, arr) => {
+      const path = arr.slice(1, i + 1).join('/')
+      return '/' + path
+    })
+    const crumbs = allPages
+      .filter((page) => page.path !== '/:path(.*)')
+      .filter((page) => paths.includes(page.path))
+      .sort((a, b) => a.level - b.level)
+      .map((page) => {
+        return {
+          title: page.title,
+          disabled: route.path === page.path,
+          href: page.path,
+          icon: page.icon,
+        }
+      })
+    return crumbs
+  })
+
+  const pages = computed(() => {
+    return allPages.filter((page) => page.level < 2).filter((page) => page.path !== '/:path(.*)')
+  })
+
+  return {
+    pages,
+    title,
+    breadcrumbs,
+  }
+})
+
+if (import.meta.hot) {
+  import.meta.hot.accept(acceptHMRUpdate(useNavigationStore, import.meta.hot))
+}
+```
+:::
+
+2. Add navigation store to main store
+
+#### `@/stores/index.ts`
+
+```ts{5,7,12}
+import { defineStore, acceptHMRUpdate } from 'pinia'
+
+export const useAppStore = defineStore('app', () => {
+  const getSettings = () => useSettingsStore()
+  const getNavigation = () => useNavigationStore()
+
+  return { settings: getSettings(), navigation: getNavigation() }
+})
+
+if (import.meta.hot) {
+  import.meta.hot.accept(acceptHMRUpdate(useSettingsStore, import.meta.hot))
+  import.meta.hot.accept(acceptHMRUpdate(useNavigationStore, import.meta.hot))
+}
+```
+
+3. Add Breadcrumbs and Menu to Default Layout.
+
+#### `@/layots/DefaultLayout.vue`
+
+```vue{5,16-26}
+</template>
+    <!-- -->
+      <v-list>
+        <v-list-item
+          v-for="page in app.navigation.pages"
+          :key="page.path"
+          :prepend-icon="page.icon"
+          :to="page.path"
+        >
+          <v-list-item-title>{{ page.title }}</v-list-item-title>
+        </v-list-item>
+      </v-list>
+    </v-navigation-drawer>
+    <!-- -->
+    <v-main class="ma-4">
+      <v-breadcrumbs :items="app.navigation.breadcrumbs">
+        <template v-slot:title="{ item, index }">
+          <v-breadcrumbs-item
+            v-if="index !== app.navigation.breadcrumbs.length - 1"
+            :to="item.href"
+          >
+            {{ item.title }}
+          </v-breadcrumbs-item>
+          <v-breadcrumbs-item v-else>{{ item.title }}</v-breadcrumbs-item>
+        </template>
+      </v-breadcrumbs>
+      <slot />
+    </v-main>
+    <!-- -->
+</template>
+
+<script setup lang="ts">
+import { version, title } from '../../package.json'
+const { mobile } = useDisplay()
+const app = useAppStore()
+const drawer = ref(false)
+const pages = ref([ // [!code --]
+  { title: 'Home', icon: '$mdiHome', path: '/' }, // [!code --]
+  { title: 'About', icon: '$mdiInformation', path: '/about' }, // [!code --]
+  { title: 'Sandbox', icon: '$mdiCog', path: '/sandbox' }, // [!code --]
+]) // [!code --]
+</script>    
+```
+
+4. Enhance Home view with cards representing pages.
+
+#### `@/pages/index.vue`
+
+::: details source
+```vue
+<template>
+  <h1>Home</h1>
+  <v-row>
+    <v-col
+      cols="12"
+      md="4"
+      v-for="page in app.navigation.pages.filter((page) => page.path !== '/')"
+      :key="page.path"
+    >
+      <v-card
+        min-height="8em"
+        :style="useCardBackground(page.color || '#ffffff').value"
+        :prepend-icon="page.icon"
+        :title="page.title"
+        :to="page.path"
+        :text="page.description"
+      >
+      </v-card>
+    </v-col>
+  </v-row>
+</template>
+
+<script setup lang="ts">
+definePage({
+  meta: {
+    title: 'Welcome Home',
+    description: 'Welcome to the home page',
+    icon: '$mdiHome',
+    color: '#ABCDEF',
+  },
+})
+import { useCardBackground } from '@/composables/ui'
+const app = useAppStore()
+</script>
+```
+:::

@@ -11,9 +11,9 @@
       <v-divider />
       <v-list>
         <v-list-item
-          v-for="page in pages"
+          v-for="page in app.navigation.pages"
           :key="page.path"
-          :prepend-icon="page.icon || '$mdiMinus'"
+          :prepend-icon="page.icon"
           :to="page.path"
         >
           <v-list-item-title>{{ page.title }}</v-list-item-title>
@@ -107,6 +107,17 @@
       ></v-btn>
     </v-app-bar>
     <v-main class="ma-4">
+      <v-breadcrumbs :items="app.navigation.breadcrumbs">
+        <template v-slot:title="{ item, index }">
+          <v-breadcrumbs-item
+            v-if="index !== app.navigation.breadcrumbs.length - 1"
+            :to="item.href"
+          >
+            {{ item.title }}
+          </v-breadcrumbs-item>
+          <v-breadcrumbs-item v-else>{{ item.title }}</v-breadcrumbs-item>
+        </template>
+      </v-breadcrumbs>
       <slot />
     </v-main>
     <v-footer app>
@@ -136,9 +147,4 @@ import { version, title } from '../../package.json'
 const { mobile } = useDisplay()
 const app = useAppStore()
 const drawer = ref(false)
-const pages = ref([
-  { title: 'Home', icon: '$mdiHome', path: '/' },
-  { title: 'About', icon: '$mdiInformation', path: '/about' },
-  { title: 'Sandbox', icon: '$mdiCog', path: '/sandbox' },
-])
 </script>
