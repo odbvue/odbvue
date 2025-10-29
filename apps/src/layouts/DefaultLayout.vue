@@ -67,7 +67,7 @@
             </v-list-item>
             <v-list-item
               link
-              prepend-icon="app.settings.themeIcon"
+              :prepend-icon="app.settings.themeIcon"
               @click="app.settings.toggleTheme()"
             >
               <v-list-item-title>
@@ -105,8 +105,39 @@
         :prepend-icon="app.settings.themeIcon"
         @click="app.settings.toggleTheme()"
       ></v-btn>
+      <v-progress-linear
+        :active="app.ui.loading"
+        indeterminate
+        absolute
+        location="bottom"
+        height="6"
+      ></v-progress-linear>
     </v-app-bar>
     <v-main class="ma-4" id="main" tabindex="-1">
+      <v-alert
+        type="info"
+        :text="app.ui.info ? t(app.ui.info) : ''"
+        v-show="app.ui.info.length > 0"
+        class="mb-2"
+      ></v-alert>
+      <v-alert
+        type="success"
+        :text="app.ui.success ? t(app.ui.success) : ''"
+        v-show="app.ui.success.length > 0"
+        class="mb-2"
+      ></v-alert>
+      <v-alert
+        type="warning"
+        :text="app.ui.warning ? t(app.ui.warning) : ''"
+        v-show="app.ui.warning.length > 0"
+        class="mb-2"
+      ></v-alert>
+      <v-alert
+        type="error"
+        :text="app.ui.error ? t(app.ui.error) : ''"
+        v-show="app.ui.error.length > 0"
+        class="mb-2"
+      ></v-alert>
       <div id="route-announcer" aria-live="polite" class="sr-only"></div>
       <v-breadcrumbs :items="app.navigation.breadcrumbs">
         <template v-slot:title="{ item, index }">
@@ -121,6 +152,15 @@
       </v-breadcrumbs>
       <a class="skip-link" href="#main" @click.prevent="focusMain">Skip to content</a>
       <slot />
+      <v-snackbar v-model="app.ui.snackbar">
+        {{ app.ui.snack }}
+        <template v-slot:actions>
+          <v-btn color="pink" variant="text" @click="app.ui.snack = ''">
+            {{ t('close') }}
+          </v-btn>
+        </template>
+      </v-snackbar>
+      <v-overlay v-model="app.ui.loading" contained></v-overlay>
     </v-main>
     <v-footer app>
       <v-row>
@@ -147,6 +187,7 @@
 <script setup lang="ts">
 import { version, title } from '../../package.json'
 const { mobile } = useDisplay()
+const { t } = useI18n()
 const app = useAppStore()
 const drawer = ref(false)
 
