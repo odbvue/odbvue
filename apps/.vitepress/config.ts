@@ -34,6 +34,12 @@ export default defineConfig({
           ],
         },
         {
+          text: 'Apis',
+          items: [
+            { text: 'Setting up Database', link: '/guide/apis/setting-up-database' },
+          ],
+        },
+        {
           text: 'Apps',
           items: [
             { text: 'Setting up VueJs', link: '/guide/apps/setting-up-vuejs' },

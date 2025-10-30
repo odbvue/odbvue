@@ -3,6 +3,10 @@
 # Release script for managing version releases
 # Usage: ./release.sh -v x.y.z -m "release-name"
 
+# Determine repo root directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 VERSION=""
 RELEASE_NAME=""
 
@@ -38,6 +42,7 @@ echo ""
 
 # Checkout main and pull latest changes
 echo "Checking out main branch..."
+cd "$REPO_ROOT"
 git checkout main
 
 echo "Pulling latest changes..."
@@ -73,6 +78,24 @@ git tag -a v$VERSION -m "Release v$VERSION - $RELEASE_NAME"
 
 echo "Pushing tag to origin..."
 git push origin v$VERSION
+
+echo ""
+echo "Generating database artifact..."
+cd "$REPO_ROOT/db"
+
+sql /nolog <<SQL
+project release -version v$VERSION
+project gen-artifact -version v$VERSION
+exit
+SQL
+
+echo "Staging database changes..."
+cd "$REPO_ROOT"
+git add db/
+git commit -m "chore(db-release): v$VERSION" || echo "No DB changes to commit"
+
+echo "Pushing database changes..."
+git push
 
 echo ""
 echo "Release v$VERSION ($RELEASE_NAME) completed successfully!"
