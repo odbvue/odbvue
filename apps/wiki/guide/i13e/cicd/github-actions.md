@@ -124,6 +124,7 @@ on:
 
 > [!NOTE]
 > On manual runs (workflow_dispatch), the workflow fetches the release bundle by tag from the GitHub Release assets. On automatic runs (workflow_run), it downloads the artifact from the associated build run.
+> Automatic deployment only proceeds when the Build & Package workflow concludes successfully.
 
 **What it does**:
 
