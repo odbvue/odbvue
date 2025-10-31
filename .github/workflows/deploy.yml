@@ -6,6 +6,9 @@ on:
         description: "Tag to deploy (e.g., v1.2.3)"
         required: true
         type: string
+  workflow_run:
+    workflows: ["Build & Package on Tag"]
+    types: [completed]
 
 concurrency:
   group: deploy-${{ inputs.tag }}
