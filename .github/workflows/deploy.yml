@@ -55,13 +55,13 @@ jobs:
           ADB_USER: ${{ secrets.ADB_USER }}
           ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
           ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
+          TNS_ADMIN: ${{ env.TNS_ADMIN }}
         run: |
           echo "TNS_ADMIN is: $TNS_ADMIN"
           echo "Wallet files at $TNS_ADMIN:"
           ls -la "$TNS_ADMIN"
           echo "Testing connection..."
-          sql -cloudconfig "$TNS_ADMIN" \
-              "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<'SQL'
+          sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<'SQL'
           SELECT 'connected as '||USER whoami FROM dual;
           exit
           SQL
@@ -72,9 +72,9 @@ jobs:
           ADB_USER: ${{ secrets.ADB_USER }}
           ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
           ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
+          TNS_ADMIN: ${{ env.TNS_ADMIN }}
         run: |
-          sql -cloudconfig "$TNS_ADMIN" \
-              "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<SQL
+          sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<SQL
           set sqlclui off
           project deploy -file $ARTIFACT_ZIP
           exit
