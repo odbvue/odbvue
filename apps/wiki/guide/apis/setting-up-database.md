@@ -155,7 +155,7 @@ exit
 ### Step 6. Commit changes
 
 ```bash
-git add *.*
+git add .
 git commit -m "db bootstrap"
 git push
 ```
