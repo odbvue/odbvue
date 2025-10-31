@@ -137,6 +137,7 @@ The deployment process is split into three jobs that run sequentially:
    - If auto-triggered: from the Build workflow artifacts for the associated run
    - If manual: from the GitHub Release assets for the provided tag
 - Verifies bundle integrity by checking the `.sha256` checksum file
+- Publishes the downloaded bundle as a workflow artifact for downstream jobs (avoids re-downloading)
 - Outputs bundle path for dependent jobs
 
 #### Job 2: `deploy-db`
