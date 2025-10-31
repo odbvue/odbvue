@@ -9,13 +9,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v2
+        with:
+          package_json_file: 'apps/package.json'
       - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: 'apps/pnpm-lock.yaml'
+      - run: cd apps && pnpm install --frozen-lockfile
+      - run: |
+          cd apps
+          pnpm changeset version
+          git add .
+          git commit -m "chore(release): version bump and changelog"
       - uses: changesets/action@v1
         with:
-          publish: ""   # we're not publishing to a registry here
-          commit: "chore(release): version packages"
-          title: "chore: version packages"
+          publish: ""
+          commit: false
+          version: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
