@@ -5,7 +5,7 @@
     "version" : "25.3.0.0"
   },
   "schemas" : [ ],
-  "lastReleaseVersion" : "v0.1.26",
+  "lastReleaseVersion" : "",
   "export" : {
     "format" : {
       "enable" : true
