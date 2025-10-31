@@ -25,7 +25,8 @@ Set-Location "$repoRoot/apps"
 $packageJsonPath = "package.json"
 $packageJson = Get-Content $packageJsonPath -Raw | ConvertFrom-Json
 $versionParts = $packageJson.version -split '\.'
-[int]$versionParts[-1]++
+$lastIndex = $versionParts.Length - 1
+$versionParts[$lastIndex] = [int]$versionParts[$lastIndex] + 1
 $packageJson.version = $versionParts -join '.'
 $packageJson | ConvertTo-Json -Depth 10 | Set-Content $packageJsonPath
 Write-Host "Version updated to $($packageJson.version)"
