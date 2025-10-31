@@ -33,14 +33,20 @@ jobs:
         shell: bash
         run: |
           cd apps
-          pnpm changeset version || true
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No version changes to commit."
-            exit 0
+          # Skip versioning if there are no pending changeset files (exclude README.md)
+          if ls .changeset/*.md 2>/dev/null | grep -v -q 'README.md'; then
+            echo "Pending changesets found. Running versioning..."
+            pnpm changeset version
+            git add -A
+            if git diff --cached --quiet; then
+              echo "No version changes to commit after versioning."
+              exit 0
+            fi
+            git commit -m "chore(release): version bump and changelog"
+            # Push back to the same branch (typically main)
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          else
+            echo "No pending changesets; skipping version bump."
           fi
-          git commit -m "chore(release): version bump and changelog"
-          # Push back to the same branch (typically main)
-          git push origin "HEAD:${GITHUB_REF_NAME}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

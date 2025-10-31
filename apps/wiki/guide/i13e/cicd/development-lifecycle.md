@@ -166,4 +166,4 @@ git push origin v1.0.0
 ```
 
 > [!IMPORTANT]
-> We do NOT publish to npm from this repository. Versioning is used for release notes and artifact tagging only. Tags (vX.Y.Z) are created and pushed manually to control release timing.
+> We do NOT publish to npm from this repository. Versioning is used for release notes and artifact tagging only. Tags (vX.Y.Z) are created and pushed manually to control release timing. If the CI versioning step fails, fix the pending changesets and re-run the workflow.
