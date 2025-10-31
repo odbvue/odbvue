@@ -15,21 +15,21 @@ jobs:
   fetch-bundle:
     runs-on: ubuntu-latest
     outputs:
-      bundle_path: ${{ steps.dl.outputs.path }}
+      bundle_path: ${{ steps.set-path.outputs.path }}
     steps:
       - uses: actions/checkout@v4
       - name: Download bundle from Build workflow
-        id: dl
         uses: actions/download-artifact@v4
         with:
           name: release-bundle
           path: bundle
-      - run: echo "path=bundle/release-${{ inputs.tag }}.tar.gz" >> "$GITHUB_OUTPUT"
+      - name: Set bundle path
+        id: set-path
+        run: echo "path=bundle/release-${{ inputs.tag }}.tar.gz" >> "$GITHUB_OUTPUT"
 
   deploy-db:
     needs: fetch-bundle
     runs-on: ubuntu-latest
-    environment: production
     steps:
       - uses: actions/checkout@v4
       - uses: gvenzl/setup-oracle-sqlcl@v1
@@ -73,7 +73,6 @@ jobs:
   deploy-web:
     needs: [fetch-bundle, deploy-db]
     runs-on: ubuntu-latest
-    environment: production
     steps:
       - name: Setup SSH
         run: |
