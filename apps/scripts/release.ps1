@@ -57,6 +57,26 @@ if ([string]::IsNullOrEmpty($ReleaseName)) {
 }
 Write-Host ""
 
+# Create version marker file to  avoid "no changeset" situationship
+Write-Host "Creating version marker file..."
+$versionDir = "$repoRoot/db/src/database/v$VERSION"
+if (-not (Test-Path $versionDir)) {
+    New-Item -ItemType Directory -Path $versionDir -Force | Out-Null
+    Write-Host "Created version directory: $versionDir"
+}
+
+$markerFile = "$versionDir/marker.sql"
+$markerContent = "PROMPT v$VERSION release marker – no schema changes"
+Set-Content -Path $markerFile -Value $markerContent
+Write-Host "Created marker file: $markerFile"
+Write-Host ""
+
+# Commit marker file
+Write-Host "Committing marker file..."
+Set-Location $repoRoot
+git add db/src/database/v$VERSION/marker.sql
+git commit -m "chore(db): v$VERSION release marker"
+
 # Create DB Release
 Write-Host "Generating database artifact..."
 Set-Location "$repoRoot/db"
