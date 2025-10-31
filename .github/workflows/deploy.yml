@@ -144,7 +144,7 @@ jobs:
         run: |
           set -euo pipefail
           REL="/var/www/releases/${{ needs.fetch-bundle.outputs.tag }}"
-          ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "sudo mkdir -p '$REL'"
+          ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "sudo mkdir -p '$REL' && sudo chown ${{ secrets.SSH_USER }}:${{ secrets.SSH_USER }} '$REL'"
           rsync -az -e "ssh -i ~/.ssh/deploy_key" --delete bundle/apps/  ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:"$REL/apps/"
           rsync -az -e "ssh -i ~/.ssh/deploy_key" --delete bundle/wiki/  ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:"$REL/wiki/"
           rsync -az -e "ssh -i ~/.ssh/deploy_key" --delete bundle/main/  ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:"$REL/main/"
@@ -152,4 +152,5 @@ jobs:
             sudo ln -sfn '$REL/apps' /var/www/apps && \
             sudo ln -sfn '$REL/wiki' /var/www/wiki && \
             sudo ln -sfn '$REL/main' /var/www/main && \
+            sudo chown -h www-data:www-data /var/www/apps /var/www/wiki /var/www/main && \
             sudo nginx -t && sudo systemctl reload nginx"
