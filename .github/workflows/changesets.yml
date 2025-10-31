@@ -27,16 +27,13 @@ jobs:
           echo "Workspace contents:" && ls -la
           echo "apps contents:" && ls -la apps
           echo ".changeset contents:" && ls -la apps/.changeset
-      - run: |
+      - name: Create release PR or publish
+        shell: bash
+        run: |
           cd apps
-          pnpm changeset version
+          pnpm changeset version || true
           git add .
           git commit -m "chore(release): version bump and changelog" || true
-      - uses: changesets/action@v1
-        with:
-          publish: ""
-          commit: false
-          version: false
-          cwd: ./apps
+          pnpm changeset publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
