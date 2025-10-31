@@ -122,7 +122,7 @@ You'll be prompted to:
 - Write a concise summary of the changes
 
 ```bash
-git add apps/.changeset/
+git add .
 git commit -m "changeset: your feature summary"
 ```
 
