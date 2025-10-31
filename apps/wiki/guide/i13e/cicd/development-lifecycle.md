@@ -168,10 +168,5 @@ git tag -a v1.0.0 -m "Release 1.0.0"
 git push origin v1.0.0
 ```
 
-> [!TIP]
-> The `pnpm changeset version` command automatically:
->
-> - Bumps versions in `./apps/package.json`
-> - Generates/updates `CHANGELOG.md`
-> - Removes `.changeset/*.md` files
-> - Creates a commit ready to push
+> [!IMPORTANT]
+> **Manual tagging required**: `pnpm changeset version` handles version bumping only. You must manually create and push git tags (vX.Y.Z) to mark releases. This intentional separation gives you explicit control over when/what gets tagged. 
