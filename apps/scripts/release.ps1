@@ -89,10 +89,18 @@ exit
 
 $sqlScript | sql /nolog
 
+# Convert SQLcl-generated files to LF
+Get-ChildItem "$repoRoot/db/dist" -Recurse -Include "*.sql", "*.xml" | ForEach-Object {
+    $content = [System.IO.File]::ReadAllText($_.FullName)
+    $content = $content -replace "`r`n", "`n"
+    [System.IO.File]::WriteAllText($_.FullName, $content)
+}
+
+# Stage database changes
 Write-Host "Staging database changes..."
 Set-Location $repoRoot
 git add db/
-git commit -m "chore(db-release): v$VERSION" -ErrorAction SilentlyContinue | Out-Null
+git commit -m "chore(db-release): v$VERSION"
 
 Write-Host "Pushing database changes..."
 git push
