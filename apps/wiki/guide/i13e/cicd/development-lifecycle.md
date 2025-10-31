@@ -99,7 +99,7 @@ Create SQL script files manually in `db/src/<your-feature-name>` and stage them:
 ```bash
 cd db
 sql /nolog
-project stage <stage-name> -file-name ./src/your-feature-name/your-script-name.sql
+project stage add-custom -file-name ./src/your-feature-name/your-script-name.sql
 !git add db/
 !git commit -m "db: description of data change"
 exit

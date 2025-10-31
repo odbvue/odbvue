@@ -72,13 +72,15 @@ mkdir -p db
 cd db
 sql /nolog
 project init -name odbvue-db
+!git add .
+!git commit -m "db: initialize sqlcl project"
 exit
 ```
 
-### Step 3. Create `./db/src/app/000_create_schema_odbvue.sql`
+### Step 3. Create `./db/src/app/001_create_schema_odbvue.sql`
 
 ::: details source
-// todo
+<<<../../../../db/src/app/001_create_schema_odbvue.sql
 :::
 
 ### Step 4. Stage and commit  
@@ -86,8 +88,8 @@ exit
 ```bash
 cd db
 sql /nolog
-project stage db-initial-setup -file-name ./src/000_create_schema_odbvue.sql
-!git add db/
+project stage add-custom -file-name ./src/app/001_create_schema_odbvue.sql
+!git add .
 !git commit -m "db: initial setup"
 exit
 ```
