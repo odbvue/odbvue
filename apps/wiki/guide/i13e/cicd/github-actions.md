@@ -22,7 +22,7 @@ OdbVue uses three primary workflows to automate the release and deployment proce
 - Reads changeset files from `.changeset/` directory
 - Bumps version numbers based on semantic versioning (patch, minor, major)
 - Updates `CHANGELOG.md` with release notes
-- Publishes the updated package.json and changelog
+- Pushes the version bump and changelog back to the repository
 - Cleans up changeset files after processing
 
 **Workflow**:
@@ -35,8 +35,7 @@ OdbVue uses three primary workflows to automate the release and deployment proce
    ├─ Bumps version in package.json
    ├─ Generates/updates CHANGELOG.md
    └─ Removes processed .changeset/*.md files
-6. Run: pnpm changeset publish
-   └─ Publishes changes
+6. Commit and push version bump back to main
 ```
 
 **Key configuration**:
@@ -44,7 +43,7 @@ OdbVue uses three primary workflows to automate the release and deployment proce
 - Uses GitHub Actions bot account for commits
 - Uses `secrets.GITHUB_TOKEN` for authentication
 
-**When to use**: Automatically triggered as part of your release process. No manual intervention needed after you merge your feature branch.
+**When to use**: Automatically triggered as part of your release process. No manual intervention needed after you merge your feature branch. We do not publish to npm in this repository.
 
 ---
 
