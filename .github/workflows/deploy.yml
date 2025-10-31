@@ -29,9 +29,15 @@ jobs:
           ADB_WALLET_PASSWORD: ${{ secrets.ADB_WALLET_PASSWORD }}
         run: |
           mkdir -p "$RUNNER_TEMP/wallet"
+          echo "Decoding wallet from base64..."
           echo "$ADB_WALLET_BASE64" | base64 -d > "$RUNNER_TEMP/wallet.zip"
+          echo "Wallet ZIP size: $(stat -f%z "$RUNNER_TEMP/wallet.zip" 2>/dev/null || stat -c%s "$RUNNER_TEMP/wallet.zip")"
+          echo "Extracting wallet..."
           unzip -P "$ADB_WALLET_PASSWORD" -q "$RUNNER_TEMP/wallet.zip" -d "$RUNNER_TEMP/wallet"
+          echo "Wallet contents:"
+          ls -la "$RUNNER_TEMP/wallet"
           echo "TNS_ADMIN=$RUNNER_TEMP/wallet" >> $GITHUB_ENV
+          echo "Set TNS_ADMIN=$RUNNER_TEMP/wallet"
 
       - name: Build artifact
         working-directory: db
@@ -50,7 +56,11 @@ jobs:
           ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
           ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
         run: |
-          sql -cloudconfig "$RUNNER_TEMP/wallet" \
+          echo "TNS_ADMIN is: $TNS_ADMIN"
+          echo "Wallet files at $TNS_ADMIN:"
+          ls -la "$TNS_ADMIN"
+          echo "Testing connection..."
+          sql -cloudconfig "$TNS_ADMIN" \
               "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<'SQL'
           SELECT 'connected as '||USER whoami FROM dual;
           exit
@@ -63,7 +73,7 @@ jobs:
           ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
           ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
         run: |
-          sql -cloudconfig "$RUNNER_TEMP/wallet" \
+          sql -cloudconfig "$TNS_ADMIN" \
               "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<SQL
           set sqlclui off
           project deploy -file $ARTIFACT_ZIP
