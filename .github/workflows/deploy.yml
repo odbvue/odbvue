@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   fetch-bundle:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     outputs:
       bundle_path: ${{ steps.set-path.outputs.path }}
@@ -66,6 +67,7 @@ jobs:
 
   deploy-db:
     needs: fetch-bundle
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -140,6 +142,7 @@ jobs:
 
   deploy-web:
     needs: [fetch-bundle, deploy-db]
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     steps:
       - name: Download bundle from Build workflow (auto-trigger)
