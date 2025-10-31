@@ -27,13 +27,18 @@ jobs:
           echo "Workspace contents:" && ls -la
           echo "apps contents:" && ls -la apps
           echo ".changeset contents:" && ls -la apps/.changeset
-      - name: Create release PR or publish
+      - name: Apply version bump and push
         shell: bash
         run: |
           cd apps
           pnpm changeset version || true
-          git add .
-          git commit -m "chore(release): version bump and changelog" || true
-          pnpm changeset publish
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No version changes to commit."
+            exit 0
+          fi
+          git commit -m "chore(release): version bump and changelog"
+          # Push back to the same branch (typically main)
+          git push origin "HEAD:${GITHUB_REF_NAME}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
