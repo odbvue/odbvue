@@ -47,3 +47,8 @@ A structured model with multiple branch types: `main`, `develop`, `feature/*`, `
 
 ![OdbVue Branching Strategy](./branching-strategy.png)
 
+### Tagging policy (explicit)
+
+> [!IMPORTANT]
+> By default, release tags (vX.Y.Z) are created from the `main` branch. Only create a short‑lived `release/x.y.z` branch when you need a stabilization/hardening window (e.g., coordinated QA or a date‑driven cut). In that case, complete QA on the temporary release branch, tag from that branch, then merge back and delete the release branch.
+
