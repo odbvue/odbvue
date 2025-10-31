@@ -19,16 +19,28 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       bundle_path: ${{ steps.set-path.outputs.path }}
+      tag: ${{ steps.get-tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
+      - name: Get tag
+        id: get-tag
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${{ github.event.workflow_run.head_branch }}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
       - name: Download bundle from Build workflow
         uses: actions/download-artifact@v4
         with:
           name: release-bundle
           path: bundle
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
       - name: Set bundle path
         id: set-path
-        run: echo "path=bundle/release-${{ inputs.tag }}.tar.gz" >> "$GITHUB_OUTPUT"
+        run: echo "path=bundle/release-${{ steps.get-tag.outputs.tag }}.tar.gz" >> "$GITHUB_OUTPUT"
 
   deploy-db:
     needs: fetch-bundle
@@ -48,7 +60,7 @@ jobs:
           set -euo pipefail
           mkdir -p bundle
           tar -xzf "${{ needs.fetch-bundle.outputs.bundle_path }}" -C bundle
-          echo "ART=bundle/db/odbvue-db-${{ inputs.tag }}.zip" >> $GITHUB_ENV
+          echo "ART=bundle/db/odbvue-db-${{ needs.fetch-bundle.outputs.tag }}.zip" >> $GITHUB_ENV
       - name: Smoke test ADB connection
         env:
           ADB_USER: ${{ secrets.ADB_USER }}
@@ -92,7 +104,7 @@ jobs:
       - name: Upload via rsync (atomic)
         run: |
           set -euo pipefail
-          REL="/var/www/releases/${{ inputs.tag }}"
+          REL="/var/www/releases/${{ needs.fetch-bundle.outputs.tag }}"
           ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p '$REL'"
           rsync -az -e "ssh -i ~/.ssh/deploy_key" --delete bundle/apps/  ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:"$REL/apps/"
           rsync -az -e "ssh -i ~/.ssh/deploy_key" --delete bundle/wiki/  ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:"$REL/wiki/"
