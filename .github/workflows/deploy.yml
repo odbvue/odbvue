@@ -43,8 +43,7 @@ jobs:
         working-directory: db
         run: |
           sql /nolog <<SQL
-          set sqlclui off
-          project gen-artifact -source . -name $NAME -version $VERSION -format zip
+          project gen-artifact -name $NAME -version $VERSION -format zip
           exit
           SQL
           ls -l artifact
