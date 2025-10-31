@@ -160,16 +160,48 @@ git commit -m "db bootstrap"
 git push
 ```
 
-### Step 7. Create DB release
+## CI/CD
+
+### Step 1. Create DB release
 
 ```bash
 cd db
 sql /nolog
 project release -version v0.1.26
 project gen-artifact -version v0.1.26
+exit
 ```
 
-> [!NOTE]
-> This can be automated in release script so that release number is always matching one in package.json
+### Step 2. Commit changes
+
+```bash
+git add .
+git commit -m "db release"
+git push
+```
+
+### Step 3. Create GitHub Secrets for DB Deployment
+
+1. Convert Database Wallet to Base64
+
+2. Create Github secrets.
+
+Go to **repository** -> **Settings** -> **Secrets and variables** -> **Actions** and add:
+
+```ini
+ADB_USER=ADMIN
+ABD_PASSWORD=MySecurePass123!
+ADB_WALLET_BASE64=ass...
+ADB_WALLET_PASSWORD=MySecurePass123!
+ADB_TNS_ALIAS=odbvue_tp 
+```
+
+3. Modify Github Actions pipeline
+
+#### `@./.github/workflows/deploy.yml`
+
+:::details source
+
+:::
 
 //todo
