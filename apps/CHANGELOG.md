@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.1.44
+
+### Patch Changes
+
+- f2f67a1: packagemanager version
+
 ## 0.1.42
 
 ### Patch Changes
