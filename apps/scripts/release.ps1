@@ -57,7 +57,7 @@ if ([string]::IsNullOrEmpty($ReleaseName)) {
 }
 Write-Host ""
 
-# Create version marker file to  avoid "no changeset" situationship
+# Create version marker file to avoid no changeset situation
 Write-Host "Creating version marker file..."
 $versionDir = "$repoRoot/db/src/database/v$VERSION"
 if (-not (Test-Path $versionDir)) {
@@ -66,7 +66,7 @@ if (-not (Test-Path $versionDir)) {
 }
 
 $markerFile = "$versionDir/marker.sql"
-$markerContent = "PROMPT v$VERSION release marker – no schema changes"
+$markerContent = "PROMPT v$VERSION release marker - no schema changes"
 Set-Content -Path $markerFile -Value $markerContent
 Write-Host "Created marker file: $markerFile"
 Write-Host ""
