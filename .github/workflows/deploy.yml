@@ -51,8 +51,10 @@ jobs:
           ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
         run: |
           sql -cloudconfig "$RUNNER_TEMP/wallet" \
-              "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" \
-              "SELECT 'connected as '||USER whoami FROM dual;"
+              "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<'SQL'
+          SELECT 'connected as '||USER whoami FROM dual;
+          exit
+          SQL
 
       - name: Deploy artifact
         working-directory: db
