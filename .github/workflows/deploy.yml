@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to deploy (e.g., v1.2.3)"
+        description: "Tag to deploy (e.g., v1.2.3). Must have a corresponding release artifact from a previous successful 'Build & Package on Tag' workflow run."
         required: true
         type: string
   workflow_run:
@@ -38,6 +38,15 @@ jobs:
           path: bundle
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
+      - name: Verify bundle exists
+        run: |
+          BUNDLE_PATH="bundle/release-${{ steps.get-tag.outputs.tag }}.tar.gz"
+          if [ ! -f "$BUNDLE_PATH" ]; then
+            echo "::error::Bundle file not found: $BUNDLE_PATH"
+            echo "Available files in bundle directory:"
+            ls -la bundle/ || echo "bundle directory does not exist"
+            exit 1
+          fi
       - name: Set bundle path
         id: set-path
         run: echo "path=bundle/release-${{ steps.get-tag.outputs.tag }}.tar.gz" >> "$GITHUB_OUTPUT"
@@ -59,8 +68,19 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p bundle
+          if [ ! -f "${{ needs.fetch-bundle.outputs.bundle_path }}" ]; then
+            echo "::error::Bundle file not found at: ${{ needs.fetch-bundle.outputs.bundle_path }}"
+            exit 1
+          fi
           tar -xzf "${{ needs.fetch-bundle.outputs.bundle_path }}" -C bundle
-          echo "ART=bundle/db/odbvue-db-${{ needs.fetch-bundle.outputs.tag }}.zip" >> $GITHUB_ENV
+          DB_ZIP="bundle/db/odbvue-db-${{ needs.fetch-bundle.outputs.tag }}.zip"
+          if [ ! -f "$DB_ZIP" ]; then
+            echo "::error::Database artifact not found in bundle: $DB_ZIP"
+            echo "Contents of bundle:"
+            find bundle -type f || true
+            exit 1
+          fi
+          echo "ART=$DB_ZIP" >> $GITHUB_ENV
       - name: Smoke test ADB connection
         env:
           ADB_USER: ${{ secrets.ADB_USER }}
@@ -100,7 +120,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p bundle
+          if [ ! -f "${{ needs.fetch-bundle.outputs.bundle_path }}" ]; then
+            echo "::error::Bundle file not found at: ${{ needs.fetch-bundle.outputs.bundle_path }}"
+            exit 1
+          fi
           tar -xzf "${{ needs.fetch-bundle.outputs.bundle_path }}" -C bundle
+          echo "Extracted bundle contents:"
+          find bundle -type f -o -type d | head -20
       - name: Upload via rsync (atomic)
         run: |
           set -euo pipefail
