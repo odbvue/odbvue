@@ -36,13 +36,13 @@ jobs:
       - name: Build artifact
         working-directory: db
         run: |
-          sql /nolog <<'SQL'
+          sql /nolog <<SQL
           set sqlclui off
-          project gen-artifact -name ${NAME} -version ${VERSION} -format zip
+          project gen-artifact -name $NAME -version $VERSION -format zip
           exit
           SQL
           ls -l artifact
-          echo "ARTIFACT_ZIP=artifact/${NAME}-${VERSION}.zip" >> "$GITHUB_ENV"
+          echo "ARTIFACT_ZIP=artifact/$NAME-$VERSION.zip" >> "$GITHUB_ENV"
 
       - name: Smoke test ADB connection
         env:
@@ -64,9 +64,9 @@ jobs:
           ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
         run: |
           sql -cloudconfig "$RUNNER_TEMP/wallet" \
-              "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<'SQL'
+              "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<SQL
           set sqlclui off
-          project deploy -file ${ARTIFACT_ZIP}
+          project deploy -file $ARTIFACT_ZIP
           exit
           SQL
 
