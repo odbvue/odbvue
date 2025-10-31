@@ -139,7 +139,7 @@ jobs:
           fi
           tar -xzf "${{ needs.fetch-bundle.outputs.bundle_path }}" -C bundle
           echo "Extracted bundle contents:"
-          find bundle -type f -o -type d | head -20
+          find bundle -type f -o -type d | head -20 || true
       - name: Upload via rsync (atomic)
         run: |
           set -euo pipefail
