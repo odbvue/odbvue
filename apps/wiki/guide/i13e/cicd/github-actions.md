@@ -122,12 +122,17 @@ on:
     types: [completed]
 ```
 
+> [!NOTE]
+> On manual runs (workflow_dispatch), the workflow fetches the release bundle by tag from the GitHub Release assets. On automatic runs (workflow_run), it downloads the artifact from the associated build run.
+
 **What it does**:
 
 The deployment process is split into three jobs that run sequentially:
 
 #### Job 1: `fetch-bundle`
-- Downloads the release bundle from the Build workflow artifacts
+- Downloads the release bundle
+   - If auto-triggered: from the Build workflow artifacts for the associated run
+   - If manual: from the GitHub Release assets for the provided tag
 - Verifies bundle integrity
 - Outputs bundle path for dependent jobs
 
@@ -229,14 +234,24 @@ The three workflows work together to create a complete CI/CD pipeline:
 
 7. Release complete, ready for deployment
 
-8. Deployment manually triggered or automatic
+8. Deployment manually triggered (by tag) or automatic (after successful build)
    └─ Triggers: deploy.yml
 
 9. Deploy workflow runs
-   ├─ Downloads bundle from build artifacts
+   ├─ Downloads bundle from build artifacts or Release assets (by tag)
    ├─ Deploys database changes to ADB
    ├─ Deploys web applications (blue/green)
    └─ Validates and reloads web server
 
 10. Production updated with zero-downtime
+
+### Manual deployment by tag
+
+You can deploy a specific version manually:
+
+1. Ensure a build has been performed for the tag (push a tag like `v1.2.3` to trigger the build). The build workflow publishes the bundle as GitHub Release assets on that tag.
+2. Run the Deploy workflow manually and provide the tag (e.g., `v1.2.3`).
+3. The workflow will download `release-<TAG>.tar.gz` (and `.sha256`) from the Release assets and proceed with DB and web deployment.
+
+If the release assets don’t exist for the tag, re-run the build workflow by pushing the tag or creating the release assets, then re-run the manual deploy.
 ```
