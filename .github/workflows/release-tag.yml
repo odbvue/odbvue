@@ -1,0 +1,61 @@
+name: Build & Package on Tag
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_zip: ${{ steps.db.outputs.zip }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SQLcl
+        uses: gvenzl/setup-oracle-sqlcl@v1
+        with:
+          version: latest
+
+      - name: Build DB artifact (zip)
+        id: db
+        working-directory: db
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME}"
+          NAME="odbvue-db"
+          sql /nolog <<SQL
+          project gen-artifact -name $NAME -version $VERSION -format zip
+          exit
+          SQL
+          test -f "artifact/$NAME-$VERSION.zip"
+          echo "zip=artifact/$NAME-$VERSION.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Setup pnpm/node
+        uses: pnpm/action-setup@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: 'apps/pnpm-lock.yaml'
+      - run: cd apps && pnpm install --frozen-lockfile
+      - run: cd apps && pnpm build && pnpm wiki:build
+
+      - name: Assemble release bundle
+        run: |
+          set -euo pipefail
+          mkdir -p build-bundle/{apps,wiki,main,db}
+          cp -r apps/dist/* build-bundle/apps/ || true
+          cp -r apps/.vitepress/dist/* build-bundle/wiki/ || true
+          cp -r main/* build-bundle/main/ || true
+          cp "${{ steps.db.outputs.zip }}" build-bundle/db/
+          tar -czf "release-${GITHUB_REF_NAME}.tar.gz" -C build-bundle .
+          shasum -a 256 "release-${GITHUB_REF_NAME}.tar.gz" > "release-${GITHUB_REF_NAME}.sha256"
+
+      - name: Upload bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle
+          path: |
+            release-${{ github.ref_name }}.tar.gz
+            release-${{ github.ref_name }}.sha256

@@ -1,209 +1,102 @@
-name: Deploy OdbVue
-
+name: Deploy
 on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to deploy (e.g., v1.2.3)"
+        required: true
+        type: string
+
+concurrency:
+  group: deploy-${{ inputs.tag }}
+  cancel-in-progress: false
 
 jobs:
-  deploy-adb:
-    name: Deploy ADB to OCI
+  fetch-bundle:
     runs-on: ubuntu-latest
-    
-    env:
-      VERSION: ${{ github.ref_name }}
-      NAME: odbvue-db
-    
+    outputs:
+      bundle_path: ${{ steps.dl.outputs.path }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup SQLcl
-        uses: gvenzl/setup-oracle-sqlcl@v1
+      - uses: actions/checkout@v4
+      - name: Download bundle from Build workflow
+        id: dl
+        uses: actions/download-artifact@v4
         with:
-          version: latest
+          name: release-bundle
+          path: bundle
+      - run: echo "path=bundle/release-${{ inputs.tag }}.tar.gz" >> "$GITHUB_OUTPUT"
 
+  deploy-db:
+    needs: fetch-bundle
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gvenzl/setup-oracle-sqlcl@v1
       - name: Restore ADB wallet
-        env:
-          ADB_WALLET_BASE64: ${{ secrets.ADB_WALLET_BASE64 }}
-          ADB_WALLET_PASSWORD: ${{ secrets.ADB_WALLET_PASSWORD }}
         run: |
+          set -euo pipefail
           mkdir -p "$RUNNER_TEMP/wallet"
-          echo "Decoding wallet from base64..."
-          echo "$ADB_WALLET_BASE64" | base64 -d > "$RUNNER_TEMP/wallet.zip"
-          echo "Wallet ZIP size: $(stat -f%z "$RUNNER_TEMP/wallet.zip" 2>/dev/null || stat -c%s "$RUNNER_TEMP/wallet.zip")"
-          echo "Extracting wallet..."
-          unzip -P "$ADB_WALLET_PASSWORD" -q "$RUNNER_TEMP/wallet.zip" -d "$RUNNER_TEMP/wallet"
-          echo "Wallet contents:"
-          ls -la "$RUNNER_TEMP/wallet"
+          printf %s "${{ secrets.ADB_WALLET_BASE64 }}" | base64 -d > "$RUNNER_TEMP/wallet.zip"
+          unzip -P "${{ secrets.ADB_WALLET_PASSWORD }}" -q "$RUNNER_TEMP/wallet.zip" -d "$RUNNER_TEMP/wallet"
           echo "TNS_ADMIN=$RUNNER_TEMP/wallet" >> $GITHUB_ENV
-          echo "Set TNS_ADMIN=$RUNNER_TEMP/wallet"
-
-      - name: Build artifact
-        working-directory: db
+      - name: Extract DB artifact
         run: |
-          sql /nolog <<SQL
-          project gen-artifact -name $NAME -version $VERSION -format zip
-          exit
-          SQL
-          ls -l artifact
-          echo "ARTIFACT_ZIP=artifact/$NAME-$VERSION.zip" >> "$GITHUB_ENV"
-
+          set -euo pipefail
+          mkdir -p bundle
+          tar -xzf "${{ needs.fetch-bundle.outputs.bundle_path }}" -C bundle
+          echo "ART=bundle/db/odbvue-db-${{ inputs.tag }}.zip" >> $GITHUB_ENV
       - name: Smoke test ADB connection
         env:
           ADB_USER: ${{ secrets.ADB_USER }}
           ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
           ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
-          TNS_ADMIN: ${{ env.TNS_ADMIN }}
         run: |
-          echo "TNS_ADMIN is: $TNS_ADMIN"
-          echo "Wallet files at $TNS_ADMIN:"
-          ls -la "$TNS_ADMIN"
-          echo "Testing connection..."
+          set -euo pipefail
           sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<'SQL'
           SELECT 'connected as '||USER whoami FROM dual;
           exit
           SQL
-
-      - name: Deploy artifact
-        working-directory: db
+      - name: Deploy DB artifact
         env:
           ADB_USER: ${{ secrets.ADB_USER }}
           ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
           ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
-          TNS_ADMIN: ${{ env.TNS_ADMIN }}
         run: |
+          set -euo pipefail
           sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<SQL
           set sqlclui off
-          project deploy -file $ARTIFACT_ZIP
+          project deploy -file "$ART"
           exit
           SQL
 
-  build-web:
-    name: Build Web Applications
-    needs: deploy-adb
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: latest
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-          cache-dependency-path: 'apps/pnpm-lock.yaml'
-      
-      - name: Install dependencies
-        run: cd apps && pnpm install --frozen-lockfile
-      
-      - name: Build Vue app
-        run: cd apps && pnpm build
-      
-      - name: Build VitePress wiki
-        run: cd apps && pnpm wiki:build
-      
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts
-          path: |
-            apps/dist
-            apps/.vitepress/dist
-          retention-days: 1
-      
-      - name: Reorganize artifacts for deployment
-        run: |
-          mkdir -p build-artifacts/apps
-          mkdir -p build-artifacts/wiki
-          mkdir -p build-artifacts/main
-          cp -r apps/dist/* build-artifacts/apps/ || true
-          cp -r apps/.vitepress/dist/* build-artifacts/wiki/ || true
-          cp -r main/* build-artifacts/main/ || true
-      
-      - name: Upload reorganized artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts-reorganized
-          path: build-artifacts/
-          retention-days: 1
-          
   deploy-web:
-    name: Deploy Web to OCI
-    needs: build-web
+    needs: [fetch-bundle, deploy-db]
     runs-on: ubuntu-latest
-    
-    env:
-      SSH_HOST: ${{ secrets.SSH_HOST }}
-      SSH_USER: ${{ secrets.SSH_USER }}
-    
+    environment: production
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-artifacts-reorganized
-          path: build-artifacts
-      
       - name: Setup SSH
         run: |
+          set -euo pipefail
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          printf %s "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          echo "${{ secrets.SSH_HOST_KEY }}" >> ~/.ssh/known_hosts
-      
-      - name: Copy deployment scripts to remote
+          printf %s "${{ secrets.SSH_HOST_KEY }}" >> ~/.ssh/known_hosts
+      - name: Extract bundle
         run: |
-          scp -i ~/.ssh/deploy_key -r i13e/oci/basic/scripts/* \
-            ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:/tmp/deploy-scripts/
-      
-      - name: Copy built artifacts to remote
+          set -euo pipefail
+          mkdir -p bundle
+          tar -xzf "${{ needs.fetch-bundle.outputs.bundle_path }}" -C bundle
+      - name: Upload via rsync (atomic)
         run: |
-          DEPLOY_DIR="/tmp/deployer-artifacts"
-          ssh -i ~/.ssh/deploy_key ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "mkdir -p $DEPLOY_DIR/apps $DEPLOY_DIR/wiki $DEPLOY_DIR/main"
-          scp -i ~/.ssh/deploy_key -r build-artifacts/apps/* ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:$DEPLOY_DIR/apps/
-          scp -i ~/.ssh/deploy_key -r build-artifacts/wiki/* ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:$DEPLOY_DIR/wiki/
-          scp -i ~/.ssh/deploy_key -r build-artifacts/main/* ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:$DEPLOY_DIR/main/
-      
-      - name: Create sites.yaml with correct absolute paths
-        run: |
-          cat > /tmp/sites.yaml << 'EOF'
-          sites:
-            - site_name: "main"
-              domain: "odbvue.com"
-              remote_path: "/var/www/main/"
-              local_path: "/tmp/deployer-artifacts/main"
-            - site_name: "apps"
-              domain: "apps.odbvue.com"
-              remote_path: "/var/www/apps/"
-              local_path: "/tmp/deployer-artifacts/apps"
-            - site_name: "wiki"
-              domain: "wiki.odbvue.com"
-              remote_path: "/var/www/wiki/"
-              local_path: "/tmp/deployer-artifacts/wiki"
-          ssl:
-            cert_file: "./.ssl/STAR.odbvue.com.crt"
-            key_file: "./.ssl/STAR.odbvue.com_key.txt"
-            ca_bundle_file: "./.ssl/STAR.odbvue.com.ca-bundle"
-          EOF
-          scp -i ~/.ssh/deploy_key /tmp/sites.yaml ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:/tmp/deploy-scripts/sites.yaml
-      
-      - name: Execute deployment
-        run: |
-          ssh -i ~/.ssh/deploy_key ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "cd /tmp/deploy-scripts && bash deploy.sh 2>&1"
-      
-      - name: Verify deployment
-        run: |
-          ssh -i ~/.ssh/deploy_key ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "sudo systemctl status nginx"
-      
-      - name: Cleanup SSH key
-        if: always()
-        run: rm -f ~/.ssh/deploy_key
+          set -euo pipefail
+          REL="/var/www/releases/${{ inputs.tag }}"
+          ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p '$REL'"
+          rsync -az -e "ssh -i ~/.ssh/deploy_key" --delete bundle/apps/  ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:"$REL/apps/"
+          rsync -az -e "ssh -i ~/.ssh/deploy_key" --delete bundle/wiki/  ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:"$REL/wiki/"
+          rsync -az -e "ssh -i ~/.ssh/deploy_key" --delete bundle/main/  ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:"$REL/main/"
+          ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "\
+            ln -sfn '$REL/apps' /var/www/apps && \
+            ln -sfn '$REL/wiki' /var/www/wiki && \
+            ln -sfn '$REL/main' /var/www/main && \
+            sudo nginx -t && sudo systemctl reload nginx"

@@ -1,9 +1,5 @@
 # Setting up Database
 
-## Overview
-
-This project uses **Oacle Autonomous AI Database** and **ORDS** as a full-featured, REST-enabled data platform.
-
 ## Concepts
 
 **Oracle Autonomous AI Database** is a next-generation, enterprise-grade database that supports relational, JSON, and NoSQL data models, and not only self-drives, self-secures, and self-repairs by automating tuning, patching, backups, and scaling, but also includes out-of-the-box AI capabilities - such as natural language querying, in-database machine learning, and vector search for generative AI integration - enabling developers and analysts to build and run intelligent, data-driven applications directly within the database.
@@ -33,189 +29,109 @@ It supports **SQL** for querying and data manipulation, along with **PL/SQL (Pro
 > 3. **Scalability and Load Balancing**: Scaling applications that rely heavily on database-side logic may require additional planning and tuning to ensure performance remains consistent as load increases.
 > 4. **Testing and Debugging**: Testing PL/SQL logic can sometimes be less straightforward than testing application-layer code, though modern tools and frameworks have improved this process significantly.
 >
-> **Conclusion**
+> **Disclaimer**
 >
 > Deciding whether to **implement business logic in PL/SQL** depends on your application’s needs, team expertise, and architecture. When performance, data integrity, and centralized rule enforcement are key, PL/SQL can offer clear advantages comparing to other available options.
 :::
 
-## Development lifecycle
+## Prepare Environment
 
-Historically, managing database changes was a tedious and error-prone process - DBAs and developers had to manually track schema updates, synchronize scripts across environments, and ensure consistency during deployments. This often led to versioning issues, missed dependencies, and time-consuming rollbacks. 
+1. [Enable Oracle Autonomous Database for Local Development](../../guide/i13e/local-development/database.md)
 
-Now, with Oracle’s **SQLcl Project** feature - built on Liquibase - teams get all the benefits of modern CI/CD practices for databases.
+2. [Enable Oracle Autonomous Database in Oracle Cloud Infrastructure](../../guide/i13e/oci/manage.md)
 
-### Prerequisites
+3. [Download and install SQLcl for Local Development](https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/download/)
 
-1. Oracle databases up and running 
+---
 
-- **local development** in Podman container
-
-- **test / prod** in Oracle Cloud Infrastructure
-
-2. **SQLcl** installed locally
-
-> [Enabling Oracle Autonomous Database for Local Development](../../guide/i13e/local-development/database.md)
->
-> [Enabling Oracle Autonomous Database in Oracle Cloud Infrastructure](../../guide/i13e/oci/manage.md)
->
-> [Download and install SQLcl Locally](https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/download/) installed locally
-
-### Workflow
-
-Development lifecycle overview using **SQLCl project** capabilities.
-
-```
-                               ┌────────────────────────────────────────┐
-                               │              Developer                 │
-                               │  Works in DEV schema using SQLcl,      │
-                               │  modifies tables/packages/procedures.  │
-                               └─────────────────┬──────────────────────┘
-                                                 │
-                                                 │ 1) Export changes to project
-                                                 ▼
-                           ┌────────────────────────────────────────┐
-                           │           SQLcl Projects               │
-                           │  project stage / export / release      │
-                           │  Creates versioned artifact ZIP        │
-                           └─────────────────┬──────────────────────┘
-                                             │
-                                             │ 2) Commit + push changes
-                                             ▼
-                          ┌────────────────────────────────────────┐
-                          │              Git Repository            │
-                          │   Feature branch → PR → Merge to main  │
-                          │   → Tag/Release created (vX.Y.Z)       │
-                          └─────────────────┬──────────────────────┘
-                                            │
-                                            │ 3) GitHub Actions workflow triggered
-                                            ▼
-      ┌────────────────────────────────────────────────────────────────────────┐
-      │                         GitHub Actions CI/CD                           │
-      │                                                                        │
-      │  on: push(tag=v*) or release                                           │
-      │                                                                        │
-      │  jobs:                                                                 │
-      │    ├─ deploy_db   → Deploys DB artifact to OCI Autonomous Database     │
-      │    │                (uses SQLcl Projects / Liquibase)                  │
-      │    │                                                                   │
-      │    └─ deploy_app  → Deploys app code to OCI Compute VM                 │
-      │                     (Kubernetes, or standalone Webserver)              │
-      │                                                                        │
-      └────────────────────────────────────────────────────────────────────────┘
-```
-
-## Step By Step (first release)
-
-The first release wIll create and deploy a new schema
-
-### Step 1. Check that SQLcl is installed
-
-```bash
-sql -v
-# SQLcl: Release 25.3.0.0 Production Build: 25.3.0.274.1210
-```
-
-### Step 2. Check connection
-
-Check that you can connect as admin and create saved connection to local development database
+Verify that you can connect to local development database:
 
 ```bash
 sql admin/************@127.0.0.1:1521/myatp
-alias save admin
+SELECT USER AS whoami FROM dual;
+# WHOAMI 
+# ______
+# ADMIN
+exit
 ```
 
-### Step 3. Create project
+## Create User (Schema)
 
-From project's root directory
+### Step 1. Create a feature branch
 
 ```bash
-mkdir -p db/src/bootstrap
+git checkout main
+git pull origin main
+git checkout -b feat/db-initial-setup
+```
+
+### Step 2. Initialize project (if not done yet)
+
+```bash
+mkdir -p db
 cd db
 sql /nolog
 project init -name odbvue-db
 exit
 ```
 
-### Step 4. Create user creation script
-
-#### `./db/src/bootstrap/001_create_user_odbvue.sql`
+### Step 3. Create `./db/src/app/000_create_schema_odbvue.sql`
 
 ::: details source
-<<< ../../../../db/src/bootstrap/001_create_user_odbvue.sql
+// todo
 :::
 
-### Step 5. Deploy script locally
-
-```bash
-sql admin/************@127.0.0.1:1521/myatp
-@./src/bootstrap/001_create_user_odbvue.sql MySecureUserPass123!
-exit
-```
-
-### Step 6. Commit changes
-
-```bash
-git add .
-git commit -m "db bootstrap"
-git push
-```
-
-## CI/CD
-
-### Step 1. Create DB release
+### Step 4. Stage and commit  
 
 ```bash
 cd db
 sql /nolog
-project release -version v0.1.26
-project gen-artifact -version v0.1.26
+project stage db-initial-setup -file-name ./src/000_create_schema_odbvue.sql
+!git add db/
+!git commit -m "db: initial setup"
 exit
 ```
 
-### Step 2. Commit changes
+### Step 5. Create changeset
 
 ```bash
-git add .
-git commit -m "db release"
+cd apps
+pnpm changeset
+```
+
+You'll be prompted to:
+
+- Select which packages changed: db
+- Choose the version bump type: patch
+- Write a concise summary of the changes: db initial setup
+
+```bash
+git add apps/.changeset/
+git commit -m "changeset: db initial setup"
+```
+
+### Step 6. Create and review Pull request
+
+```bash
+git push -u origin feat/db-initial-setup
+```
+
+Then on GitHub:
+
+- Open a PR against `main`
+- Request reviews
+- Address feedback and push updates
+- Ensure CI/CD checks pass
+
+### Step 6. Merge to main
+
+```bash
+git checkout main
+git pull origin main
+git merge --squash feat/db-initial-setup
 git push
+
+# Clean up
+git branch -d feat/db-initial-setup
+git push origin --delete feat/db-initial-setup
 ```
-
-### Step 3. Create GitHub Secrets for DB Deployment
-
-1. Convert Database Wallet to Base64
-
-2. Create Github secrets.
-
-Go to **repository** -> **Settings** -> **Secrets and variables** -> **Actions** and add:
-
-```ini
-ADB_USER=ADMIN
-ABD_PASSWORD=MySecurePass123!
-ADB_WALLET_BASE64=ass...
-ADB_WALLET_PASSWORD=MySecurePass123!
-ADB_TNS_ALIAS=odbvue_tp 
-```
-
-3. Modify Github Actions pipeline
-
-#### `@./.github/workflows/deploy.yml`
-
-:::details source
-
-:::
-
-4. Modify release scripts
-
-#### `@./release.sh`
-
-:::details source
-
-:::
-
-//todo
-
-!!! removing pre-build
-    "prebuild": "pnpm version patch --no-git-tag-version",
-    "prewiki:build": "pnpm version patch --no-git-tag-version",
-
-    
