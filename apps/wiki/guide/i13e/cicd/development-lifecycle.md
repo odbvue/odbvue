@@ -122,7 +122,7 @@ You'll be prompted to:
 - Write a concise summary of the changes
 
 ```bash
-git add apps/.changeset/
+git add .
 git commit -m "changeset: your feature summary"
 ```
 
@@ -156,22 +156,17 @@ git push origin --delete feat/your-feature-name
 
 When ready to release (multiple features can be batched):
 
-```bash
-cd apps
-pnpm changeset version
-git add .
-git commit -m "chore(release): version bump and changelog"
-git push
+1. Merge your PRs to `main`. The CI Changesets workflow will automatically run `pnpm changeset version`, update package versions and `CHANGELOG.md`, and push the commit back to `main`.
+2. Create a Git tag matching the new version and push it to trigger the build & package workflow:
 
-# Create a tag to mark the release
+```bash
+# Create a tag to mark the release (replace with the version from package.json)
 git tag -a v1.0.0 -m "Release 1.0.0"
 git push origin v1.0.0
 ```
 
-> [!TIP]
-> The `pnpm changeset version` command automatically:
->
-> - Bumps versions in `./apps/package.json`
-> - Generates/updates `CHANGELOG.md`
-> - Removes `.changeset/*.md` files
-> - Creates a commit ready to push
+> [!IMPORTANT]
+> We do NOT publish to npm from this repository. Versioning is used for release notes and artifact tagging only. Tags (vX.Y.Z) are created and pushed manually to control release timing. If the CI versioning step fails, fix the pending changesets and re-run the workflow.
+
+> [!NOTE]
+> Tagging policy: create release tags from `main` by default. Only create a temporary `release/x.y.z` branch when you need a stabilization window; in that case, perform QA on that branch and tag from it, then merge back to `main` and delete the release branch.

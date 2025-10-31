@@ -4,6 +4,8 @@ on:
     branches:
       - main
   workflow_dispatch: {}
+permissions:
+  contents: write
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -27,13 +29,24 @@ jobs:
           echo "Workspace contents:" && ls -la
           echo "apps contents:" && ls -la apps
           echo ".changeset contents:" && ls -la apps/.changeset
-      - name: Create release PR or publish
+      - name: Apply version bump and push
         shell: bash
         run: |
           cd apps
-          pnpm changeset version || true
-          git add .
-          git commit -m "chore(release): version bump and changelog" || true
-          pnpm changeset publish
+          # Skip versioning if there are no pending changeset files (exclude README.md)
+          if ls .changeset/*.md 2>/dev/null | grep -v -q 'README.md'; then
+            echo "Pending changesets found. Running versioning..."
+            pnpm changeset version
+            git add -A
+            if git diff --cached --quiet; then
+              echo "No version changes to commit after versioning."
+              exit 0
+            fi
+            git commit -m "chore(release): version bump and changelog"
+            # Push back to the same branch (typically main)
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          else
+            echo "No pending changesets; skipping version bump."
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

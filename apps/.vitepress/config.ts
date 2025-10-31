@@ -35,9 +35,7 @@ export default defineConfig({
         },
         {
           text: 'Apis',
-          items: [
-            { text: 'Setting up Database', link: '/guide/apis/setting-up-database' },
-          ],
+          items: [{ text: 'Setting up Database', link: '/guide/apis/setting-up-database' }],
         },
         {
           text: 'Apps',
