@@ -259,4 +259,15 @@ You can deploy a specific version manually:
 3. The workflow will download `release-<TAG>.tar.gz` (and `.sha256`) from the Release assets and proceed with DB and web deployment.
 
 If the release assets don’t exist for the tag, re-run the build workflow by pushing the tag or creating the release assets, then re-run the manual deploy.
+
+## Security
+
+We follow the principle of least privilege in our workflows:
+
+- Minimal token scopes via `permissions:` at the workflow level:
+   - Changesets: `contents: write` (push version bump commits)
+   - Build & Package: `contents: write`, `actions: write` (upload artifacts and publish Release assets)
+   - Deploy: `contents: read`, `actions: read` (download artifacts and Release assets)
+- Action references are pinned (e.g., `actions/checkout@v4`, `gvenzl/setup-oracle-sqlcl@v1`). For SQLcl, we also specify a version in the action input to ensure predictable tooling.
+- SSH deploys use known_hosts pinning and strict ownership/permissions adjustments on the target host.
 ```

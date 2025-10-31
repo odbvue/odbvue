@@ -10,6 +10,10 @@ on:
     workflows: ["Build & Package on Tag"]
     types: [completed]
 
+permissions:
+  contents: read
+  actions: read
+
 concurrency:
   # Serialize per tag when available; otherwise, fall back to the originating run id to avoid cross-tag serialization
   group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.tag || (github.event_name == 'workflow_run' && (github.event.workflow_run.head_branch || github.event.workflow_run.id)) || github.run_id }}
@@ -100,6 +104,8 @@ jobs:
           name: current-bundle
           path: bundle
       - uses: gvenzl/setup-oracle-sqlcl@v1
+        with:
+          version: latest
       - name: Restore ADB wallet
         run: |
           set -euo pipefail
