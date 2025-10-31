@@ -152,5 +152,4 @@ jobs:
             sudo ln -sfn '$REL/apps' /var/www/apps && \
             sudo ln -sfn '$REL/wiki' /var/www/wiki && \
             sudo ln -sfn '$REL/main' /var/www/main && \
-            sudo chown -h www-data:www-data /var/www/apps /var/www/wiki /var/www/main && \
             sudo nginx -t && sudo systemctl reload nginx"
