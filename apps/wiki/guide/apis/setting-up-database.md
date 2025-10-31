@@ -57,83 +57,16 @@ exit
 
 ## Create User (Schema)
 
-### Step 1. Create a feature branch
-
-```bash
-git checkout main
-git pull origin main
-git checkout -b feat/db-initial-setup
-```
-
-### Step 2. Initialize project (if not done yet)
-
-```bash
-mkdir -p db
-cd db
-sql /nolog
-project init -name odbvue-db
-!git add .
-!git commit -m "db: initialize sqlcl project"
-exit
-```
-
-### Step 3. Create `./db/src/app/001_create_schema_odbvue.sql`
+### Step 1. Create `./db/src/app/001_create_schema_odbvue.sql`
 
 ::: details source
 <<<../../../../db/src/app/001_create_schema_odbvue.sql
 :::
 
-### Step 4. Stage and commit  
+### Step 2. Follow development workflow
 
-```bash
-cd db
-sql /nolog
-project stage add-custom -file-name ./src/app/001_create_schema_odbvue.sql
-!git add .
-!git commit -m "db: initial setup"
-exit
-```
+[Development Lifecycle](./../i13e/cicd/development-lifecycle.md)
 
-### Step 5. Create changeset
-
-```bash
-cd apps
-pnpm changeset
-```
-
-You'll be prompted to:
-
-- Select which packages changed: db
-- Choose the version bump type: patch
-- Write a concise summary of the changes: db initial setup
-
-```bash
-git add apps/.changeset/
-git commit -m "changeset: db initial setup"
-```
-
-### Step 6. Create and review Pull request
-
-```bash
-git push -u origin feat/db-initial-setup
-```
-
-Then on GitHub:
-
-- Open a PR against `main`
-- Request reviews
-- Address feedback and push updates
-- Ensure CI/CD checks pass
-
-### Step 6. Merge to main
-
-```bash
-git checkout main
-git pull origin main
-git merge --squash feat/db-initial-setup
-git push
-
-# Clean up
-git branch -d feat/db-initial-setup
-git push origin --delete feat/db-initial-setup
-```
+> [!TIP]
+> After successful deployments changes are in database change log 
+> `SELECT * FROM databasechangelog;`
