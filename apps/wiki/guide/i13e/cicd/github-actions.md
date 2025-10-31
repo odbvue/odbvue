@@ -125,6 +125,9 @@ on:
 > On manual runs (workflow_dispatch), the workflow fetches the release bundle by tag from the GitHub Release assets. On automatic runs (workflow_run), it downloads the artifact from the associated build run.
 > Automatic deployment only proceeds when the Build & Package workflow concludes successfully.
 
+> [!NOTE]
+> Concurrency: Deploy runs are serialized per tag. Manual runs group on the provided tag; automatic runs group on the originating tag (or unique run id as a fallback), preventing unrelated deployments from blocking each other.
+
 **What it does**:
 
 The deployment process is split into three jobs that run sequentially:
