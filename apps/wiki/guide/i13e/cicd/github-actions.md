@@ -136,7 +136,7 @@ The deployment process is split into three jobs that run sequentially:
 - Downloads the release bundle
    - If auto-triggered: from the Build workflow artifacts for the associated run
    - If manual: from the GitHub Release assets for the provided tag
-- Verifies bundle integrity
+- Verifies bundle integrity by checking the `.sha256` checksum file
 - Outputs bundle path for dependent jobs
 
 #### Job 2: `deploy-db`
@@ -242,6 +242,7 @@ The three workflows work together to create a complete CI/CD pipeline:
 
 9. Deploy workflow runs
    ├─ Downloads bundle from build artifacts or Release assets (by tag)
+   ├─ Validates checksum (.sha256) before extraction
    ├─ Deploys database changes to ADB
    ├─ Deploys web applications (blue/green)
    └─ Validates and reloads web server
