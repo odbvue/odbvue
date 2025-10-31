@@ -23,6 +23,7 @@ Write-Host ""
 Write-Host "Building application..."
 Set-Location "$repoRoot/apps"
 pnpm build
+pnpm wiki:build
 
 # Extract version from package.json
 $packageJson = Get-Content package.json -Raw | ConvertFrom-Json

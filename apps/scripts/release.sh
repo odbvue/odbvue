@@ -43,6 +43,7 @@ echo ""
 echo "Building application..."
 cd "$REPO_ROOT/apps"
 pnpm build
+pnpm wiki:build
 
 # Extract version from package.json
 VERSION=$(grep '"version"' package.json | head -1 | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
