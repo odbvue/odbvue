@@ -15,15 +15,27 @@ Write-Host "Checking out main branch..."
 Set-Location $repoRoot
 git checkout main
 
-#Write-Host "Pulling latest changes..."
-#git pull
-#Write-Host ""
+Write-Host "Pulling latest changes..."
+git pull
+Write-Host ""
 
-# Build the application (which auto-increments version)
-Write-Host "Building application..."
+# Increment version in package.json
+Write-Host "Incrementing version in package.json..."
 Set-Location "$repoRoot/apps"
-pnpm build
-#pnpm wiki:build
+$packageJsonPath = "package.json"
+$packageJson = Get-Content $packageJsonPath -Raw | ConvertFrom-Json
+$versionParts = $packageJson.version -split '\.'
+[int]$versionParts[-1]++
+$packageJson.version = $versionParts -join '.'
+$packageJson | ConvertTo-Json -Depth 10 | Set-Content $packageJsonPath
+Write-Host "Version updated to $($packageJson.version)"
+Write-Host ""
+
+# Build the application
+# Write-Host "Building application..."
+# Set-Location "$repoRoot/apps"
+# pnpm build
+# pnpm wiki:build
 
 # Extract version from package.json
 $packageJson = Get-Content package.json -Raw | ConvertFrom-Json

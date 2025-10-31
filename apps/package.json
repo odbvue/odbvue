@@ -9,8 +9,6 @@
   },
   "scripts": {
     "dev": "vite",
-    "prebuild": "pnpm version patch --no-git-tag-version",
-    "prewiki:build": "pnpm version patch --no-git-tag-version",
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "test:unit": "vitest",

@@ -213,3 +213,9 @@ ADB_TNS_ALIAS=odbvue_tp
 :::
 
 //todo
+
+!!! removing pre-build
+    "prebuild": "pnpm version patch --no-git-tag-version",
+    "prewiki:build": "pnpm version patch --no-git-tag-version",
+
+    
