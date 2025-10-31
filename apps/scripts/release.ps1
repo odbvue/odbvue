@@ -16,6 +16,26 @@ $repoRoot = Split-Path -Parent (Split-Path -Parent $scriptDir)
 Write-Host "Starting release process for v$Version - $ReleaseName"
 Write-Host ""
 
+# Create DB Release
+Write-Host "Generating database artifact..."
+Set-Location "$repoRoot\db"
+
+$sqlScript = @"
+project release -version v$Version
+project gen-artifact -version v$Version
+exit
+"@
+
+$sqlScript | sql /nolog
+
+Write-Host "Staging database changes..."
+Set-Location $repoRoot
+git add db/
+git commit -m "chore(db-release): v$Version" -ErrorAction SilentlyContinue | Out-Null
+
+Write-Host "Pushing database changes..."
+git push
+
 # Checkout main and pull latest changes
 Write-Host "Checking out main branch..."
 Set-Location $repoRoot
@@ -53,27 +73,8 @@ Write-Host "Creating tag v$Version..."
 git tag -a v$Version -m "Release v$Version - $ReleaseName"
 
 Write-Host "Pushing tag to origin..."
+git push origin main
 git push origin v$Version
 
 Write-Host ""
-Write-Host "Generating database artifact..."
-Set-Location "$repoRoot\db"
-
-$sqlScript = @"
-project release -version v$Version
-project gen-artifact -version v$Version
-exit
-"@
-
-$sqlScript | sql /nolog
-
-Write-Host "Staging database changes..."
-Set-Location $repoRoot
-git add db/
-git commit -m "chore(db-release): v$Version" -ErrorAction SilentlyContinue | Out-Null
-
-Write-Host "Pushing database changes..."
-git push
-
-Write-Host ""
-Write-Host "Release v$Version ($ReleaseName) completed successfully!"
+Write-Host "Release process for v$Version - $ReleaseName completed successfully."

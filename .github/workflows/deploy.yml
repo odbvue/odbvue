@@ -6,8 +6,71 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
-  build:
-    name: Build Applications
+  deploy-adb:
+    name: Deploy ADB to OCI
+    runs-on: ubuntu-latest
+    
+    env:
+      VERSION: ${{ github.ref_name }}
+      NAME: odbvue-db
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SQLcl
+        uses: gvenzl/setup-oracle-sqlcl@v1
+        with:
+          version: latest
+
+      - name: Restore ADB wallet
+        env:
+          ADB_WALLET_BASE64: ${{ secrets.ADB_WALLET_BASE64 }}
+          ADB_WALLET_PASSWORD: ${{ secrets.ADB_WALLET_PASSWORD }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/wallet"
+          echo "$ADB_WALLET_BASE64" | base64 -d > "$RUNNER_TEMP/wallet.zip"
+          unzip -P "$ADB_WALLET_PASSWORD" -q "$RUNNER_TEMP/wallet.zip" -d "$RUNNER_TEMP/wallet"
+          echo "TNS_ADMIN=$RUNNER_TEMP/wallet" >> $GITHUB_ENV
+
+      - name: Build artifact
+        working-directory: db
+        run: |
+          sql /nolog <<'SQL'
+          set sqlclui off
+          project gen-artifact -name ${NAME} -version ${VERSION} -format zip
+          exit
+          SQL
+          ls -l artifact
+          echo "ARTIFACT_ZIP=artifact/${NAME}-${VERSION}.zip" >> "$GITHUB_ENV"
+
+      - name: Smoke test ADB connection
+        env:
+          ADB_USER: ${{ secrets.ADB_USER }}
+          ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
+          ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
+        run: |
+          sql -cloudconfig "$RUNNER_TEMP/wallet" \
+              "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" \
+              "SELECT 'connected as '||USER whoami FROM dual;"
+
+      - name: Deploy artifact
+        working-directory: db
+        env:
+          ADB_USER: ${{ secrets.ADB_USER }}
+          ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
+          ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
+        run: |
+          sql -cloudconfig "$RUNNER_TEMP/wallet" \
+              "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<'SQL'
+          set sqlclui off
+          project deploy -file ${ARTIFACT_ZIP}
+          exit
+          SQL
+
+  build-web:
+    name: Build Web Applications
+    needs: deploy-adb
     runs-on: ubuntu-latest
     
     steps:
@@ -60,69 +123,9 @@ jobs:
           path: build-artifacts/
           retention-days: 1
           
-  deploy-adb:
-    name: Deploy ADB to OCI
-    runs-on: ubuntu-latest
-    
-    env:
-      VERSION: ${{ github.ref_name }}
-      NAME: odbvue-db
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup SQLcl
-        uses: Quantalabs/setup-oracle-sqlcl@v1
-
-      - name: Restore ADB wallet
-        env:
-          ADB_WALLET_BASE64: ${{ secrets.ADB_WALLET_BASE64 }}
-          ADB_WALLET_PASSWORD: ${{ secrets.ADB_WALLET_PASSWORD }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/wallet"
-          echo "$ADB_WALLET_BASE64" | base64 -d > "$RUNNER_TEMP/wallet.zip"
-          unzip -P "$ADB_WALLET_PASSWORD" -q "$RUNNER_TEMP/wallet.zip" -d "$RUNNER_TEMP/wallet"
-          echo "TNS_ADMIN=$RUNNER_TEMP/wallet" >> $GITHUB_ENV
-
-      - name: Build artifact
-        working-directory: db
-        run: |
-          sql /nolog <<'SQL'
-          set sqlclui off
-          project gen-artifact -name ${NAME} -version ${VERSION} -format zip
-          exit
-          SQL
-          ls -l artifact
-          echo "ARTIFACT_ZIP=artifact/${NAME}-${VERSION}.zip" >> "$GITHUB_ENV"
-
-      - name: Smoke test ADB connection
-        env:
-          ADB_USER: ${{ secrets.ADB_USER }}
-          ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
-          ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
-        run: |
-          sql -cloudconfig "$RUNNER_TEMP/wallet" \
-              "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" \
-              "SELECT 'connected as '||USER whoami FROM dual;"
-
-      - name: Deploy artifact
-        working-directory: db
-        env:
-          ADB_USER: ${{ secrets.ADB_USER }}
-          ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
-          ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
-        run: |
-          sql -cloudconfig "$RUNNER_TEMP/wallet" \
-              "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<'SQL'
-          set sqlclui off
-          project deploy -file ${ARTIFACT_ZIP}
-          exit
-          SQL
-
   deploy-web:
     name: Deploy Web to OCI
-    needs: build
+    needs: build-web
     runs-on: ubuntu-latest
     
     env:

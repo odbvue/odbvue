@@ -40,6 +40,24 @@ set -e
 echo "Starting release process for v$VERSION - $RELEASE_NAME"
 echo ""
 
+# Create DB Release
+echo "Generating database artifact..."
+cd "$REPO_ROOT/db"
+
+sql /nolog <<SQL
+project release -version v$VERSION
+project gen-artifact -version v$VERSION
+exit
+SQL
+
+echo "Staging database changes..."
+cd "$REPO_ROOT"
+git add db/
+git commit -m "chore(db-release): v$VERSION" || echo "No DB changes to commit"
+
+echo "Pushing database changes..."
+git push
+
 # Checkout main and pull latest changes
 echo "Checking out main branch..."
 cd "$REPO_ROOT"
@@ -77,25 +95,8 @@ echo "Creating tag v$VERSION..."
 git tag -a v$VERSION -m "Release v$VERSION - $RELEASE_NAME"
 
 echo "Pushing tag to origin..."
+git push origin main
 git push origin v$VERSION
 
 echo ""
-echo "Generating database artifact..."
-cd "$REPO_ROOT/db"
-
-sql /nolog <<SQL
-project release -version v$VERSION
-project gen-artifact -version v$VERSION
-exit
-SQL
-
-echo "Staging database changes..."
-cd "$REPO_ROOT"
-git add db/
-git commit -m "chore(db-release): v$VERSION" || echo "No DB changes to commit"
-
-echo "Pushing database changes..."
-git push
-
-echo ""
-echo "Release v$VERSION ($RELEASE_NAME) completed successfully!"
+echo "Release process for v$VERSION - $RELEASE_NAME completed successfully."

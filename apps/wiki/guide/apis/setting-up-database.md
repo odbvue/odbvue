@@ -204,4 +204,12 @@ ADB_TNS_ALIAS=odbvue_tp
 
 :::
 
+4. Modify release scripts
+
+#### `@./release.sh`
+
+:::details source
+
+:::
+
 //todo
