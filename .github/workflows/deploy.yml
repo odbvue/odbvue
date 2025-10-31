@@ -31,13 +31,26 @@ jobs:
             TAG="${{ github.event.workflow_run.head_branch }}"
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-      - name: Download bundle from Build workflow
+      - name: Download bundle from Build workflow (auto-trigger)
+        if: ${{ github.event_name == 'workflow_run' }}
         uses: actions/download-artifact@v4
         with:
           name: release-bundle
           path: bundle
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
+      - name: Download bundle from GitHub Release (manual trigger)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p bundle
+          gh release download "${{ steps.get-tag.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            -p "release-${{ steps.get-tag.outputs.tag }}.tar.gz" \
+            -p "release-${{ steps.get-tag.outputs.tag }}.sha256" \
+            -D bundle
       - name: Verify bundle exists
         run: |
           BUNDLE_PATH="bundle/release-${{ steps.get-tag.outputs.tag }}.tar.gz"
@@ -56,13 +69,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Download bundle artifact
+      - name: Download bundle from Build workflow (auto-trigger)
+        if: ${{ github.event_name == 'workflow_run' }}
         uses: actions/download-artifact@v4
         with:
           name: release-bundle
           path: bundle
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
+      - name: Download bundle from GitHub Release (manual trigger)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p bundle
+          gh release download "${{ needs.fetch-bundle.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            -p "release-${{ needs.fetch-bundle.outputs.tag }}.tar.gz" \
+            -p "release-${{ needs.fetch-bundle.outputs.tag }}.sha256" \
+            -D bundle
       - uses: gvenzl/setup-oracle-sqlcl@v1
       - name: Restore ADB wallet
         run: |
@@ -116,13 +142,26 @@ jobs:
     needs: [fetch-bundle, deploy-db]
     runs-on: ubuntu-latest
     steps:
-      - name: Download bundle artifact
+      - name: Download bundle from Build workflow (auto-trigger)
+        if: ${{ github.event_name == 'workflow_run' }}
         uses: actions/download-artifact@v4
         with:
           name: release-bundle
           path: bundle
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
+      - name: Download bundle from GitHub Release (manual trigger)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p bundle
+          gh release download "${{ needs.fetch-bundle.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            -p "release-${{ needs.fetch-bundle.outputs.tag }}.tar.gz" \
+            -p "release-${{ needs.fetch-bundle.outputs.tag }}.sha256" \
+            -D bundle
       - name: Setup SSH
         run: |
           set -euo pipefail
