@@ -10,12 +10,18 @@ on:
     workflows: ["Build & Package on Tag"]
     types: [completed]
 
+permissions:
+  contents: read
+  actions: read
+
 concurrency:
-  group: deploy-${{ inputs.tag }}
+  # Serialize per tag when available; otherwise, fall back to the originating run id to avoid cross-tag serialization
+  group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.tag || (github.event_name == 'workflow_run' && (github.event.workflow_run.head_branch || github.event.workflow_run.id)) || github.run_id }}
   cancel-in-progress: false
 
 jobs:
   fetch-bundle:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     outputs:
       bundle_path: ${{ steps.set-path.outputs.path }}
@@ -31,13 +37,26 @@ jobs:
             TAG="${{ github.event.workflow_run.head_branch }}"
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-      - name: Download bundle from Build workflow
+      - name: Download bundle from Build workflow (auto-trigger)
+        if: ${{ github.event_name == 'workflow_run' }}
         uses: actions/download-artifact@v4
         with:
           name: release-bundle
           path: bundle
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
+      - name: Download bundle from GitHub Release (manual trigger)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p bundle
+          gh release download "${{ steps.get-tag.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            -p "release-${{ steps.get-tag.outputs.tag }}.tar.gz" \
+            -p "release-${{ steps.get-tag.outputs.tag }}.sha256" \
+            -D bundle
       - name: Verify bundle exists
         run: |
           BUNDLE_PATH="bundle/release-${{ steps.get-tag.outputs.tag }}.tar.gz"
@@ -47,23 +66,46 @@ jobs:
             ls -la bundle/ || echo "bundle directory does not exist"
             exit 1
           fi
+      - name: Verify bundle checksum
+        run: |
+          set -euo pipefail
+          cd bundle
+          if [ ! -f "release-${{ steps.get-tag.outputs.tag }}.sha256" ]; then
+            echo "::error::Checksum file not found: release-${{ steps.get-tag.outputs.tag }}.sha256"
+            ls -la
+            exit 1
+          fi
+          # Verify integrity; fails the job on mismatch
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum -c "release-${{ steps.get-tag.outputs.tag }}.sha256"
+          else
+            shasum -a 256 -c "release-${{ steps.get-tag.outputs.tag }}.sha256"
+          fi
       - name: Set bundle path
         id: set-path
         run: echo "path=bundle/release-${{ steps.get-tag.outputs.tag }}.tar.gz" >> "$GITHUB_OUTPUT"
+      - name: Upload bundle for downstream jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: current-bundle
+          path: |
+            bundle/release-${{ steps.get-tag.outputs.tag }}.tar.gz
+            bundle/release-${{ steps.get-tag.outputs.tag }}.sha256
 
   deploy-db:
     needs: fetch-bundle
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Download bundle artifact
+      - name: Download bundle from current workflow
         uses: actions/download-artifact@v4
         with:
-          name: release-bundle
+          name: current-bundle
           path: bundle
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event.workflow_run.id }}
       - uses: gvenzl/setup-oracle-sqlcl@v1
+        with:
+          version: latest
       - name: Restore ADB wallet
         run: |
           set -euo pipefail
@@ -78,6 +120,11 @@ jobs:
           if [ ! -f "${{ needs.fetch-bundle.outputs.bundle_path }}" ]; then
             echo "::error::Bundle file not found at: ${{ needs.fetch-bundle.outputs.bundle_path }}"
             exit 1
+          fi
+          # Verify checksum before extraction
+          SHA_FILE="bundle/$(basename "${{ needs.fetch-bundle.outputs.bundle_path }}" | sed 's/\.tar\.gz$/.sha256/')"
+          if [ -f "$SHA_FILE" ]; then
+            (cd bundle && sha256sum -c "$(basename "$SHA_FILE")")
           fi
           tar -xzf "${{ needs.fetch-bundle.outputs.bundle_path }}" -C bundle
           DB_ZIP="bundle/db/odbvue-db-${{ needs.fetch-bundle.outputs.tag }}.zip"
@@ -114,15 +161,14 @@ jobs:
 
   deploy-web:
     needs: [fetch-bundle, deploy-db]
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     steps:
-      - name: Download bundle artifact
+      - name: Download bundle from current workflow
         uses: actions/download-artifact@v4
         with:
-          name: release-bundle
+          name: current-bundle
           path: bundle
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event.workflow_run.id }}
       - name: Setup SSH
         run: |
           set -euo pipefail
@@ -136,6 +182,11 @@ jobs:
           if [ ! -f "${{ needs.fetch-bundle.outputs.bundle_path }}" ]; then
             echo "::error::Bundle file not found at: ${{ needs.fetch-bundle.outputs.bundle_path }}"
             exit 1
+          fi
+          # Verify checksum before extraction
+          SHA_FILE="bundle/$(basename "${{ needs.fetch-bundle.outputs.bundle_path }}" | sed 's/\.tar\.gz$/.sha256/')"
+          if [ -f "$SHA_FILE" ]; then
+            (cd bundle && sha256sum -c "$(basename "$SHA_FILE")")
           fi
           tar -xzf "${{ needs.fetch-bundle.outputs.bundle_path }}" -C bundle
           echo "Extracted bundle contents:"
