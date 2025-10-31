@@ -18,10 +18,13 @@ jobs:
           cache-dependency-path: 'apps/pnpm-lock.yaml'
       - run: cd apps && pnpm install --frozen-lockfile
       - run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+      - run: |
           cd apps
           pnpm changeset version
           git add .
-          git commit -m "chore(release): version bump and changelog"
+          git commit -m "chore(release): version bump and changelog" || true
       - uses: changesets/action@v1
         with:
           publish: ""
