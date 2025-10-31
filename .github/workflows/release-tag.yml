@@ -56,7 +56,7 @@ jobs:
           cp -r main/* build-bundle/main/ || true
           cp "${{ steps.db.outputs.zip }}" build-bundle/db/
           tar -czf "release-${GITHUB_REF_NAME}.tar.gz" -C build-bundle .
-          shasum -a 256 "release-${GITHUB_REF_NAME}.tar.gz" > "release-${GITHUB_REF_NAME}.sha256"
+          sha256sum "release-${GITHUB_REF_NAME}.tar.gz" > "release-${GITHUB_REF_NAME}.sha256"
 
       - name: Upload bundle
         uses: actions/upload-artifact@v4
