@@ -140,16 +140,30 @@ jobs:
           tar -xzf "${{ needs.fetch-bundle.outputs.bundle_path }}" -C bundle
           echo "Extracted bundle contents:"
           find bundle -type f -o -type d | head -20 || true
-      - name: Upload via rsync (atomic)
+      - name: Deploy with blue/green strategy
         run: |
           set -euo pipefail
-          REL="/var/www/releases/${{ needs.fetch-bundle.outputs.tag }}"
-          ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "sudo mkdir -p '$REL' && sudo chown ${{ secrets.SSH_USER }}:${{ secrets.SSH_USER }} '$REL'"
-          rsync -az -e "ssh -i ~/.ssh/deploy_key" --delete bundle/apps/  ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:"$REL/apps/"
-          rsync -az -e "ssh -i ~/.ssh/deploy_key" --delete bundle/wiki/  ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:"$REL/wiki/"
-          rsync -az -e "ssh -i ~/.ssh/deploy_key" --delete bundle/main/  ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:"$REL/main/"
-          ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "\
-            sudo ln -sfn '$REL/apps' /var/www/apps && \
-            sudo ln -sfn '$REL/wiki' /var/www/wiki && \
-            sudo ln -sfn '$REL/main' /var/www/main && \
-            sudo nginx -t && sudo systemctl reload nginx"
+          
+          for site in apps wiki main; do
+            # Get current active slot
+            ACTIVE=$(ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "readlink /var/www/$site/current 2>/dev/null | grep -oE '(blue|green)' || echo blue")
+            INACTIVE=$([ "$ACTIVE" = "blue" ] && echo "green" || echo "blue")
+            TARGET_DIR="/var/www/$site/$INACTIVE"
+            
+            echo "Deploying $site: $ACTIVE -> $INACTIVE"
+            
+            # Create target directory
+            ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "sudo mkdir -p '$TARGET_DIR' && sudo chown nginx:nginx '$TARGET_DIR'"
+            
+            # Upload content
+            rsync -az -e "ssh -i ~/.ssh/deploy_key" --delete bundle/$site/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:"$TARGET_DIR/"
+            
+            # Fix permissions
+            ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "sudo chown -R nginx:nginx '$TARGET_DIR' && sudo find '$TARGET_DIR' -type d -exec chmod 755 {} \; && sudo find '$TARGET_DIR' -type f -exec chmod 644 {} \;"
+            
+            # Flip symlink atomically
+            ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "sudo ln -sfn '$TARGET_DIR' /var/www/$site/current.tmp && sudo mv -T /var/www/$site/current.tmp /var/www/$site/current"
+          done
+          
+          # Validate and reload nginx
+          ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "sudo nginx -t && sudo systemctl reload nginx"
