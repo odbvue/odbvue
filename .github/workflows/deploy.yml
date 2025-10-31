@@ -152,13 +152,13 @@ jobs:
             
             echo "Deploying $site: $ACTIVE -> $INACTIVE"
             
-            # Clean and create target directory
-            ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "sudo rm -rf '$TARGET_DIR' && sudo mkdir -p '$TARGET_DIR' && sudo chown nginx:nginx '$TARGET_DIR'"
+            # Clean and create target directory (owned by deploy user for rsync)
+            ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "sudo rm -rf '$TARGET_DIR' && sudo mkdir -p '$TARGET_DIR' && sudo chown ${{ secrets.SSH_USER }}:${{ secrets.SSH_USER }} '$TARGET_DIR'"
             
-            # Upload content
+            # Upload content (rsync can now write)
             rsync -az -e "ssh -i ~/.ssh/deploy_key" bundle/$site/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:"$TARGET_DIR/"
             
-            # Fix permissions
+            # Fix permissions (change to nginx owner)
             ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "sudo chown -R nginx:nginx '$TARGET_DIR' && sudo find '$TARGET_DIR' -type d -exec chmod 755 {} \; && sudo find '$TARGET_DIR' -type f -exec chmod 644 {} \;"
             
             # Flip symlink atomically
