@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.1.50
+
+### Patch Changes
+
+- 8046085: cicd db refactoring
+
 ## 0.1.45
 
 ### Patch Changes
