@@ -203,6 +203,8 @@ Secrets are referenced in workflows using the format: `secrets.SECRET_NAME`
 - `ADB_USER` - Oracle database user
 - `ADB_PASSWORD` - Oracle database password
 - `ADB_TNS_ALIAS` - Oracle TNS alias/connection name
+- `ADB_SCHEMA_NAME` - Schema name of APP user (ODBVUE)
+- `ADB_SCHEMA_PASSWORD` - Password for APP user 
 - `SSH_PRIVATE_KEY` - SSH private key for web server access
 - `SSH_HOST_KEY` - SSH host public key fingerprint
 - `SSH_USER` - SSH user account (e.g., deploy user)
