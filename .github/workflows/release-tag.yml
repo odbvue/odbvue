@@ -29,6 +29,8 @@ jobs:
           VERSION="${GITHUB_REF_NAME}"
           NAME="odbvue-db"
           sql /nolog <<SQL
+          project stage add-custom -file-name ./dist/utils/777_marker.sql
+          project release -version $VERSION
           project gen-artifact -name $NAME -version $VERSION -format zip
           exit
           SQL
