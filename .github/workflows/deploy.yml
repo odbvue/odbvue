@@ -148,6 +148,10 @@ jobs:
           VERSION="${{ needs.fetch-bundle.outputs.tag }}"
           NAME="odbvue-db"
           
+          # Calculate EDITION from schema name and version
+          EDITION="${ADB_SCHEMA_NAME}_$(echo "$VERSION" | tr . _)"
+          EDITION="${EDITION^^}"
+          
           # Find the extracted database artifact in bundle
           DB_ARTIFACT="bundle/db/${NAME}-${VERSION}.zip"
           
@@ -168,6 +172,7 @@ jobs:
           define ADB_SCHEMA_NAME = '${ADB_SCHEMA_NAME}'
           define ADB_SCHEMA_PASSWORD = '${ADB_SCHEMA_PASSWORD}'
           define VERSION = '${VERSION}'
+          define EDITION = '${EDITION}'
           define ARTIFACT_PATH = '${ARTIFACT_PATH}'
           prompt Variables defined..
           project deploy -file &ARTIFACT_PATH
