@@ -274,3 +274,54 @@ We follow the principle of least privilege in our workflows:
 - Action references are pinned (e.g., `actions/checkout@v4`, `gvenzl/setup-oracle-sqlcl@v1`). For SQLcl, we also specify a version in the action input to ensure predictable tooling.
 - SSH deploys use known_hosts pinning and strict ownership/permissions adjustments on the target host.
 ```
+
+## EBR Overview
+
+**Edition-Based Redefinition (EBR)** is Oracle's zero-downtime deployment pattern:
+
+1. **Create** a new edition (invisible child edition of ORA$BASE)
+2. **Deploy** code to the new edition
+3. **Validate** the edition works
+4. **Switch** atomically - all new connections use new edition, existing connections stay on old edition
+5. **Cleanup** - keep last 3 editions, drop older ones
+
+**Result:** Zero downtime, instant rollback capability, complete audit trail via Liquibase.
+
+## Implementation details
+
+### Creating release tag
+
+#### `.\.github\worflows\release-tag.yml`
+
+build job:
+
+When a tag is pushed (e.g., `v1.2.3`),  Adds a Liquibase entry with the normalized version as a tag.
+
+### Deploying changes
+
+#### `.\.github\worflows\deploy.yml`
+
+deploy-db job
+│
+├─ Extract bundle
+├─ Create ODBVUE_v1_2_3 (invisible)
+├─ ALTER SESSION EDITION = ODBVUE_v1_2_3
+├─ project deploy -file $ART (Liquibase records tag)
+│  └─ DATABASECHANGELOG now has: id, author, dateexecuted, tag=v1_2_3
+├─ SELECT USER FROM dual (validate)
+├─ ALTER DATABASE DEFAULT EDITION = ODBVUE_v1_2_3
+│  └─ NEW CONNECTIONS use v1_2_3
+│  └─ OLD CONNECTIONS stay on ORA$BASE
+├─ Query DATABASECHANGELOG (audit)
+├─ Find editions to drop (rank > 3)
+├─ DROP ODBVUE_v1_1_9 CASCADE
+│
+└─ On failure: DROP ODBVUE_v1_2_3 CASCADE, keep previous
+
+## Diagnostics
+
+All deployed changesets:
+
+```sql
+SELECT * FROM databasechangelog;
+```
