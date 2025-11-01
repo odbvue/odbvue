@@ -96,6 +96,8 @@ jobs:
     needs: fetch-bundle
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
+    outputs:
+      new_edition: ${{ steps.create-edition.outputs.edition }}
     steps:
       - uses: actions/checkout@v4
       - name: Download bundle from current workflow
@@ -146,22 +148,205 @@ jobs:
           SELECT 'connected as '||USER whoami FROM dual;
           exit
           SQL
-      - name: Deploy DB artifact
+      - name: Create new edition for deployment
+        id: create-edition
+        env:
+          ADB_USER: ${{ secrets.ADB_USER }}
+          ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
+          ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
+          TAG: ${{ needs.fetch-bundle.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # Convert tag format: v1.2.3 -> v1_2_3 (Liquibase compatible)
+          EDITION_TAG=$(echo "$TAG" | tr '.' '_')
+          NEW_EDITION="ODBVUE_${EDITION_TAG}"
+          
+          echo "Creating new edition: $NEW_EDITION"
+          sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<SQL
+          BEGIN
+            EXECUTE IMMEDIATE 'CREATE EDITION $NEW_EDITION AS CHILD OF ORA\$BASE INVISIBLE';
+            DBMS_OUTPUT.PUT_LINE('Edition created: $NEW_EDITION');
+          EXCEPTION
+            WHEN OTHERS THEN
+              IF SQLCODE = -38801 THEN  -- Edition already exists
+                DBMS_OUTPUT.PUT_LINE('Edition already exists: $NEW_EDITION');
+              ELSE
+                RAISE;
+              END IF;
+          END;
+          /
+          exit
+          SQL
+          
+          echo "edition=$NEW_EDITION" >> "$GITHUB_OUTPUT"
+      - name: Deploy to new edition
         env:
           ADB_USER: ${{ secrets.ADB_USER }}
           ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
           ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
         run: |
           set -euo pipefail
+          NEW_EDITION="${{ steps.create-edition.outputs.edition }}"
+          
+          echo "Deploying to edition: $NEW_EDITION"
           sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<SQL
+          ALTER SESSION SET EDITION_NAME = $NEW_EDITION;
           set sqlclui off
           project deploy -file "$ART"
+          exit
+          SQL
+      - name: Validate new edition
+        env:
+          ADB_USER: ${{ secrets.ADB_USER }}
+          ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
+          ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
+        run: |
+          set -euo pipefail
+          NEW_EDITION="${{ steps.create-edition.outputs.edition }}"
+          
+          echo "Validating new edition: $NEW_EDITION"
+          sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<'SQL'
+          ALTER SESSION SET EDITION_NAME = ${NEW_EDITION};
+          SELECT USER FROM dual;
+          exit
+          SQL
+      - name: Switch to new edition
+        env:
+          ADB_USER: ${{ secrets.ADB_USER }}
+          ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
+          ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
+        run: |
+          set -euo pipefail
+          NEW_EDITION="${{ steps.create-edition.outputs.edition }}"
+          
+          echo "Activating new edition: $NEW_EDITION"
+          sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<SQL
+          ALTER DATABASE DEFAULT EDITION = $NEW_EDITION;
+          COMMIT;
+          exit
+          SQL
+      - name: Get deployment history
+        id: get-history
+        env:
+          ADB_USER: ${{ secrets.ADB_USER }}
+          ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
+          ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
+        run: |
+          set -euo pipefail
+          
+          echo "Deployment history (via DATABASECHANGELOG):"
+          sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<'SQL'
+          SELECT 
+            tag,
+            MAX(dateexecuted) AS deployed_at,
+            COUNT(*) AS changesets,
+            LISTAGG(author, ', ') WITHIN GROUP (ORDER BY author) AS authors
+          FROM databasechangelog
+          WHERE tag IS NOT NULL
+          GROUP BY tag
+          ORDER BY dateexecuted DESC;
+          exit
+          SQL
+      - name: Get cleanup targets
+        id: get-cleanup
+        env:
+          ADB_USER: ${{ secrets.ADB_USER }}
+          ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
+          ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
+        run: |
+          set -euo pipefail
+          
+          echo "Finding editions to cleanup (keeping last 3)..."
+          EDITIONS_TO_DROP=$(sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<'SQL'
+          WITH tag_summary AS (
+            SELECT 
+              tag,
+              ROW_NUMBER() OVER (ORDER BY MAX(dateexecuted) DESC) AS tag_rank,
+              MAX(dateexecuted) AS deployed_at
+            FROM databasechangelog
+            WHERE tag IS NOT NULL
+            GROUP BY tag
+          )
+          SELECT 'ODBVUE_' || tag FROM tag_summary WHERE tag_rank > 3 ORDER BY deployed_at ASC;
+          exit
+          SQL
+          )
+          
+          if [ -z "$EDITIONS_TO_DROP" ]; then
+            echo "No editions to cleanup"
+          else
+            echo "Editions to drop:"
+            echo "$EDITIONS_TO_DROP"
+          fi
+          
+          echo "editions<<EOF" >> "$GITHUB_ENV"
+          echo "$EDITIONS_TO_DROP" >> "$GITHUB_ENV"
+          echo "EOF" >> "$GITHUB_ENV"
+      - name: Cleanup old editions
+        env:
+          ADB_USER: ${{ secrets.ADB_USER }}
+          ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
+          ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
+        run: |
+          set -euo pipefail
+          
+          if [ -z "$editions" ]; then
+            echo "No editions to cleanup"
+            exit 0
+          fi
+          
+          echo "$editions" | while read -r edition; do
+            if [ -n "$edition" ] && [ "$edition" != "" ]; then
+              echo "Dropping edition: $edition"
+              sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<SQL
+              BEGIN
+                EXECUTE IMMEDIATE 'DROP EDITION $edition CASCADE';
+                DBMS_OUTPUT.PUT_LINE('Successfully dropped: $edition');
+              EXCEPTION
+                WHEN OTHERS THEN
+                  IF SQLCODE = -38802 THEN  -- Edition doesn't exist
+                    DBMS_OUTPUT.PUT_LINE('Edition does not exist: $edition');
+                  ELSE
+                    RAISE;
+                  END IF;
+              END;
+              /
+              exit
+              SQL
+            fi
+          done
+          
+          echo "Cleanup completed"
+      - name: Rollback on failure
+        if: failure()
+        env:
+          ADB_USER: ${{ secrets.ADB_USER }}
+          ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
+          ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
+        run: |
+          set -euo pipefail
+          NEW_EDITION="${{ steps.create-edition.outputs.edition }}"
+          
+          echo "Deployment failed! Rolling back..."
+          echo "Dropping failed edition: $NEW_EDITION"
+          
+          sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<SQL
+          BEGIN
+            EXECUTE IMMEDIATE 'DROP EDITION $NEW_EDITION CASCADE';
+            DBMS_OUTPUT.PUT_LINE('Rolled back: $NEW_EDITION');
+          EXCEPTION
+            WHEN OTHERS THEN
+              IF SQLCODE != -38802 THEN  -- Edition doesn't exist
+                RAISE;
+              END IF;
+          END;
+          /
           exit
           SQL
 
   deploy-web:
     needs: [fetch-bundle, deploy-db]
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
+    if: ${{ success() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')) }}
     runs-on: ubuntu-latest
     steps:
       - name: Download bundle from current workflow

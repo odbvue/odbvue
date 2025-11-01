@@ -21,6 +21,34 @@ jobs:
         with:
           version: latest
 
+      - name: Generate Liquibase release tag changelog
+        id: gen-tag
+        working-directory: db
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME}"
+          TAG_NORMALIZED="${VERSION//./_}"
+          
+          # Create releases directory if it doesn't exist
+          mkdir -p src/releases
+          
+          # Generate Liquibase changelog entry with tag
+          cat > "src/releases/release-${TAG_NORMALIZED}.yaml" <<'CHANGELOG'
+          databaseChangeLog:
+            changeSet:
+              id: tag-${TAG_NORMALIZED}
+              author: release-automation
+              changes:
+                - tagDatabase:
+                    tag: ${TAG_NORMALIZED}
+          CHANGELOG
+          
+          # Replace placeholder with actual tag
+          sed -i "s/\${TAG_NORMALIZED}/${TAG_NORMALIZED}/g" "src/releases/release-${TAG_NORMALIZED}.yaml"
+          
+          echo "tag=${TAG_NORMALIZED}" >> "$GITHUB_OUTPUT"
+          echo "Generated release tag changelog: src/releases/release-${TAG_NORMALIZED}.yaml"
+
       - name: Build DB artifact (zip)
         id: db
         working-directory: db
