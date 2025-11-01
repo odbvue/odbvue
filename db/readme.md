@@ -8,9 +8,25 @@ project init -name odbvue-db
 # Your project has been successfully created
 !git add .
 !git commit -m "db init project"
-project release -version 0.0.0
+project release -version v0.0.0
 !git add .
 !git commit -m "db init project release"
+
+000_before_deploy.sql
+777_marker.sql
+999_after_deploy.sql
+install.sql
+
+.gitignore
+.env
+
+deploy.sh
+
+release-tag.yml
+deploy.yml
+
+
+
 
 # Example Template
 
