@@ -54,19 +54,3 @@ SELECT USER AS whoami FROM dual;
 # ADMIN
 exit
 ```
-
-## Create User (Schema)
-
-### Step 1. Create `./db/src/app/001_create_schema_odbvue.sql`
-
-::: details source
-<<<../../../../db/src/app/001_create_schema_odbvue.sql
-:::
-
-### Step 2. Follow development workflow
-
-[Development Lifecycle](./../i13e/cicd/development-lifecycle.md)
-
-> [!TIP]
-> After successful deployments changes are in database change log 
-> `SELECT * FROM databasechangelog;`

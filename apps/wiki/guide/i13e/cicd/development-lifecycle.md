@@ -161,7 +161,7 @@ When ready to release (multiple features can be batched):
 
 ```bash
 # Create a tag to mark the release (replace with the version from package.json)
-git tag -a v1.0.0 -m "Release 1.0.0"
+git tag -a v1.0.0 -m "Release v1.0.0"
 git push origin v1.0.0
 ```
 
