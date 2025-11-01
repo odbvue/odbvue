@@ -164,12 +164,12 @@ jobs:
           echo "Creating new edition: $NEW_EDITION"
           sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" << ENDSQL
           BEGIN
-            EXECUTE IMMEDIATE 'CREATE EDITION $NEW_EDITION AS CHILD OF ORA\$BASE INVISIBLE';
-            DBMS_OUTPUT.PUT_LINE('Edition created: $NEW_EDITION');
+            EXECUTE IMMEDIATE 'CREATE EDITION '$NEW_EDITION' AS CHILD OF ORA\$BASE INVISIBLE';
+            DBMS_OUTPUT.PUT_LINE('Edition created: '$NEW_EDITION');
           EXCEPTION
             WHEN OTHERS THEN
               IF SQLCODE = -38801 THEN  -- Edition already exists
-                DBMS_OUTPUT.PUT_LINE('Edition already exists: $NEW_EDITION');
+                DBMS_OUTPUT.PUT_LINE('Edition already exists: '$NEW_EDITION');
               ELSE
                 RAISE;
               END IF;
@@ -179,6 +179,7 @@ jobs:
           ENDSQL
           
           echo "edition=$NEW_EDITION" >> "$GITHUB_OUTPUT"
+        shell: bash
       - name: Deploy to new edition
         env:
           ADB_USER: ${{ secrets.ADB_USER }}
@@ -219,7 +220,7 @@ jobs:
           
           echo "Activating new edition: $NEW_EDITION"
           sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<SQL
-          ALTER DATABASE DEFAULT EDITION = $NEW_EDITION;
+          ALTER DATABASE DEFAULT EDITION = "$NEW_EDITION";
           COMMIT;
           exit
           SQL
@@ -298,12 +299,12 @@ jobs:
               echo "Dropping edition: $edition"
               sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" << ENDSQL
           BEGIN
-            EXECUTE IMMEDIATE 'DROP EDITION $edition CASCADE';
-            DBMS_OUTPUT.PUT_LINE('Successfully dropped: $edition');
+            EXECUTE IMMEDIATE 'DROP EDITION '$edition' CASCADE';
+            DBMS_OUTPUT.PUT_LINE('Successfully dropped: '$edition');
           EXCEPTION
             WHEN OTHERS THEN
               IF SQLCODE = -38802 THEN
-                DBMS_OUTPUT.PUT_LINE('Edition does not exist: $edition');
+                DBMS_OUTPUT.PUT_LINE('Edition does not exist: '$edition');
               ELSE
                 RAISE;
               END IF;
@@ -330,8 +331,8 @@ jobs:
           
           sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" << ENDSQL
           BEGIN
-            EXECUTE IMMEDIATE 'DROP EDITION $NEW_EDITION CASCADE';
-            DBMS_OUTPUT.PUT_LINE('Rolled back: $NEW_EDITION');
+            EXECUTE IMMEDIATE 'DROP EDITION '$NEW_EDITION' CASCADE';
+            DBMS_OUTPUT.PUT_LINE('Rolled back: '$NEW_EDITION');
           EXCEPTION
             WHEN OTHERS THEN
               IF SQLCODE != -38802 THEN
