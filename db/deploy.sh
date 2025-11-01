@@ -46,10 +46,6 @@ define ADB_SCHEMA_PASSWORD = '${ADB_SCHEMA_PASSWORD}'
 define VERSION = '${VERSION}'
 define EDITION = '${EDITION}'
 prompt Variables defined..
-project stage add-custom -file-name ./dist/utils/777_marker.sql
-prompt Staged..
-project release -version $VERSION
-prompt Released..
 project gen-artifact -name $NAME -version $VERSION -format zip
 prompt Artifact generated..
 project deploy -file ./artifact/$NAME-$VERSION.zip
@@ -58,3 +54,9 @@ lb tag -tag "$VERSION"
 prompt Tagged..
 exit
 ENDSQL
+
+# === For Testing ===
+# project stage add-custom -file-name ./dist/utils/777_marker.sql
+# prompt Staged..
+# project release -version $VERSION
+# prompt Released..
