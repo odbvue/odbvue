@@ -1,1 +1,1 @@
-FROM container-registry.oracle.com/database/adb-free:latest-23ai
+FROM container-registry.oracle.com/database/adb-free:latest
