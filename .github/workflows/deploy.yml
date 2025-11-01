@@ -106,7 +106,7 @@ jobs:
       - uses: gvenzl/setup-oracle-sqlcl@v1
         with:
           version: latest
-      - name: Extract bundle and get artifact path
+      - name: Extract bundle and verify database artifact
         run: |
           set -euo pipefail
           if [ ! -f "${{ needs.fetch-bundle.outputs.bundle_path }}" ]; then
@@ -126,7 +126,7 @@ jobs:
             find bundle -type f || true
             exit 1
           fi
-          echo "DB_ARTIFACT=$DB_ZIP" >> $GITHUB_ENV
+          echo "Database artifact verified at: $DB_ZIP"
       - name: Restore ADB wallet
         run: |
           set -euo pipefail
@@ -147,23 +147,30 @@ jobs:
           set -euo pipefail
           VERSION="${{ needs.fetch-bundle.outputs.tag }}"
           NAME="odbvue-db"
-          EDITION="${ADB_SCHEMA_NAME}_$(echo "$VERSION" | tr . _)"
-          EDITION="${EDITION^^}"
+          
+          # Find the extracted database artifact in bundle
+          DB_ARTIFACT="bundle/db/${NAME}-${VERSION}.zip"
+          
+          # Resolve the absolute path to the artifact
+          if [ ! -f "$DB_ARTIFACT" ]; then
+            echo "::error::Database artifact not found at: $DB_ARTIFACT"
+            echo "Available files in bundle:"
+            find bundle -type f || true
+            exit 1
+          fi
+          
+          ARTIFACT_PATH="$(cd "$(dirname "$DB_ARTIFACT")" && pwd)/$(basename "$DB_ARTIFACT")"
+          echo "Deploying artifact from: $ARTIFACT_PATH"
           echo "Connecting to ${ADB_TNS_ALIAS}..."
+          
           sql -nohistory "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" << ENDSQL
           prompt Connected..
           define ADB_SCHEMA_NAME = '${ADB_SCHEMA_NAME}'
           define ADB_SCHEMA_PASSWORD = '${ADB_SCHEMA_PASSWORD}'
           define VERSION = '${VERSION}'
-          define EDITION = '${EDITION}'
+          define ARTIFACT_PATH = '${ARTIFACT_PATH}'
           prompt Variables defined..
-          project stage add-custom -file-name ./dist/utils/777_marker.sql
-          prompt Staged..
-          project release -version $VERSION
-          prompt Released..
-          project gen-artifact -name $NAME -version $VERSION -format zip
-          prompt Artifact generated..
-          project deploy -file ./artifact/$NAME-$VERSION.zip
+          project deploy -file &ARTIFACT_PATH
           prompt Artifact deployed..
           lb tag -tag "$VERSION"
           prompt Tagged..
