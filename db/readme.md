@@ -25,6 +25,10 @@ deploy.sh
 release-tag.yml
 deploy.yml
 
+changeset
+
+proj config set -name schemas -value odbvue
+project export
 
 
 
