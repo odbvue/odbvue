@@ -21,41 +21,6 @@ jobs:
         with:
           version: latest
 
-      - name: Generate release tag changelog
-        id: gen-tag
-        working-directory: db
-        run: |
-          set -euo pipefail
-          VERSION="${GITHUB_REF_NAME}"
-          TAG_NORMALIZED="${VERSION//./_}"
-          
-          # Create the tag changelog file that will be executed during project deploy
-          # This ensures the tag is recorded in DATABASECHANGELOG during deployment
-          mkdir -p "dist/releases/next/changes/release-tag"
-          
-          cat > "dist/releases/next/changes/release-tag/tag.changelog.xml" <<XMLEOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <databaseChangeLog xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                             xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
-                             xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
-                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
-            <changeSet id="tag-${TAG_NORMALIZED}" author="release" runAlways="false">
-              <tagDatabase tag="${TAG_NORMALIZED}"/>
-            </changeSet>
-          </databaseChangeLog>
-          XMLEOF
-          
-          echo "tag=${TAG_NORMALIZED}" >> "$GITHUB_OUTPUT"
-          echo "Generated tag changelog: dist/releases/next/changes/release-tag/tag.changelog.xml"
-
-      - name: Include tag changelog in release manifest
-        working-directory: db
-        run: |
-          set -euo pipefail
-          # Add include directive to the release.changelog.xml
-          sed -i '/<!--CHANGES-->/a <include file="changes/release-tag/tag.changelog.xml" relativeToChangelogFile="true"/>' dist/releases/next/release.changelog.xml
-          echo "Updated release.changelog.xml to include tag changelog"
-
       - name: Build DB artifact (zip)
         id: db
         working-directory: db
