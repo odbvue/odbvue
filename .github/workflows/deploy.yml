@@ -162,7 +162,7 @@ jobs:
           NEW_EDITION="ODBVUE_${EDITION_TAG}"
           
           echo "Creating new edition: $NEW_EDITION"
-          sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<SQL
+          sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" << ENDSQL
           BEGIN
             EXECUTE IMMEDIATE 'CREATE EDITION $NEW_EDITION AS CHILD OF ORA\$BASE INVISIBLE';
             DBMS_OUTPUT.PUT_LINE('Edition created: $NEW_EDITION');
@@ -176,7 +176,7 @@ jobs:
           END;
           /
           exit
-          SQL
+          ENDSQL
           
           echo "edition=$NEW_EDITION" >> "$GITHUB_OUTPUT"
       - name: Deploy to new edition
@@ -189,12 +189,11 @@ jobs:
           NEW_EDITION="${{ steps.create-edition.outputs.edition }}"
           
           echo "Deploying to edition: $NEW_EDITION"
-          sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<SQL
-          ALTER SESSION SET EDITION_NAME = $NEW_EDITION;
+          sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" << ENDSQL
           set sqlclui off
           project deploy -file "$ART"
           exit
-          SQL
+          ENDSQL
       - name: Validate new edition
         env:
           ADB_USER: ${{ secrets.ADB_USER }}
@@ -205,11 +204,10 @@ jobs:
           NEW_EDITION="${{ steps.create-edition.outputs.edition }}"
           
           echo "Validating new edition: $NEW_EDITION"
-          sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<'SQL'
-          ALTER SESSION SET EDITION_NAME = ${NEW_EDITION};
+          sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" << 'ENDSQL'
           SELECT USER FROM dual;
           exit
-          SQL
+          ENDSQL
       - name: Switch to new edition
         env:
           ADB_USER: ${{ secrets.ADB_USER }}
@@ -235,7 +233,7 @@ jobs:
           set -euo pipefail
           
           echo "Deployment history (via DATABASECHANGELOG):"
-          sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<'SQL'
+          sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" << 'ENDSQL'
           SELECT 
             tag,
             MAX(dateexecuted) AS deployed_at,
@@ -244,9 +242,9 @@ jobs:
           FROM databasechangelog
           WHERE tag IS NOT NULL
           GROUP BY tag
-          ORDER BY dateexecuted DESC;
+          ORDER BY MAX(dateexecuted) DESC;
           exit
-          SQL
+          ENDSQL
       - name: Get cleanup targets
         id: get-cleanup
         env:
@@ -257,7 +255,7 @@ jobs:
           set -euo pipefail
           
           echo "Finding editions to cleanup (keeping last 3)..."
-          EDITIONS_TO_DROP=$(sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<'SQL'
+          EDITIONS_TO_DROP=$(sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" << 'ENDSQL'
           WITH tag_summary AS (
             SELECT 
               tag,
@@ -269,7 +267,7 @@ jobs:
           )
           SELECT 'ODBVUE_' || tag FROM tag_summary WHERE tag_rank > 3 ORDER BY deployed_at ASC;
           exit
-          SQL
+          ENDSQL
           )
           
           if [ -z "$EDITIONS_TO_DROP" ]; then
@@ -298,21 +296,21 @@ jobs:
           echo "$editions" | while read -r edition; do
             if [ -n "$edition" ] && [ "$edition" != "" ]; then
               echo "Dropping edition: $edition"
-              sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<SQL
-              BEGIN
-                EXECUTE IMMEDIATE 'DROP EDITION $edition CASCADE';
-                DBMS_OUTPUT.PUT_LINE('Successfully dropped: $edition');
-              EXCEPTION
-                WHEN OTHERS THEN
-                  IF SQLCODE = -38802 THEN  -- Edition doesn't exist
-                    DBMS_OUTPUT.PUT_LINE('Edition does not exist: $edition');
-                  ELSE
-                    RAISE;
-                  END IF;
-              END;
-              /
-              exit
-              SQL
+              sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" << ENDSQL
+          BEGIN
+            EXECUTE IMMEDIATE 'DROP EDITION $edition CASCADE';
+            DBMS_OUTPUT.PUT_LINE('Successfully dropped: $edition');
+          EXCEPTION
+            WHEN OTHERS THEN
+              IF SQLCODE = -38802 THEN
+                DBMS_OUTPUT.PUT_LINE('Edition does not exist: $edition');
+              ELSE
+                RAISE;
+              END IF;
+          END;
+          /
+          exit
+          ENDSQL
             fi
           done
           
@@ -330,19 +328,19 @@ jobs:
           echo "Deployment failed! Rolling back..."
           echo "Dropping failed edition: $NEW_EDITION"
           
-          sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" <<SQL
+          sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" << ENDSQL
           BEGIN
             EXECUTE IMMEDIATE 'DROP EDITION $NEW_EDITION CASCADE';
             DBMS_OUTPUT.PUT_LINE('Rolled back: $NEW_EDITION');
           EXCEPTION
             WHEN OTHERS THEN
-              IF SQLCODE != -38802 THEN  -- Edition doesn't exist
+              IF SQLCODE != -38802 THEN
                 RAISE;
               END IF;
           END;
           /
           exit
-          SQL
+          ENDSQL
 
   deploy-web:
     needs: [fetch-bundle, deploy-db]
