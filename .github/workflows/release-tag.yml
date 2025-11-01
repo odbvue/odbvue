@@ -33,7 +33,7 @@ jobs:
           # This ensures the tag is recorded in DATABASECHANGELOG during deployment
           mkdir -p "dist/releases/next/changes/release-tag"
           
-          cat > "dist/releases/next/changes/release-tag/tag.changelog.xml" <<'XMLEOF'
+          cat > "dist/releases/next/changes/release-tag/tag.changelog.xml" <<XMLEOF
           <?xml version="1.0" encoding="UTF-8"?>
           <databaseChangeLog xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                              xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
