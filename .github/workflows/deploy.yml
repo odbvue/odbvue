@@ -106,17 +106,9 @@ jobs:
       - uses: gvenzl/setup-oracle-sqlcl@v1
         with:
           version: latest
-      - name: Restore ADB wallet
+      - name: Extract bundle and get artifact path
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/wallet"
-          printf %s "${{ secrets.ADB_WALLET_BASE64 }}" | base64 -d > "$RUNNER_TEMP/wallet.zip"
-          unzip -P "${{ secrets.ADB_WALLET_PASSWORD }}" -q "$RUNNER_TEMP/wallet.zip" -d "$RUNNER_TEMP/wallet"
-          echo "TNS_ADMIN=$RUNNER_TEMP/wallet" >> $GITHUB_ENV
-      - name: Extract DB artifact
-        run: |
-          set -euo pipefail
-          mkdir -p bundle
           if [ ! -f "${{ needs.fetch-bundle.outputs.bundle_path }}" ]; then
             echo "::error::Bundle file not found at: ${{ needs.fetch-bundle.outputs.bundle_path }}"
             exit 1
@@ -134,17 +126,47 @@ jobs:
             find bundle -type f || true
             exit 1
           fi
-          echo "ART=$DB_ZIP" >> $GITHUB_ENV
+          echo "DB_ARTIFACT=$DB_ZIP" >> $GITHUB_ENV
+      - name: Restore ADB wallet
+        run: |
+          set -euo pipefail
+          WALLET_DIR="/tmp/wallet"
+          mkdir -p "$WALLET_DIR"
+          printf %s "${{ secrets.ADB_WALLET_BASE64 }}" | base64 -d > "$WALLET_DIR/wallet.zip"
+          unzip -P "${{ secrets.ADB_WALLET_PASSWORD }}" -q -o "$WALLET_DIR/wallet.zip" -d "$WALLET_DIR"
+          echo "TNS_ADMIN=$WALLET_DIR" >> $GITHUB_ENV
+          echo "Wallet extracted to $WALLET_DIR"
       - name: Deploy DB
         env:
           ADB_USER: ${{ secrets.ADB_USER }}
           ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
           ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
+          ADB_SCHEMA_NAME: ${{ secrets.ADB_SCHEMA_NAME }}
+          ADB_SCHEMA_PASSWORD: ${{ secrets.ADB_SCHEMA_PASSWORD }}
         run: |
           set -euo pipefail
-          echo "Deploying DB from artifact: $ART"
-          sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" << ENDSQL
-          project deploy -file "$ART"
+          VERSION="${{ needs.fetch-bundle.outputs.tag }}"
+          NAME="odbvue-db"
+          EDITION="${ADB_SCHEMA_NAME}_$(echo "$VERSION" | tr . _)"
+          EDITION="${EDITION^^}"
+          echo "Connecting to ${ADB_TNS_ALIAS}..."
+          sql -nohistory "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" << ENDSQL
+          prompt Connected..
+          define ADB_SCHEMA_NAME = '${ADB_SCHEMA_NAME}'
+          define ADB_SCHEMA_PASSWORD = '${ADB_SCHEMA_PASSWORD}'
+          define VERSION = '${VERSION}'
+          define EDITION = '${EDITION}'
+          prompt Variables defined..
+          project stage add-custom -file-name ./dist/utils/777_marker.sql
+          prompt Staged..
+          project release -version $VERSION
+          prompt Released..
+          project gen-artifact -name $NAME -version $VERSION -format zip
+          prompt Artifact generated..
+          project deploy -file ./artifact/$NAME-$VERSION.zip
+          prompt Artifact deployed..
+          lb tag -tag "$VERSION"
+          prompt Tagged..
           exit
           ENDSQL
 
