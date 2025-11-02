@@ -27,8 +27,10 @@ $packageJson | ConvertTo-Json | Set-Content $packageJsonPath
 # Database project release
 if (Test-Path "db") {
     Push-Location db
-    sql /nolog
-    project release -version "v$VersionNoV"
+    @"
+project release -version "v$VersionNoV"
+exit
+"@ | sql /nolog
     git add .
     $dbCommitMessage = "db: release $Version $(if ($Message) { $Message })"
     git commit -m $dbCommitMessage

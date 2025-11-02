@@ -31,8 +31,10 @@ jq --arg version "$VERSION_NO_V" '.version = $version' "$PACKAGE_JSON_PATH" > "$
 # Database project release
 if [ -d "db" ]; then
     cd db
-    sql /nolog
-    project release -version "v$VERSION_NO_V"
+    sql /nolog <<EOF
+project release -version "v$VERSION_NO_V"
+exit
+EOF
     git add .
     DB_COMMIT_MESSAGE="db: release $VERSION $([ -n "$MESSAGE" ] && echo "$MESSAGE" || echo "")"
     git commit -m "$DB_COMMIT_MESSAGE"
