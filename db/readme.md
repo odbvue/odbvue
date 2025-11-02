@@ -8,6 +8,7 @@ project init -name odbvue-db
 # Your project has been successfully created
 !git add .
 !git commit -m "db init project"
+
 project release -version v0.0.0
 !git add .
 !git commit -m "db init project release"
@@ -36,11 +37,19 @@ git checkout main
 git pull origin main
 git checkout -b feat/[feature-name]
 
+mkdir db
+cd db
+
+sql /nolog
+project init -name odbvue-db
+# Your project has been successfully created
+proj config set -name schemas -value odbvue
+# Process completed successfully
+!git add .
+!git commit -m "db - project init"
 
 
 ---
-
-
 
 
 ### Step 1. Start new feature
