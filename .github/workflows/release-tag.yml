@@ -24,24 +24,13 @@ jobs:
       - name: Generate DB artifact
         id: db
         working-directory: db
-        env:
-          ADB_USER: ${{ secrets.ADB_USER }}
-          ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
-          ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME}"
           NAME="odbvue-db"
           
-          # Setup wallet for DB connection
-          WALLET_DIR="/tmp/wallet"
-          mkdir -p "$WALLET_DIR"
-          printf %s "${{ secrets.ADB_WALLET_BASE64 }}" | base64 -d > "$WALLET_DIR/wallet.zip"
-          unzip -P "${{ secrets.ADB_WALLET_PASSWORD }}" -q -o "$WALLET_DIR/wallet.zip" -d "$WALLET_DIR"
-          export TNS_ADMIN="$WALLET_DIR"
-          
-          # Generate artifact with DB connection
-          sql "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" << ENDSQL
+          # Generate artifact
+          sql /nolog << ENDSQL
           project gen-artifact -name $NAME -version $VERSION -format zip
           exit
           ENDSQL
@@ -56,23 +45,6 @@ jobs:
           
           echo "zip=db/$ARTIFACT" >> "$GITHUB_OUTPUT"
           echo "DB artifact generated: $ARTIFACT"
-
-      - name: List artifact contents
-        working-directory: db
-        run: |
-          set -euo pipefail
-          ARTIFACT="artifact/odbvue-db-${GITHUB_REF_NAME}.zip"
-          if [ -f "$ARTIFACT" ]; then
-            echo "::group::Artifact file: $ARTIFACT"
-            ls -lh "$ARTIFACT"
-            echo "::endgroup::"
-            echo "::group::Artifact contents"
-            unzip -l "$ARTIFACT"
-            echo "::endgroup::"
-          else
-            echo "::error::Artifact file not found: $ARTIFACT"
-            ls -la artifact/ || echo "artifact directory does not exist"
-          fi
 
       - name: Setup pnpm/node
         uses: pnpm/action-setup@v2

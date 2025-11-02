@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1762081214914 stripComments:false  logicalFilePath:featdb-whoami\odbvue\package_bodies\pck_api_sandbox.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_bodies/pck_api_sandbox.sql:8d3c76728775ae6d35a4af91d57e44f5f9070fe3:3f4f89c1f3e3a5e79d7050bed5641ad62f21644c:alter
+
 create or replace package body odbvue.pck_api_sandbox as
 
     procedure whoami as
@@ -53,5 +57,3 @@ create or replace package body odbvue.pck_api_sandbox as
 end pck_api_sandbox;
 /
 
-
--- sqlcl_snapshot {"hash":"3f4f89c1f3e3a5e79d7050bed5641ad62f21644c","type":"PACKAGE_BODY","name":"PCK_API_SANDBOX","schemaName":"ODBVUE","sxml":""}
