@@ -188,62 +188,90 @@ terraform destroy
 
 ## Terraform files
 
-::: details `provider.tf` - Configures OCI provider with authentication profile and region
+#### `@/provider.tf` - Configures OCI provider with authentication profile and region
+
+::: details source
 <<< ../../../../../i13e/oci/basic/terraform/provider.tf
 :::
 
-::: details `versions.tf` - Specifies Terraform and provider version requirements
+#### `@/versions.tf` - Specifies Terraform and provider version requirements
+
+::: details source
 <<< ../../../../../i13e/oci/basic/terraform/versions.tf
 :::
 
-::: details `variables.tf` - Input variables for OCI profile, region, credentials, ADB, email, and resource names
+#### `@/variables.tf` - Input variables for OCI profile, region, credentials, ADB, email, and resource names
+
+::: details source
 <<< ../../../../../i13e/oci/basic/terraform/variables.tf
 :::
 
-::: details `oci_config.tf` - Deprecated (use variables.tf)
+#### `@/oci_config.tf` - Deprecated (use variables.tf)
+
+::: details source
 <<< ../../../../../i13e/oci/basic/terraform/oci_config.tf
 :::
 
-::: details `compartment.tf` - Creates or retrieves OCI compartment "odbvue-test"
+#### `@/compartment.tf` - Creates or retrieves OCI compartment "odbvue-test"
+
+::: details source
 <<< ../../../../../i13e/oci/basic/terraform/compartment.tf
 :::
 
-::: details `networking.tf` - VCN, Internet Gateway, route tables, DHCP options, subnet, and NSG with firewall rules
+#### `@/networking.tf` - VCN, Internet Gateway, route tables, DHCP options, subnet, and NSG with firewall rules
+
+::: details source
 <<< ../../../../../i13e/oci/basic/terraform/networking.tf
 :::
 
-::: details `compute.tf` - Oracle Linux 9 VM instance with NGINX, SSH configuration, and cloud-init setup
+#### `@/compute.tf` - Oracle Linux 9 VM instance with NGINX, SSH configuration, and cloud-init setup
+
+::: details source
 <<< ../../../../../i13e/oci/basic/terraform/compute.tf
 :::
 
-::: details `public_ip.tf` - Reserves and attaches public IP to compute instance
+#### `@/public_ip.tf` - Reserves and attaches public IP to compute instance
+
+::: details source
 <<< ../../../../../i13e/oci/basic/terraform/public_ip.tf
 :::
 
-::: details `adb.tf` - Autonomous Database (Always Free), wallet generation and download
+#### `@/adb.tf` - Autonomous Database (Always Free), wallet generation and download
+
+::: details source
 <<< ../../../../../i13e/oci/basic/terraform/adb.tf
 :::
 
-::: details `email.tf` - Optional Email Delivery approved sender (if `var.email_sender` set)
+#### `@/email.tf` - Optional Email Delivery approved sender (if `var.email_sender` set)
+
+::: details source
 <<< ../../../../../i13e/oci/basic/terraform/email.tf
 :::
 
-::: details `objectstorage.tf` - Object Storage bucket with restricted access
+#### `@/objectstorage.tf` - Object Storage bucket with restricted access
+
+::: details source
 <<< ../../../../../i13e/oci/basic/terraform/objectstorage.tf
 :::
 
-::: details `outputs.tf` - Exports instance IPs, ADB connection info, and storage hints
+#### `@/outputs.tf` - Exports instance IPs, ADB connection info, and storage hints
+
+::: details source
 <<< ../../../../../i13e/oci/basic/terraform/outputs.tf
 :::
 
-::: details `terraform.tfvars.example` - Template showing required variables
-<<< ../../../../../i13e/oci/basic/terraform/terraform.tfvars.example {tfvars}
+#### `@/terraform.tfvars.example` - Template showing required variables
+
+::: details source
+<<< ../../../../../i13e/oci/basic/terraform/terraform.tfvars.example
 :::
 
 > [!NOTE] 
 > Make sure that `.gitignore` exists and prevents secrets and terraform state from being submitted to git.
 
-::: details `.gitignore`
-<<< ../../../../../i13e/oci/basic/.gitignore {ini}
+#### `@/.gitignore` - Prevents secrets and terraform state from being submitted to git
+
+::: details source
+<<< ../../../../../i13e/oci/basic/.gitignore
 :::
 

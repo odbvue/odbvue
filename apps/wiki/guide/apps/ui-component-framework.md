@@ -86,7 +86,9 @@ export default createVuetify({
 
 1. Create light and dark themes.
 
-::: details `@/themes/themes.json`
+#### `@/themes/themes.json`
+
+::: details source
 <<< ../../../src/themes/themes.json
 :::
 
