@@ -48,7 +48,7 @@ define EDITION = '${EDITION}'
 prompt Variables defined..
 project gen-artifact -name $NAME -version $VERSION -format zip
 prompt Artifact generated..
-project deploy -file ./artifact/$NAME-$VERSION.zip
+project deploy -file ./artifact/$NAME-$VERSION.zip -log-path .
 prompt Artifact deployed..
 lb tag -tag "$VERSION"
 prompt Tagged..
