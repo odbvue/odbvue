@@ -79,7 +79,32 @@ git add .
 git commit
 
 
-changest
+### Step X. Create PR
+
+Check if all code is committed, create changeset, push to origin
+
+#### `./scripts/create-pr.sh`
+
+```bash
+cd apps
+pnpm changeset
+```
+
+You'll be prompted to:
+
+- Choose the version bump type: patch, minor, or major
+- Write a concise [summary-of-the-changes]
+- Select which packages changed (usually main app)
+
+```bash
+git add .
+git commit -m "changeset: [summary-of-the-changes]"
+cd ..
+```
+
+
+
+
 
 git push -u origin feat/your-feature-name
 ```
