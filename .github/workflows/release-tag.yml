@@ -73,10 +73,6 @@ jobs:
             echo "::error::Artifact file not found: $ARTIFACT"
             ls -la artifact/ || echo "artifact directory does not exist"
           fi
-          
-          # Exit after debugging
-          echo "::notice::Debugging completed - exiting for review"
-          exit 1
 
       - name: Setup pnpm/node
         uses: pnpm/action-setup@v2

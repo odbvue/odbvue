@@ -14,11 +14,11 @@ EXEC :adb_schema_password := '&ADB_SCHEMA_PASSWORD';
 EXEC :version := '&VERSION';
 EXEC :edition := '&EDITION';
 
-@@dist/utils/000_before_deploy.sql
+@@utils/000_before_deploy.sql
 
 lb update -log -changelog-file releases/main.changelog.xml -search-path "."
 
-@@dist/utils/999_after_deploy.sql
+@@utils/999_after_deploy.sql
 
 UNDEFINE adb_schema_name
 UNDEFINE adb_schema_password
