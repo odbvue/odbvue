@@ -263,7 +263,7 @@ terraform destroy
 #### `@/terraform.tfvars.example` - Template showing required variables
 
 ::: details source
-<<< ../../../../../i13e/oci/basic/terraform/terraform.tfvars.example
+<<< ../../../../../i13e/oci/basic/terraform/terraform.tfvars.example {ini}
 :::
 
 > [!NOTE] 
