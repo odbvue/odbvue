@@ -29,8 +29,21 @@ changeset
 
 proj config set -name schemas -value odbvue
 
+---
+# dx
 
-### Step 1. Start work
+git checkout main
+git pull origin main
+git checkout -b feat/[feature-name]
+
+
+
+---
+
+
+
+
+### Step 1. Start new feature
 
 ./begin-new-feature.sh [feature-name]
 
@@ -38,6 +51,14 @@ git checkout main
 git pull origin main
 git checkout -b feat/[feature-name]
 
+### Step 2. Develop
+
+
+#### Database First 
+
+#### Database DDL
+
+#### Database DML
 
 development in local db
 
