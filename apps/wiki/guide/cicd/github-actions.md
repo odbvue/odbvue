@@ -44,7 +44,7 @@ OdbVue uses three primary workflows to automate the release and deployment proce
 - Uses `secrets.GITHUB_TOKEN` for authentication
  
 > [!IMPORTANT]
-> Versioning must succeed when pending changesets exist. The workflow skips versioning when there are no `.changeset/*.md` files (excluding README.md). If versioning fails, the workflow will fail—fix the changesets and re-run.
+> Versioning must succeed when pending changesets exist. The workflow skips versioning when there are no `.changeset/*.md` files (excluding README.md). If versioning fails, the workflow will fail - fix the changesets and re-run.
 
 **When to use**: Automatically triggered as part of your release process. No manual intervention needed after you merge your feature branch. We do not publish to npm in this repository.
 

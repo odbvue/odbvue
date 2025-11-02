@@ -45,8 +45,6 @@ When you visit a website with a valid SSL certificate, you'll see a padlock icon
 | **Verification** | Varies by type | Automatic domain/DNS validation |
 | **Best For** | Business websites, e-commerce | Personal projects, education, testing |
 
----
-
 ## Commercial SSL Certificates
 
 ### Main Issuers
@@ -116,8 +114,6 @@ Once the CA approves your certificate:
 2. Copy them to your server
 3. Configure your Nginx web server to use the certificate
 4. Test that HTTPS is working
-
----
 
 ## Let's Encrypt - Free SSL Certificates
 
@@ -212,8 +208,6 @@ To see your certificates:
 ```bash
 sudo certbot certificates
 ```
-
----
 
 ## Decision Guide
 

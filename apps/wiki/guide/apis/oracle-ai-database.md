@@ -1,18 +1,16 @@
-# Setting up Database
-
-## Concepts
+# Oracle Database
 
 **Oracle Autonomous AI Database** is a next-generation, enterprise-grade database that supports relational, JSON, and NoSQL data models, and not only self-drives, self-secures, and self-repairs by automating tuning, patching, backups, and scaling, but also includes out-of-the-box AI capabilities - such as natural language querying, in-database machine learning, and vector search for generative AI integration - enabling developers and analysts to build and run intelligent, data-driven applications directly within the database.
 
-It supports **SQL** for querying and data manipulation, along with **PL/SQL (Procedural Language/SQL)** — Oracle’s proprietary procedural extension to SQL that enables developers to implement complex business logic directly within the database. **PL/SQL** provides robust programming capabilities, allowing efficient, secure, and high-performance execution of application logic close to the data.
+It supports **SQL** for querying and data manipulation, along with **PL/SQL (Procedural Language/SQL)** - Oracle’s proprietary procedural extension to SQL that enables developers to implement complex business logic directly within the database. **PL/SQL** provides robust programming capabilities, allowing efficient, secure, and high-performance execution of application logic close to the data.
 
 **Oracle REST Data Services (ORDS)** is a mid-tier application that provides a RESTful web service interface for Oracle Database. It allows developers to easily expose database objects as REST APIs without needing to write custom backend code, leveraging Oracle’s authentication, authorization, and security features.
 
+---
+
 **Together, Oracle Database and ORDS** turn the database into a full-featured, REST-enabled data platform for modern application development, combining powerful data management, procedural logic with PL/SQL, and RESTful integration capabilities.
 
-**Oracle SQLcl** (SQL Command Line) is a modern command-line interface for Oracle Database that extends the traditional SQL*Plus tool with enhanced features such as scripting, command history, JSON and CSV output, MCP, Liquibase integration, and support for SQLcl Projects to manage database CI/CD workflows.
-
-::: details NOTE
+::: details Note on implement business logic in PL/SQL 
 > Using PL/SQL for business logic can be a good idea, but it depends on several factors. Here are some points to consider:
 >
 > **Advantages**
@@ -32,25 +30,7 @@ It supports **SQL** for querying and data manipulation, along with **PL/SQL (Pro
 > **Disclaimer**
 >
 > Deciding whether to **implement business logic in PL/SQL** depends on your application’s needs, team expertise, and architecture. When performance, data integrity, and centralized rule enforcement are key, PL/SQL can offer clear advantages comparing to other available options.
+>
+> ![Note](/favicon.ico)
+>
 :::
-
-## Prepare Environment
-
-1. [Enable Oracle Autonomous Database for Local Development](../../guide/i13e/local-development/database.md)
-
-2. [Enable Oracle Autonomous Database in Oracle Cloud Infrastructure](../../guide/i13e/oci/manage.md)
-
-3. [Download and install SQLcl for Local Development](https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/download/)
-
----
-
-Verify that you can connect to local development database:
-
-```bash
-sql admin/************@127.0.0.1:1521/myatp
-SELECT USER AS whoami FROM dual;
-# WHOAMI 
-# ______
-# ADMIN
-exit
-```
