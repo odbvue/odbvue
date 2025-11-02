@@ -1,22 +1,26 @@
--- SQLcl uses the SQLCL engine for formatted sql changelog not the JDBC engine
--- By default, a project will not use substitution variables and allows blank
--- lines in sql statements.
-
-set define off
+set define on
+set verify off
+set feedback off
+set serveroutput on
 set sqlblanklines on
 
--- Prechecks modifiable helper
--- Check running with SQLcl
--- Check minimum DB version
--- Check character set
--- @utils/prechecks.sql
+VARIABLE adb_schema_name VARCHAR2(128 CHAR)
+VARIABLE adb_schema_password VARCHAR2(128 CHAR)
+VARIABLE version VARCHAR2(128 CHAR)
+VARIABLE edition VARCHAR2(128 CHAR)
 
--- SLOT
--- Custom pre Liquibase code here (perhaps creation of a schema)
--- This is MINIMAL pre setup, everything that can go through Liquibase - SHOULD
+EXEC :adb_schema_name := '&ADB_SCHEMA_NAME';
+EXEC :adb_schema_password := '&ADB_SCHEMA_PASSWORD';
+EXEC :version := '&VERSION';
+EXEC :edition := '&EDITION';
 
--- Kick off Liquibase
-prompt "Installing/updating schemas"
+@@dist/utils/000_before_deploy.sql
+
 lb update -log -changelog-file releases/main.changelog.xml -search-path "."
 
---@utils/recompile.sql
+@@dist/utils/999_after_deploy.sql
+
+UNDEFINE adb_schema_name
+UNDEFINE adb_schema_password
+UNDEFINE version
+UNDEFINE edition 
