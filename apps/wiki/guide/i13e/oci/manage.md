@@ -82,11 +82,11 @@ This setup will create and manage changes for a separate Compartment with single
 
 ## Prerequisites
 
-OCI Account.
+### 1. OCI Account
 
-## Prepare Environment
+OCI tenant with Administration privileges 
 
-### Step 1. Get OCI Config
+### 2. OCI Configuration saved locally
 
 1. Create `./.oci/` directory in Home directory.
 
@@ -131,14 +131,14 @@ key_file=~/.oci/prod_key.pem
 > [!NOTE] 
 > Use Linux-style paths in `key_file` even on Windows.
 
-### Step 2. Generate SSH Key
+### 3. Generated SSH Key pair
 
 ```bash
 ssh-keygen -t rsa -b 4096 -f ~/.ssh/odbvue -N ""
 ```
-Keys will be saved to `~/.ssh`.
+Keys will be saved to `~/.ssh` in your home directory.
 
-### Step 3. Install Terraform
+### 4. Install Terraform
 
 [Install Terraform](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli)
 
@@ -154,39 +154,16 @@ After installation check that it works:
 terraform -v
 ```
 
-### Step 4. Configure terraform.tfvars
+## Deployment
 
-Copy `terraform.tfvars.example` to `terraform.tfvars` and update with your values.
-
-## Usage
-
-### Initial setup (once)
+### Step 1. Initial setup (once)
 
 ```bash
 cd terraform
 terraform init
 ```
 
-### Apply changes to infrastructure
-
-```bash
-terraform plan
-```
-
-```bash
-terraform apply
-```
-
-> [!NOTE]
-> On succesful Autonomous Database modification Wallet will be automatically downloaded to `./wallets/` folder. Make sure that the folder exists.
-
-### Destroy everything (if needed)
-
-```bash
-terraform destroy
-```
-
-## Terraform files
+### Step 2. Create terraform configuration files
 
 #### `@/provider.tf` - Configures OCI provider with authentication profile and region
 
@@ -266,12 +243,48 @@ terraform destroy
 <<< ../../../../../i13e/oci/basic/terraform/terraform.tfvars.example {ini}
 :::
 
-> [!NOTE] 
-> Make sure that `.gitignore` exists and prevents secrets and terraform state from being submitted to git.
-
 #### `@/.gitignore` - Prevents secrets and terraform state from being submitted to git
 
 ::: details source
 <<< ../../../../../i13e/oci/basic/.gitignore {ini}
 :::
 
+> [!WARNING] 
+> Make sure that `.gitignore` exists and prevents secrets and terraform state from being submitted to git.
+
+### Step 3. Configure terraform.tfvars
+
+Copy `terraform.tfvars.example` to `terraform.tfvars` and update with your values.
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `tenancy_ocid` | Your OCI Tenancy OCID from API credentials | `ocid1.tenancy.oc1..aaaaaaaa...` |
+| `oci_profile` | OCI profile name from ~/.oci/config | `DEFAULT` |
+| `region` | OCI region code | `eu-frankfurt-1` |
+| `adb_admin_password` | Autonomous Database admin password (9-30 chars, must include uppercase, lowercase, digit, special char) | `MySecurePass123!` |
+| `adb_wallet_password` | Password for ADB wallet encryption | `MySecurePass123!` |
+| `ssh_public_key_path` | Path to SSH public key for compute instance | `../.ssh/odbvue.pub` |
+| `adb_db_name` | Autonomous Database name | `odbvueadb` |
+| `adb_workload` | Database workload type: OLTP, DW, AJD, or APEX | `OLTP` |
+| `adb_cpu_count` | Number of OCPUs for ADB (1 for Always Free) | `1` |
+| `adb_storage_tb` | Storage in TB for ADB (1 for Always Free) | `1` |
+| `email_sender` | Email Delivery approved sender (optional, leave empty to skip) | `admin@odbvue.com` |
+
+### Step 4. Apply changes to infrastructure
+
+```bash
+terraform plan
+```
+
+```bash
+terraform apply
+```
+
+> [!NOTE]
+> On succesful Autonomous Database modification Wallet will be automatically downloaded to `./wallets/` folder. Make sure that the folder exists.
+
+### Step 5. (if needed) Destroy infrastructure
+
+```bash
+terraform destroy
+```

@@ -74,30 +74,30 @@ sites:
 #### `@/setup.sh` - Unified nginx setup script for local or remote deployment
 
 ::: details source
-<<< ../../../../../i13e/oci/basic/scripts/setup.sh
+<<< ../../../../i13e/oci/basic/scripts/setup.sh
 :::
 
 #### `@/deploy.sh` - Blue/green deployment script with rollback and validation
 
 ::: details source
-<<< ../../../../../i13e/oci/basic/scripts/deploy.sh
+<<< ../../../../i13e/oci/basic/scripts/deploy.sh
 :::
 
 #### `@/nginx.conf.tpl` - Main nginx configuration template
 
 ::: details source
-<<< ../../../../../i13e/oci/basic/scripts/nginx.conf.tpl {ini}
+<<< ../../../../i13e/oci/basic/scripts/nginx.conf.tpl {ini}
 :::
 
 #### `@/site.conf.tpl` - Per-site server block template with SSL and security headers
 
 ::: details source
-<<< ../../../../../i13e/oci/basic/scripts/site.conf.tpl {ini}
+<<< ../../../../i13e/oci/basic/scripts/site.conf.tpl {ini}
 :::
 
 #### `@/sites.yaml` - Site configuration for nginx setup and deployment
 
 ::: details source
-<<< ../../../../../i13e/oci/basic/scripts/sites.yaml
+<<< ../../../../i13e/oci/basic/scripts/sites.yaml
 :::
 

@@ -113,6 +113,12 @@ Remove container with web server:
 ./remove.sh [container-name]
 ```
 
+## Accessing container
+
+After successful setup from VSCode [Pod manager](https://marketplace.visualstudio.com/items?itemName=dreamcatcher45.podmanager) 
+
+![Pod Manager](./web.png)
+
 ## Troubleshooting
 
 **Check container status:**

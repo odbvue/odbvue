@@ -10,7 +10,7 @@ It supports **SQL** for querying and data manipulation, along with **PL/SQL (Pro
 
 **Together, Oracle Database and ORDS** turn the database into a full-featured, REST-enabled data platform for modern application development, combining powerful data management, procedural logic with PL/SQL, and RESTful integration capabilities.
 
-::: details Note on implement business logic in PL/SQL 
+::: details Note on implementing business logic in PL/SQL 
 > Using PL/SQL for business logic can be a good idea, but it depends on several factors. Here are some points to consider:
 >
 > **Advantages**

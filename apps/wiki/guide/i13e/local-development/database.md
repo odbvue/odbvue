@@ -29,6 +29,9 @@ This pulls from [Oracle Container Registry](https://container-registry.oracle.co
 - `:latest` = Oracle 19c
 - `:latest-23ai` = Oracle 23ai with built-in AI capabilities
 
+> [!NOTE]
+> As per end of 2025 there are still some SQLcl and 23ai compatibility issues, 19c is a safer choice.
+
 ### Step 3. Create `compose.yaml`
 
 Create `./compose.yaml`:
