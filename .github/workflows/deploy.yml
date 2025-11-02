@@ -153,7 +153,7 @@ jobs:
           EDITION="${EDITION^^}"
           
           # Extract db sources from bundle
-          DB_BUNDLE="bundle/db-src-${VERSION}.tar.gz"
+          DB_BUNDLE="bundle/db/db-src-${VERSION}.tar.gz"
           if [ ! -f "$DB_BUNDLE" ]; then
             echo "::error::Database sources not found in bundle: $DB_BUNDLE"
             echo "Available files in bundle:"
