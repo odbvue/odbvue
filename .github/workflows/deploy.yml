@@ -106,7 +106,7 @@ jobs:
       - uses: gvenzl/setup-oracle-sqlcl@v1
         with:
           version: latest
-      - name: Extract bundle and verify database artifact
+      - name: Extract bundle and verify database sources
         run: |
           set -euo pipefail
           if [ ! -f "${{ needs.fetch-bundle.outputs.bundle_path }}" ]; then
@@ -119,14 +119,14 @@ jobs:
             (cd bundle && sha256sum -c "$(basename "$SHA_FILE")")
           fi
           tar -xzf "${{ needs.fetch-bundle.outputs.bundle_path }}" -C bundle
-          DB_ZIP="bundle/db/odbvue-db-${{ needs.fetch-bundle.outputs.tag }}.zip"
-          if [ ! -f "$DB_ZIP" ]; then
-            echo "::error::Database artifact not found in bundle: $DB_ZIP"
+          DB_SRC="bundle/db/db-src-${{ needs.fetch-bundle.outputs.tag }}.tar.gz"
+          if [ ! -f "$DB_SRC" ]; then
+            echo "::error::Database sources not found in bundle: $DB_SRC"
             echo "Contents of bundle:"
             find bundle -type f || true
             exit 1
           fi
-          echo "Database artifact verified at: $DB_ZIP"
+          echo "Database sources verified at: $DB_SRC"
       - name: Restore ADB wallet
         run: |
           set -euo pipefail
