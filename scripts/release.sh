@@ -1,27 +1,32 @@
 #!/bin/bash
 
 # Create and publish release
-# Usage: ./release.sh [version] [message]
+# Usage: ./release.sh [-m "message"]
 
-if [ -z "$1" ] || [ -z "$2" ]; then
-    echo "Error: version and message are required"
-    echo "Usage: ./release.sh [version] [message]"
-    exit 1
-fi
+MESSAGE=""
 
-VERSION=$1
-MESSAGE=$2
+while getopts "m:" opt; do
+    case $opt in
+        m) MESSAGE="$OPTARG" ;;
+        *) echo "Usage: $0 [-m message]"; exit 1 ;;
+    esac
+done
 
 git checkout main
 git pull origin main
 
-# Bump version in package.json files (remove v prefix if present)
-VERSION_NO_V=${VERSION#v}
+# Read version from apps/package.json and increment last number
+PACKAGE_JSON_PATH="apps/package.json"
+CURRENT_VERSION=$(jq -r '.version' "$PACKAGE_JSON_PATH")
 
-# Update package.json in apps directory
-if [ -f "apps/package.json" ]; then
-    jq --arg version "$VERSION_NO_V" '.version = $version' apps/package.json > apps/package.json.tmp && mv apps/package.json.tmp apps/package.json
-fi
+# Parse and increment version
+IFS='.' read -r -a VERSION_PARTS <<< "$CURRENT_VERSION"
+VERSION_PARTS[-1]=$((${VERSION_PARTS[-1]} + 1))
+VERSION_NO_V=$(IFS='.'; echo "${VERSION_PARTS[*]}")
+VERSION="v$VERSION_NO_V"
+
+# Save incremented version back to apps/package.json
+jq --arg version "$VERSION_NO_V" '.version = $version' "$PACKAGE_JSON_PATH" > "$PACKAGE_JSON_PATH.tmp" && mv "$PACKAGE_JSON_PATH.tmp" "$PACKAGE_JSON_PATH"
 
 # Database project release
 if [ -d "db" ]; then
@@ -29,14 +34,16 @@ if [ -d "db" ]; then
     sql /nolog
     project release -version "v$VERSION_NO_V"
     git add .
-    git commit -m "db: release $VERSION $MESSAGE"
+    DB_COMMIT_MESSAGE="db: release $VERSION $([ -n "$MESSAGE" ] && echo "$MESSAGE" || echo "")"
+    git commit -m "$DB_COMMIT_MESSAGE"
     cd ..
 fi
 
 git add .
-git commit -m "release: $VERSION $MESSAGE"
+COMMIT_MESSAGE="release: $VERSION $([ -n "$MESSAGE" ] && echo "$MESSAGE" || echo "")"
+git commit -m "$COMMIT_MESSAGE"
 
-git tag -a "$VERSION" -m "Release $VERSION $MESSAGE"
+git tag -a "$VERSION" -m "Release $VERSION $([ -n "$MESSAGE" ] && echo "$MESSAGE" || echo "")"
 git push origin "$VERSION"
 
 echo "Release $VERSION published successfully"
