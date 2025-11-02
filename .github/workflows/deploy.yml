@@ -152,20 +152,25 @@ jobs:
           EDITION="${ADB_SCHEMA_NAME}_$(echo "$VERSION" | tr . _)"
           EDITION="${EDITION^^}"
           
-          # Find the extracted database artifact in bundle
-          DB_ARTIFACT="bundle/db/${NAME}-${VERSION}.zip"
-          
-          # Resolve the absolute path to the artifact
-          if [ ! -f "$DB_ARTIFACT" ]; then
-            echo "::error::Database artifact not found at: $DB_ARTIFACT"
+          # Extract db sources from bundle
+          DB_BUNDLE="bundle/db-src-${VERSION}.tar.gz"
+          if [ ! -f "$DB_BUNDLE" ]; then
+            echo "::error::Database sources not found in bundle: $DB_BUNDLE"
             echo "Available files in bundle:"
             find bundle -type f || true
             exit 1
           fi
           
-          ARTIFACT_PATH="$(cd "$(dirname "$DB_ARTIFACT")" && pwd)/$(basename "$DB_ARTIFACT")"
-          echo "Deploying artifact from: $ARTIFACT_PATH"
+          # Create a temporary directory for db sources
+          TEMP_DB_DIR=$(mktemp -d)
+          tar -xzf "$DB_BUNDLE" -C "$TEMP_DB_DIR"
+          
+          echo "Deploying version: $VERSION"
           echo "Connecting to ${ADB_TNS_ALIAS}..."
+          
+          # Generate artifact from source AND deploy in one connected session
+          # This ensures schema/edition initialization runs
+          cd "$TEMP_DB_DIR"
           
           sql -nohistory "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" << ENDSQL
           prompt Connected..
@@ -173,14 +178,18 @@ jobs:
           define ADB_SCHEMA_PASSWORD = '${ADB_SCHEMA_PASSWORD}'
           define VERSION = '${VERSION}'
           define EDITION = '${EDITION}'
-          define ARTIFACT_PATH = '${ARTIFACT_PATH}'
           prompt Variables defined..
-          project deploy -file &ARTIFACT_PATH -log-path .
+          project gen-artifact -name $NAME -version $VERSION -format zip
+          prompt Artifact generated..
+          project deploy -file ./artifact/$NAME-$VERSION.zip -log-path .
           prompt Artifact deployed..
           lb tag -tag "$VERSION"
           prompt Tagged..
           exit
           ENDSQL
+          
+          # Cleanup
+          rm -rf "$TEMP_DB_DIR"
 
   deploy-web:
     needs: [fetch-bundle, deploy-db]

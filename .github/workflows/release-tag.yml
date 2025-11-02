@@ -21,19 +21,17 @@ jobs:
         with:
           version: latest
 
-      - name: Build DB artifact (zip)
+      - name: Package DB sources for deployment
         id: db
         working-directory: db
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME}"
-          NAME="odbvue-db"
-          sql /nolog <<SQL
-          project gen-artifact -name $NAME -version $VERSION -format zip
-          exit
-          SQL
-          test -f "artifact/$NAME-$VERSION.zip"
-          echo "zip=db/artifact/$NAME-$VERSION.zip" >> "$GITHUB_OUTPUT"
+          # Package db sources (not artifact) - artifact will be generated at deploy time with DB connection
+          tar -czf "db-src-${VERSION}.tar.gz" .dbtools/ src/
+          test -f "db-src-${VERSION}.tar.gz"
+          echo "src=db/db-src-${VERSION}.tar.gz" >> "$GITHUB_OUTPUT"
+          echo "DB sources packaged for deployment"
 
       - name: Setup pnpm/node
         uses: pnpm/action-setup@v2
@@ -54,7 +52,7 @@ jobs:
           cp -r apps/dist/* build-bundle/apps/ || true
           cp -r apps/.vitepress/dist/* build-bundle/wiki/ || true
           cp -r main/* build-bundle/main/ || true
-          cp "${{ steps.db.outputs.zip }}" build-bundle/db/
+          cp "${{ steps.db.outputs.src }}" build-bundle/db/
           tar -czf "release-${GITHUB_REF_NAME}.tar.gz" -C build-bundle .
           sha256sum "release-${GITHUB_REF_NAME}.tar.gz" > "release-${GITHUB_REF_NAME}.sha256"
 
