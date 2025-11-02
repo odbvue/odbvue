@@ -35,7 +35,9 @@ export default defineConfig({
         },
         {
           text: 'Apis',
-          items: [{ text: 'Setting up Database', link: '/guide/apis/setting-up-database' }],
+          items: [{ text: 'Oracle AI Database', link: '/guide/apis/oracle-ai-database' },
+            { text: 'Setting up', link: '/guide/apis/setting-up' }],
+
         },
         {
           text: 'Apps',
@@ -95,9 +97,9 @@ export default defineConfig({
         {
           text: 'CI/CD',
           items: [
-            { text: 'Branching Strategies', link: '/guide/i13e/cicd/branching-strategies' },
-            { text: 'Development Lifecycle', link: '/guide/i13e/cicd/development-lifecycle' },
-            { text: 'GitHub Actions', link: '/guide/i13e/cicd/github-actions' },
+            { text: 'Branching Strategies', link: '/guide/cicd/branching-strategies' },
+            { text: 'Development Lifecycle', link: '/guide/cicd/development-lifecycle' },
+            { text: 'GitHub Actions', link: '/guide/cicd/github-actions' },
           ],
         },
       ],

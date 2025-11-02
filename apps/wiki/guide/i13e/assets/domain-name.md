@@ -25,14 +25,14 @@ Visit your registrar's website and search for your desired domain name. If unava
 > - **Keep it simple**: Easy to spell, pronounce, and remember.
 > - **Length matters**: Shorter is generally better, but clarity beats brevity.
 > - **Avoid hyphens and numbers**: These can confuse users.
-> - **Plan ahead**: Register early if possible—popular names sell quickly.
+> - **Plan ahead**: Register early if possible - popular names sell quickly.
 
 ### Step 3: Register
 Purchase the domain for at least one year. Multi-year purchases often offer discounts. Then configure DNS records to point to your server (your hosting provider will guide this).
 
 ### Step 4: Set Renewal Reminders
 
-**Important**: Domains expire if not renewed. Set a calendar reminder 30-60 days before your renewal date to ensure you don't lose access to your domain. Most registrars offer auto-renewal options—you can enable this to avoid forgetting, but always monitor it to catch billing issues.
+**Important**: Domains expire if not renewed. Set a calendar reminder 30-60 days before your renewal date to ensure you don't lose access to your domain. Most registrars offer auto-renewal options - you can enable this to avoid forgetting, but always monitor it to catch billing issues.
 
 Note: Even if you've paid for multiple years, some registrars require annual technical renewals or confirmations. Check your registrar's requirements to stay compliant.
 
@@ -47,7 +47,7 @@ DNS records control where your domain points and how it behaves. Common types in
 - **MX Record**: Directs email to your mail server.
 - **NS Record**: Points to your DNS provider's nameservers.
 
-**Critical**: DNS changes propagate globally over time (typically 24-48 hours, sometimes longer). Plan carefully when making changes—don't update records on Friday afternoon if something breaks immediately! Test thoroughly and allow propagation time before relying on new configurations.
+**Critical**: DNS changes propagate globally over time (typically 24-48 hours, sometimes longer). Plan carefully when making changes - don't update records on Friday afternoon if something breaks immediately! Test thoroughly and allow propagation time before relying on new configurations.
 
 
 

@@ -63,7 +63,7 @@ resource "oci_core_network_security_group" "nsg_web" {
   display_name   = local.nsg_web_name
 }
 
-# NSG Rules — inbound 80/443/22
+# NSG Rules  -  inbound 80/443/22
 resource "oci_core_network_security_group_security_rule" "nsg_web_in_http" {
   network_security_group_id = oci_core_network_security_group.nsg_web.id
   direction                 = "INGRESS"
@@ -106,7 +106,7 @@ resource "oci_core_network_security_group_security_rule" "nsg_web_in_ssh" {
   }
 }
 
-# NSG egress — all
+# NSG egress  -  all
 resource "oci_core_network_security_group_security_rule" "nsg_web_egress_all" {
   network_security_group_id = oci_core_network_security_group.nsg_web.id
   direction                 = "EGRESS"

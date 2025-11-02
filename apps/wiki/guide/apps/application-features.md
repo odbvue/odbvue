@@ -463,7 +463,7 @@ const app = useAppStore()
 
 ### Dynamic page titles
 
-Updating the page title makes SPAs accessible and clear — screen readers announce the new page, browser tabs show the right name, and users always know where they are.
+Updating the page title makes SPAs accessible and clear  -  screen readers announce the new page, browser tabs show the right name, and users always know where they are.
 
 1. Install [Unhead](https://unhead.unjs.io/) to enable manipulation of page head data.
 
@@ -610,7 +610,7 @@ router.afterEach((to) => {
 
 ### Focus Management
 
-Focus management ensures that after navigation in a SPA, keyboard and screen-reader users start at the new page’s main heading — just like a full page load. It improves orientation and makes tabbing predictable.
+Focus management ensures that after navigation in a SPA, keyboard and screen-reader users start at the new page’s main heading  -  just like a full page load. It improves orientation and makes tabbing predictable.
 
 1. Add Focus Management feature to Router
 

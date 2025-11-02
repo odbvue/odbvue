@@ -6,7 +6,7 @@ Branching strategies define how teams organize, isolate, and integrate their wor
 
 The main benefit of using a clear branching strategy is that it helps teams collaborate efficiently, reduce merge conflicts, and ensure predictable, high-quality releases. 
 
-By choosing the right model—whether lightweight for speed or structured for control—teams can balance agility with stability, adapt to their release cadence, and keep their codebase healthy as the project grows.
+By choosing the right model - whether lightweight for speed or structured for control - teams can balance agility with stability, adapt to their release cadence, and keep their codebase healthy as the project grows.
 
 ## Common strategies
 

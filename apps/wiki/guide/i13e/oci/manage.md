@@ -272,6 +272,6 @@ terraform destroy
 #### `@/.gitignore` - Prevents secrets and terraform state from being submitted to git
 
 ::: details source
-<<< ../../../../../i13e/oci/basic/.gitignore
+<<< ../../../../../i13e/oci/basic/.gitignore {ini}
 :::
 

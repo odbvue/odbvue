@@ -2,9 +2,9 @@
 
 ## Overview
 
-Layouts are reusable page wrappers that define the shared structure and UI elements around your content — such as headers, sidebars, and footers.
+Layouts are reusable page wrappers that define the shared structure and UI elements around your content  -  such as headers, sidebars, and footers.
 
-They let different parts of your app share consistent visual frameworks while still rendering unique views inside. By switching layouts dynamically, based on route, can easily present different page shells — like an admin dashboard, public site, or auth screen, without duplicating layout code.
+They let different parts of your app share consistent visual frameworks while still rendering unique views inside. By switching layouts dynamically, based on route, can easily present different page shells  -  like an admin dashboard, public site, or auth screen, without duplicating layout code.
 
 ## Implementation
 
