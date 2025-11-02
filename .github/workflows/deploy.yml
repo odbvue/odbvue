@@ -165,6 +165,8 @@ jobs:
           
           # Deploy to database
           sql -nohistory "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" << ENDSQL
+          whenever oserror exit failure
+          whenever sqlerror exit sql.sqlcode rollback
           prompt Connected..
           define ADB_SCHEMA_NAME = '${ADB_SCHEMA_NAME}'
           define ADB_SCHEMA_PASSWORD = '${ADB_SCHEMA_PASSWORD}'

@@ -3,7 +3,5 @@
                    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
-<include file="sys/object_grants/object_grants_as_grantor.sys.edition.odbvue_v0_0_59.sql" relativeToChangelogFile="true"/>
-<include file="sys/object_grants/object_grants_as_grantor.sys.edition.odbvue_v_0_0_61.sql" relativeToChangelogFile="true"/>
 <include file="odbvue/package_bodies/pck_api_sandbox.sql" relativeToChangelogFile="true"/>
 </databaseChangeLog>
