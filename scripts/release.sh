@@ -23,7 +23,15 @@ if [ -f "apps/package.json" ]; then
     jq --arg version "$VERSION_NO_V" '.version = $version' apps/package.json > apps/package.json.tmp && mv apps/package.json.tmp apps/package.json
 fi
 
-# todo later: sql /nolog
+# Database project release
+if [ -d "db" ]; then
+    cd db
+    sql /nolog
+    project release -version "v$VERSION_NO_V"
+    git add .
+    git commit -m "db: release $VERSION $MESSAGE"
+    cd ..
+fi
 
 git add .
 git commit -m "release: $VERSION $MESSAGE"
