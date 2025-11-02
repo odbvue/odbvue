@@ -106,7 +106,7 @@ jobs:
       - uses: gvenzl/setup-oracle-sqlcl@v1
         with:
           version: latest
-      - name: Extract bundle and verify database sources
+      - name: Extract bundle and verify database artifact
         run: |
           set -euo pipefail
           if [ ! -f "${{ needs.fetch-bundle.outputs.bundle_path }}" ]; then
@@ -119,14 +119,14 @@ jobs:
             (cd bundle && sha256sum -c "$(basename "$SHA_FILE")")
           fi
           tar -xzf "${{ needs.fetch-bundle.outputs.bundle_path }}" -C bundle
-          DB_SRC="bundle/db/db-src-${{ needs.fetch-bundle.outputs.tag }}.tar.gz"
-          if [ ! -f "$DB_SRC" ]; then
-            echo "::error::Database sources not found in bundle: $DB_SRC"
-            echo "Contents of bundle:"
-            find bundle -type f || true
+          DB_ARTIFACT="bundle/db/odbvue-db-${{ needs.fetch-bundle.outputs.tag }}.zip"
+          if [ ! -f "$DB_ARTIFACT" ]; then
+            echo "::error::Database artifact not found in bundle: $DB_ARTIFACT"
+            echo "Contents of bundle/db:"
+            find bundle/db -type f || true
             exit 1
           fi
-          echo "Database sources verified at: $DB_SRC"
+          echo "Database artifact verified at: $DB_ARTIFACT"
       - name: Restore ADB wallet
         run: |
           set -euo pipefail
@@ -152,44 +152,18 @@ jobs:
           EDITION="${ADB_SCHEMA_NAME}_$(echo "$VERSION" | tr . _)"
           EDITION="${EDITION^^}"
           
-          # Extract db sources from bundle
-          DB_BUNDLE="bundle/db/db-src-${VERSION}.tar.gz"
-          if [ ! -f "$DB_BUNDLE" ]; then
-            echo "::error::Database sources not found in bundle: $DB_BUNDLE"
-            echo "Available files in bundle:"
-            find bundle -type f || true
+          # Get artifact from bundle
+          DB_ARTIFACT="bundle/db/$NAME-${VERSION}.zip"
+          if [ ! -f "$DB_ARTIFACT" ]; then
+            echo "::error::Database artifact not found: $DB_ARTIFACT"
+            ls -la bundle/db/ || echo "bundle/db directory does not exist"
             exit 1
           fi
-          
-          # Create a temporary directory for db sources
-          TEMP_DB_DIR=$(mktemp -d)
-          tar -xzf "$DB_BUNDLE" -C "$TEMP_DB_DIR"
           
           echo "Deploying version: $VERSION"
           echo "Connecting to ${ADB_TNS_ALIAS}..."
           
-          # Debug: Check what was extracted
-          echo "::group::Extracted project structure"
-          ls -la "$TEMP_DB_DIR"
-          echo "::endgroup::"
-          
-          # Generate artifact first (no DB connection needed)
-          cd "$TEMP_DB_DIR"
-          sql /nolog << SQLGEN
-          project gen-artifact -name $NAME -version $VERSION -format zip -verbose
-          exit
-          SQLGEN
-          
-          echo "Artifact generated, now deploying..."
-          
-          # Verify artifact was created
-          if [ ! -f "./artifact/$NAME-$VERSION.zip" ]; then
-            echo "::error::Artifact file not found after generation"
-            ls -la ./artifact/ || echo "artifact directory doesn't exist"
-            exit 1
-          fi
-          
-          # Now deploy to database
+          # Deploy to database
           sql -nohistory "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" << ENDSQL
           prompt Connected..
           define ADB_SCHEMA_NAME = '${ADB_SCHEMA_NAME}'
@@ -197,15 +171,12 @@ jobs:
           define VERSION = '${VERSION}'
           define EDITION = '${EDITION}'
           prompt Variables defined..
-          project deploy -file ./artifact/$NAME-$VERSION.zip -log-path . -verbose
+          project deploy -file "$DB_ARTIFACT" -log-path . -verbose
           prompt Artifact deployed..
           lb tag -tag "$VERSION"
           prompt Tagged..
           exit
           ENDSQL
-          
-          # Cleanup
-          rm -rf "$TEMP_DB_DIR"
 
   deploy-web:
     needs: [fetch-bundle, deploy-db]
