@@ -173,21 +173,30 @@ jobs:
           ls -la "$TEMP_DB_DIR"
           echo "::endgroup::"
           
-          # Generate artifact from source AND deploy in one connected session
-          # This ensures schema/edition initialization runs
-          # Must run from temp_db_dir where .dbtools exists
+          # Generate artifact first (no DB connection needed)
           cd "$TEMP_DB_DIR"
+          sql /nolog << SQLGEN
+          project gen-artifact -name $NAME -version $VERSION -format zip -verbose
+          exit
+          SQLGEN
           
+          echo "Artifact generated, now deploying..."
+          
+          # Verify artifact was created
+          if [ ! -f "./artifact/$NAME-$VERSION.zip" ]; then
+            echo "::error::Artifact file not found after generation"
+            ls -la ./artifact/ || echo "artifact directory doesn't exist"
+            exit 1
+          fi
+          
+          # Now deploy to database
           sql -nohistory "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" << ENDSQL
           prompt Connected..
           define ADB_SCHEMA_NAME = '${ADB_SCHEMA_NAME}'
           define ADB_SCHEMA_PASSWORD = '${ADB_SCHEMA_PASSWORD}'
           define VERSION = '${VERSION}'
           define EDITION = '${EDITION}'
-          define WORK_DIR = '${TEMP_DB_DIR}'
           prompt Variables defined..
-          project gen-artifact -name $NAME -version $VERSION -format zip -verbose
-          prompt Artifact generated..
           project deploy -file ./artifact/$NAME-$VERSION.zip -log-path . -verbose
           prompt Artifact deployed..
           lb tag -tag "$VERSION"
