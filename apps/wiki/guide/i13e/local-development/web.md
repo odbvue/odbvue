@@ -10,25 +10,33 @@ Local web server environment using Podman and Nginx. Serves static site content 
 
 ### Step 1. Create static initial `./html/index.html`
 
-::: details `./html/index.html`
+#### `./html/index.html`
+
+::: details source
 <<<../../../../../i13e/local/web/html/index.html
 :::
 
 ### Step 2. Create Nginx configuration file
 
-::: details  `./nginx.conf`
+#### `./nginx.conf`
+
+::: details source
 <<<../../../../../i13e/local/web/nginx.conf {ini}
 :::
 
 ### Step 3. Create Dockerfile
 
-::: details `./Dockerfile`
+#### `./Dockerfile`
+
+::: details source
 <<<../../../../../i13e/local/web/Dockerfile
 :::
 
 ### Step 4. Create Compose file
 
-::: details `./compose.yaml`
+#### `./compose.yaml`
+
+::: details source
 <<<../../../../../i13e/local/web/compose.yaml
 :::
 
@@ -37,7 +45,9 @@ Local web server environment using Podman and Nginx. Serves static site content 
 
 ### Step 5. Create Empty folder `./releases` and add it to Git ignore
 
-::: details `./.gitignore`
+#### `./.gitignore`
+
+::: details source
 <<<../../../../../i13e/local/web/.gitignore {ini}
 :::
 
@@ -45,15 +55,21 @@ Local web server environment using Podman and Nginx. Serves static site content 
 
 ### Scripts
 
-::: details `./build.sh`
+#### `./build.sh`
+
+::: details source
 <<<../../../../../i13e/local/web/build.sh
 :::
 
-::: details `./deploy.sh`
+#### `./deploy.sh`
+
+::: details source
 <<<../../../../../i13e/local/web/deploy.sh
 :::
 
-::: details `./remove.sh`
+#### `./remove.sh`
+
+::: details source
 <<<../../../../../i13e/local/web/remove.sh
 :::
 

@@ -13,7 +13,9 @@ pnpm i --save-dev @types/markdown-it
 
 1. Create markdown extension
 
-::: details `./.vitepress/markdown-it-video.ts`
+#### `./.vitepress/markdown-it-video.ts`
+
+::: details source
 <<< ../../../.vitepress/markdown-it-video.ts
 :::
 

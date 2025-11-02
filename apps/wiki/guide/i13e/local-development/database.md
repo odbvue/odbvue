@@ -12,8 +12,8 @@
 Create `.env` with passwords for Oracle Database:
 
 ```ini
-ADMIN_PASSWORD="MySecurePass123#"
-WALLET_PASSWORD="MySecurePass123#"
+ADMIN_PASSWORD="MySecurePass123!"
+WALLET_PASSWORD="MySecurePass123!"
 ```
 
 > [!WARNING]

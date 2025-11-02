@@ -142,7 +142,9 @@ As on moment there is no native support yet - see [Feature request](https://gith
 
 1. Create a plugin file
 
-::: details `@/plugins/icons.ts`
+#### `@/plugins/icons.ts`
+
+::: details source
 <<< ../../../src/plugins/icons.ts
 :::
 
