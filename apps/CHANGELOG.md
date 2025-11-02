@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.73
+
+### Patch Changes
+
+- efc4e9c: test db changes
+
 ## 0.0.60
 
 ### Patch Changes
