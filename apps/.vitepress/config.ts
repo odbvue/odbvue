@@ -90,15 +90,14 @@ export default defineConfig({
                 { text: 'Deploy', link: '/guide/i13e/oci/deploy' },
               ],
             },
-            {
-              text: 'CI/CD',
-              collapsed: true,
-              items: [
-                { text: 'Branching Strategies', link: '/guide/i13e/cicd/branching-strategies' },
-                { text: 'Development Lifecycle', link: '/guide/i13e/cicd/development-lifecycle' },
-                { text: 'GitHub Actions', link: '/guide/i13e/cicd/github-actions' },
-              ],
-            },
+          ],
+        },
+        {
+          text: 'CI/CD',
+          items: [
+            { text: 'Branching Strategies', link: '/guide/i13e/cicd/branching-strategies' },
+            { text: 'Development Lifecycle', link: '/guide/i13e/cicd/development-lifecycle' },
+            { text: 'GitHub Actions', link: '/guide/i13e/cicd/github-actions' },
           ],
         },
       ],
