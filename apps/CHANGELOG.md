@@ -1,5 +1,12 @@
 # odbvue
 
+## 0.1.57
+
+### Patch Changes
+
+- 08a330c: db project init
+- 1e8209d: dx scripts and db refactoring
+
 ## 0.1.55
 
 ### Patch Changes
