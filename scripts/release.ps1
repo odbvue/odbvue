@@ -43,5 +43,6 @@ git commit -m $commitMessage
 
 git tag -a "$Version" -m "Release $Version $(if ($Message) { $Message })"
 git push origin "$Version"
+git push
 
 Write-Output "Release $Version published successfully"
