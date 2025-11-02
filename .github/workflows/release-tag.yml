@@ -57,6 +57,27 @@ jobs:
           echo "zip=db/$ARTIFACT" >> "$GITHUB_OUTPUT"
           echo "DB artifact generated: $ARTIFACT"
 
+      - name: List artifact contents
+        working-directory: db
+        run: |
+          set -euo pipefail
+          ARTIFACT="artifact/odbvue-db-${GITHUB_REF_NAME}.zip"
+          if [ -f "$ARTIFACT" ]; then
+            echo "::group::Artifact file: $ARTIFACT"
+            ls -lh "$ARTIFACT"
+            echo "::endgroup::"
+            echo "::group::Artifact contents"
+            unzip -l "$ARTIFACT"
+            echo "::endgroup::"
+          else
+            echo "::error::Artifact file not found: $ARTIFACT"
+            ls -la artifact/ || echo "artifact directory does not exist"
+          fi
+          
+          # Exit after debugging
+          echo "::notice::Debugging completed - exiting for review"
+          exit 1
+
       - name: Setup pnpm/node
         uses: pnpm/action-setup@v2
         with:
