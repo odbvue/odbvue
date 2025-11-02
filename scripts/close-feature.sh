@@ -1,20 +1,20 @@
 #!/bin/bash
 
 # Close feature branch
-# Usage: ./close-feature.sh [feature-name]
+# Usage: ./close-feature.sh
 
-if [ -z "$1" ]; then
-    echo "Error: feature name is required"
-    echo "Usage: ./close-feature.sh [feature-name]"
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Safety check: exit if on main
+if [ "$CURRENT_BRANCH" = "main" ]; then
+    echo "Error: Already on main branch"
     exit 1
 fi
 
-FEATURE_NAME=$1
-
 git checkout main
 git pull origin main
-git merge --squash feat/$FEATURE_NAME
+git merge --squash $CURRENT_BRANCH
 git push
-git branch -d feat/$FEATURE_NAME
-git push origin --delete feat/$FEATURE_NAME
+git branch -d $CURRENT_BRANCH
+git push origin --delete $CURRENT_BRANCH
 echo "Feature closed"

@@ -131,15 +131,15 @@ On GitHub - create, review, approve and merge pull request
 
 ### Step X. Close feature
 
-#### `./scripts/close-feature.sh [feature-name]`
+#### `./scripts/close-feature.sh`
 
 ```bash
 git checkout main
 git pull origin main
-git merge --squash feat/[feature-name]
+git merge --squash [current-branch]
 git push
-git branch -d feat/[feature-name]
-git push origin --delete feat/[feature-name]
+git branch -d [current-branch]
+git push origin --delete [current-branch]
 echo "Feature closed"
 ```
 

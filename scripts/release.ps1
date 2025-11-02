@@ -22,7 +22,15 @@ if (Test-Path "apps/package.json") {
     $packageJson | ConvertTo-Json | Set-Content "apps/package.json"
 }
 
-# todo later: sql /nolog
+# Database project release
+if (Test-Path "db") {
+    Push-Location db
+    sql /nolog
+    project release -version "v$VersionNoV"
+    git add .
+    git commit -m "db: release $Version $Message"
+    Pop-Location
+}
 
 git add .
 git commit -m "release: $Version $Message"
