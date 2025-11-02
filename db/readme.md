@@ -28,9 +28,54 @@ deploy.yml
 changeset
 
 proj config set -name schemas -value odbvue
+
+
+### Step 1. Start work
+
+./begin-new-feature.sh [feature-name]
+
+git checkout main
+git pull origin main
+git checkout -b feat/[feature-name]
+
+
+development in local db
+
 project export
+git add .
+git commit
+project stage 
+git add .
+git commit
 
 
+changest
+
+git push -u origin feat/your-feature-name
+```
+
+Then on GitHub:
+
+- Open a PR against `main`
+- Request reviews
+- Address feedback and push updates
+- Ensure CI/CD checks pass
+
+### Step 6. Merge to main
+
+```bash
+git checkout main
+git pull origin main
+git merge --squash feat/your-feature-name
+git push
+
+bump json package
+git add .
+git commit
+git tag -a v1.0.0 -m "Release v1.0.0"
+git push origin v1.0.0
+
+---
 
 # Example Template
 
