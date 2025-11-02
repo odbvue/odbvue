@@ -6,3 +6,5 @@ var/*
 *.zip
 *.log
 **/.DS_Store
+
+.env
