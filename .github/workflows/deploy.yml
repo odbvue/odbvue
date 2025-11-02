@@ -175,7 +175,7 @@ jobs:
           define EDITION = '${EDITION}'
           define ARTIFACT_PATH = '${ARTIFACT_PATH}'
           prompt Variables defined..
-          project deploy -file &ARTIFACT_PATH
+          project deploy -file &ARTIFACT_PATH -log-path .
           prompt Artifact deployed..
           lb tag -tag "$VERSION"
           prompt Tagged..
