@@ -168,6 +168,11 @@ jobs:
           echo "Deploying version: $VERSION"
           echo "Connecting to ${ADB_TNS_ALIAS}..."
           
+          # Debug: Check what was extracted
+          echo "::group::Extracted project structure"
+          ls -la "$TEMP_DB_DIR"
+          echo "::endgroup::"
+          
           # Generate artifact from source AND deploy in one connected session
           # This ensures schema/edition initialization runs
           # Must run from temp_db_dir where .dbtools exists
@@ -179,10 +184,11 @@ jobs:
           define ADB_SCHEMA_PASSWORD = '${ADB_SCHEMA_PASSWORD}'
           define VERSION = '${VERSION}'
           define EDITION = '${EDITION}'
+          define WORK_DIR = '${TEMP_DB_DIR}'
           prompt Variables defined..
-          project gen-artifact -name $NAME -version $VERSION -format zip
+          project gen-artifact -name $NAME -version $VERSION -format zip -verbose
           prompt Artifact generated..
-          project deploy -file ./artifact/$NAME-$VERSION.zip -log-path .
+          project deploy -file ./artifact/$NAME-$VERSION.zip -log-path . -verbose
           prompt Artifact deployed..
           lb tag -tag "$VERSION"
           prompt Tagged..
