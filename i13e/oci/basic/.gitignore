@@ -1,0 +1,25 @@
+# OCI Configuration & Secrets
+.oci/
+.ssh/
+.ssl/
+.wallets/
+
+# Terraform Variables Files - NEVER commit secrets!
+*.tfvars
+*.tfvars.local
+*.auto.tfvars
+*.auto.tfvars.json
+
+# Terraform state files (CRITICAL - never commit)
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+.terraform/
+
+# Terraform logs
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
