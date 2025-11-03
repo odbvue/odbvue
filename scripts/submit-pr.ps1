@@ -15,6 +15,34 @@ if ($status) {
   exit 1
 }
 
+param(
+    [Parameter(Position=0, Mandatory=$false)]
+    [string]$Connection
+)
+
+# Try to get connection from environment variable if not provided
+if ([string]::IsNullOrWhiteSpace($Connection)) {
+    $Connection = $env:ODBVUE_DB_DEV
+}
+
+if ([string]::IsNullOrWhiteSpace($Connection)) {
+    Write-Host "Error: Connection not provided and ODBVUE_DB_DEV environment variable not set." -ForegroundColor Red
+    Write-Host "Usage: .\submit-pr.ps1 [Connection]" -ForegroundColor Red
+    exit 1
+}
+
+Push-Location db
+
+$sqlScript = @"
+connect $Connection
+project stage 
+exit
+"@
+
+$sqlScript | sql /nolog
+
+Pop-Location
+
 Push-Location apps
 pnpm changeset
 

@@ -35,9 +35,6 @@ if [ -d "db" ]; then
 project release -version "v$VERSION_NO_V"
 exit
 EOF
-    git add .
-    DB_COMMIT_MESSAGE="db: release $VERSION $([ -n "$MESSAGE" ] && echo "$MESSAGE" || echo "")"
-    git commit -m "$DB_COMMIT_MESSAGE"
     cd ..
 fi
 

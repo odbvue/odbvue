@@ -20,3 +20,10 @@ SELECT USER AS whoami FROM dual;
 # ADMIN
 exit
 ```
+
+//todo
+
+000_before_deploy.sql
+777_marker.sql
+999_after_deploy.sql
+install.sql

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Wrapper for changeset workflow
-# Usage: ./create-pr.sh
+# Usage: ./submit-pr.sh <Connection>
 # You'll be prompted to:
 # - Select which packages changed (usually main app)
 # - Choose version bump: patch, minor, or major
@@ -15,12 +15,31 @@ if [[ -n $(git status -s) ]]; then
   exit 1
 fi
 
+CONNECTION=${1:-$ODBVUE_DB_DEV}
+
+if [ -z "$CONNECTION" ]; then
+  echo "Error: Connection not provided and ODBVUE_DB_DEV environment variable not set." >&2
+  echo "Usage: $0 [Connection]" >&2
+  exit 1
+fi
+
+cd db
+
+sql /nolog << EOF
+connect $CONNECTION
+project stage
+exit
+EOF
+
+cd ..
+
 cd apps
 pnpm changeset
 
 # Commit the changeset
 git add .
-git commit -m "changeset: $(ls -t .changeset/*.md 2>/dev/null | head -1 | xargs tail -1)"
+summary=$(tail -1 "$(ls -t .changeset/*.md 2>/dev/null | head -1)")
+git commit -m "changeset: $summary"
 echo "Changeset created and committed."
 
 # Push to remote
