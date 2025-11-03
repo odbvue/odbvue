@@ -2,9 +2,27 @@
 
 ## Concepts
 
-Historically, managing database changes was a tedious and error-prone process - DBAs and developers had to manually track schema updates, synchronize scripts across environments, and ensure consistency during deployments. This often led to versioning issues, missed dependencies, and time-consuming rollbacks. Now, with Oracle’s **SQLcl Project** feature - built on Liquibase - teams get all the benefits of modern CI/CD practices for databases.
+A **repository** is a central storage location for a project's code, configuration files, documentation, and version history. It can be hosted on platforms like GitHub, GitLab, or Bitbucket.
 
-**Changesets** is a lightweight tool (by Atlassian, now community-maintained) that helps manage versioning, changelogs, and releases in monorepos as OdbVue. It tracks what changed, where, and how it should affect version numbers - all before you actually publish or deploy - and generates automatic changelog.
+**Git** is a distributed version control system that tracks changes to files and enables multiple developers to collaborate on the same codebase simultaneously. It records the full history of commits and allows branching, merging, and rollback.
+
+A **branch** is an independent line of development within a repo. It allows developers to work on features, fixes, or experiments without affecting the main codebase (`main` branch).
+
+A **commit** is a snapshot of code changes saved to the repository, often tied to a message describing what was modified and why.
+
+**Changesets** (*Changesets* tool by Atlassian) help track and version changes across a monorepo. They define what changed, where, and how version numbers or changelogs should be updated before release.
+
+A **pull request** (GitHub) or **merge request** (GitLab) is a proposal to merge code from one branch into another. It’s where code review, testing, and discussion occur before integration.
+
+**Code review** is the peer-review process of examining code in a PR to ensure quality, readability, performance, and adherence to team standards.
+
+A **release** is a packaged version of your software (often with version tags like `v1.2.3`) that’s published for users, often accompanied by a changelog and release notes.
+
+A **tag** marks specific commits as release points (e.g., `v1.0.0`) in Git history — important for versioning and rollback.
+
+## Process Overview
+
+//todo
 
 ## Initial setup (once)
 
@@ -12,12 +30,15 @@ Historically, managing database changes was a tedious and error-prone process - 
 
 ```bash
 git init
-git config core.autocrlf true
+git config core.autocrlf input
 git config user.name "Your Name"
 git config user.email "your.email@example.com"
 ```
 
-### Step 2. Install and initialize the changesets tool (in `./apps/`)
+> [!TIP]
+> Add `.gitattributes` file to project root folder with `* text eol=lf`
+
+### Step 2. Install and initialize the changesets tool
 
 ```bash
 pnpm add -D @changesets/cli
@@ -30,30 +51,68 @@ pnpm changeset init
 > This can be done at later stage of project, when database development starts
 >
 > Prerequisite: SQLcl is installed
+>
+> **SQLcl project** feature lets organize SQL scripts, DDL files, and configuration into a structured workspace - it helps to manage, version, and run database scripts more easily by grouping related files, tracking connections and settings, and supporting repeatable deployments or automation workflows.
 
 From the project's root directory
 
 ```bash
-mkdir -p db
+mkdir db
 cd db
 sql /nolog
 project init -name odbvue-db
+# Your project has been successfully created
+proj config set -name schemas -value odbvue
+# Process completed successfully
+!git add .
+!git commit -m "db - project init"
 exit
+cd ..
 ```
 
-## Development process
-
-### Overview
-
-This section describes the day-to-day workflow for developing features and database changes using the Trunk + Temporary Release Branch strategy with Changesets.
+## Developing a feature
 
 ### Step 1. Create a feature branch
+
+#### `./scripts/create-feature.sh [feature-name]`
 
 ```bash
 git checkout main
 git pull origin main
-git checkout -b feat/your-feature-name
+git checkout -b feat/[feature-name]
 ```
+
+### Step 2. Implement application changes
+
+Work on feature in the feature branch. Commit regularly.
+
+```bash
+git add .
+git commit -m "feat(scope): description of change"
+```
+
+### Step 2a. Implement database DDL changes (if needed)
+
+DDL - Data definition language - create and alter database object like table structure, packages
+
+Do development directly in development database. When done:
+
+#### `./scripts/db-export.sh [connection-string] [commit-message]`
+
+```bash 
+sql connect [connection-string]
+project export
+!git add .
+!git commit -m "db export: [commit-message]"
+exit
+```
+
+
+---
+
+# OLD
+
+
 
 ### Step 2. Implement application changes
 
@@ -170,3 +229,144 @@ git push origin v1.0.0
 
 > [!NOTE]
 > Tagging policy: create release tags from `main` by default. Only create a temporary `release/x.y.z` branch when you need a stabilization window; in that case, perform QA on that branch and tag from it, then merge back to `main` and delete the release branch.
+
+---
+---
+---
+
+
+git checkout -b feat/cicd-db
+mkdir db
+cd db
+
+sql /nolog
+project init -name odbvue-db
+# Your project has been successfully created
+!git add .
+!git commit -m "db init project"
+
+project release -version v0.0.0
+!git add .
+!git commit -m "db init project release"
+
+000_before_deploy.sql
+777_marker.sql
+999_after_deploy.sql
+install.sql
+
+.gitignore
+.env
+
+deploy.sh
+
+release-tag.yml
+deploy.yml
+
+changeset
+
+proj config set -name schemas -value odbvue
+
+
+
+
+### Step X. Develop Database
+
+#### creating and altering objects in local db
+project export
+git add .
+git commit
+
+#### inserting and updating data
+project stage add-custom -file-name [file-name]
+git add .
+git commit
+
+### Step X. Stage Database changes
+
+Commits and stages database changes.
+
+#### `./scripts/stage-db.sh [connection-string] [commit-message]`
+
+```bash
+#./scripts/stage-db.ps1 "admin/MySecurePass123!@127.0.0.1:1521/myatp" "test staging"
+cd db
+git add .
+git commit "db: [commit-message]"
+sql /nolog
+> connect [connection-string]
+> project stage 
+> exit
+git add .
+git commit "db stage: [commit-message]"
+echo "Database changes staged anb committed: [commit-message]"
+cd ..
+```
+
+### Step X. Create PR
+
+Check if all code is committed, create changeset, push to origin
+
+#### `./scripts/submit-pr.sh`
+
+```bash
+cd apps
+pnpm changeset
+```
+
+You'll be prompted to:
+
+- Choose the version bump type: patch, minor, or major
+- Write a concise [summary-of-the-changes]
+- Select which packages changed (usually main app)
+
+```bash
+git add .
+git commit -m "changeset: [summary-of-the-changes]"
+git push -u origin feat/your-feature-name
+cd ..
+```
+
+### Step X. Approve PR
+
+On GitHub - create, review, approve and merge pull request
+
+- Open a PR against `main`
+- Request reviews
+- Address feedback and push updates
+- Ensure CI/CD checks pass
+
+### Step X. Close feature
+
+#### `./scripts/close-feature.sh`
+
+```bash
+git checkout main
+git pull origin main
+git merge --squash [current-branch]
+git push
+git branch -d [current-branch]
+git push origin --delete [current-branch]
+echo "Feature closed"
+```
+
+### Step X. Release
+
+Create and publish release
+
+#### `./scripts/release.sh [version] [message]`
+
+```bash
+git checkout main
+git pull origin main
+
+bump json packages version to [version] (remove v prefix)
+
+# todo later: sql /nolog
+
+git add .
+git commit -m "release: [version] [message]"
+
+git tag -a [version] -m "Release [version] [message]"
+git push origin [version]
+```
+
