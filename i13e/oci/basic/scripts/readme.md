@@ -1,70 +1,78 @@
-# Nginx Setup & Deployment Scripts
+## Web Server Setup
 
-## Overview
+After Compute infrastructure is up and running it is necessary to set up Nginx and prepare for site deployment.
 
-Automated scripts for setting up nginx and deploying web content using **blue/green deployments** on local or remote machines.
+### Step 1. Configuration
 
-## Scripts
+Nginx configuration template:
 
-### `setup.sh` - Nginx Configuration
-**What it does:**
-- Installs nginx with dependencies (yq)
-- Creates directory structure for blue/green deployment
-- Generates nginx config from `sites.yaml` template
-- Sets up SSL certificates and permissions
+#### `./i13e/oci/basic/scripts/nginx.conf.tpl` 
 
-**Usage:**
+::: details source
+<<< ../../../../../i13e/oci/basic/scripts/nginx.conf.tpl {ini}
+::: 
+
+Nginx individual Site configuration template:
+
+#### `./i13e/oci/basic/scripts/nginx.site.conf.tpl` 
+
+::: details source
+<<< ../../../../../i13e/oci/basic/scripts/nginx.site.conf.tpl {ini}
+::: 
+
+Sites:
+
+#### `./i13e/oci/basic/scripts/sites.yaml` 
+
+::: details source
+<<< ../../../../../i13e/oci/basic/scripts/sites.yaml
+::: 
+
+### Step 2. SSL Certificates
+
+Assure that Wildcard SSL certificates are in `./scripts/.sll/` folder.
+
+### Step 3. Copy all needed files to remote server
+
+Script will copy all configuration files, scripts and site content to web server's `~\deploy\` folder.
+
 ```bash
-# Local setup
-bash setup.sh
-
-# Remote setup (SSH)
-bash setup.sh user@host.com [~/.ssh/key]
+./copy.sh [ssh-key] opc@[public-ip-address]
+#./copy.sh ~/.ssh/odbvue opc@12.34.56.789
 ```
 
-### `deploy.sh` - Blue/Green Deployment
-**What it does:**
-- Deploys site content to inactive slot (blue or green)
-- Validates deployment and runs smoke tests
-- Swaps symlink to activate new version (zero-downtime)
-- Supports rollback to previous deployment
+#### `./i13e/oci/basic/scripts/copy.sh` 
 
-**Usage:**
+::: details source
+<<< ../../../../../i13e/oci/basic/scripts/copy.sh
+::: 
+
+### Step 4. Run setup
+
+Script will setup Nginx based on configuration templates and will create `Helo, {site-name}!` sites according to `./sites.yaml`. 
+
 ```bash
-# Local: deploy all sites
-bash deploy.sh
-
-# Remote: deploy all sites
-bash deploy.sh user@host.com [~/.ssh/key]
-
-# Deploy specific site
-bash deploy.sh [user@host.com] app-name
-
-# Test without changes
-bash deploy.sh --dry-run
-
-# Rollback to previous version
-bash deploy.sh [user@host.com] --rollback
-
-# Validate config only
-bash deploy.sh --validate
+chmod +x ./setup.sh
+./setup.sh
 ```
 
-## Configuration
+#### `./i13e/oci/basic/scripts/setup.sh` 
 
-Edit `sites.yaml` to define sites:
-```yaml
-sites:
-  - site_name: "myapp"
-    domain: "example.com"
-    local_path: "../releases/latest"
-    remote_path: "/var/www/myapp"
+::: details source
+<<< ../../../../../i13e/oci/basic/scripts/setup.sh
+::: 
+
+### Step 5. Deploy content (optional)
+
+Script will deploy actual content based on `./sites.yaml`. 
+
+```bash
+chmod +x ./deploy.sh
+./deploy.sh
 ```
 
-## Requirements
-- **Local:** nginx, yq, sudo
-- **Remote:** SSH access + same tools on target server
+#### `./i13e/oci/basic/scripts/deploy.sh` 
 
-## Templates
-- `nginx.conf.tpl` - Main nginx config template
-- `site.conf.tpl` - Per-site server blocks (SSL, headers, caching)
+::: details source
+<<< ../../../../../i13e/oci/basic/scripts/deploy.sh
+::: 

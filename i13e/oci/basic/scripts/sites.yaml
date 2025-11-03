@@ -1,24 +1,16 @@
 # Sites
 sites:
-  - site_name: "main"
-    domain: "odbvue.com"
-    remote_path: "/var/www/main/"
-    local_path: "../../../../main"
+  - siteName: "main"
+    domainName: "odbvue.com"
+    remotePath: "/var/www/main/"
+    localPath: "~/odbvue/main"
 
-  - site_name: "apps"
-    domain: "apps.odbvue.com"
-    remote_path: "/var/www/apps/"
-    local_path: "../../../../apps/dist"
+  - siteName: "apps"
+    domainName: "apps.odbvue.com"
+    remotePath: "/var/www/apps/"
+    localPath: "~/odbvue/apps/dist"
 
-  - site_name: "wiki"
-    domain: "wiki.odbvue.com"
-    remote_path: "/var/www/wiki/"
-    local_path: "../../../../apps/.vitepress/dist"
-
-# SSL Configuration
-ssl:
-  cert_file: "./.ssl/STAR.odbvue.com.crt"
-  key_file: "./.ssl/STAR.odbvue.com_key.txt"
-  ca_bundle_file: "./.ssl/STAR.odbvue.com.ca-bundle"
-
-
+  - siteName: "wiki"
+    domainName: "wiki.odbvue.com"
+    remotePath: "/var/www/wiki/"
+    localPath: "~/odbvue/apps/.vitepress/dist"
