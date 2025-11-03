@@ -73,7 +73,7 @@ export default defineConfig({
               ],
             },
             {
-              text: 'Local development',
+              text: 'Local',
               collapsed: true,
               items: [
                 { text: 'Environment', link: '/guide/i13e/local-development/environment.md' },
@@ -100,7 +100,6 @@ export default defineConfig({
             { text: 'Branching Strategies', link: '/guide/cicd/branching-strategies' },
             { text: 'Development Lifecycle', link: '/guide/cicd/development-lifecycle' },
             { text: 'GitHub Actions', link: '/guide/cicd/github-actions' },
-            { text: 'Deploy', link: '/guide/cicd/deploy' },
           ],
         },
       ],
