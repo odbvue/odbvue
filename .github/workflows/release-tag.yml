@@ -1,0 +1,92 @@
+name: Build & Package on Tag
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_zip: ${{ steps.db.outputs.zip }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SQLcl
+        uses: gvenzl/setup-oracle-sqlcl@v1
+        with:
+          version: latest
+
+      - name: Generate DB artifact
+        id: db
+        working-directory: db
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME}"
+          NAME="odbvue-db"
+          
+          # Generate artifact
+          sql /nolog << ENDSQL
+          project gen-artifact -name $NAME -version $VERSION -format zip
+          exit
+          ENDSQL
+          
+          # Verify artifact was created
+          ARTIFACT="artifact/${NAME}-${VERSION}.zip"
+          if [ ! -f "$ARTIFACT" ]; then
+            echo "::error::Artifact file not found: $ARTIFACT"
+            ls -la artifact/ || echo "artifact directory does not exist"
+            exit 1
+          fi
+          
+          echo "zip=db/$ARTIFACT" >> "$GITHUB_OUTPUT"
+          echo "DB artifact generated: $ARTIFACT"
+
+      - name: Setup pnpm/node
+        uses: pnpm/action-setup@v2
+        with:
+          package_json_file: 'apps/package.json'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: 'apps/pnpm-lock.yaml'
+      - run: cd apps && pnpm install --frozen-lockfile
+      - run: cd apps && pnpm build && pnpm wiki:build
+
+      - name: Assemble release bundle
+        run: |
+          set -euo pipefail
+          mkdir -p build-bundle/{apps,wiki,main,db}
+          cp -r apps/dist/* build-bundle/apps/ || true
+          cp -r apps/.vitepress/dist/* build-bundle/wiki/ || true
+          cp -r main/* build-bundle/main/ || true
+          cp "${{ steps.db.outputs.zip }}" build-bundle/db/
+          tar -czf "release-${GITHUB_REF_NAME}.tar.gz" -C build-bundle .
+          sha256sum "release-${GITHUB_REF_NAME}.tar.gz" > "release-${GITHUB_REF_NAME}.sha256"
+
+      - name: Upload bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle
+          path: |
+            release-${{ github.ref_name }}.tar.gz
+            release-${{ github.ref_name }}.sha256
+
+      - name: Publish GitHub Release assets
+        if: ${{ github.ref_type == 'tag' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: |
+            release-${{ github.ref_name }}.tar.gz
+            release-${{ github.ref_name }}.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
