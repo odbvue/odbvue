@@ -1,22 +1,28 @@
 #!/bin/bash
 
 # Check if required parameters are provided
-if [ $# -lt 2 ]; then
-    echo "Usage: ./db-export.sh <Connection> <CommitMessage>"
+if [ $# -lt 1 ]; then
+    echo "Usage: ./db-export.sh <CommitMessage> [Connection]"
     exit 1
 fi
 
-CONNECTION=$1
-COMMIT_MESSAGE=$2
+COMMIT_MESSAGE=$1
+CONNECTION=${2:-$ODBVUE_DB_DEV}
 
-# Create SQL script and execute it
+if [ -z "$CONNECTION" ]; then
+    echo "Error: Connection not provided and ODBVUE_DB_DEV environment variable not set."
+    echo "Usage: ./db-export.sh <CommitMessage> [Connection]"
+    exit 1
+fi
+
+cd db
+
 sql /nolog <<EOF
 connect $CONNECTION
 project export
 !git add .
-!git commit -m "db export: $COMMIT_MESSAGE"
+!git commit -m "feat(db): $COMMIT_MESSAGE"
 exit
 EOF
 
-echo "Database changes exported and committed: $COMMIT_MESSAGE"
 cd ..

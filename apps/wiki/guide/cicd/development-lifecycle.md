@@ -22,7 +22,29 @@ A **tag** marks specific commits as release points (e.g., `v1.0.0`) in Git histo
 
 ## Process Overview
 
-//todo
+1. **Initial Setup (once)**
+   Set up the Git repository, initialize the Changesets tool, and configure the database project using SQLcl.
+
+2. **Create a Feature Branch**
+   Start new work by branching from `main` - named `feat/[feature-name]`.
+
+3. **Develop and Commit Changes**
+   Implement the feature or fix, committing changes regularly with clear messages.
+
+4. **(Optional) Apply Database Changes**
+   For database updates, export DDL or create DML scripts with SQLcl project and commit them.
+
+5. **Prepare Pull Request**
+   Finalize changes, generate a changeset (for version tracking), and push your branch.
+
+6. **Submit and Review PR**
+   On GitHub ppen a pull request to `main`. Peers review, test, and approve before merging.
+
+7. **Close Feature Branch**
+   After merging, clean up the branch locally and remotely.
+
+8. **Release**
+   Tag a new version, commit release notes, and push to origin for deployment or distribution.
 
 ## Initial setup (once)
 
@@ -70,7 +92,7 @@ exit
 cd ..
 ```
 
-## Developing a feature
+## Development
 
 ### Step 1. Create a feature branch
 
@@ -93,263 +115,96 @@ git commit -m "feat(scope): description of change"
 
 ### Step 2a. Implement database DDL changes (if needed)
 
-DDL - Data definition language - create and alter database object like table structure, packages
+DDL - Data Definition Language - create and alter database object like table structure, packages
 
 Do development directly in development database. When done:
 
-#### `./scripts/db-export.sh [connection-string] [commit-message]`
+#### `./scripts/db-export.sh [commit-message] [connection-string]`
 
 ```bash 
-sql connect [connection-string]
+cd db
+sql [connection-string]
 project export
 !git add .
-!git commit -m "db export: [commit-message]"
+!git commit -m "feat(db): [commit-message]"
 exit
+cd ..
 ```
 
+### Step 2b. Implement database DML changes (if needed)
 
----
+DML - Data Manipulation Language - insert and update data scripts  
 
-# OLD
+Create SQL script files manually in `db/src/<your-feature-name>` and stage:
 
-
-
-### Step 2. Implement application changes
-
-Work on your feature in the feat/ branch. Commit regularly:
-
-```bash
-git add .
-git commit -m "feat(scope): description of change"
-```
-
-### Step 3. Implement database changes (optional)
-
-If your feature requires database schema or data changes:
-
-#### For DDL changes (creating and altering schema objects):
-
-Develop in local database:
-
-```bash
-sql admin/************@127.0.0.1:1521/myatp
-
-# Make schema changes, test them
--- CREATE TABLE, ALTER TABLE, etc.
-exit
-```
-
-When done, export and stage the changes:
+#### `./scripts/db-add-custom.sh [path-to-file] [commit-message]`
 
 ```bash
 cd db
 sql /nolog
-project export -name <your-feature-name>
-project stage <your-feature-name>
-!git add db/
-!git commit -m "db: description of database change"
-exit
-```
-
-#### For DML changes (custom data manipulation scripts)
-
-Create SQL script files manually in `db/src/<your-feature-name>` and stage them:
-
-```bash
-cd db
-sql /nolog
-project stage add-custom -file-name ./src/your-feature-name/your-script-name.sql
+project stage add-custom -file-name [path-to-file]
 !git add .
-!git commit -m "db: description of data change"
+!git commit -m "feat(db): [commit-message]"
 exit
+cd ..
 ```
 
 > [!NOTE]
 > Scripts will be executed in alphabetic order name `001_*`, `002_*` and so on
 
-### Step 4. Create changeset
+### Step 3. Create Pull Request
+
+When feature is ready:
+
+#### `./scripts/submit-pr.sh [connection-string]`
 
 ```bash
+cd db
+sql [connection-string]
+project stage 
+exit
+cd ..
+
 cd apps
 pnpm changeset
 ```
 
 You'll be prompted to:
 
-- Select which packages changed (usually main app)
 - Choose the version bump type: patch, minor, or major
 - Write a concise summary of the changes
 
 ```bash
 git add .
-git commit -m "changeset: your feature summary"
+git commit -m "changeset: [changeset-summary]"
+git push -u origin feat/feat/[feature-name]
+cd..
 ```
 
-### Step 5. Create and review Pull request
-
-```bash
-git push -u origin feat/your-feature-name
-```
+### Step 4. Merge Pull Request
 
 Then on GitHub:
 
 - Open a PR against `main`
 - Request reviews
 - Address feedback and push updates
-- Ensure CI/CD checks pass
+- Merge into `main`
 
-### Step 6. Merge to main
-
-```bash
-git checkout main
-git pull origin main
-git merge --squash feat/your-feature-name
-git push
-
-# Clean up
-git branch -d feat/your-feature-name
-git push origin --delete feat/your-feature-name
-```
-
-### Step 7. Create a release (from main)
-
-When ready to release (multiple features can be batched):
-
-1. Merge your PRs to `main`. The CI Changesets workflow will automatically run `pnpm changeset version`, update package versions and `CHANGELOG.md`, and push the commit back to `main`.
-2. Create a Git tag matching the new version and push it to trigger the build & package workflow:
-
-```bash
-# Create a tag to mark the release (replace with the version from package.json)
-git tag -a v1.0.0 -m "Release v1.0.0"
-git push origin v1.0.0
-```
-
-> [!IMPORTANT]
-> We do NOT publish to npm from this repository. Versioning is used for release notes and artifact tagging only. Tags (vX.Y.Z) are created and pushed manually to control release timing. If the CI versioning step fails, fix the pending changesets and re-run the workflow.
-
-> [!NOTE]
-> Tagging policy: create release tags from `main` by default. Only create a temporary `release/x.y.z` branch when you need a stabilization window; in that case, perform QA on that branch and tag from it, then merge back to `main` and delete the release branch.
-
----
----
----
-
-
-git checkout -b feat/cicd-db
-mkdir db
-cd db
-
-sql /nolog
-project init -name odbvue-db
-# Your project has been successfully created
-!git add .
-!git commit -m "db init project"
-
-project release -version v0.0.0
-!git add .
-!git commit -m "db init project release"
-
-000_before_deploy.sql
-777_marker.sql
-999_after_deploy.sql
-install.sql
-
-.gitignore
-.env
-
-deploy.sh
-
-release-tag.yml
-deploy.yml
-
-changeset
-
-proj config set -name schemas -value odbvue
-
-
-
-
-### Step X. Develop Database
-
-#### creating and altering objects in local db
-project export
-git add .
-git commit
-
-#### inserting and updating data
-project stage add-custom -file-name [file-name]
-git add .
-git commit
-
-### Step X. Stage Database changes
-
-Commits and stages database changes.
-
-#### `./scripts/stage-db.sh [connection-string] [commit-message]`
-
-```bash
-#./scripts/stage-db.ps1 "admin/MySecurePass123!@127.0.0.1:1521/myatp" "test staging"
-cd db
-git add .
-git commit "db: [commit-message]"
-sql /nolog
-> connect [connection-string]
-> project stage 
-> exit
-git add .
-git commit "db stage: [commit-message]"
-echo "Database changes staged anb committed: [commit-message]"
-cd ..
-```
-
-### Step X. Create PR
-
-Check if all code is committed, create changeset, push to origin
-
-#### `./scripts/submit-pr.sh`
-
-```bash
-cd apps
-pnpm changeset
-```
-
-You'll be prompted to:
-
-- Choose the version bump type: patch, minor, or major
-- Write a concise [summary-of-the-changes]
-- Select which packages changed (usually main app)
-
-```bash
-git add .
-git commit -m "changeset: [summary-of-the-changes]"
-git push -u origin feat/your-feature-name
-cd ..
-```
-
-### Step X. Approve PR
-
-On GitHub - create, review, approve and merge pull request
-
-- Open a PR against `main`
-- Request reviews
-- Address feedback and push updates
-- Ensure CI/CD checks pass
-
-### Step X. Close feature
+### Step 5. Close the feature
 
 #### `./scripts/close-feature.sh`
 
 ```bash
+# [current-branch] git rev-parse --abbrev-ref HEAD
 git checkout main
 git pull origin main
 git merge --squash [current-branch]
 git push
 git branch -d [current-branch]
 git push origin --delete [current-branch]
-echo "Feature closed"
 ```
 
-### Step X. Release
+## Release
 
 Create and publish release
 
@@ -359,14 +214,18 @@ Create and publish release
 git checkout main
 git pull origin main
 
-bump json packages version to [version] (remove v prefix)
+# bump json packages version to [version] (remove v prefix)
 
-# todo later: sql /nolog
+cd db
+sql /nolog
+project release -version [version]
+exit
+cd ..
 
 git add .
 git commit -m "release: [version] [message]"
 
 git tag -a [version] -m "Release [version] [message]"
 git push origin [version]
+git push
 ```
-
