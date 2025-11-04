@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.78
+
+### Patch Changes
+
+- 32e9641: db ordsify
+
 ## 0.0.73
 
 ### Patch Changes
