@@ -203,6 +203,8 @@ Pattern in as follows:
 
 ### Example
 
+This:
+
 ```plsql
 CREATE OR REPLACE EDITIONABLE PACKAGE pck_demo AS -- Application 
 
@@ -225,7 +227,7 @@ END pck_demo;
 /
 ```
 
-becomes:
+becomes this:
 
 ```log
 Creating module: demo
@@ -235,6 +237,8 @@ Creating module: demo
 ```
 
 and is publicly accessible.
+
+Requesting:
 
 ```bash
 curl -X GET "https://localhost:8443/ords/odbvue/demo/test/a/1" -k
@@ -246,6 +250,23 @@ returns:
 {"tests":[{"key":"param1","val":"a"},{"key":"param2","val":"1"},{"key":"param3","val":null},{"key":"param4","val":null}],"test":"Test B"}
 ```
 
+> [!TIP]
+> Pattern is as follows:
+> - for GET `https://localhost:8443/ords/[schema-name]/[package-name]/[procedure-name]/[non-defualted-attributes]?[defaulted-attributes]`
+> - same for POST/PUT/DELETE, just `[defaulted-attributes]` shall be passed in request body 
+
 ### Implementation underneath
 
-//todo
+Standalone procedure is initiated by Trigger each time when schema objects changes.
+
+#### `./db/src/database/odbvue/triggers/trg_ordsify.sql`
+
+::: details source
+<<< ../../../../db/src/database/odbvue/triggers/trg_ordsify.sql
+:::
+
+#### `./db/src/database/odbvue/procedures/prc_ordsify.sql`
+
+::: details source
+<<< ../../../../db/src/database/odbvue/procedures/prc_ordsify.sql
+:::

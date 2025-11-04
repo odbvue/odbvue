@@ -8,7 +8,7 @@ create or replace editionable trigger odbvue.trg_ordsify
             dbms_scheduler.create_job(
                 job_name   => 'JOB_ORDSIFY_' || ora_dict_obj_name,
                 job_type   => 'PLSQL_BLOCK',
-                job_action => 'BEGIN ordsify('''
+                job_action => 'BEGIN prc_ordsify('''
                               || ora_dict_obj_name
                               || ''', '''', FALSE); END;',
                 start_date => systimestamp + interval '5' second,
