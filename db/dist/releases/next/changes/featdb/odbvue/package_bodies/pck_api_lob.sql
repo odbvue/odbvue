@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1762284801448 stripComments:false  logicalFilePath:featdb\odbvue\package_bodies\pck_api_lob.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_bodies/pck_api_lob.sql:1e64084792043ed4a94fcb64df9152f7c7a6c27e:9ac7586c3c6f6abae1e5848e3d3c8ff0232afb6d:alter
+
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_lob AS
 
   -- PRIVATE
@@ -327,5 +331,3 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_lob AS
 END;
 /
 
-
--- sqlcl_snapshot {"hash":"9ac7586c3c6f6abae1e5848e3d3c8ff0232afb6d","type":"PACKAGE_BODY","name":"PCK_API_LOB","schemaName":"ODBVUE","sxml":""}

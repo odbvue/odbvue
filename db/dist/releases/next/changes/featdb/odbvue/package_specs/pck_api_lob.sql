@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1762284803325 stripComments:false  logicalFilePath:featdb\odbvue\package_specs\pck_api_lob.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_specs/pck_api_lob.sql:4c9043e7129da66e6895b07731028514d3ef8073:3b42fa73b6f5cc43fea20f64947a6bf98c0a5ec6:alter
+
 CREATE OR REPLACE PACKAGE odbvue.pck_api_lob AS -- Package for LOB processing. Credit: https://github.com/paulzip-dev/Base64
 
     SUBTYPE boolean IS PLS_INTEGER RANGE 0..1;
@@ -42,5 +46,3 @@ CREATE OR REPLACE PACKAGE odbvue.pck_api_lob AS -- Package for LOB processing. C
 END;
 /
 
-
--- sqlcl_snapshot {"hash":"3b42fa73b6f5cc43fea20f64947a6bf98c0a5ec6","type":"PACKAGE_SPEC","name":"PCK_API_LOB","schemaName":"ODBVUE","sxml":""}

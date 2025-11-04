@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1762284803135 stripComments:false  logicalFilePath:featdb\odbvue\package_bodies\pck_api_zip.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_bodies/pck_api_zip.sql:eed3a342366931301f9fb68c7e5a06e75243fc4d:5d474760eaf28afc70147389944722b2f8eab921:alter
+
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_zip AS
 
     TYPE file_list IS
@@ -2697,5 +2701,3 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_zip AS
 END;
 /
 
-
--- sqlcl_snapshot {"hash":"5d474760eaf28afc70147389944722b2f8eab921","type":"PACKAGE_BODY","name":"PCK_API_ZIP","schemaName":"ODBVUE","sxml":""}
