@@ -10,6 +10,12 @@ fi
 
 FEATURE_NAME=$1
 
+# Check for unmerged changes
+if [ -n "$(git status --porcelain)" ]; then
+  echo "Error: You have unmerged changes. Please commit or stash them before proceeding."
+  exit 1
+fi
+
 git checkout main
 git pull origin main
 git checkout -b feat/$FEATURE_NAME

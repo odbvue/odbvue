@@ -5,6 +5,13 @@ if (-not $FeatureName) {
     exit 1
 }
 
+# Check for unmerged changes
+$status = git status --porcelain
+if ($status) {
+    Write-Host "Error: You have unmerged changes. Please commit or stash them before proceeding."
+    exit 1
+}
+
 git checkout main
 git pull origin main
 git checkout -b "feat/$FeatureName"
