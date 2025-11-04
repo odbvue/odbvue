@@ -1,6 +1,8 @@
 {
     "cSpell.words": [
-        "Exadata"
+        "Exadata",
+        "EDITIONABLE",
+        "VARCHAR2"
     ],
     "postman.settings.dotenv-detection-notification-visibility": false
 }

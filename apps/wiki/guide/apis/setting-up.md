@@ -180,3 +180,72 @@ Above scripts provide automatic creation of new edition per each release.
 > SELECT * FROM all_editions;
 > SELECT * FROM all_objects_ae WHERE edition_name IS NOT NULL;
 > ```  
+
+## Enabling ORDS
+
+### Concept
+
+**OdbVue** Database has an automation feature that auto enables REST services for PL/SQL package procedures that matches certain pattern.
+
+If package includes procedures with `get_`, `post_`, `put_`, `delete_` prefix, they are immediately after deployment publicly exposed in ORDS.
+
+Pattern in as follows:
+
+- Packages becomes modules (prefix `pck_` is removed if exists; `_` are replaced to `-`)
+
+- Procedures become methods (prefixes `get_`, `post_`, `put_`, `delete_` are removed; `_` are replaced to `-`)
+
+- Non-defaulted attributes become path parameters
+
+- Defaulted attributes become query parameters
+
+- Everything get lower-cased
+
+### Example
+
+```plsql
+CREATE OR REPLACE EDITIONABLE PACKAGE pck_demo AS -- Application 
+
+    PROCEDURE get_test( -- get test 1
+        r_test OUT VARCHAR2 -- Test Result
+    );
+
+    PROCEDURE get_test( -- get test 2
+        p_param1 IN VARCHAR2, -- Parameter 1 
+        p_param2 IN NUMBER, -- Parameter 2
+        p_param3 IN VARCHAR2 DEFAULT 'TEST', -- Parameter 3
+        p_param4 IN NUMBER DEFAULT 123, -- Parameter 4
+        r_tests OUT SYS_REFCURSOR, -- Test Results [{key: val}]
+        r_test OUT VARCHAR2 -- Test Result
+    );
+
+    PROCEDURE delete_test; -- Delete test
+
+END pck_demo;
+/
+```
+
+becomes:
+
+```log
+Creating module: demo
+  Creating endpoint: GET test/
+  Creating endpoint: GET test/:param1/:param2
+  Creating endpoint: DELETE test/
+```
+
+and is publicly accessible.
+
+```bash
+curl -X GET "https://localhost:8443/ords/odbvue/demo/test/a/1" -k
+```
+
+returns:
+
+```json
+{"tests":[{"key":"param1","val":"a"},{"key":"param2","val":"1"},{"key":"param3","val":null},{"key":"param4","val":null}],"test":"Test B"}
+```
+
+### Implementation underneath
+
+//todo
