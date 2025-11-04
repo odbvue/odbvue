@@ -109,10 +109,16 @@ cd ..
 #### `./scripts/create-feature.sh [feature-name]`
 
 ```bash
+# Check for unmerged changes
+git status --porcelain
+# If clean, proceed:
 git checkout main
 git pull origin main
 git checkout -b feat/[feature-name]
 ```
+
+> [!IMPORTANT]
+> The script will exit if you have uncommitted changes. Commit or stash any changes before running the script.
 
 ### Step 2. Implement application changes
 
