@@ -3,6 +3,7 @@
                    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
-<!--CHANGES-->
-<include file="changes/featdb/stage.changelog.xml" relativeToChangelogFile="true"/>
+<include file="sys/object_grants/object_grants_as_grantor.sys.package_spec.dbms_crypto.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_specs/pck_api_zip.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_bodies/pck_api_zip.sql" relativeToChangelogFile="true"/>
 </databaseChangeLog>
