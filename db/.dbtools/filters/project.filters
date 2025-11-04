@@ -24,6 +24,9 @@ Reference list of export_types from internal.fixed.filters
         'USER'                 
 */    
 
+-- Limit to ODBVUE schema only
+owner = 'ODBVUE',
+
 -- Liquibase Tables
 object_type != 'TABLE' or object_name not in ('DATABASECHANGELOG',
                                               'DATABASECHANGELOGLOCK',
