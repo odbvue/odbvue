@@ -29,7 +29,7 @@
     <identSpaces>4</identSpaces>
     <breaksAfterSelect>true</breaksAfterSelect>
     <spaceAfterCommas>true</spaceAfterCommas>
-    <kwCase>oracle.dbtools.app.Format.Case.lower</kwCase>
+    <kwCase>oracle.dbtools.app.Format.Case.upper</kwCase>
     <removeDoubleQuotes>true</removeDoubleQuotes>
     <formatWhenSyntaxError>false</formatWhenSyntaxError>
 </options>

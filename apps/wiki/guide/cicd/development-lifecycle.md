@@ -98,6 +98,10 @@ cd ..
 > -- Limit to ODBVUE schema only
 > owner = 'ODBVUE',
 > ```
+
+> [!TIP]
+> SQLcl project export format can be adjusted in `./db/.dbtools/project.sqlFormat.xml`
+
 ## Development
 
 ### Step 1. Create a feature branch
