@@ -1,5 +1,13 @@
 # odbvue
 
+## 0.0.84
+
+### Patch Changes
+
+- 477b9fa: db zip package
+- ea44ddd: dx workflow
+- 8ba5706: db zip package
+
 ## 0.0.80
 
 ### Patch Changes
