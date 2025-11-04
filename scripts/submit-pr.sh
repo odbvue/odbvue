@@ -33,10 +33,13 @@ EOF
 
 cd ..
 
+# Stage database changes first
+git add db/
+
 cd apps
 pnpm changeset
 
-# Commit the changeset
+# Commit the changeset and database changes
 git add .
 summary=$(tail -1 "$(ls -t .changeset/*.md 2>/dev/null | head -1)")
 git commit -m "changeset: $summary"

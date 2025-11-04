@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1762284803622 stripComments:false  logicalFilePath:featdb\odbvue\procedures\prc_mdify.sql
+-- sqlcl_snapshot db/src/database/odbvue/procedures/prc_mdify.sql:bf87b0e5c2a14a853c9584bb54d0f41ca84d9c01:aed9d32fa6ad19b5836de5e86e310374784cff6f:alter
+
 CREATE OR REPLACE PROCEDURE odbvue.prc_mdify (
     p_object IN VARCHAR2
 ) AS
@@ -425,5 +429,3 @@ BEGIN
 END;
 /
 
-
--- sqlcl_snapshot {"hash":"aed9d32fa6ad19b5836de5e86e310374784cff6f","type":"PROCEDURE","name":"PRC_MDIFY","schemaName":"ODBVUE","sxml":""}

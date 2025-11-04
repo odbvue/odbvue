@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1762284803923 stripComments:false  logicalFilePath:featdb\odbvue\triggers\trg_ordsify.sql
+-- sqlcl_snapshot db/src/database/odbvue/triggers/trg_ordsify.sql:9c0376f30943f8379d009295be20bae0c49f2b6e:26cde499e2b2e130dfaf02bd017ebb2c18babea3:alter
+
 CREATE OR REPLACE EDITIONABLE TRIGGER odbvue.trg_ordsify
     AFTER CREATE OR ALTER ON SCHEMA BEGIN
         IF (
@@ -21,5 +25,3 @@ CREATE OR REPLACE EDITIONABLE TRIGGER odbvue.trg_ordsify
 
 ALTER TRIGGER odbvue.trg_ordsify ENABLE;
 
-
--- sqlcl_snapshot {"hash":"f04620fb1a08aa29a8a1d6e122accfbca2a8b72d","type":"TRIGGER","name":"TRG_ORDSIFY","schemaName":"ODBVUE","sxml":""}

@@ -40,17 +40,12 @@ export default defineConfig({
             { text: 'Conventions', link: '/guide/apis/conventions' },
             { text: 'Setting up', link: '/guide/apis/setting-up' },
             {
-              text: 'Capabilites',
+              text: 'Capabilities',
               collapsed: true,
               items: [
-                {
-                  text: 'Large Binary Objects',
-                  link: '/guide/apis/capabilities/large-binary-objects',
-                },
-                {
-                  text: 'ZIP Archives',
-                  link: '/guide/apis/capabilities/zip',
-                },
+                { text: 'Large Binary Objects', link: '/guide/apis/capabilities/lob' },
+                { text: 'Calling HTTP', link: '/guide/apis/capabilities/http' },
+                { text: 'ZIP Archives', link: '/guide/apis/capabilities/zip' },
               ],
             },
           ],

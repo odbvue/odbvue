@@ -181,6 +181,9 @@ project stage
 exit
 cd ..
 
+# Stage database changes first
+git add db/
+
 cd apps
 pnpm changeset
 ```

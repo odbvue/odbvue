@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1762284803395 stripComments:false  logicalFilePath:featdb\odbvue\package_specs\pck_api_zip.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_specs/pck_api_zip.sql:bd63367181fb53805f99437c6ca77b7df7e5b7e1:7655cb509a7f34cd662c7e4def36a8d3e147906a:alter
+
 CREATE OR REPLACE PACKAGE odbvue.pck_api_zip AS -- Package for handling zip files, Credit: https://github.com/antonscheffer/as_zip AS
 
     TYPE t_file_list IS
@@ -42,5 +46,3 @@ CREATE OR REPLACE PACKAGE odbvue.pck_api_zip AS -- Package for handling zip file
 END;
 /
 
-
--- sqlcl_snapshot {"hash":"7655cb509a7f34cd662c7e4def36a8d3e147906a","type":"PACKAGE_SPEC","name":"PCK_API_ZIP","schemaName":"ODBVUE","sxml":""}
