@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.79
+
+### Patch Changes
+
+- c2678b9: db lob package
+
 ## 0.0.78
 
 ### Patch Changes
