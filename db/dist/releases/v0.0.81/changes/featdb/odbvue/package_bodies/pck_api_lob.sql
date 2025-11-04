@@ -1,5 +1,5 @@
 -- liquibase formatted sql
--- changeset ODBVUE:1762266057875 stripComments:false  logicalFilePath:featdb\odbvue\package_bodies\pck_api_lob.sql
+-- changeset ODBVUE:1762266057875a stripComments:false  logicalFilePath:featdb\odbvue\package_bodies\pck_api_lob.sql
 -- sqlcl_snapshot db/src/database/odbvue/package_bodies/pck_api_lob.sql:null:1e64084792043ed4a94fcb64df9152f7c7a6c27e:create
 
 create or replace package body odbvue.pck_api_lob as

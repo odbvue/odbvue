@@ -1,5 +1,5 @@
 -- liquibase formatted sql
--- changeset ODBVUE:1762266058227 stripComments:false  logicalFilePath:featdb\odbvue\procedures\prc_mdify.sql
+-- changeset ODBVUE:1762266058227c stripComments:false  logicalFilePath:featdb\odbvue\procedures\prc_mdify.sql
 -- sqlcl_snapshot db/src/database/odbvue/procedures/prc_mdify.sql:null:bf87b0e5c2a14a853c9584bb54d0f41ca84d9c01:create
 
 create or replace procedure odbvue.prc_mdify (
