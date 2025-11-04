@@ -1,4 +1,5 @@
-create or replace editionable trigger odbvue.trg_ordsify
+
+  CREATE OR REPLACE EDITIONABLE TRIGGER "ODBVUE"."TRG_ORDSIFY" 
     after create or alter on schema begin
         if (
             ora_dict_obj_type = 'PACKAGE'
@@ -18,8 +19,7 @@ create or replace editionable trigger odbvue.trg_ordsify
         end if;
     end;
 /
+ALTER TRIGGER "ODBVUE"."TRG_ORDSIFY" ENABLE;
 
-alter trigger odbvue.trg_ordsify enable;
 
-
--- sqlcl_snapshot {"hash":"9c0376f30943f8379d009295be20bae0c49f2b6e","type":"TRIGGER","name":"TRG_ORDSIFY","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"e83d9434c6f068f2bb0ba683e6422ac0a9b8dc86","type":"TRIGGER","name":"TRG_ORDSIFY","schemaName":"ODBVUE","sxml":""}

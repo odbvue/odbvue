@@ -1,57 +1,64 @@
-create or replace package body odbvue.pck_api_sandbox as
+create or replace 
+PACKAGE BODY ODBVUE.pck_api_sandbox AS 
+    PROCEDURE whoami
+    AS
+        TYPE t_attr_list IS TABLE OF VARCHAR2(64);
+        v_attrs t_attr_list := t_attr_list(
+        'SESSION_USER',
+        'CURRENT_USER',
+        'CURRENT_SCHEMA',
+        'CURRENT_SCHEMAID',
+        'SESSIONID',
+        'HOST',
+        'IP_ADDRESS',
+        'OS_USER',
+        'TERMINAL',
+        'DB_NAME',
+        'INSTANCE_NAME',
+        'SERVICE_NAME',
+        'MODULE',
+        'ACTION',
+        'CLIENT_IDENTIFIER',
+        'AUTHENTICATED_IDENTITY',
+        'PROXY_USER',
+        'CURRENT_EDITION_NAME',
+        'ENTRYID',
+        'LANG',
+        'LANGUAGE'
+        );
+        FUNCTION toCamelCase(p_str IN VARCHAR2) RETURN VARCHAR2 IS
+            v_result VARCHAR2(4000);
+            v_next_upper BOOLEAN := FALSE;  
+    BEGIN
+        FOR i IN 1 .. LENGTH(p_str) LOOP
+            IF SUBSTR(p_str, i, 1) = '_' THEN
+                v_next_upper := TRUE;
+            ELSIF v_next_upper THEN
+                v_result := v_result || UPPER(SUBSTR(p_str, i, 1));
+                v_next_upper := FALSE;
+            ELSE
+                v_result := v_result || LOWER(SUBSTR(p_str, i, 1));
+            END IF;
+        END LOOP;
+        RETURN v_result;
+    END toCamelCase;
 
-    procedure whoami as
-
-        type t_attr_list is
-            table of varchar2(64);
-        v_attrs t_attr_list := t_attr_list('SESSION_USER', 'CURRENT_USER', 'CURRENT_SCHEMA', 'CURRENT_SCHEMAID', 'SESSIONID',
-                                           'HOST', 'IP_ADDRESS', 'OS_USER', 'TERMINAL', 'DB_NAME',
-                                           'INSTANCE_NAME', 'SERVICE_NAME', 'MODULE', 'ACTION', 'CLIENT_IDENTIFIER',
-                                           'AUTHENTICATED_IDENTITY', 'PROXY_USER', 'CURRENT_EDITION_NAME', 'ENTRYID', 'LANG',
-                                           'LANGUAGE');
-
-        function tocamelcase (
-            p_str in varchar2
-        ) return varchar2 is
-            v_result     varchar2(4000);
-            v_next_upper boolean := false;
+    BEGIN
+        DBMS_OUTPUT.PUT_LINE('whoami:');
+        FOR i IN 1 .. v_attrs.COUNT LOOP    
         begin
-            for i in 1..length(p_str) loop
-                if substr(p_str, i, 1) = '_' then
-                    v_next_upper := true;
-                elsif v_next_upper then
-                    v_result := v_result
-                                || upper(substr(p_str, i, 1));
-                    v_next_upper := false;
-                else
-                    v_result := v_result
-                                || lower(substr(p_str, i, 1));
-                end if;
-            end loop;
+            DBMS_OUTPUT.PUT_LINE('  ' || toCamelCase(v_attrs(i)) || ': ' || SYS_CONTEXT('USERENV', v_attrs(i)));
+        EXCEPTION
+            when others then DBMS_OUTPUT.PUT_LINE('  ' || toCamelCase(v_attrs(i)) || ': <not available>');
+        end;
 
-            return v_result;
-        end tocamelcase;
 
-    begin
-        dbms_output.put_line('whoami:');
-        for i in 1..v_attrs.count loop
-            begin
-                dbms_output.put_line('  '
-                                     || tocamelcase(v_attrs(i))
-                                     || ': ' || sys_context('USERENV',
-                                                            v_attrs(i)));
+        END LOOP;
+    END whoami;
 
-            exception
-                when others then
-                    dbms_output.put_line('  '
-                                         || tocamelcase(v_attrs(i)) || ': <not available>');
-            end;
-        end loop;
-
-    end whoami;
-
-end pck_api_sandbox;
+END pck_api_sandbox;
 /
 
 
--- sqlcl_snapshot {"hash":"3f4f89c1f3e3a5e79d7050bed5641ad62f21644c","type":"PACKAGE_BODY","name":"PCK_API_SANDBOX","schemaName":"ODBVUE","sxml":""}
+
+-- sqlcl_snapshot {"hash":"0a56fd7edb4b67fc894d57e39edaa3b350bd09d0","type":"PACKAGE_BODY","name":"PCK_API_SANDBOX","schemaName":"ODBVUE","sxml":""}
