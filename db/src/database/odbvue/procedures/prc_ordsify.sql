@@ -1,238 +1,237 @@
-create or replace 
-procedure ODBVUE.prc_ordsify (
-    p_package      varchar2 default null,
-    p_version_name varchar2 default null,
-    p_silent_mode  boolean default false
-) as
+CREATE OR REPLACE PROCEDURE odbvue.prc_ordsify (
+    p_package      VARCHAR2 DEFAULT NULL,
+    p_version_name VARCHAR2 DEFAULT NULL,
+    p_silent_mode  BOOLEAN DEFAULT FALSE
+) AS
 
-    v_schema_name     varchar2(30 char);
-    v_is_ords_enabled pls_integer;
-    v_module          varchar2(30 char);
-    v_role            varchar2(30 char);
-    v_privilege       varchar2(30 char);
-    v_method          varchar2(30 char);
-    v_pattern         varchar2(2000 char);
-    v_params          varchar2(2000 char);
-    v_argument        varchar2(30 char);
-    v_type            varchar2(30 char);
-    v_comment         varchar2(2000 char);
+    v_schema_name     VARCHAR2(30 CHAR);
+    v_is_ords_enabled PLS_INTEGER;
+    v_module          VARCHAR2(30 CHAR);
+    v_role            VARCHAR2(30 CHAR);
+    v_privilege       VARCHAR2(30 CHAR);
+    v_method          VARCHAR2(30 CHAR);
+    v_pattern         VARCHAR2(2000 CHAR);
+    v_params          VARCHAR2(2000 CHAR);
+    v_argument        VARCHAR2(30 CHAR);
+    v_type            VARCHAR2(30 CHAR);
+    v_comment         VARCHAR2(2000 CHAR);
 
-    procedure log (
-        p varchar2
-    ) as
-    begin
-        if not p_silent_mode then
+    PROCEDURE log (
+        p VARCHAR2
+    ) AS
+    BEGIN
+        IF NOT p_silent_mode THEN
             dbms_output.put_line(p);
-        end if;
-    end;
+        END IF;
+    END;
 
-    function get_comment (
-        p_package   in varchar2,
-        p_procedure in varchar2,
-        p_argument  in varchar2,
-        p_overload  in pls_integer default 1
-    ) return varchar2 as
-        type t_lines is
-            table of pls_integer;
+    FUNCTION get_comment (
+        p_package   IN VARCHAR2,
+        p_procedure IN VARCHAR2,
+        p_argument  IN VARCHAR2,
+        p_overload  IN PLS_INTEGER DEFAULT 1
+    ) RETURN VARCHAR2 AS
+        TYPE t_lines IS
+            TABLE OF PLS_INTEGER;
         v_lines t_lines;
-        v_text  varchar2(2000 char);
-    begin
-        if p_package is null then
-            return null;
-        end if;
-        if p_procedure is null then
-            select
-                case
-                    when text like '%--%' then
+        v_text  VARCHAR2(2000 CHAR);
+    BEGIN
+        IF p_package IS NULL THEN
+            RETURN NULL;
+        END IF;
+        IF p_procedure IS NULL THEN
+            SELECT
+                CASE
+                    WHEN text LIKE '%--%' THEN
                         replace(
                             trim(substr(text,
                                         instr(text, '--') + 2)),
                             chr(10),
                             ''
                         )
-                    else
-                        null
-                end
-            into v_text
-            from
+                    ELSE
+                        NULL
+                END
+            INTO v_text
+            FROM
                 user_source
-            where
+            WHERE
                     type = 'PACKAGE'
-                and name = upper(trim(p_package))
-                and replace(
+                AND name = upper(trim(p_package))
+                AND replace(
                     upper(trim(text)),
                     ' ',
                     ''
-                ) like '%PACKAGE'
+                ) LIKE '%PACKAGE'
                        || upper(trim(p_package))
                        || '%';
 
-            return v_text;
-        end if;
+            RETURN v_text;
+        END IF;
 
-        select
+        SELECT
             line
-        bulk collect
-        into v_lines
-        from
+        BULK COLLECT
+        INTO v_lines
+        FROM
             user_source
-        where
+        WHERE
                 type = 'PACKAGE'
-            and name = upper(trim(p_package))
-            and replace(
+            AND name = upper(trim(p_package))
+            AND replace(
                 trim(upper(text)),
                 ' ',
                 ''
-            ) like 'PROCEDURE'
+            ) LIKE 'PROCEDURE'
                    || upper(trim(p_procedure))
                    || '%'
-        order by
+        ORDER BY
             line;
 
-        if p_argument is null then
-            select
-                case
-                    when text like '%--%' then
+        IF p_argument IS NULL THEN
+            SELECT
+                CASE
+                    WHEN text LIKE '%--%' THEN
                         replace(
                             trim(substr(text,
                                         instr(text, '--') + 2)),
                             chr(10),
                             ''
                         )
-                    else
-                        null
-                end
-            into v_text
-            from
+                    ELSE
+                        NULL
+                END
+            INTO v_text
+            FROM
                 user_source
-            where
+            WHERE
                     type = 'PACKAGE'
-                and name = upper(trim(p_package))
-                and line = v_lines(coalesce(p_overload, 1));
+                AND name = upper(trim(p_package))
+                AND line = v_lines(coalesce(p_overload, 1));
 
-            return v_text;
-        end if;
+            RETURN v_text;
+        END IF;
 
-        begin
-            select
-                case
-                    when text like '%--%' then
+        BEGIN
+            SELECT
+                CASE
+                    WHEN text LIKE '%--%' THEN
                         replace(
                             trim(substr(text,
                                         instr(text, '--') + 2)),
                             chr(10),
                             ''
                         )
-                    else
-                        null
-                end
-            into v_text
-            from
+                    ELSE
+                        NULL
+                END
+            INTO v_text
+            FROM
                 user_source
-            where
+            WHERE
                     type = 'PACKAGE'
-                and name = upper(trim(p_package))
-                and replace(
+                AND name = upper(trim(p_package))
+                AND replace(
                     trim(upper(text)),
                     ' ',
                     ''
-                ) like upper(trim(p_argument))
+                ) LIKE upper(trim(p_argument))
                        || '%'
-                and line > v_lines(coalesce(p_overload, 1))
-            order by
+                AND line > v_lines(coalesce(p_overload, 1))
+            ORDER BY
                 line
-            fetch first 1 rows only;
+            FETCH FIRST 1 ROWS ONLY;
 
-        exception
-            when no_data_found then
-                v_text := null;
-        end;
+        EXCEPTION
+            WHEN no_data_found THEN
+                v_text := NULL;
+        END;
 
-        return v_text;
-    exception
-        when others then
-            return null;
-    end;
+        RETURN v_text;
+    EXCEPTION
+        WHEN OTHERS THEN
+            RETURN NULL;
+    END;
 
-begin
+BEGIN
     log('Begin setup of ORDS services');
-    select
+    SELECT
         lower(sys_context('userenv', 'current_schema'))
-    into v_schema_name
-    from
+    INTO v_schema_name
+    FROM
         dual;
 
     log('Schema: ' || v_schema_name);
 
     -- Enable schema 
-    select
-        count(id)
-    into v_is_ords_enabled
-    from
+    SELECT
+        COUNT(id)
+    INTO v_is_ords_enabled
+    FROM
         user_ords_schemas
-    where
+    WHERE
             parsing_schema = upper(v_schema_name)
-        and status = 'ENABLED';
+        AND status = 'ENABLED';
 
-    if ( v_is_ords_enabled = 0 ) then
+    IF ( v_is_ords_enabled = 0 ) THEN
         ords.enable_schema(
-            p_enabled             => true,
+            p_enabled             => TRUE,
             p_schema              => v_schema_name,
             p_url_mapping_type    => 'BASE_PATH',
             p_url_mapping_pattern => v_schema_name,
-            p_auto_rest_auth      => false
+            p_auto_rest_auth      => FALSE
         );
 
-        commit;
+        COMMIT;
         log('ORDS enabled for schema');
-    end if;    
+    END IF;    
 
 -- modules
 
-    for m in (
-        select
+    FOR m IN (
+        SELECT
             o.object_name
-        from
+        FROM
             all_objects o
-        where
+        WHERE
                 owner = upper(v_schema_name)
-            and o.object_type = 'PACKAGE'
-            and ( ( p_package is null )
-                  or ( upper(p_package) = o.object_name ) )
-            and exists (
-                select
+            AND o.object_type = 'PACKAGE'
+            AND ( ( p_package IS NULL )
+                  OR ( upper(p_package) = o.object_name ) )
+            AND EXISTS (
+                SELECT
                     p.procedure_name
-                from
+                FROM
                     all_procedures p
-                where
+                WHERE
                         p.owner = upper(v_schema_name)
-                    and p.object_name = o.object_name
-                    and ( p.procedure_name like 'GET_%'
-                          or p.procedure_name like 'POST_%'
-                          or p.procedure_name like 'PUT_%'
-                          or p.procedure_name like 'DELETE_%' )
+                    AND p.object_name = o.object_name
+                    AND ( p.procedure_name LIKE 'GET_%'
+                          OR p.procedure_name LIKE 'POST_%'
+                          OR p.procedure_name LIKE 'PUT_%'
+                          OR p.procedure_name LIKE 'DELETE_%' )
             )
-    ) loop
+    ) LOOP
         v_module := lower(replace(
-            case
-                when substr(m.object_name, 1, 4) = 'PCK_' then
+            CASE
+                WHEN substr(m.object_name, 1, 4) = 'PCK_' THEN
                     substr(m.object_name, 5)
-                else
+                ELSE
                     m.object_name
-            end
+            END
             ||
-            case
-                when p_version_name is not null then
+            CASE
+                WHEN p_version_name IS NOT NULL THEN
                     '-' || p_version_name
-                else
+                ELSE
                     ''
-            end,
+            END,
             '_',
             '-'));
 
         log('');
         log('Creating module: ' || v_module);
-        v_comment := get_comment(m.object_name, null, null);
+        v_comment := get_comment(m.object_name, NULL, NULL);
         ords.define_module(
             p_module_name    => v_module,
             p_base_path      => v_module || '/',
@@ -240,61 +239,61 @@ begin
             p_comments       => v_comment
         );
 
-        for p in (
-            select
+        FOR p IN (
+            SELECT
                 o.procedure_name,
                 o.overload
-            from
+            FROM
                 all_procedures o
-            where
+            WHERE
                     o.object_name = m.object_name
-                and o.procedure_name is not null
-                and o.owner = upper(v_schema_name)
-            order by
+                AND o.procedure_name IS NOT NULL
+                AND o.owner = upper(v_schema_name)
+            ORDER BY
                 o.subprogram_id
-        ) loop
+        ) LOOP
             v_method :=
-                case
-                    when p.procedure_name like 'POST_%' then
+                CASE
+                    WHEN p.procedure_name LIKE 'POST_%' THEN
                         'POST'
-                    when p.procedure_name like 'PUT_%' then
+                    WHEN p.procedure_name LIKE 'PUT_%' THEN
                         'PUT'
-                    when p.procedure_name like 'DELETE_%' then
+                    WHEN p.procedure_name LIKE 'DELETE_%' THEN
                         'DELETE'
-                    when p.procedure_name like 'GET_%' then
+                    WHEN p.procedure_name LIKE 'GET_%' THEN
                         'GET'
-                    else
-                        null
-                end;
+                    ELSE
+                        NULL
+                END;
 
-            if v_method is not null then
+            IF v_method IS NOT NULL THEN
                 v_params := '';
                 v_pattern := '';
-                for a in (
-                    select
+                FOR a IN (
+                    SELECT
                         argument_name,
                         defaulted,
                         in_out
-                    from
+                    FROM
                         all_arguments
-                    where
+                    WHERE
                             package_name = m.object_name
-                        and object_name = p.procedure_name
-                        and overload = p.overload
-                        and owner = upper(v_schema_name)
-                    order by
+                        AND object_name = p.procedure_name
+                        AND overload = p.overload
+                        AND owner = upper(v_schema_name)
+                    ORDER BY
                         position
-                ) loop
+                ) LOOP
                     v_argument :=
-                        case
-                            when substr(a.argument_name, 1, 2) in ( 'P_', 'R_' ) then
+                        CASE
+                            WHEN substr(a.argument_name, 1, 2) IN ( 'P_', 'R_' ) THEN
                                 substr(
                                     lower(a.argument_name),
                                     3
                                 )
-                            else
+                            ELSE
                                 lower(a.argument_name)
-                        end;
+                        END;
 
                     v_params := v_params
                                 || lower(a.argument_name)
@@ -302,25 +301,25 @@ begin
                                 || v_argument
                                 || ',';
 
-                    if a.defaulted = 'N' then
-                        if a.in_out = 'IN' then
+                    IF a.defaulted = 'N' THEN
+                        IF a.in_out = 'IN' THEN
                             v_pattern := v_pattern
                                          || ':'
                                          || v_argument
                                          || '/';
-                        end if;
-                    end if;
+                        END IF;
+                    END IF;
 
-                end loop;
+                END LOOP;
 
                 v_params := substr(v_params,
                                    1,
                                    length(v_params) - 1);
-                if ( length(v_params) > 0 ) then
+                IF ( length(v_params) > 0 ) THEN
                     v_params := '('
                                 || v_params
                                 || ')';
-                end if;
+                END IF;
 
                 v_pattern := substr(v_pattern,
                                     1,
@@ -340,14 +339,14 @@ begin
                 ))
                              || '/'
                              ||
-                    case
-                        when v_method = 'GET' then
+                    CASE
+                        WHEN v_method = 'GET' THEN
                             v_pattern
-                        else
-                            null
-                    end;
+                        ELSE
+                            NULL
+                    END;
 
-                v_comment := get_comment(m.object_name, p.procedure_name, null, p.overload);
+                v_comment := get_comment(m.object_name, p.procedure_name, NULL, p.overload);
 
                 log('  Creating endpoint: '
                     || v_method
@@ -358,7 +357,7 @@ begin
                     p_comments    => v_comment
                 );
 
-                commit;
+                COMMIT;
                 ords.define_handler(
                     p_module_name    => v_module,
                     p_pattern        => v_pattern,
@@ -375,46 +374,46 @@ begin
                     p_comments       => v_comment
                 );
 
-                commit;
-                for a in (
-                    select
+                COMMIT;
+                FOR a IN (
+                    SELECT
                         argument_name,
                         defaulted,
                         in_out,
                         data_type
-                    from
+                    FROM
                         all_arguments
-                    where
+                    WHERE
                             package_name = m.object_name
-                        and object_name = p.procedure_name
-                        and overload = p.overload
-                        and owner = upper(v_schema_name)
-                    order by
+                        AND object_name = p.procedure_name
+                        AND overload = p.overload
+                        AND owner = upper(v_schema_name)
+                    ORDER BY
                         position
-                ) loop
+                ) LOOP
                     v_argument :=
-                        case
-                            when substr(a.argument_name, 1, 2) in ( 'P_', 'R_' ) then
+                        CASE
+                            WHEN substr(a.argument_name, 1, 2) IN ( 'P_', 'R_' ) THEN
                                 substr(
                                     lower(a.argument_name),
                                     3
                                 )
-                            else
+                            ELSE
                                 lower(a.argument_name)
-                        end;
+                        END;
 
                     -- https://docs.oracle.com/en/database/oracle/oracle-rest-data-services/18.3/aelig/ords-database-type-mappings.html#GUID-4F7FA58A-1C29-4B7E-819F-21DB4B68FFE1
                     v_type :=
-                        case a.data_type -- The native type of the parameter. Valid values: STRING, INT, DOUBLE, BOOLEAN, LONG, TIMESTAMP
-                            when 'REF CURSOR'     then
+                        CASE a.data_type -- The native type of the parameter. Valid values: STRING, INT, DOUBLE, BOOLEAN, LONG, TIMESTAMP
+                            WHEN 'REF CURSOR'     THEN
                                 'RESULTSET'
-                            when 'BINARY_INTEGER' then
+                            WHEN 'BINARY_INTEGER' THEN
                                 'INT'
-                            else
+                            ELSE
                                 'STRING'
-                        end;
+                        END;
 
-                    if a.argument_name not in ( 'P_BODY' ) then
+                    IF a.argument_name NOT IN ( 'P_BODY' ) THEN
                         v_comment := get_comment(m.object_name, p.procedure_name, a.argument_name, p.overload);
 
                         ords.define_parameter(
@@ -424,35 +423,34 @@ begin
                             p_name               => v_argument,
                             p_bind_variable_name => v_argument,
                             p_source_type        =>
-                                           case a.in_out
-                                               when 'OUT' then
+                                           CASE a.in_out
+                                               WHEN 'OUT' THEN
                                                    'RESPONSE'
-                                               else
+                                               ELSE
                                                    'HEADER'
-                                           end,
+                                           END,
                             p_param_type         => v_type,
                             p_access_method      => a.in_out,
                             p_comments           => v_comment
                         );
 
-                        commit;
-                    end if;
+                        COMMIT;
+                    END IF;
 
-                end loop;
+                END LOOP;
 
-            end if;
+            END IF;
 
-        end loop;
+        END LOOP;
 
-    end loop;
+    END LOOP;
 
     -- done
 
     log('');
     log('Success!');
-end;
+END;
 /
 
 
-
--- sqlcl_snapshot {"hash":"882be6c6879d46c14ed77ccf741939f6b5906d02","type":"PROCEDURE","name":"PRC_ORDSIFY","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"98413c810610e25414044feb849463b2e9bf8144","type":"PROCEDURE","name":"PRC_ORDSIFY","schemaName":"ODBVUE","sxml":""}
