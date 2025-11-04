@@ -47,6 +47,10 @@ export default defineConfig({
                   text: 'Large Binary Objects',
                   link: '/guide/apis/capabilities/large-binary-objects',
                 },
+                {
+                  text: 'ZIP Archives',
+                  link: '/guide/apis/capabilities/zip',
+                },
               ],
             },
           ],
