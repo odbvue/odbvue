@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+<include file="odbvue/package_specs/pck_api_lob.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_bodies/pck_api_lob.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/procedures/prc_mdify.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_bodies/pck_api_lob.sql" relativeToChangelogFile="true"/> <!-- action="create" -->
+<include file="odbvue/package_specs/pck_api_lob.sql" relativeToChangelogFile="true"/> <!-- action="create" -->
+<include file="odbvue/procedures/prc_mdify.sql" relativeToChangelogFile="true"/> <!-- action="create" -->
+</databaseChangeLog>
