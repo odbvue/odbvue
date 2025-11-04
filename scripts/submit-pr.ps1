@@ -1,5 +1,10 @@
 #Requires -Version 5.0
 
+param(
+    [Parameter(Position=0, Mandatory=$false)]
+    [string]$Connection
+)
+
 # Wrapper for changeset workflow
 # Usage: .\create-pr.ps1
 # You'll be prompted to:
@@ -14,11 +19,6 @@ if ($status) {
   Write-Host $status
   exit 1
 }
-
-param(
-    [Parameter(Position=0, Mandatory=$false)]
-    [string]$Connection
-)
 
 # Try to get connection from environment variable if not provided
 if ([string]::IsNullOrWhiteSpace($Connection)) {
