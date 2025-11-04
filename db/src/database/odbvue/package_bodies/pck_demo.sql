@@ -1,4 +1,5 @@
-create or replace package body odbvue.pck_demo as /*
+create or replace 
+PACKAGE BODY ODBVUE.pck_demo AS /*
     PROCEDURE get_version (
         r_version OUT VARCHAR2
     ) AS
@@ -9,56 +10,40 @@ create or replace package body odbvue.pck_demo as /*
     );
     END get_version;
 */
-    procedure get_test (
-        r_test out varchar2
-    ) as
-    begin
+    PROCEDURE get_test(
+        r_test OUT VARCHAR2
+    ) AS
+    BEGIN
         r_test := 'Test A';
-    end get_test;
+    END get_test;
 
-    procedure get_test (
-        p_param1 in varchar2,
-        p_param2 in number,
-        p_param3 in varchar2 default 'TEST',
-        p_param4 in number default 123,
-        r_tests  out sys_refcursor,
-        r_test   out varchar2
-    ) as
-    begin
+    PROCEDURE get_test(
+        p_param1 IN VARCHAR2,
+        p_param2 IN NUMBER,
+        p_param3 IN VARCHAR2 DEFAULT 'TEST',
+        p_param4 IN NUMBER DEFAULT 123,
+        r_tests OUT SYS_REFCURSOR,
+        r_test OUT VARCHAR2
+    ) AS
+    BEGIN
         r_test := 'Test B';
-        open r_tests for select
-                                                                                'param1' as key,
-                                                                                p_param1 as val
-                                                                            from
-                                                                                dual
-                                                           union all
-                                                           select
-                                                               'param2'          as key,
-                                                               to_char(p_param2) as val
-                                                           from
-                                                               dual
-                                          union all
-                                          select
-                                              'param3' as key,
-                                              p_param3 as val
-                                          from
-                                              dual
-                         union all
-                         select
-                             'param4'          as key,
-                             to_char(p_param4) as val
-                         from
-                             dual;
 
-    end get_test;
+        OPEN r_tests FOR
+        SELECT 'param1' AS key, p_param1 AS val FROM dual
+        UNION ALL
+        SELECT 'param2' AS key, TO_CHAR(p_param2) AS val FROM dual
+        UNION ALL
+        SELECT 'param3' AS key, p_param3 AS val FROM dual
+        UNION ALL
+        SELECT 'param4' AS key, TO_CHAR(p_param4) AS val FROM dual
+        ;
+    END get_test;
 
-    procedure delete_test as
-    begin
-        null;
-    end delete_test;
+    PROCEDURE delete_test AS BEGIN NULL; END delete_test;
 
-end pck_demo;
+END pck_demo;
 /
 
 
--- sqlcl_snapshot {"hash":"ee21abf6ad46ecd2124265554225d0210f4fa06a","type":"PACKAGE_BODY","name":"PCK_DEMO","schemaName":"ODBVUE","sxml":""}
+
+-- sqlcl_snapshot {"hash":"ea060d74c42c1cfd5f0830456db8688d4002e328","type":"PACKAGE_BODY","name":"PCK_DEMO","schemaName":"ODBVUE","sxml":""}

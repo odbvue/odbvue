@@ -1,77 +1,62 @@
-create or replace procedure odbvue.prc_mdify (
-    p_object in varchar2
-) as
+create or replace 
+PROCEDURE ODBVUE.prc_mdify(
+    p_object IN VARCHAR2
+)
+AS
+    v_schema_name VARCHAR2(30) := USER;
+    v_object_name VARCHAR2(128 CHAR);
+    v_object_type VARCHAR2(128 CHAR);
+    v_editionable CHAR(1 CHAR);
+    v_overload PLS_INTEGER;
 
-    v_schema_name varchar2(30) := user;
-    v_object_name varchar2(128 char);
-    v_object_type varchar2(128 char);
-    v_editionable char(1 char);
-    v_overload    pls_integer;
-    lf            varchar2(2) := chr(10);
-    v             varchar2(2000 char);
-    n             pls_integer;
-    r             clob;
+  lf VARCHAR2(2) := CHR(10);
+  v VARCHAR2(2000 CHAR);
+  n PLS_INTEGER;
 
-    procedure line (
-        p varchar2 default ''
-    ) as
-    begin
-        r := r
-             || p
-             || lf;
-    end;
+  r CLOB;
 
-    procedure list_item (
-        key varchar2,
-        val varchar2
-    ) as
-    begin
-        r := r
-             || '- '
-             || key
-             || ': **'
-             || val
-             || '**'
-             || lf;
-    end;
+  PROCEDURE line(p VARCHAR2 DEFAULT '') AS
+  BEGIN
+    r := r || p || lf;
+  END;
 
-    procedure print as
+  PROCEDURE list_item(key VARCHAR2, val VARCHAR2) AS
+  BEGIN
+    r := r || '- ' || key || ': **' || val || '**' || lf;
+  END;
 
-        v_offset       pls_integer := 1;
-        v_line         varchar2(32767);
-        v_total_length pls_integer := length(r);
-        v_line_length  pls_integer;
-    begin
-        while v_offset <= v_total_length loop
-            v_line_length := instr(r,
-                                   chr(10),
-                                   v_offset) - v_offset;
-            if v_line_length < 0 then
-                v_line_length := v_total_length + 1 - v_offset;
-            end if;
-            v_line := substr(r, v_offset, v_line_length);
-            dbms_output.put_line(v_line);
-            v_offset := v_offset + v_line_length + 1;
-        end loop;
-    end;
 
-begin
+  PROCEDURE print 
+  AS 
+    v_offset PLS_INTEGER:=1;
+    v_line VARCHAR2(32767);
+    v_total_length PLS_INTEGER:=LENGTH(r);
+    v_line_length PLS_INTEGER;
+  BEGIN
+    WHILE v_offset <= v_total_length LOOP
+      v_line_length:=instr(r,chr(10),v_offset)-v_offset;
+      IF v_line_length<0 THEN
+        v_line_length:=v_total_length+1-v_offset;
+      END IF;
+      v_line:=substr(r,v_offset,v_line_length);
+      dbms_output.put_line(v_line); 
+      v_offset:=v_offset+v_line_length+1;
+    END LOOP;
+  END;
+
+BEGIN
 
 -- PACKAGES
 
-    select
-        count(*)
-    into n
-    from
-        all_procedures up
-    where
-        up.procedure_name is null
-        and up.object_type = 'PACKAGE'
-        and up.owner = v_schema_name
-        and ( p_object is null
-              or up.object_name = upper(p_object) );
+  SELECT COUNT(*)
+  INTO n
+  FROM all_procedures up
+  WHERE up.procedure_name IS NULL
+  AND up.object_type = 'PACKAGE'
+  AND up.owner = v_schema_name
+  AND (p_object IS NULL OR up.object_name = UPPER(p_object));
 
-    if n > 0 then
+  IF n > 0 THEN
 
 /*
     line('## Packages');
@@ -111,319 +96,188 @@ begin
 */
     -- PACKAGE - DETAILS
 
-        for c in (
-            select
-                up.object_name as package_name,
-                (
-                    select
-                        replace(
-                            replace(
-                                trim(replace(
-                                    substr(s.text,
-                                           instr(s.text, '--', 1)),
-                                    '--',
-                                    ''
-                                )),
-                                chr(13),
-                                ''
-                            ),
-                            chr(10),
-                            ''
-                        )
-                    from
-                        all_source s
-                    where
-                            name = up.object_name
-                        and type = 'PACKAGE'
-                        and ( upper(s.text) like '%PACKAGE%' )
-                        and ( upper(s.text) not like '%BODY%' )
-                        and s.text like '%--%'
-                        and rownum = 1
-                        and s.owner = v_schema_name
-                )              as comments
-            from
-                all_procedures up
-            where
-                up.procedure_name is null
-                and up.object_type = 'PACKAGE'
-                and up.owner = v_schema_name
-                and ( p_object is null
-                      or up.object_name = upper(p_object) )
-            order by
-                package_name
-        ) loop
-            line('# '
-                 || c.package_name || '');
-            line();
-            line(c.comments);
-            line();   
+    FOR c IN (
+      SELECT 
+        up.object_name AS package_name,
+        (
+          SELECT 
+            REPLACE(REPLACE(TRIM(REPLACE(SUBSTR(s.text,INSTR(s.text,'--',1)),'--','')),CHR(13),''),CHR(10),'') 
+          FROM all_source s
+          WHERE name = up.object_name
+          AND type = 'PACKAGE'
+          AND (UPPER(s.text)LIKE '%PACKAGE%')
+          AND (UPPER(s.text) NOT LIKE '%BODY%')
+          AND s.text LIKE '%--%'
+          AND rownum = 1
+          AND s.owner = v_schema_name
+        ) AS comments
+      FROM all_procedures up
+      WHERE up.procedure_name IS NULL
+      AND up.object_type = 'PACKAGE'
+      AND up.owner = v_schema_name
+      AND (p_object IS NULL OR up.object_name = UPPER(p_object))
+      ORDER BY package_name
+    ) LOOP 
+
+      line('# ' || c.package_name || '');
+      line();
+
+      line(c.comments);
+      line();   
 
       -- Package dependencies
 
-            select
-                count(*)
-            into n
-            from
-                all_dependencies d
-            where
-                    d.owner = v_schema_name
-                and d.referenced_owner = v_schema_name
-                and d.type = 'PACKAGE'
-                and d.name = c.package_name;
+      SELECT COUNT(*)
+      INTO n
+      FROM all_dependencies d
+      WHERE d.owner = v_schema_name
+      AND d.referenced_owner = v_schema_name
+      AND d.type = 'PACKAGE'
+      AND d.name = c.package_name;
 
-            if n > 0 then
-                line('Dependencies:');
-                line();
-                line('| Referenced type | Referenced name |');
-                line('| --------------- | --------------- |');
-                for c4 in (
-                    select
-                        d.referenced_type,
-                        d.referenced_name
-                    from
-                        all_dependencies d
-                    where
-                            d.owner = v_schema_name
-                        and d.referenced_owner = v_schema_name
-                        and d.type = 'PACKAGE'
-                        and d.name = c.package_name
-                ) loop
-                    line('|'
-                         || c4.referenced_type
-                         || '|'
-                         || c4.referenced_name || '|');
-                end loop;
+      IF n > 0 THEN
 
-                line();
-            end if;
+        line('Dependencies:');
+        line();
+
+        line('| Referenced type | Referenced name |');
+        line('| --------------- | --------------- |');
+
+        FOR c4 IN (
+          SELECT 
+            d.referenced_type,
+            d.referenced_name
+          FROM all_dependencies d
+          WHERE d.owner = v_schema_name
+          AND d.referenced_owner = v_schema_name
+          AND d.type = 'PACKAGE'
+          AND d.name = c.package_name
+        ) LOOP
+          line('|' || c4.referenced_type || '|' || c4.referenced_name || '|');
+        END LOOP;
+
+        line();
+
+      END IF;
 
       -- Package routines
 
-            for c2 in (
-                select
-                    o.procedure_name,
-                    o.overload,
-                    (
-                        select
-                            replace(
-                                replace(
-                                    trim(replace(
-                                        substr(s.text,
-                                               instr(s.text, '--', 1)),
-                                        '--',
-                                        ''
-                                    )),
-                                    chr(13),
-                                    ''
-                                ),
-                                chr(10),
-                                ''
-                            )
-                        from
-                            all_source s
-                        where
-                                name = o.object_name
-                            and type = 'PACKAGE'
-                            and ( ( ( upper(s.text) like '%PROCEDURE%' )
-                                    or ( upper(s.text) like '%FUNCTION%' ) )
-                                  and ( upper(s.text) like '% '
-                                                           || upper(o.procedure_name)
-                                                           || ' %'
-                                        or upper(s.text) like '% '
-                                        || upper(o.procedure_name)
-                                        || '(%'
-                                           or upper(s.text) like '% '
-                                                                 || upper(o.procedure_name)
-                                                                 || ';%' ) )
-                            and s.text like '%--%'
-                            and rownum = 1
-                            and s.owner = v_schema_name
-                    ) as comments
-                from
-                    all_procedures o
-                where
-                        o.object_name = c.package_name
-                    and o.object_name is not null
-                    and o.procedure_name is not null
-                    and o.owner = v_schema_name
-            ) loop
-                line('## ' || c2.procedure_name);
-                line();
-                line(c2.comments);
-                line();
-                select
-                    count(*)
-                into n
-                from
-                    all_arguments a
-                where
-                        a.package_name = c.package_name
-                    and a.object_name = c2.procedure_name
-                    and ( overload is null
-                          or overload = c2.overload )
-                    and a.owner = v_schema_name;
+      FOR c2 IN (
+        SELECT 
+          o.procedure_name,
+          o.overload,
+          (
+            SELECT 
+              REPLACE(REPLACE(TRIM(REPLACE(SUBSTR(s.text,INSTR(s.text,'--',1)),'--','')),CHR(13),''),CHR(10),'')  
+            FROM all_source s
+            WHERE name = o.object_name
+            AND type = 'PACKAGE'
+            AND (
+              ((UPPER(s.text) LIKE '%PROCEDURE%') OR (UPPER(s.text) LIKE '%FUNCTION%'))
+              AND
+              (UPPER(s.text) LIKE '% ' || UPPER(o.procedure_name) || ' %' OR UPPER(s.text) LIKE '% ' || UPPER(o.procedure_name) || '(%' OR UPPER(s.text) LIKE '% ' || UPPER(o.procedure_name) || ';%')
+            )
+            AND s.text LIKE '%--%'
+            AND rownum = 1
+            AND s.owner = v_schema_name
+          ) AS comments
+        FROM all_procedures o
+        WHERE o.object_name = c.package_name
+        AND o.object_name IS NOT NULL
+        AND o.procedure_name IS NOT NULL
+        AND o.owner = v_schema_name
+      ) LOOP 
 
-                if n > 0 then
-                    line('| Argument name | In Out | Data type | Default value | Description |');
-                    line('| ------------- | ------ | --------- | ------------- | ----------- |');
-                    for c3 in (
-                        select
-                            argument_name,
-                            data_type,
-                            in_out,
-                            (
-                                select
-                                    regexp_replace(
-                                        regexp_substr(s.text, 'DEFAULT\s+(\S+)', 1, 1, null,
-                                                      1),
-                                        ',$',
-                                        ''
-                                    )
-                                from
-                                    all_source s
-                                where
-                                        name = package_name
-                                    and type = 'PACKAGE'
-                                    and s.owner = v_schema_name
-                                    and ( ( ( argument_name is not null )
-                                            and ( instr(
-                                        upper(text),
-                                        argument_name
-                                    ) > 0 ) )
-                                          or ( ( argument_name is null )
-                                               and ( instr(
-                                        upper(text),
-                                        ')'
-                                    ) > 0 )
-                                               and ( instr(
-                                        upper(text),
-                                        'RETURN'
-                                    ) > 0 )
-                                               and ( instr(
-                                        upper(text),
-                                        ';'
-                                    ) > 0 ) ) )
-                                    and line > (
-                                        select
-                                            min(line)
-                                        from
-                                            all_source
-                                        where
-                                            ( ( ( instr(
-                                                upper(text),
-                                                'PROCEDURE'
-                                            ) > 0 )
-                                                or ( instr(
-                                                upper(text),
-                                                'FUNCTION'
-                                            ) > 0 ) )
-                                              and ( instr(
-                                                upper(text),
-                                                upper(object_name)
-                                            ) > 0 ) )
-                                            and owner = v_schema_name
-                                    )
-                                    and s.text like '%--%'
-                                    and rownum = 1
-                            ) as default_value,
-                            (
-                                select
-                                    replace(
-                                        replace(
-                                            trim(replace(
-                                                substr(text,
-                                                       instr(text, '--', 1)),
-                                                '--',
-                                                ''
-                                            )),
-                                            chr(13),
-                                            ''
-                                        ),
-                                        chr(10),
-                                        ''
-                                    )
-                                from
-                                    all_source s
-                                where
-                                        name = package_name
-                                    and type = 'PACKAGE'
-                                    and s.owner = v_schema_name
-                                    and ( ( ( argument_name is not null )
-                                            and ( instr(
-                                        upper(text),
-                                        argument_name
-                                    ) > 0 ) )
-                                          or ( ( argument_name is null )
-                                               and ( instr(
-                                        upper(text),
-                                        ')'
-                                    ) > 0 )
-                                               and ( instr(
-                                        upper(text),
-                                        'RETURN'
-                                    ) > 0 )
-                                               and ( instr(
-                                        upper(text),
-                                        ';'
-                                    ) > 0 ) ) )
-                                    and line > (
-                                        select
-                                            min(line)
-                                        from
-                                            all_source
-                                        where
-                                            ( ( ( instr(
-                                                upper(text),
-                                                'PROCEDURE'
-                                            ) > 0 )
-                                                or ( instr(
-                                                upper(text),
-                                                'FUNCTION'
-                                            ) > 0 ) )
-                                              and ( instr(
-                                                upper(text),
-                                                upper(object_name)
-                                            ) > 0 ) )
-                                            and owner = v_schema_name
-                                    )
-                                    and s.text like '%--%'
-                                    and rownum = 1
-                            ) as comments
-                        from
-                            all_arguments
-                        where
-                                package_name = c.package_name
-                            and object_name = c2.procedure_name
-                            and ( overload is null
-                                  or overload = c2.overload )
-                            and owner = v_schema_name
-                        order by
-                            position
-                    ) loop
-                        line('|'
-                             || c3.argument_name
-                             || '|'
-                             || c3.in_out
-                             || '|'
-                             || c3.data_type
-                             || '|'
-                             || c3.default_value
-                             || '|'
-                             || c3.comments || '|');
-                    end loop;
+        line('## ' || c2.procedure_name);
+        line();   
 
-                    line();
-                end if;
+        line(c2.comments);
+        line();
 
-            end loop;
+        SELECT COUNT(*)
+        INTO n
+        FROM all_arguments a
+        WHERE a.package_name = c.package_name
+        AND a.object_name = c2.procedure_name
+        AND (overload IS NULL OR overload = c2.overload)
+        AND a.owner = v_schema_name;
 
-        end loop;
+        IF n > 0 THEN
 
-    end if;
+          line('| Argument name | In Out | Data type | Default value | Description |');
+          line('| ------------- | ------ | --------- | ------------- | ----------- |');
 
-    print;
-end;
+          FOR c3 IN (
+            SELECT
+              argument_name,
+              data_type,
+              in_out,
+              (
+                SELECT 
+                    REGEXP_REPLACE(REGEXP_SUBSTR(s.text, 'DEFAULT\s+(\S+)', 1, 1, NULL, 1), ',$', '')
+                FROM all_source s
+                WHERE NAME = package_name
+                AND TYPE = 'PACKAGE'
+                AND s.owner = v_schema_name
+                AND (
+                  ((argument_name IS NOT NULL) AND (INSTR(UPPER(text),argument_name) > 0))
+                  OR
+                  ((argument_name IS NULL) AND (INSTR(UPPER(text),')') > 0) AND (INSTR(UPPER(text),'RETURN') > 0) AND (INSTR(UPPER(text),';') > 0)) 
+                )  
+                AND line > (
+                  SELECT MIN(line)
+                  FROM all_source
+                  WHERE (((INSTR(UPPER(text),'PROCEDURE') > 0) OR (INSTR(UPPER(text),'FUNCTION') > 0)) AND (INSTR(UPPER(text),UPPER(OBJECT_NAME)) > 0))
+                  AND owner = v_schema_name
+                )
+                AND s.TEXT LIKE '%--%'
+                AND rownum = 1 
+              ) AS default_value,
+              (
+                SELECT REPLACE(REPLACE(TRIM(REPLACE(SUBSTR(text,INSTR(text,'--',1)),'--','')),CHR(13),''),CHR(10),'')
+                FROM all_source s
+                WHERE NAME = package_name
+                AND TYPE = 'PACKAGE'
+                AND s.owner = v_schema_name
+                AND (
+                  ((argument_name IS NOT NULL) AND (INSTR(UPPER(text),argument_name) > 0))
+                  OR
+                  ((argument_name IS NULL) AND (INSTR(UPPER(text),')') > 0) AND (INSTR(UPPER(text),'RETURN') > 0) AND (INSTR(UPPER(text),';') > 0)) 
+                )  
+                AND line > (
+                  SELECT MIN(line)
+                  FROM all_source
+                  WHERE (((INSTR(UPPER(text),'PROCEDURE') > 0) OR (INSTR(UPPER(text),'FUNCTION') > 0)) AND (INSTR(UPPER(text),UPPER(OBJECT_NAME)) > 0))
+                  AND owner = v_schema_name
+                )
+                AND s.TEXT LIKE '%--%'
+                AND rownum = 1 
+              ) AS comments
+            FROM all_arguments
+            WHERE package_name = c.package_name
+            AND object_name = c2.procedure_name
+            AND (overload IS NULL OR overload = c2.overload)
+            AND owner = v_schema_name
+            ORDER BY position
+          ) LOOP
+            line('|' || c3.argument_name || '|' || c3.in_out || '|' || c3.data_type || '|' || c3.default_value || '|' || c3.comments || '|');
+          END LOOP;
+
+          line();
+
+        END IF;  
+
+      END LOOP;  
+
+    END LOOP;
+
+  END IF;
+
+  print;
+
+END;
 /
 
 
--- sqlcl_snapshot {"hash":"bf87b0e5c2a14a853c9584bb54d0f41ca84d9c01","type":"PROCEDURE","name":"PRC_MDIFY","schemaName":"ODBVUE","sxml":""}
+
+-- sqlcl_snapshot {"hash":"eaee0b5e51257c2fefbca8741c323beccb966f9d","type":"PROCEDURE","name":"PRC_MDIFY","schemaName":"ODBVUE","sxml":""}
