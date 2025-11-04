@@ -147,11 +147,11 @@ jobs:
           set -euo pipefail
           VERSION="${{ needs.fetch-bundle.outputs.tag }}"
           NAME="odbvue-db"
-          
+
           # Calculate EDITION from schema name and version
           EDITION="${ADB_SCHEMA_NAME}_$(echo "$VERSION" | tr . _)"
           EDITION="${EDITION^^}"
-          
+
           # Get artifact from bundle
           DB_ARTIFACT="bundle/db/$NAME-${VERSION}.zip"
           if [ ! -f "$DB_ARTIFACT" ]; then
@@ -159,12 +159,13 @@ jobs:
             ls -la bundle/db/ || echo "bundle/db directory does not exist"
             exit 1
           fi
-          
+
           echo "Deploying version: $VERSION"
           echo "Connecting to ${ADB_TNS_ALIAS}..."
-          
-          # Deploy to database
-          sql -nohistory "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" << ENDSQL
+
+          # Deploy to database and capture output
+          DEPLOY_LOG="deploy.log"
+          sql -nohistory "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" > "$DEPLOY_LOG" 2>&1 << ENDSQL || true
           whenever oserror exit failure
           whenever sqlerror exit sql.sqlcode rollback
           prompt Connected..
@@ -179,6 +180,17 @@ jobs:
           prompt Tagged..
           exit
           ENDSQL
+
+          # Check for Liquibase errors in the log
+          if grep -q "ERROR\|ValidationFailed\|Exception" "$DEPLOY_LOG"; then
+            echo "::error::Liquibase deployment failed. Check log below:"
+            cat "$DEPLOY_LOG"
+            exit 1
+          fi
+
+          # Show deployment log
+          echo "Deployment completed successfully:"
+          cat "$DEPLOY_LOG"
 
   deploy-web:
     needs: [fetch-bundle, deploy-db]
@@ -215,7 +227,7 @@ jobs:
       - name: Deploy with blue/green strategy
         run: |
           set -euo pipefail
-          
+
           for site in apps wiki main; do
             # Get current active slot
             ACTIVE=$(ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "readlink /var/www/$site/current 2>/dev/null | grep -oE '(blue|green)' || echo blue")
@@ -236,6 +248,6 @@ jobs:
             # Flip symlink atomically
             ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "sudo ln -sfn '$TARGET_DIR' /var/www/$site/current.tmp && sudo mv -T /var/www/$site/current.tmp /var/www/$site/current"
           done
-          
+
           # Validate and reload nginx
           ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "sudo nginx -t && sudo systemctl reload nginx"
