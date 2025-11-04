@@ -22,4 +22,4 @@ create or replace editionable trigger odbvue.trg_ordsify
 alter trigger odbvue.trg_ordsify enable;
 
 
--- sqlcl_snapshot {"hash":"bb5f7c8c05a86a213c21242f4e5f49151716e75b","type":"TRIGGER","name":"TRG_ORDSIFY","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"9c0376f30943f8379d009295be20bae0c49f2b6e","type":"TRIGGER","name":"TRG_ORDSIFY","schemaName":"ODBVUE","sxml":""}
