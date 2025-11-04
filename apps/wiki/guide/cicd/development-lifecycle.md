@@ -18,7 +18,7 @@ A **pull request** (GitHub) or **merge request** (GitLab) is a proposal to merge
 
 A **release** is a packaged version of your software (often with version tags like `v1.2.3`) that’s published for users, often accompanied by a changelog and release notes.
 
-A **tag** marks specific commits as release points (e.g., `v1.0.0`) in Git history — important for versioning and rollback.
+A **tag** marks specific commits as release points (e.g., `v1.0.0`) in Git history - important for versioning and rollback.
 
 ## Process Overview
 

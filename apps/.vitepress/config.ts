@@ -35,9 +35,21 @@ export default defineConfig({
         },
         {
           text: 'Apis',
-          items: [{ text: 'Oracle AI Database', link: '/guide/apis/oracle-ai-database' },
-            { text: 'Setting up', link: '/guide/apis/setting-up' }],
-
+          items: [
+            { text: 'Oracle AI Database', link: '/guide/apis/oracle-ai-database' },
+            { text: 'Conventions', link: '/guide/apis/conventions' },
+            { text: 'Setting up', link: '/guide/apis/setting-up' },
+            {
+              text: 'Capabilites',
+              collapsed: true,
+              items: [
+                {
+                  text: 'Large Binary Objects',
+                  link: '/guide/apis/capabilities/large-binary-objects',
+                },
+              ],
+            },
+          ],
         },
         {
           text: 'Apps',
