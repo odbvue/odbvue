@@ -1,5 +1,5 @@
 -- liquibase formatted sql
--- changeset ODBVUE:1762266057921 stripComments:false  logicalFilePath:featdb\odbvue\package_specs\pck_api_lob.sql
+-- changeset ODBVUE:1762266057921b stripComments:false  logicalFilePath:featdb\odbvue\package_specs\pck_api_lob.sql
 -- sqlcl_snapshot db/src/database/odbvue/package_specs/pck_api_lob.sql:null:4c9043e7129da66e6895b07731028514d3ef8073:create
 
 create or replace package odbvue.pck_api_lob as -- Package for LOB processing. Credit: https://github.com/paulzip-dev/Base64
