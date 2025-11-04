@@ -27,6 +27,12 @@ Reference list of export_types from internal.fixed.filters
 -- Limit to ODBVUE schema only
 owner = 'ODBVUE',
 
+-- Restrict ORDS exports to only ODBVUE schema
+not (export_type = 'ORDS_SCHEMA' and parsing_schema != 'ODBVUE'),
+
+-- Avoid SYS/ADMIN folders created by privilege exports; keep only grants issued by ODBVUE
+not (export_type = 'OBJECT_GRANT' and grantor != 'ODBVUE'),
+
 -- Liquibase Tables
 object_type != 'TABLE' or object_name not in ('DATABASECHANGELOG',
                                               'DATABASECHANGELOGLOCK',
