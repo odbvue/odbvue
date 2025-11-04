@@ -13,7 +13,6 @@
 <include file="odbvue/package_bodies/pck_api_sandbox.sql" relativeToChangelogFile="true"/>
 <include file="odbvue/package_bodies/pck_api_zip.sql" relativeToChangelogFile="true"/>
 <include file="odbvue/package_bodies/pck_demo.sql" relativeToChangelogFile="true"/>
-<include file="odbvue/tables/dbtools$mcp_log.sql" relativeToChangelogFile="true"/>
 <include file="odbvue/procedures/prc_mdify.sql" relativeToChangelogFile="true"/>
 <include file="odbvue/procedures/prc_ordsify.sql" relativeToChangelogFile="true"/>
 <include file="odbvue/triggers/trg_ordsify.sql" relativeToChangelogFile="true"/>
