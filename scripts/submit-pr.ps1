@@ -43,10 +43,13 @@ $sqlScript | sql /nolog
 
 Pop-Location
 
+# Stage database changes first
+git add db/
+
 Push-Location apps
 pnpm changeset
 
-# Commit the changeset
+# Commit the changeset and database changes
 git add .
 $summary = Get-Content (Get-ChildItem .changeset/*.md -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1) | Select-Object -Last 1
 git commit -m "changeset: $summary"
