@@ -1,4 +1,4 @@
-CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_zip IS
+CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_zip AS
 
     TYPE file_list IS
         TABLE OF CLOB;
@@ -2698,4 +2698,4 @@ END;
 /
 
 
--- sqlcl_snapshot {"hash":"4152a1e84e535a6844bbfaecd14aada9b97b448c","type":"PACKAGE_BODY","name":"PCK_API_ZIP","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"5d474760eaf28afc70147389944722b2f8eab921","type":"PACKAGE_BODY","name":"PCK_API_ZIP","schemaName":"ODBVUE","sxml":""}
