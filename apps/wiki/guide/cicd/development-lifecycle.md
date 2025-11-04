@@ -92,6 +92,12 @@ exit
 cd ..
 ```
 
+> [!NOTE]
+> For SQLcl project to export objects of only particular schema, need to set up filter in `./db/.dbtools/filters`
+> ```ini
+> -- Limit to ODBVUE schema only
+> owner = 'ODBVUE',
+> ```
 ## Development
 
 ### Step 1. Create a feature branch
