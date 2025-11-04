@@ -1,4 +1,4 @@
-create or replace procedure odbvue.ordsify (
+create or replace procedure odbvue.prc_ordsify (
     p_package      varchar2 default null,
     p_version_name varchar2 default null,
     p_silent_mode  boolean default false
@@ -453,4 +453,4 @@ end;
 /
 
 
--- sqlcl_snapshot {"hash":"47006d13ef05ed1b57415059a75ddb6568c86ad6","type":"PROCEDURE","name":"ORDSIFY","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"47006d13ef05ed1b57415059a75ddb6568c86ad6","type":"PROCEDURE","name":"PRC_ORDSIFY","schemaName":"ODBVUE","sxml":""}
