@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.94
+
+### Patch Changes
+
+- 7318076: missing admnin package
+
 ## 0.0.92
 
 ### Patch Changes
