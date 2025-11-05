@@ -23,4 +23,38 @@ BEGIN
 
     END;
 
+    procedure acl_remove_all_hosts( 
+        p_schema VARCHAR2
+    ) AS 
+    BEGIN
+        FOR e IN (
+            SELECT
+                host,
+                lower_port,
+                upper_port,
+                privilege
+            FROM dba_host_aces
+            WHERE principal = UPPER(p_schema)
+        ) LOOP
+            BEGIN
+                DBMS_NETWORK_ACL_ADMIN.REMOVE_HOST_ACE (
+                    e.host,
+                    e.lower_port,
+                    e.upper_port,
+                    xs$ace_type(
+                        privilege_list => xs$name_list(e.privilege),
+                        principal_name => UPPER(p_schema),
+                        principal_type => xs_acl.ptype_db
+                    )
+                );
+                COMMIT;
+            EXCEPTION
+                WHEN OTHERS THEN
+                    DBMS_OUTPUT.PUT_LINE('Error removing ACE for host ' || e.host || 
+                        ' -> ' || e.privilege || 
+                        ' (' || e.lower_port || '-' || e.upper_port || '): ' || SQLERRM);
+            END;        
+        END LOOP;
+    END;
+
 end pck_api_admin;
