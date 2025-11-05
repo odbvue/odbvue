@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1762339249078 stripComments:false  logicalFilePath:featdb\odbvue\procedures\prc_mdify.sql
+-- sqlcl_snapshot db/src/database/odbvue/procedures/prc_mdify.sql:aed9d32fa6ad19b5836de5e86e310374784cff6f:e1a79bd375cb67c5c75c83b21bc0e15df54b9b65:alter
+
 CREATE OR REPLACE PROCEDURE odbvue.prc_mdify ( -- Procedure generates markdown database documentation for current schema
     p_filter IN VARCHAR2, -- e.g. PACKAGE=pck_api_lob
     p_title  IN VARCHAR2 DEFAULT NULL -- e.g. 'Large Binary Objects',
@@ -438,5 +442,3 @@ BEGIN
 END;
 /
 
-
--- sqlcl_snapshot {"hash":"e1a79bd375cb67c5c75c83b21bc0e15df54b9b65","type":"PROCEDURE","name":"PRC_MDIFY","schemaName":"ODBVUE","sxml":""}
