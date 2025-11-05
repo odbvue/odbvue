@@ -1,18 +1,18 @@
 CREATE OR REPLACE PROCEDURE odbvue.prc_mdify ( -- Procedure generates markdown database documentation for current schema
     p_filter IN VARCHAR2, -- e.g. PACKAGE=pck_api_lob
-    p_title IN VARCHAR2 DEFAULT NULL -- e.g. 'Large Binary Objects',
+    p_title  IN VARCHAR2 DEFAULT NULL -- e.g. 'Large Binary Objects',
 ) AS
 
-    v_schema_name VARCHAR2(30) := user;
-    v_object_name VARCHAR2(128 CHAR);
-    v_object_type VARCHAR2(128 CHAR);
+    v_schema_name  VARCHAR2(30) := user;
+    v_object_name  VARCHAR2(128 CHAR);
+    v_object_type  VARCHAR2(128 CHAR);
     v_object_count PLS_INTEGER;
-    v_editionable CHAR(1 CHAR);
-    v_overload    PLS_INTEGER;
-    lf            VARCHAR2(2) := chr(10);
-    v             VARCHAR2(2000 CHAR);
-    n             PLS_INTEGER;
-    r             CLOB;
+    v_editionable  CHAR(1 CHAR);
+    v_overload     PLS_INTEGER;
+    lf             VARCHAR2(2) := chr(10);
+    v              VARCHAR2(2000 CHAR);
+    n              PLS_INTEGER;
+    r              CLOB;
 
     PROCEDURE line (
         p VARCHAR2 DEFAULT '',
@@ -20,19 +20,29 @@ CREATE OR REPLACE PROCEDURE odbvue.prc_mdify ( -- Procedure generates markdown d
     ) AS
     BEGIN
         r := r
-            || CASE
-                WHEN v_object_count > 1 AND i > 0 THEN '#' 
-                ELSE '' 
-                END 
-            || CASE (i - 1) 
-               WHEN 1 THEN '# ' 
-               WHEN 2 THEN '## ' 
-               WHEN 3 THEN '### ' 
-               WHEN 4 THEN '#### ' 
-               ELSE '' 
-               END
-            || p
-            || lf;
+             ||
+            CASE
+                WHEN v_object_count > 1
+                     AND i > 0 THEN
+                    '#'
+                ELSE
+                    ''
+            END
+             ||
+            CASE ( i - 1 )
+                WHEN 1 THEN
+                    '# '
+                WHEN 2 THEN
+                    '## '
+                WHEN 3 THEN
+                    '### '
+                WHEN 4 THEN
+                    '#### '
+                ELSE
+                    ''
+            END
+             || p
+             || lf;
     END;
 
     PROCEDURE list_item (
@@ -70,95 +80,98 @@ CREATE OR REPLACE PROCEDURE odbvue.prc_mdify ( -- Procedure generates markdown d
     END;
 
 BEGIN
-
     v_schema_name := user;
+    IF (
+        p_filter IS NOT NULL
+        AND instr(p_filter, '=') > 0
+    ) THEN
+        v_object_type := substr(p_filter,
+                                1,
+                                instr(p_filter, '=') - 1);
 
-    if ( p_filter IS NOT NULL AND instr(p_filter,'=') > 0 ) then
-        v_object_type := substr(p_filter,1,instr(p_filter,'=')-1);
-        v_object_name := substr(p_filter,instr(p_filter,'=')+1);
+        v_object_name := substr(p_filter,
+                                instr(p_filter, '=') + 1);
     END IF;
 
     -- PACKAGES
 
     SELECT
         COUNT(up.object_name)
-    INTO 
-        v_object_count
+    INTO v_object_count
     FROM
         all_procedures up
     WHERE
-        up.owner = v_schema_name
+            up.owner = v_schema_name
         AND up.procedure_name IS NULL
         AND ( v_object_type IS NULL
-            OR up.object_type = 'PACKAGE' )
+              OR up.object_type = 'PACKAGE' )
         AND ( v_object_name IS NULL
-            OR up.object_name = upper(v_object_name) )
-            ;
+              OR up.object_name = upper(v_object_name) );
 
-    IF v_object_count > 1 THEN 
+    IF v_object_count > 1 THEN
         line('Packages', 1);
         line;
     END IF;
-
     FOR c IN (
         SELECT
             object_name AS package_name,
-                    (
-                    SELECT
+            (
+                SELECT
+                    replace(
                         replace(
-                            replace(
-                                trim(replace(
-                                    substr(s.text,
-                                           instr(s.text, '--', 1)),
-                                    '--',
-                                    ''
-                                )),
-                                chr(13),
+                            trim(replace(
+                                substr(s.text,
+                                       instr(s.text, '--', 1)),
+                                '--',
                                 ''
-                            ),
-                            chr(10),
+                            )),
+                            chr(13),
                             ''
-                        )
-                    FROM
-                        all_source s
-                    WHERE
-                            name = up.object_name
-                        AND type = 'PACKAGE'
-                        AND ( upper(s.text) LIKE '%PACKAGE%' )
-                        AND ( upper(s.text) NOT LIKE '%BODY%' )
-                        AND s.text LIKE '%--%'
-                        AND ROWNUM = 1
-                        AND s.owner = v_schema_name
-                )              AS comments
+                        ),
+                        chr(10),
+                        ''
+                    )
+                FROM
+                    all_source s
+                WHERE
+                        name = up.object_name
+                    AND type = 'PACKAGE'
+                    AND ( upper(s.text) LIKE '%PACKAGE%' )
+                    AND ( upper(s.text) NOT LIKE '%BODY%' )
+                    AND s.text LIKE '%--%'
+                    AND ROWNUM = 1
+                    AND s.owner = v_schema_name
+            )           AS comments
         FROM
             all_procedures up
         WHERE
-            up.owner = v_schema_name
+                up.owner = v_schema_name
             AND up.procedure_name IS NULL
             AND ( v_object_type IS NULL
-                OR up.object_type = 'PACKAGE' )
+                  OR up.object_type = 'PACKAGE' )
             AND ( v_object_name IS NULL
-                OR up.object_name = upper(v_object_name) )
+                  OR up.object_name = upper(v_object_name) )
     ) LOOP
-
-        line(COALESCE(p_title,c.package_name), 2);
+        line(
+            coalesce(p_title, c.package_name),
+            2
+        );
         line;
-
         line(c.comments);
         line;
-
         line('::: details example');
-        line('<<< ../../../../../db/src/database/odbvue/tests/' || LOWER(c.package_name) || '.sql');
+        line('<<< ../../../../../db/src/database/odbvue/tests/'
+             || lower(c.package_name) || '.sql');
         line(':::');
         line;
-
         line('::: details specification');
-        line('<<< ../../../../../db/src/database/odbvue/package_specs/' || LOWER(c.package_name) || '.sql');
+        line('<<< ../../../../../db/src/database/odbvue/package_specs/'
+             || lower(c.package_name) || '.sql');
         line(':::');
         line;
-
         line('::: details implementation');
-        line('<<< ../../../../../db/src/database/odbvue/package_bodies/' || LOWER(c.package_name) || '.sql');
+        line('<<< ../../../../../db/src/database/odbvue/package_bodies/'
+             || lower(c.package_name) || '.sql');
         line(':::');
         line;
 
@@ -193,9 +206,9 @@ BEGIN
                     AND d.name = c.package_name
             ) LOOP
                 line('|'
-                        || c4.referenced_type
-                        || '|'
-                        || c4.referenced_name || '|');
+                     || c4.referenced_type
+                     || '|'
+                     || c4.referenced_name || '|');
             END LOOP;
 
             line();
@@ -213,7 +226,7 @@ BEGIN
                             replace(
                                 trim(replace(
                                     substr(s.text,
-                                            instr(s.text, '--', 1)),
+                                           instr(s.text, '--', 1)),
                                     '--',
                                     ''
                                 )),
@@ -230,15 +243,15 @@ BEGIN
                         AND type = 'PACKAGE'
                         AND ( ( ( upper(s.text) LIKE '%PROCEDURE%' )
                                 OR ( upper(s.text) LIKE '%FUNCTION%' ) )
-                                AND ( upper(s.text) LIKE '% '
-                                                        || upper(o.procedure_name)
-                                                        || ' %'
+                              AND ( upper(s.text) LIKE '% '
+                                                       || upper(o.procedure_name)
+                                                       || ' %'
                                     OR upper(s.text) LIKE '% '
                                     || upper(o.procedure_name)
                                     || '(%'
-                                        OR upper(s.text) LIKE '% '
-                                                                || upper(o.procedure_name)
-                                                                || ';%' ) )
+                                       OR upper(s.text) LIKE '% '
+                                                             || upper(o.procedure_name)
+                                                             || ';%' ) )
                         AND s.text LIKE '%--%'
                         AND ROWNUM = 1
                         AND s.owner = v_schema_name
@@ -255,7 +268,6 @@ BEGIN
             line();
             line(c2.comments);
             line();
-            
             SELECT
                 COUNT(*)
             INTO n
@@ -265,7 +277,7 @@ BEGIN
                     a.package_name = c.package_name
                 AND a.object_name = c2.procedure_name
                 AND ( overload IS NULL
-                        OR overload = c2.overload )
+                      OR overload = c2.overload )
                 AND a.owner = v_schema_name;
 
             IF n > 0 THEN
@@ -280,7 +292,7 @@ BEGIN
                             SELECT
                                 regexp_replace(
                                     regexp_substr(s.text, 'DEFAULT\s+(\S+)', 1, 1, NULL,
-                                                    1),
+                                                  1),
                                     ',$',
                                     ''
                                 )
@@ -295,16 +307,16 @@ BEGIN
                                     upper(text),
                                     argument_name
                                 ) > 0 ) )
-                                        OR ( ( argument_name IS NULL )
-                                            AND ( instr(
+                                      OR ( ( argument_name IS NULL )
+                                           AND ( instr(
                                     upper(text),
                                     ')'
                                 ) > 0 )
-                                            AND ( instr(
+                                           AND ( instr(
                                     upper(text),
                                     'RETURN'
                                 ) > 0 )
-                                            AND ( instr(
+                                           AND ( instr(
                                     upper(text),
                                     ';'
                                 ) > 0 ) ) )
@@ -322,7 +334,7 @@ BEGIN
                                             upper(text),
                                             'FUNCTION'
                                         ) > 0 ) )
-                                            AND ( instr(
+                                          AND ( instr(
                                             upper(text),
                                             upper(object_name)
                                         ) > 0 ) )
@@ -337,7 +349,7 @@ BEGIN
                                     replace(
                                         trim(replace(
                                             substr(text,
-                                                    instr(text, '--', 1)),
+                                                   instr(text, '--', 1)),
                                             '--',
                                             ''
                                         )),
@@ -358,16 +370,16 @@ BEGIN
                                     upper(text),
                                     argument_name
                                 ) > 0 ) )
-                                        OR ( ( argument_name IS NULL )
-                                            AND ( instr(
+                                      OR ( ( argument_name IS NULL )
+                                           AND ( instr(
                                     upper(text),
                                     ')'
                                 ) > 0 )
-                                            AND ( instr(
+                                           AND ( instr(
                                     upper(text),
                                     'RETURN'
                                 ) > 0 )
-                                            AND ( instr(
+                                           AND ( instr(
                                     upper(text),
                                     ';'
                                 ) > 0 ) ) )
@@ -385,7 +397,7 @@ BEGIN
                                             upper(text),
                                             'FUNCTION'
                                         ) > 0 ) )
-                                            AND ( instr(
+                                          AND ( instr(
                                             upper(text),
                                             upper(object_name)
                                         ) > 0 ) )
@@ -400,34 +412,31 @@ BEGIN
                             package_name = c.package_name
                         AND object_name = c2.procedure_name
                         AND ( overload IS NULL
-                                OR overload = c2.overload )
+                              OR overload = c2.overload )
                         AND owner = v_schema_name
                     ORDER BY
                         position
                 ) LOOP
                     line('|'
-                            || c3.argument_name
-                            || '|'
-                            || c3.in_out
-                            || '|'
-                            || c3.data_type
-                            || '|'
-                            || c3.default_value
-                            || '|'
-                            || c3.comments || '|');
+                         || c3.argument_name
+                         || '|'
+                         || c3.in_out
+                         || '|'
+                         || c3.data_type
+                         || '|'
+                         || c3.default_value
+                         || '|'
+                         || c3.comments || '|');
                 END LOOP; -- Package Routine Arguments
                 line;
-
             END IF;
 
         END LOOP; -- Package Routines
-
     END LOOP; -- Packages
 
     print;
-
 END;
 /
 
 
--- sqlcl_snapshot {"hash":"aed9d32fa6ad19b5836de5e86e310374784cff6f","type":"PROCEDURE","name":"PRC_MDIFY","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"e1a79bd375cb67c5c75c83b21bc0e15df54b9b65","type":"PROCEDURE","name":"PRC_MDIFY","schemaName":"ODBVUE","sxml":""}
