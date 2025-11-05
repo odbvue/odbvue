@@ -14,6 +14,7 @@ BEGIN
                 IF v_error_stack LIKE '%ORA-24247%' THEN
                     DBMS_OUTPUT.PUT_LINE('ERROR (ORA-24247): Network access denied by Access Control List (ACL).');
                     DBMS_OUTPUT.PUT_LINE('ACL must be enabled first using pck_api_admin.acl_append_host.');
+                    DBMS_OUTPUT.PUT_LINE('exec admin.pck_api_admin.acl_append_host(''ODBVUE'', ''api.chucknorris.io'', 443, 443, ''http'');');
                 ELSE
                     RAISE;
                 END IF;
