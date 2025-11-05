@@ -1,6 +1,18 @@
-# PCK_API_LOB
+# Large Object Binaries
 
 Package for LOB processing. Credit: https://github.com/paulzip-dev/Base64
+
+::: details example
+<<< ../../../../../db/src/database/odbvue/tests/pck_api_lob.sql
+:::
+
+::: details specification
+<<< ../../../../../db/src/database/odbvue/package_specs/pck_api_lob.sql
+:::
+
+::: details implementation
+<<< ../../../../../db/src/database/odbvue/package_bodies/pck_api_lob.sql
+:::
 
 ## BASE64_TO_BLOB
 

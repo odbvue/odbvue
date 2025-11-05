@@ -1,4 +1,4 @@
-CREATE OR REPLACE PACKAGE odbvue.pck_api_zip AS -- Package for handling zip files, Credit: https://github.com/antonscheffer/as_zip AS
+CREATE OR REPLACE PACKAGE odbvue.pck_api_zip AS -- Package for handling zip files, Credit: https://github.com/antonscheffer/as_zip
 
     TYPE t_file_list IS
         TABLE OF CLOB;
