@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.92
+
+### Patch Changes
+
+- 71d6e03: admin package
+
 ## 0.0.86
 
 ### Patch Changes
