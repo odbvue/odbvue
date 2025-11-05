@@ -25,7 +25,7 @@ Reference list of export_types from internal.fixed.filters
 */    
 
 -- Limit to ODBVUE schema only
-owner = 'ODBVUE',
+owner in ('ODBVUE', 'ADMIN'),
 
 -- Restrict ORDS exports to only ODBVUE schema
 not (export_type = 'ORDS_SCHEMA' and parsing_schema != 'ODBVUE'),
