@@ -1,6 +1,18 @@
-# PCK_API_ZIP
+# ZIP Archives
 
-Package for handling zip files, Credit: https://github.com/antonscheffer/as_zip 
+Package for handling zip files, Credit: https://github.com/antonscheffer/as_zip
+
+::: details example
+<<< ../../../../../db/src/database/odbvue/tests/pck_api_zip.sql
+:::
+
+::: details specification
+<<< ../../../../../db/src/database/odbvue/package_specs/pck_api_zip.sql
+:::
+
+::: details implementation
+<<< ../../../../../db/src/database/odbvue/package_bodies/pck_api_zip.sql
+:::
 
 ## ADD
 

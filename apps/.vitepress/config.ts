@@ -43,9 +43,10 @@ export default defineConfig({
               text: 'Capabilities',
               collapsed: true,
               items: [
-                { text: 'Large Binary Objects', link: '/guide/apis/capabilities/lob' },
-                { text: 'Calling HTTP', link: '/guide/apis/capabilities/http' },
-                { text: 'ZIP Archives', link: '/guide/apis/capabilities/zip' },
+                { text: 'API Reference', link: '/guide/apis/capabilities/api-reference' },
+                { text: 'Large Object Binaries', link: '/guide/apis/capabilities/pck-api-lob' },
+                { text: 'Calling HTTP', link: '/guide/apis/capabilities/pck-api-http' },
+                { text: 'ZIP Archives', link: '/guide/apis/capabilities/pck-api-zip' },
               ],
             },
           ],

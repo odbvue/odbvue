@@ -1,6 +1,18 @@
-# PCK_API_HTTP
+# Calling HTTP
 
 Package for HTTP call processing
+
+::: details example
+<<< ../../../../../db/src/database/odbvue/tests/pck_api_http.sql
+:::
+
+::: details specification
+<<< ../../../../../db/src/database/odbvue/package_specs/pck_api_http.sql
+:::
+
+::: details implementation
+<<< ../../../../../db/src/database/odbvue/package_bodies/pck_api_http.sql
+:::
 
 ## MIME_TYPE
 
