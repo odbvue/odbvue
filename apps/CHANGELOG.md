@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.96
+
+### Patch Changes
+
+- 79d1bf6: json package
+
 ## 0.0.94
 
 ### Patch Changes
