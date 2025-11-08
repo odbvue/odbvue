@@ -64,6 +64,22 @@ Package for handling xml
 <<< ../../../../../db/src/database/odbvue/package_bodies/pck_api_xml.sql
 :::
 
+## YAML
+
+Package for handling YAML
+
+::: details example
+<<< ../../../../../db/src/database/odbvue/tests/pck_api_yaml.sql
+:::
+
+::: details specification
+<<< ../../../../../db/src/database/odbvue/package_specs/pck_api_yaml.sql
+:::
+
+::: details implementation
+<<< ../../../../../db/src/database/odbvue/package_bodies/pck_api_yaml.sql
+:::
+
 ## ZIP Archives
 
 Package for handling zip files, Credit: https://github.com/antonscheffer/as_zip

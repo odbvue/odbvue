@@ -48,6 +48,7 @@ export default defineConfig({
                 { text: 'Calling HTTP', link: '/guide/apis/capabilities/pck-api-http' },
                 { text: 'JSON', link: '/guide/apis/capabilities/pck-api-json' },
                 { text: 'XML', link: '/guide/apis/capabilities/pck-api-xml' },
+                { text: 'YAML', link: '/guide/apis/capabilities/pck-api-yaml' },
                 { text: 'ZIP Archives', link: '/guide/apis/capabilities/pck-api-zip' },
               ],
             },
