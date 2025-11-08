@@ -48,6 +48,22 @@ Package for handling json
 <<< ../../../../../db/src/database/odbvue/package_bodies/pck_api_json.sql
 :::
 
+## XML
+
+Package for handling xml 
+
+::: details example
+<<< ../../../../../db/src/database/odbvue/tests/pck_api_xml.sql
+:::
+
+::: details specification
+<<< ../../../../../db/src/database/odbvue/package_specs/pck_api_xml.sql
+:::
+
+::: details implementation
+<<< ../../../../../db/src/database/odbvue/package_bodies/pck_api_xml.sql
+:::
+
 ## ZIP Archives
 
 Package for handling zip files, Credit: https://github.com/antonscheffer/as_zip
