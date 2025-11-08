@@ -19,7 +19,7 @@ CREATE OR REPLACE EDITIONABLE TRIGGER odbvue.trg_ordsify
     END;
 /
 
-ALTER TRIGGER odbvue.trg_ordsify DISABLE;
+ALTER TRIGGER odbvue.trg_ordsify ENABLE;
 
 
--- sqlcl_snapshot {"hash":"fb674ecf3257f4d42b79fb71d936367619fb29ca","type":"TRIGGER","name":"TRG_ORDSIFY","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"f04620fb1a08aa29a8a1d6e122accfbca2a8b72d","type":"TRIGGER","name":"TRG_ORDSIFY","schemaName":"ODBVUE","sxml":""}
