@@ -1,7 +1,4 @@
 CREATE OR REPLACE PACKAGE odbvue.pck_api_xml AS -- Package for handling xml 
-  -- Count element children per name (local-name is fine for most XMLs)
-    TYPE t_cnt IS
-        TABLE OF PLS_INTEGER INDEX BY VARCHAR2(4000);
     FUNCTION init -- Function to initialize empty xml object 
      RETURN CLOB; -- Returns a clob representing an empty xml object
 
@@ -51,4 +48,4 @@ END pck_api_xml;
 /
 
 
--- sqlcl_snapshot {"hash":"e631848fddb0f576f98d4370927865a68eb2d6a5","type":"PACKAGE_SPEC","name":"PCK_API_XML","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"583a940c4ff1890ef6535d0e768f1677c3f80e79","type":"PACKAGE_SPEC","name":"PCK_API_XML","schemaName":"ODBVUE","sxml":""}
