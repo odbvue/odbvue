@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1762637561639 stripComments:false  logicalFilePath:featdb\odbvue\package_specs\pck_api_xml.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_specs/pck_api_xml.sql:e631848fddb0f576f98d4370927865a68eb2d6a5:583a940c4ff1890ef6535d0e768f1677c3f80e79:alter
+
 CREATE OR REPLACE PACKAGE odbvue.pck_api_xml AS -- Package for handling xml 
     FUNCTION init -- Function to initialize empty xml object 
      RETURN CLOB; -- Returns a clob representing an empty xml object
@@ -47,5 +51,3 @@ CREATE OR REPLACE PACKAGE odbvue.pck_api_xml AS -- Package for handling xml
 END pck_api_xml;
 /
 
-
--- sqlcl_snapshot {"hash":"583a940c4ff1890ef6535d0e768f1677c3f80e79","type":"PACKAGE_SPEC","name":"PCK_API_XML","schemaName":"ODBVUE","sxml":""}
