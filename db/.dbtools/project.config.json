@@ -16,7 +16,7 @@
       "constraintsAsAlter" : true,
       "emitSchema" : true,
       "force" : true,
-      "partitioning" : false,
+      "partitioning" : true,
       "segmentAttributes" : false,
       "sizeByteKeyword" : true,
       "sqlterminator" : true,
