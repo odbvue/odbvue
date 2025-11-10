@@ -38,5 +38,6 @@
 <include file="v0.0.99/release.changelog.xml" relativeToChangelogFile="true"/>
 <include file="v0.0.101/release.changelog.xml" relativeToChangelogFile="true"/>
 <include file="v0.0.103/release.changelog.xml" relativeToChangelogFile="true"/>
+<include file="v0.0.104/release.changelog.xml" relativeToChangelogFile="true"/>
 <include file="next/release.changelog.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>
