@@ -1,93 +1,57 @@
-CREATE OR REPLACE PACKAGE odbvue.pck_api_audit AS
-    FUNCTION timestamp_ns RETURN NUMBER;
+CREATE OR REPLACE PACKAGE odbvue.pck_api_audit AS -- Audit Package
 
-    FUNCTION attributes (
-        key1   IN VARCHAR2,
-        value1 IN VARCHAR2,
-        key2   IN VARCHAR2 DEFAULT NULL,
-        value2 IN VARCHAR2 DEFAULT NULL,
-        key3   IN VARCHAR2 DEFAULT NULL,
-        value3 IN VARCHAR2 DEFAULT NULL,
-        key4   IN VARCHAR2 DEFAULT NULL,
-        value4 IN VARCHAR2 DEFAULT NULL,
-        key5   IN VARCHAR2 DEFAULT NULL,
-        value5 IN VARCHAR2 DEFAULT NULL,
-        key6   IN VARCHAR2 DEFAULT NULL,
-        value6 IN VARCHAR2 DEFAULT NULL
-    ) RETURN CLOB;
+    g_service_name VARCHAR2(200);
+    g_service_version VARCHAR2(30);
+    FUNCTION attributes ( -- Create JSON attributes
+        key1   IN VARCHAR2, -- Key 1
+        value1 IN VARCHAR2, -- Value 1
+        key2   IN VARCHAR2 DEFAULT NULL, -- Key 2
+        value2 IN VARCHAR2 DEFAULT NULL, -- Value 2
+        key3   IN VARCHAR2 DEFAULT NULL, -- Key 3
+        value3 IN VARCHAR2 DEFAULT NULL, -- Value 3
+        key4   IN VARCHAR2 DEFAULT NULL, -- Key 4
+        value4 IN VARCHAR2 DEFAULT NULL, -- Value 4
+        key5   IN VARCHAR2 DEFAULT NULL, -- Key 5
+        value5 IN VARCHAR2 DEFAULT NULL, -- Value 5
+        key6   IN VARCHAR2 DEFAULT NULL, -- Key 6
+        value6 IN VARCHAR2 DEFAULT NULL -- Value 6
+    ) RETURN CLOB; -- JSON attributes
 
-    PROCEDURE begin_trace (
-        p_name       app_audit_spans.name%TYPE DEFAULT 'root_span',
-        p_attributes IN app_audit_spans.attributes%TYPE DEFAULT NULL
+    PROCEDURE debug ( -- Log Debug Message
+        p_message    app_audit.message%TYPE, -- Message
+        p_attributes app_audit.attributes%TYPE DEFAULT NULL -- Attributes
     );
 
-    PROCEDURE end_trace (
-        p_status IN app_audit_traces.status%TYPE
+    PROCEDURE info ( -- Log Info Message
+        p_message    app_audit.message%TYPE, -- Message
+        p_attributes app_audit.attributes%TYPE DEFAULT NULL -- Attributes
     );
 
-    PROCEDURE start_span (
-        p_name       IN app_audit_spans.name%TYPE,
-        p_attributes IN app_audit_spans.attributes%TYPE DEFAULT NULL
+    PROCEDURE warn ( -- Log Warn Message
+        p_message    app_audit.message%TYPE, -- Message
+        p_attributes app_audit.attributes%TYPE DEFAULT NULL -- Attributes
     );
 
-    PROCEDURE end_span;
-
-    PROCEDURE record_event (
-        p_name       IN app_audit_events.name%TYPE,
-        p_attributes IN app_audit_events.attributes%TYPE DEFAULT NULL
+    PROCEDURE error ( -- Log Error Message
+        p_message    app_audit.message%TYPE, -- Message
+        p_attributes app_audit.attributes%TYPE DEFAULT NULL -- Attributes
     );
 
-    PROCEDURE record_log (
-        p_severity   IN app_audit_logs.severity_text%TYPE,
-        p_message    IN app_audit_logs.message%TYPE,
-        p_attributes IN app_audit_logs.attributes%TYPE DEFAULT NULL
+    PROCEDURE fatal ( -- Log Fatal Message
+        p_message    app_audit.message%TYPE, -- Message
+        p_attributes app_audit.attributes%TYPE DEFAULT NULL -- Attributes
     );
 
-    PROCEDURE debug (
-        p_message    IN app_audit_logs.message%TYPE,
-        p_attributes IN app_audit_logs.attributes%TYPE DEFAULT NULL
+    PROCEDURE bulk ( -- Bulk Log Messages
+        p_data CLOB -- JSON Array of log entries [{severity, message, attributes, created}]
     );
 
-    PROCEDURE info (
-        p_message    IN app_audit_logs.message%TYPE,
-        p_attributes IN app_audit_logs.attributes%TYPE DEFAULT NULL
-    );
-
-    PROCEDURE warn (
-        p_message    IN app_audit_logs.message%TYPE,
-        p_attributes IN app_audit_logs.attributes%TYPE DEFAULT NULL
-    );
-
-    PROCEDURE error (
-        p_message    IN app_audit_logs.message%TYPE,
-        p_attributes IN app_audit_logs.attributes%TYPE DEFAULT NULL
-    );
-
-    PROCEDURE fatal (
-        p_message    IN app_audit_logs.message%TYPE,
-        p_attributes IN app_audit_logs.attributes%TYPE DEFAULT NULL
-    );
-
-    PROCEDURE otel_logs (
-        p_trace_id    IN app_audit_traces.id%TYPE,
-        p_period_from IN TIMESTAMP,
-        p_period_to   IN TIMESTAMP,
-        p_limit       PLS_INTEGER DEFAULT 1000,
-        p_offset      PLS_INTEGER DEFAULT 0,
-        r_otel        OUT SYS_REFCURSOR
-    );
-
-    PROCEDURE otel_spans (
-        p_trace_id    IN app_audit_traces.id%TYPE,
-        p_period_from IN TIMESTAMP,
-        p_period_to   IN TIMESTAMP,
-        p_limit       PLS_INTEGER DEFAULT 1000,
-        p_offset      PLS_INTEGER DEFAULT 0,
-        r_otel        OUT SYS_REFCURSOR
+    PROCEDURE archive ( -- Archive Old Records
+        p_older_than IN TIMESTAMP -- Archive records older than this timestamp
     );
 
 END pck_api_audit;
 /
 
 
--- sqlcl_snapshot {"hash":"c5c18afd23ab3fe865c12f5790f0d8221e36e3c8","type":"PACKAGE_SPEC","name":"PCK_API_AUDIT","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"86d42f453885726e38c4bc45b2ec70e2beca5378","type":"PACKAGE_SPEC","name":"PCK_API_AUDIT","schemaName":"ODBVUE","sxml":""}

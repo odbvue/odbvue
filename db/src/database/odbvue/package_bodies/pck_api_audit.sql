@@ -1,16 +1,5 @@
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_audit AS
 
-    g_service_name    app_audit_traces.service_name%TYPE;
-    g_service_version app_audit_traces.service_version%TYPE;
-
-    FUNCTION timestamp_ns RETURN NUMBER IS
-        ts TIMESTAMP WITH TIME ZONE := systimestamp;
-    BEGIN
-        RETURN ( extract(DAY FROM ( ts - TIMESTAMP '1970-01-01 00:00:00 UTC' )) * 86400 * 1e9 ) + ( extract(HOUR FROM ( ts - TIMESTAMP
-        '1970-01-01 00:00:00 UTC' )) * 3600 * 1e9 ) + ( extract(MINUTE FROM ( ts - TIMESTAMP '1970-01-01 00:00:00 UTC' )) * 60 * 1e9 )
-        + ( extract(SECOND FROM ( ts - TIMESTAMP '1970-01-01 00:00:00 UTC' )) * 1e9 );
-    END timestamp_ns;
-
     FUNCTION attributes (
         key1   IN VARCHAR2,
         value1 IN VARCHAR2,
@@ -46,513 +35,201 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_audit AS
         RETURN v_json.to_clob();
     END attributes;
 
-    PROCEDURE begin_trace (
-        p_name       IN app_audit_spans.name%TYPE DEFAULT 'root_span',
-        p_attributes IN app_audit_spans.attributes%TYPE DEFAULT NULL
+    PROCEDURE log (
+        p_severity   IN VARCHAR2,
+        p_message    IN app_audit.message%TYPE,
+        p_attributes IN app_audit.attributes%TYPE DEFAULT NULL,
+        p_created    IN TIMESTAMP DEFAULT systimestamp
     ) AS
 
-        v_trace_id app_audit_traces.id%TYPE := lower(dbms_crypto.randombytes(16));
-        v_span_id  app_audit_spans.id%TYPE := lower(dbms_crypto.randombytes(8));
+        v_request_method  VARCHAR2(30 CHAR);
+        v_request_uri     VARCHAR2(2000 CHAR);
+        v_agent           VARCHAR2(2000 CHAR);
+        v_ip              VARCHAR2(200 CHAR);
+        v_error_message   VARCHAR2(2000 CHAR);
+        v_error_backtrace VARCHAR2(2000 CHAR);
+        v_attributes      json_object_t := json_object_t.parse(coalesce(p_attributes, '{}'));
+        v_attributes_clob CLOB;
         PRAGMA autonomous_transaction;
     BEGIN
-        INSERT INTO app_audit_traces (
-            id,
-            created_at,
-            service_name,
-            service_version
-        ) VALUES ( v_trace_id,
-                   systimestamp,
-                   coalesce(g_service_name, 'unknown_service'),
-                   coalesce(g_service_version, 'unknown_version') );
+        BEGIN
+            v_attributes.put('service_name', g_service_name);
+            v_attributes.put('service_version', g_service_version);
+        EXCEPTION
+            WHEN OTHERS THEN
+                NULL;
+        END;
 
-        INSERT INTO app_audit_spans (
-            id,
-            trace_id,
-            name,
-            start_time_ns,
-            attributes
-        ) VALUES ( v_span_id,
-                   v_trace_id,
-                   p_name,
-                   timestamp_ns(),
-                   p_attributes );
+        BEGIN
+            v_request_method := trim(owa_util.get_cgi_env('REQUEST_METHOD'));
+            v_request_uri := trim(owa_util.get_cgi_env('REQUEST_URI'));
+            v_agent := trim(owa_util.get_cgi_env('HTTP_USER_AGENT'));
+            v_ip := trim(owa_util.get_cgi_env('REMOTE_ADDR'));
+        EXCEPTION
+            WHEN OTHERS THEN
+                NULL;
+        END;
 
-        dbms_session.set_context('OTEL_CTX', 'TRACE_ID', v_trace_id);
-        dbms_session.set_context('OTEL_CTX', 'SPAN_ID', v_span_id);
-        COMMIT;
-    END begin_trace;
+        IF v_request_method IS NOT NULL THEN
+            v_attributes.put('request_method', v_request_method);
+        END IF;
+        IF v_request_uri IS NOT NULL THEN
+            v_attributes.put('request_uri', v_request_uri);
+            DECLARE
+                v_module VARCHAR2(200 CHAR) := regexp_substr(v_request_uri, '[^/]+', 1, 3);
+                v_method VARCHAR2(200 CHAR) := regexp_substr(v_request_uri, '[^/]+', 1, 4);
+            BEGIN
+                IF v_module IS NOT NULL THEN
+                    v_attributes.put('module_name', v_module);
+                END IF;
+                IF v_method IS NOT NULL THEN
+                    v_attributes.put('method_name', v_method);
+                END IF;
+            EXCEPTION
+                WHEN OTHERS THEN
+                    NULL;
+            END;
 
-    PROCEDURE end_trace (
-        p_status IN app_audit_traces.status%TYPE
-    ) AS
-        PRAGMA autonomous_transaction;
-        v_trace_id app_audit_traces.id%TYPE := sys_context('OTEL_CTX', 'TRACE_ID');
-    BEGIN
-        UPDATE app_audit_traces
-        SET
-            status = p_status
-        WHERE
-            id = v_trace_id;
+        END IF;
 
-        UPDATE app_audit_spans
-        SET
-            end_time_ns = timestamp_ns(),
-            status = p_status
-        WHERE
-                trace_id = v_trace_id
-            AND end_time_ns IS NULL;
+        IF v_agent IS NOT NULL THEN
+            v_attributes.put('request_user_agent', v_agent);
+        END IF;
+        IF v_ip IS NOT NULL THEN
+            v_attributes.put('request_client_ip', v_ip);
+        END IF;
+        BEGIN
+            v_error_message := substr(sqlerrm, 1, 2000);
+            v_error_backtrace := substr(dbms_utility.format_error_backtrace, 1, 2000);
+            CASE
+                WHEN substr(v_error_message, 1, 8) = 'ORA-0000' THEN
+                    v_error_message := NULL;
+                    v_error_backtrace := NULL;
+            END CASE;
 
-        dbms_session.clear_context('OTEL_CTX');
-        COMMIT;
-    END end_trace;
+        EXCEPTION
+            WHEN OTHERS THEN
+                NULL;
+        END;
 
-    PROCEDURE start_span (
-        p_name       IN app_audit_spans.name%TYPE,
-        p_attributes IN app_audit_spans.attributes%TYPE DEFAULT NULL
-    ) AS
-
-        v_span_id        app_audit_spans.id%TYPE := lower(dbms_crypto.randombytes(8));
-        v_trace_id       app_audit_traces.id%TYPE := sys_context('OTEL_CTX', 'TRACE_ID');
-        v_parent_span_id app_audit_spans.id%TYPE := sys_context('OTEL_CTX', 'SPAN_ID');
-    BEGIN
-        INSERT INTO app_audit_spans (
-            id,
-            trace_id,
-            parent_span_id,
-            name,
-            attributes,
-            start_time_ns,
-            scope_name,
-            scope_version
-        ) VALUES ( v_span_id,
-                   v_trace_id,
-                   v_parent_span_id,
-                   p_name,
-                   p_attributes,
-                   timestamp_ns(),
-                   p_name,
-                   g_service_version );
-
-        dbms_session.set_context('OTEL_CTX', 'SPAN_ID', v_span_id);
-        COMMIT;
-    END start_span;
-
-    PROCEDURE end_span AS
-
-        v_span_id        app_audit_spans.id%TYPE := sys_context('OTEL_CTX', 'SPAN_ID');
-        PRAGMA autonomous_transaction;
-        v_parent_span_id app_audit_spans.id%TYPE;
-    BEGIN
-        SELECT
-            parent_span_id
-        INTO v_parent_span_id
-        FROM
-            app_audit_spans
-        WHERE
-            id = v_span_id;
-
-        UPDATE app_audit_spans
-        SET
-            end_time_ns = timestamp_ns()
-        WHERE
-            id = v_span_id;
-
-        dbms_session.set_context('OTEL_CTX', 'SPAN_ID', v_parent_span_id);
-        COMMIT;
-    END end_span;
-
-    PROCEDURE record_event (
-        p_name       IN app_audit_events.name%TYPE,
-        p_attributes IN app_audit_events.attributes%TYPE DEFAULT NULL
-    ) AS
-        v_span_id app_audit_spans.id%TYPE := sys_context('OTEL_CTX', 'SPAN_ID');
-        PRAGMA autonomous_transaction;
-    BEGIN
-        INSERT INTO app_audit_events (
-            span_id,
-            name,
-            attributes,
-            time_ns
-        ) VALUES ( v_span_id,
-                   p_name,
-                   p_attributes,
-                   timestamp_ns() );
-
-        COMMIT;
-    END record_event;
-
-    PROCEDURE record_log (
-        p_severity   IN app_audit_logs.severity_text%TYPE,
-        p_message    IN app_audit_logs.message%TYPE,
-        p_attributes IN app_audit_logs.attributes%TYPE DEFAULT NULL
-    ) AS
-
-        v_trace_id   app_audit_traces.id%TYPE := sys_context('OTEL_CTX', 'TRACE_ID');
-        v_span_id    app_audit_spans.id%TYPE := sys_context('OTEL_CTX', 'SPAN_ID');
-        v_scope_name app_audit_logs.scope_name%TYPE := utl_call_stack.subprogram(1)(1);
-        PRAGMA autonomous_transaction;
-    BEGIN
-        INSERT INTO app_audit_logs (
-            trace_id,
-            span_id,
-            severity_number,
-            severity_text,
-            scope_name,
-            scope_version,
+        IF v_error_message IS NOT NULL THEN
+            v_attributes.put('error_message', v_error_message);
+        END IF;
+        IF v_error_backtrace IS NOT NULL THEN
+            v_attributes.put('error_stack', v_error_backtrace);
+        END IF;
+        v_attributes_clob := v_attributes.to_clob();
+        INSERT INTO app_audit (
+            severity,
             message,
             attributes,
-            created_at,
-            time_ns
-        ) VALUES ( v_trace_id,
-                   v_span_id,
-                   CASE upper(p_severity)
-                       WHEN 'TRACE' THEN
-                           1
-                       WHEN 'DEBUG' THEN
-                           5
-                       WHEN 'INFO'  THEN
-                           9
-                       WHEN 'WARN'  THEN
-                           13
-                       WHEN 'ERROR' THEN
-                           17
-                       WHEN 'FATAL' THEN
-                           21
-                       ELSE
-                           9
-                   END,
-                   upper(p_severity),
-                   coalesce(v_scope_name, g_service_name, 'unknown_scope'),
-                   coalesce(g_service_version, 'unknown_version'),
+            created
+        ) VALUES ( p_severity,
                    p_message,
-                   p_attributes,
-                   systimestamp,
-                   timestamp_ns() );
+                   v_attributes_clob,
+                   p_created );
 
         COMMIT;
-    END record_log;
+    END log;
 
     PROCEDURE debug (
-        p_message    IN app_audit_logs.message%TYPE,
-        p_attributes IN app_audit_logs.attributes%TYPE DEFAULT NULL
+        p_message    app_audit.message%TYPE,
+        p_attributes app_audit.attributes%TYPE DEFAULT NULL
     ) AS
     BEGIN
-        record_log(
-            p_severity => 'DEBUG',
-            p_message  => p_message
-        );
+        log('DEBUG', p_message, p_attributes);
     END debug;
 
     PROCEDURE info (
-        p_message    IN app_audit_logs.message%TYPE,
-        p_attributes IN app_audit_logs.attributes%TYPE DEFAULT NULL
+        p_message    app_audit.message%TYPE,
+        p_attributes app_audit.attributes%TYPE DEFAULT NULL
     ) AS
     BEGIN
-        record_log(
-            p_severity   => 'INFO',
-            p_message    => p_message,
-            p_attributes => p_attributes
-        );
+        log('INFO', p_message, p_attributes);
     END info;
 
     PROCEDURE warn (
-        p_message    IN app_audit_logs.message%TYPE,
-        p_attributes IN app_audit_logs.attributes%TYPE DEFAULT NULL
+        p_message    app_audit.message%TYPE,
+        p_attributes app_audit.attributes%TYPE DEFAULT NULL
     ) AS
     BEGIN
-        record_log(
-            p_severity => 'WARN',
-            p_message  => p_message
-        );
+        log('WARN', p_message, p_attributes);
     END warn;
 
     PROCEDURE error (
-        p_message    IN app_audit_logs.message%TYPE,
-        p_attributes IN app_audit_logs.attributes%TYPE DEFAULT NULL
+        p_message    app_audit.message%TYPE,
+        p_attributes app_audit.attributes%TYPE DEFAULT NULL
     ) AS
     BEGIN
-        record_log(
-            p_severity => 'ERROR',
-            p_message  => p_message
-        );
+        log('ERROR', p_message, p_attributes);
     END error;
 
     PROCEDURE fatal (
-        p_message    IN app_audit_logs.message%TYPE,
-        p_attributes IN app_audit_logs.attributes%TYPE DEFAULT NULL
+        p_message    app_audit.message%TYPE,
+        p_attributes app_audit.attributes%TYPE DEFAULT NULL
     ) AS
     BEGIN
-        record_log(
-            p_severity => 'FATAL',
-            p_message  => p_message
-        );
+        log('FATAL', p_message, p_attributes);
     END fatal;
 
-    PROCEDURE otel_logs (
-        p_trace_id    IN app_audit_traces.id%TYPE,
-        p_period_from IN TIMESTAMP,
-        p_period_to   IN TIMESTAMP,
-        p_limit       PLS_INTEGER DEFAULT 1000,
-        p_offset      PLS_INTEGER DEFAULT 0,
-        r_otel        OUT SYS_REFCURSOR
+    PROCEDURE bulk (
+        p_data CLOB
     ) AS
     BEGIN
-        OPEN r_otel FOR WITH logs AS (
-                                            SELECT
-                                                    JSON_OBJECT(
-                                                        'attributes' VALUE JSON_ARRAY(
-                                                            JSON_OBJECT(
-                                                                'key' VALUE 'service.name',
-                                                                        'value' VALUE
-                                                                    JSON_OBJECT(
-                                                                        'stringValue' VALUE t.service_name
-                                                                    )
-                                                            ),
-                                           JSON_OBJECT(
-                                                                'key' VALUE 'service.version',
-                                                       'value' VALUE
-                                                                    JSON_OBJECT(
-                                                                        'stringValue' VALUE t.service_version
-                                                                    )
-                                                            )
-                                                        )
-                                                    )
-                                                AS trace_resource,
-                                                    JSON_OBJECT(
-                                                        'name' VALUE l.scope_name,
-                                                        'version' VALUE l.scope_version
-                                                    )
-                                                AS log_scope,
-                                                    JSON_OBJECT(
-                                                        'timeUnixNano' VALUE to_char(l.time_ns),
-                                                                'observedTimeUnixNano' VALUE to_char(l.time_ns),
-                                                                'severityNumber' VALUE l.severity_number,
-                                                                'severityText' VALUE l.severity_text,
-                                                                'body' VALUE
-                                                            JSON_OBJECT(
-                                                                'stringValue' VALUE l.message
-                                                            ),
-                                                                'attributes' VALUE
-                                                            CASE
-                                                                WHEN l.attributes IS NOT NULL THEN
-                                                                    JSON_ARRAY()
-                                                                ELSE
-                                                                    JSON_ARRAY()
-                                                            END,
-                                                                'traceId' VALUE l.trace_id,
-                                                                'spanId' VALUE coalesce(l.span_id, ''),
-                                                                'flags' VALUE 1
-                                                    )
-                                                AS log_record
-                                            FROM
-                                                     app_audit_traces t
-                                                JOIN app_audit_logs l ON l.trace_id = t.id
-                                            WHERE
-                                                ( p_trace_id IS NULL
-                                                  OR t.id = p_trace_id )
-                                                AND ( p_period_from IS NULL
-                                                      OR t.created_at >= p_period_from )
-                                                AND ( p_period_to IS NULL
-                                                      OR t.created_at <= p_period_to )
-                                            ORDER BY
-                                                t.created_at DESC
-                                            OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY
-                                        )
-                                        SELECT
-                                            JSON_SERIALIZE(
-                                                JSON_OBJECT(
-                                                    'resourceLogs' VALUE JSON_ARRAYAGG(
-                                                        JSON_OBJECT(
-                                                            'resource' VALUE JSON_QUERY(trace_resource, '$'),
-                                                                    'scopeLogs' VALUE JSON_ARRAY(
-                                                                JSON_OBJECT(
-                                                                    'scope' VALUE JSON_QUERY(log_scope, '$'),
-                                                                            'logRecords' VALUE JSON_ARRAYAGG(log_record)
-                                                                )
-                                                            )
-                                                        )
-                                                    )
-                                                )
-                                            PRETTY) AS payload
-                                        FROM
-                                            logs
-                        GROUP BY
-                            trace_resource,
-                            log_scope;
-
-    END otel_logs;
-
-    PROCEDURE otel_spans (
-        p_trace_id    IN app_audit_traces.id%TYPE,
-        p_period_from IN TIMESTAMP,
-        p_period_to   IN TIMESTAMP,
-        p_limit       PLS_INTEGER DEFAULT 1000,
-        p_offset      PLS_INTEGER DEFAULT 0,
-        r_otel        OUT SYS_REFCURSOR
-    ) AS
-    BEGIN
-        OPEN r_otel FOR WITH spans AS (
-                                            SELECT
-                                                    JSON_OBJECT(
-                                                        'attributes' VALUE JSON_ARRAY(
-                                                            JSON_OBJECT(
-                                                                'key' VALUE 'service.name',
-                                                                        'value' VALUE
-                                                                    JSON_OBJECT(
-                                                                        'stringValue' VALUE t.service_name
-                                                                    )
-                                                            ),
-                                           JSON_OBJECT(
-                                                                'key' VALUE 'service.version',
-                                                       'value' VALUE
-                                                                    JSON_OBJECT(
-                                                                        'stringValue' VALUE t.service_version
-                                                                    )
-                                                            )
-                                                        )
-                                                    )
-                                                AS trace_resource,
-                                                    JSON_OBJECT(
-                                                        'name' VALUE s.scope_name,
-                                                        'version' VALUE s.scope_version
-                                                    )
-                                                AS span_scope,
-                                                    CASE
-                                                        WHEN s.parent_span_id IS NOT NULL THEN
-                                                                JSON_OBJECT(
-                                                                    'traceId' VALUE s.trace_id,
-                                                                            'spanId' VALUE s.id,
-                                                                            'parentSpanId' VALUE s.parent_span_id,
-                                                                            'name' VALUE s.name,
-                                                                            'kind' VALUE s.kind,
-                                                                            'startTimeUnixNano' VALUE to_char(s.start_time_ns),
-                                                                            'endTimeUnixNano' VALUE to_char(s.end_time_ns),
-                                                                            'attributes' VALUE
-                                                                        CASE
-                                                                            WHEN s.attributes IS NOT NULL THEN
-                                                                                JSON_ARRAY()
-                                                                            ELSE
-                                                                                JSON_ARRAY()
-                                                                        END,
-                                                                            'events' VALUE(
-                                                                        SELECT
-                                                                            JSON_ARRAYAGG(
-                                                                                JSON_OBJECT(
-                                                                                    'timeUnixNano' VALUE to_char(e.time_ns),
-                                                                                            'name' VALUE e.name,
-                                                                                            'attributes' VALUE
-                                                                                        CASE
-                                                                                            WHEN e.attributes IS NOT NULL THEN
-                                                                                                JSON_ARRAY()
-                                                                                            ELSE
-                                                                                                JSON_ARRAY()
-                                                                                        END
-                                                                                )
-                                                                            )
-                                                                        FROM
-                                                                            app_audit_events e
-                                                                        WHERE
-                                                                            e.span_id = s.id
-                                                                    ),
-                                                                            'status' VALUE
-                                                                        JSON_OBJECT(
-                                                                            'code' VALUE
-                                                                                CASE s.status
-                                                                                    WHEN 'OK'    THEN
-                                                                                        'STATUS_CODE_OK'
-                                                                                    WHEN 'ERROR' THEN
-                                                                                        'STATUS_CODE_ERROR'
-                                                                                    ELSE
-                                                                                        'STATUS_CODE_UNSET'
-                                                                                END
-                                                                        )
-                                                                )
-                                                        ELSE
-                                                            JSON_OBJECT(
-                                                                    'traceId' VALUE s.trace_id,
-                                                                            'spanId' VALUE s.id,
-                                                                            'name' VALUE s.name,
-                                                                            'kind' VALUE s.kind,
-                                                                            'startTimeUnixNano' VALUE to_char(s.start_time_ns),
-                                                                            'endTimeUnixNano' VALUE to_char(s.end_time_ns),
-                                                                            'attributes' VALUE
-                                                                        CASE
-                                                                            WHEN s.attributes IS NOT NULL THEN
-                                                                                JSON_ARRAY()
-                                                                            ELSE
-                                                                                JSON_ARRAY()
-                                                                        END,
-                                                                            'events' VALUE(
-                                                                        SELECT
-                                                                            JSON_ARRAYAGG(
-                                                                                JSON_OBJECT(
-                                                                                    'timeUnixNano' VALUE to_char(e.time_ns),
-                                                                                            'name' VALUE e.name,
-                                                                                            'attributes' VALUE
-                                                                                        CASE
-                                                                                            WHEN e.attributes IS NOT NULL THEN
-                                                                                                JSON_ARRAY()
-                                                                                            ELSE
-                                                                                                JSON_ARRAY()
-                                                                                        END
-                                                                                )
-                                                                            )
-                                                                        FROM
-                                                                            app_audit_events e
-                                                                        WHERE
-                                                                            e.span_id = s.id
-                                                                    ),
-                                                                            'status' VALUE
-                                                                        JSON_OBJECT(
-                                                                            'code' VALUE
-                                                                                CASE s.status
-                                                                                    WHEN 'OK'    THEN
-                                                                                        'STATUS_CODE_OK'
-                                                                                    WHEN 'ERROR' THEN
-                                                                                        'STATUS_CODE_ERROR'
-                                                                                    ELSE
-                                                                                        'STATUS_CODE_UNSET'
-                                                                                END
-                                                                        )
-                                                                )
-                                                    END AS span_record
-                                            FROM
-                                                     app_audit_traces t
-                                                JOIN app_audit_spans s ON s.trace_id = t.id
-                                            WHERE
-                                                ( p_trace_id IS NULL
-                                                  OR t.id = p_trace_id )
-                                                AND ( p_period_from IS NULL
-                                                      OR t.created_at >= p_period_from )
-                                                AND ( p_period_to IS NULL
-                                                      OR t.created_at <= p_period_to )
-                                            ORDER BY
-                                                t.created_at DESC
-                                            OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY
-                                        )
-                                        SELECT
-                                            JSON_SERIALIZE(
-                                                JSON_OBJECT(
-                                                    'resourceSpans' VALUE JSON_ARRAYAGG(
-                                                        JSON_OBJECT(
-                                                            'resource' VALUE JSON_QUERY(trace_resource, '$'),
-                                                                    'scopeSpans' VALUE JSON_ARRAY(
-                                                                JSON_OBJECT(
-                                                                    'scope' VALUE JSON_QUERY(span_scope, '$'),
-                                                                            'spans' VALUE JSON_ARRAYAGG(span_record)
-                                                                )
-                                                            )
-                                                        )
-                                                    )
-                                                )
-                                            PRETTY) AS payload
-                                        FROM
-                                            spans
-                        GROUP BY
-                            trace_resource,
-                            span_scope;
-
+        FOR rec IN (
+            SELECT
+                severity,
+                message,
+                attributes,
+                created
+            FROM
+                JSON_TABLE ( p_data, '$[*]'
+                    COLUMNS (
+                        severity VARCHAR2 ( 30 CHAR ) PATH '$.severity',
+                        message VARCHAR2 ( 2000 CHAR ) PATH '$.message',
+                        attributes CLOB FORMAT JSON PATH '$.attributes',
+                        created TIMESTAMP PATH '$.created'
+                    )
+                )
+        ) LOOP
+            log(rec.severity, rec.message, rec.attributes, rec.created);
+        END LOOP;
     END;
+
+    PROCEDURE archive (
+        p_older_than IN TIMESTAMP
+    ) AS
+        PRAGMA autonomous_transaction;
+    BEGIN
+        INSERT INTO app_audit_archive (
+            id,
+            severity,
+            message,
+            attributes,
+            created
+        )
+            SELECT
+                id,
+                severity,
+                message,
+                attributes,
+                created
+            FROM
+                app_audit
+            WHERE
+                created < p_older_than;
+
+        DELETE FROM app_audit
+        WHERE
+            created < p_older_than;
+
+        COMMIT;
+        dbms_output.put_line('Archived '
+                             || SQL%rowcount
+                             || ' audit records older than '
+                             || p_older_than || '.');
+
+    END archive;
 
 BEGIN
     BEGIN
@@ -581,10 +258,11 @@ BEGIN
 
     EXCEPTION
         WHEN OTHERS THEN
+            g_service_name := 'unknown_service';
             g_service_version := 'unknown_version';
     END;
 END pck_api_audit;
 /
 
 
--- sqlcl_snapshot {"hash":"24c1dac0a8312db57132b286204ee83470bb204c","type":"PACKAGE_BODY","name":"PCK_API_AUDIT","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"b90c65efb0e742697eb42f3e3b0a95869551392a","type":"PACKAGE_BODY","name":"PCK_API_AUDIT","schemaName":"ODBVUE","sxml":""}
