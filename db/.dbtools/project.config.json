@@ -2,7 +2,7 @@
   "project" : "odbvue-db",
   "sqlcl" : {
     "connectionName" : "",
-    "version" : "latest"
+    "version" : "25.3.1.0"
   },
   "schemas" : [ "odbvue" ],
   "lastReleaseVersion" : "v0.0.105",
