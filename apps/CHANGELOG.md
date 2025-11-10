@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.113
+
+### Patch Changes
+
+- 5710455: validate package
+
 ## 0.0.102
 
 ### Patch Changes
