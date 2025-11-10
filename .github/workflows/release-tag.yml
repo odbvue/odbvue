@@ -2,7 +2,7 @@ name: Build & Package on Tag
 on:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - "v[0-9]+.[0-9]+.[0-9]+"
 
 permissions:
   contents: write
@@ -19,7 +19,7 @@ jobs:
       - name: Setup SQLcl
         uses: gvenzl/setup-oracle-sqlcl@v1
         with:
-          version: latest
+          version: 25.3.0.0
 
       - name: Generate DB artifact
         id: db
@@ -28,13 +28,17 @@ jobs:
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME}"
           NAME="odbvue-db"
-          
-          # Generate artifact
+
+          # Ensure artifact directory exists
+          mkdir -p artifact
+
+          # Generate artifact using Liquibase project in current directory
           sql /nolog << ENDSQL
+          project set-location .
           project gen-artifact -name $NAME -version $VERSION -format zip
           exit
           ENDSQL
-          
+
           # Verify artifact was created
           ARTIFACT="artifact/${NAME}-${VERSION}.zip"
           if [ ! -f "$ARTIFACT" ]; then
@@ -42,19 +46,19 @@ jobs:
             ls -la artifact/ || echo "artifact directory does not exist"
             exit 1
           fi
-          
+
           echo "zip=db/$ARTIFACT" >> "$GITHUB_OUTPUT"
           echo "DB artifact generated: $ARTIFACT"
 
       - name: Setup pnpm/node
         uses: pnpm/action-setup@v2
         with:
-          package_json_file: 'apps/package.json'
+          package_json_file: "apps/package.json"
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: 'apps/pnpm-lock.yaml'
+          cache-dependency-path: "apps/pnpm-lock.yaml"
       - run: cd apps && pnpm install --frozen-lockfile
       - run: cd apps && pnpm build && pnpm wiki:build
 
