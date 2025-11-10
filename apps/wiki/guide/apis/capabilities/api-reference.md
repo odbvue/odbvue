@@ -86,6 +86,22 @@ Package for handling xml
 <<< ../../../../../db/src/database/odbvue/package_bodies/pck_api_xml.sql
 :::
 
+# Validate
+
+Package provides methods for validating values against rules
+
+::: details example
+<<< ../../../../../db/src/database/odbvue/tests/pck_api_validate.sql
+:::
+
+::: details specification
+<<< ../../../../../db/src/database/odbvue/package_specs/pck_api_validate.sql
+:::
+
+::: details implementation
+<<< ../../../../../db/src/database/odbvue/package_bodies/pck_api_validate.sql
+:::
+
 ## YAML
 
 Package for handling YAML
