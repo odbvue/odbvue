@@ -19,7 +19,7 @@ jobs:
       - name: Setup SQLcl
         uses: gvenzl/setup-oracle-sqlcl@v1
         with:
-          version: 25.3.0
+          version: "latest"
 
       - name: Generate DB artifact
         id: db
