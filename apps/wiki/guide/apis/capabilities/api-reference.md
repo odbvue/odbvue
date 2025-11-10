@@ -1,6 +1,28 @@
 # API Reference
 
-## Large Object Binaries
+## Audit
+
+Audit Package
+
+::: details example
+<<< ../../../../../db/src/database/odbvue/tests/pck_api_audit.sql
+:::
+
+::: details specification
+<<< ../../../../../db/src/database/odbvue/package_specs/pck_api_audit.sql
+:::
+
+::: details implementation
+<<< ../../../../../db/src/database/odbvue/package_bodies/pck_api_audit.sql
+:::
+
+Dependencies:
+
+| Referenced type | Referenced name |
+| --------------- | --------------- |
+|TABLE|APP_AUDIT|
+
+## LOB
 
 Package for LOB processing. Credit: https://github.com/paulzip-dev/Base64
 
@@ -16,7 +38,7 @@ Package for LOB processing. Credit: https://github.com/paulzip-dev/Base64
 <<< ../../../../../db/src/database/odbvue/package_bodies/pck_api_lob.sql
 :::
 
-## Calling HTTP
+## HTTP
 
 Package for HTTP call processing
 
@@ -80,7 +102,7 @@ Package for handling YAML
 <<< ../../../../../db/src/database/odbvue/package_bodies/pck_api_yaml.sql
 :::
 
-## ZIP Archives
+## ZIP
 
 Package for handling zip files, Credit: https://github.com/antonscheffer/as_zip
 
