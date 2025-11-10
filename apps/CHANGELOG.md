@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.102
+
+### Patch Changes
+
+- 7d7a359: audit package
+
 ## 0.0.100
 
 ### Patch Changes
