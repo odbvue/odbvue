@@ -1,21 +1,20 @@
 DECLARE
 
     c_name CONSTANT VARCHAR2(100) := 'pck_api_audit test';
+
     c_attributes CONSTANT CLOB := pck_api_audit.attributes(
         'action', 'TEST',
         'module', 'pck_api_audit'
     );
 
+    PROCEDURE sub AS
+    BEGIN
 
+        pck_api_audit.start_span('New Sub Span');
+        pck_api_audit.record_event('New Event for Sub Span');
+        pck_api_audit.end_span;
 
-    procedure sub as 
-    begin
-
-        PCK_API_AUDIT.START_SPAN('New subspan');
-        PCK_API_AUDIT.RECORD_EVENT('New event for Subspan');
-        PCK_API_AUDIT.END_SPAN;
-
-    end;    
+    END;
 
 BEGIN   
 
@@ -24,7 +23,7 @@ BEGIN
         p_attributes => c_attributes
     );
 
-    pck_api_audit.RECORD_EVENT(
+    pck_api_audit.record_event(
         p_name     => 'Test Event 1',
         p_attributes => pck_api_audit.attributes(
             'step', '1',
@@ -34,8 +33,7 @@ BEGIN
 
     sub;
 
-
-    pck_api_audit.RECORD_EVENT(
+    pck_api_audit.record_event(
         p_name     => 'Test Event 1',
         p_attributes => pck_api_audit.attributes(
             'step', '2',
@@ -44,14 +42,12 @@ BEGIN
     );
 
     pck_api_audit.info(
-        p_message  => 'Audit trace started',
+        p_message  => 'Audit Info',
         p_attributes => pck_api_audit.attributes(
             'event.type', 'startup',
             'uuid', LOWER(SYS_GUID())
-
-        )
+          )
     );
-
 
     pck_api_audit.end_trace(
         p_status   => 'OK'
@@ -68,98 +64,9 @@ EXCEPTION
 END;
 /
 
-DECLARE
-    otel_output CLOB;
-BEGIN   
-    pck_api_audit.to_otel(
-      null,
-      r_otel => otel_output
-    );
-    dbms_output.put_line(otel_output);
-END;
-/
 
 
-select * from app_audit_traces;
 
-select * from app_audit_spans;
-
-select * from app_audit_logs;
-
-select * from app_audit_events;
-
-select * from app_audit_logs where uuid = '43289da77f218bfce0630301590a0342';
-
-WITH logs AS (
-    SELECT
-        l.trace_id,
-        JSON_OBJECT(
-          'timeUnixNano' VALUE TO_CHAR(TO_NUMBER(TO_CHAR(l.created_at, 'SSSSSSSSS')) * 1000000000),
-          'observedTimeUnixNano' VALUE TO_CHAR(TO_NUMBER(TO_CHAR(l.created_at, 'SSSSSSSSS')) * 1000000000),
-          'severityNumber' VALUE l.severity_number,
-          'severityText' VALUE l.severity_text,
-          'body' VALUE JSON_OBJECT('stringValue' VALUE l.message),
-          'attributes' VALUE CASE WHEN l.attributes IS NOT NULL THEN JSON_ARRAY() ELSE JSON_ARRAY() END,
-          'traceId' VALUE l.trace_id,
-          'spanId' VALUE COALESCE(l.span_id, ''),
-          'flags' VALUE 1
-        ) AS log_record
-
-    FROM app_audit_logs l
-), spans AS (
-    SELECT
-        s.trace_id,
-        JSON_OBJECT(
-          'traceId' VALUE s.trace_id,
-          'spanId' VALUE s.id,
-          'parentSpanId' VALUE COALESCE(s.parent_span_id, ''),
-          'name' VALUE s.name,
-          'kind' VALUE s.kind,
-          'startTimeUnixNano' VALUE TO_CHAR(s.start_time_ns),
-          'endTimeUnixNano' VALUE TO_CHAR(s.end_time_ns),
-          'attributes' VALUE CASE WHEN s.attributes IS NOT NULL THEN JSON_ARRAY() ELSE JSON_ARRAY() END,
-          'events' VALUE (
-              SELECT JSON_ARRAYAGG(
-                  JSON_OBJECT(
-                      'timeUnixNano' VALUE TO_CHAR(e.time_ns),
-                      'name' VALUE e.name,
-                      'attributes' VALUE CASE WHEN e.attributes IS NOT NULL THEN JSON_ARRAY() ELSE JSON_ARRAY() END
-                  )
-              )
-              FROM app_audit_events e
-              WHERE e.span_id = s.id
-          ),
-          'status' VALUE JSON_OBJECT('code' VALUE CASE s.status WHEN 'OK' THEN 'STATUS_CODE_OK' WHEN 'ERROR' THEN 'STATUS_CODE_ERROR' ELSE 'STATUS_CODE_UNSET' END)
-        ) AS span_record
-    FROM app_audit_spans s
-), resources AS (
-    SELECT
-        JSON_OBJECT(
-          'resource' VALUE JSON_OBJECT(
-              'attributes' VALUE JSON_ARRAY(
-                  JSON_OBJECT('key' VALUE 'service.name', 'value' VALUE JSON_OBJECT('stringValue' VALUE t.service_name)),
-                  JSON_OBJECT('key' VALUE 'service.version', 'value' VALUE JSON_OBJECT('stringValue' VALUE t.service_version))
-              )
-          ),
-          'scopeLogs' VALUE JSON_ARRAY(
-              JSON_OBJECT(
-                  'scope' VALUE JSON_OBJECT('name' VALUE 'plsql.audit', 'version' VALUE '0.2.0'),
-                  'logRecords' VALUE (
-                      SELECT JSON_ARRAYAGG(lg.log_record)
-                      FROM logs lg
-                      WHERE lg.trace_id = t.id
-                  )
-              )
-          )
-        ) AS resource_log
-    FROM app_audit_traces t
-)
--- Final JSON Assembly - LOGS
-SELECT json_serialize(
- JSON_OBJECT(
-    'resourceLogs' VALUE JSON_ARRAYAGG(r.resource_log)
-) pretty )
-FROM resources r;
 /*
 
 --

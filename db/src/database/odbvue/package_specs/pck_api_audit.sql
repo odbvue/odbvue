@@ -1,5 +1,4 @@
 CREATE OR REPLACE PACKAGE odbvue.pck_api_audit AS
-
     FUNCTION timestamp_ns RETURN NUMBER;
 
     FUNCTION attributes (
@@ -69,26 +68,26 @@ CREATE OR REPLACE PACKAGE odbvue.pck_api_audit AS
         p_attributes IN app_audit_logs.attributes%TYPE DEFAULT NULL
     );
 
-    PROCEDURE otel_logs(
-        p_trace_id IN app_audit_traces.id%TYPE,
+    PROCEDURE otel_logs (
+        p_trace_id    IN app_audit_traces.id%TYPE,
         p_period_from IN TIMESTAMP,
-        p_period_to IN TIMESTAMP,
-        p_limit PLS_INTEGER DEFAULT 1000,
-        p_offset PLS_INTEGER DEFAULT 0,
-        r_otel OUT SYS_REFCURSOR
+        p_period_to   IN TIMESTAMP,
+        p_limit       PLS_INTEGER DEFAULT 1000,
+        p_offset      PLS_INTEGER DEFAULT 0,
+        r_otel        OUT SYS_REFCURSOR
     );
 
-    PROCEDURE otel_spans(
-        p_trace_id IN app_audit_traces.id%TYPE,
+    PROCEDURE otel_spans (
+        p_trace_id    IN app_audit_traces.id%TYPE,
         p_period_from IN TIMESTAMP,
-        p_period_to IN TIMESTAMP,
-        p_limit PLS_INTEGER DEFAULT 1000,
-        p_offset PLS_INTEGER DEFAULT 0,
-        r_otel OUT SYS_REFCURSOR
+        p_period_to   IN TIMESTAMP,
+        p_limit       PLS_INTEGER DEFAULT 1000,
+        p_offset      PLS_INTEGER DEFAULT 0,
+        r_otel        OUT SYS_REFCURSOR
     );
 
 END pck_api_audit;
 /
 
 
--- sqlcl_snapshot {"hash":"4bd49342e571003478f2432c3e3e1592c80202c0","type":"PACKAGE_SPEC","name":"PCK_API_AUDIT","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"c5c18afd23ab3fe865c12f5790f0d8221e36e3c8","type":"PACKAGE_SPEC","name":"PCK_API_AUDIT","schemaName":"ODBVUE","sxml":""}
