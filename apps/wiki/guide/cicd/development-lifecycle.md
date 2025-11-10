@@ -100,6 +100,9 @@ cd ..
 > ```
 
 > [!TIP]
+> For SQLcl project to export table partitions set `"partitioning" : true` in `./db/.dbtools/project.config.json`
+
+> [!TIP]
 > SQLcl project export format can be adjusted in `./db/.dbtools/project.sqlFormat.xml`
 
 ## Development
