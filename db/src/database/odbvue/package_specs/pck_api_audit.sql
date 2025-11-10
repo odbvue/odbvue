@@ -52,6 +52,3 @@ CREATE OR REPLACE PACKAGE odbvue.pck_api_audit AS -- Audit Package
 
 END pck_api_audit;
 /
-
-
--- sqlcl_snapshot {"hash":"86d42f453885726e38c4bc45b2ec70e2beca5378","type":"PACKAGE_SPEC","name":"PCK_API_AUDIT","schemaName":"ODBVUE","sxml":""}
