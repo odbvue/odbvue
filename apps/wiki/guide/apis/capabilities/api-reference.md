@@ -1,5 +1,27 @@
 # API Reference
 
+## Audit
+
+Audit Package
+
+::: details example
+<<< ../../../../../db/src/database/odbvue/tests/pck_api_audit.sql
+:::
+
+::: details specification
+<<< ../../../../../db/src/database/odbvue/package_specs/pck_api_audit.sql
+:::
+
+::: details implementation
+<<< ../../../../../db/src/database/odbvue/package_bodies/pck_api_audit.sql
+:::
+
+Dependencies:
+
+| Referenced type | Referenced name |
+| --------------- | --------------- |
+|TABLE|APP_AUDIT|
+
 ## Large Object Binaries
 
 Package for LOB processing. Credit: https://github.com/paulzip-dev/Base64
