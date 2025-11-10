@@ -34,7 +34,6 @@ jobs:
 
           # Generate artifact using Liquibase project in current directory
           sql /nolog << ENDSQL
-          project set-location .
           project gen-artifact -name $NAME -version $VERSION -format zip
           exit
           ENDSQL
