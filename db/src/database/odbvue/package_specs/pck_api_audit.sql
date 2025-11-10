@@ -1,6 +1,5 @@
 CREATE OR REPLACE PACKAGE odbvue.pck_api_audit AS
-    SUBTYPE t_trace_id IS app_audit_traces.id%TYPE;
-    SUBTYPE t_span_id IS app_audit_spans.id%TYPE;
+
     FUNCTION timestamp_ns RETURN NUMBER;
 
     FUNCTION attributes (
@@ -44,7 +43,7 @@ CREATE OR REPLACE PACKAGE odbvue.pck_api_audit AS
         p_message    IN app_audit_logs.message%TYPE,
         p_attributes IN app_audit_logs.attributes%TYPE DEFAULT NULL
     );
-    --
+
     PROCEDURE debug (
         p_message    IN app_audit_logs.message%TYPE,
         p_attributes IN app_audit_logs.attributes%TYPE DEFAULT NULL
@@ -70,14 +69,22 @@ CREATE OR REPLACE PACKAGE odbvue.pck_api_audit AS
         p_attributes IN app_audit_logs.attributes%TYPE DEFAULT NULL
     );
 
-    PROCEDURE to_otel_logs (
-        p_trace_id IN t_trace_id DEFAULT NULL,
-        r_otel     IN OUT NOCOPY CLOB
+    PROCEDURE otel_logs(
+        p_trace_id IN app_audit_traces.id%TYPE,
+        p_period_from IN TIMESTAMP,
+        p_period_to IN TIMESTAMP,
+        p_limit PLS_INTEGER DEFAULT 1000,
+        p_offset PLS_INTEGER DEFAULT 0,
+        r_otel OUT SYS_REFCURSOR
     );
 
-    PROCEDURE to_otel_traces (
-        p_trace_id IN t_trace_id DEFAULT NULL,
-        r_otel     IN OUT NOCOPY CLOB
+    PROCEDURE otel_spans(
+        p_trace_id IN app_audit_traces.id%TYPE,
+        p_period_from IN TIMESTAMP,
+        p_period_to IN TIMESTAMP,
+        p_limit PLS_INTEGER DEFAULT 1000,
+        p_offset PLS_INTEGER DEFAULT 0,
+        r_otel OUT SYS_REFCURSOR
     );
 
 END pck_api_audit;

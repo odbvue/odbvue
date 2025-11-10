@@ -47,12 +47,12 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_audit AS
     END attributes;
 
     PROCEDURE begin_trace (
-        p_name       app_audit_spans.name%TYPE DEFAULT 'root_span',
+        p_name IN app_audit_spans.name%TYPE DEFAULT 'root_span',
         p_attributes IN app_audit_spans.attributes%TYPE DEFAULT NULL
     ) AS
 
-        v_trace_id t_trace_id := lower(dbms_crypto.randombytes(16));
-        v_span_id  t_span_id := lower(dbms_crypto.randombytes(8));
+        v_trace_id app_audit_traces.id%TYPE := lower(dbms_crypto.randombytes(16));
+        v_span_id  app_audit_spans.id%TYPE := lower(dbms_crypto.randombytes(8));
         PRAGMA autonomous_transaction;
     BEGIN
         INSERT INTO app_audit_traces (
@@ -63,7 +63,8 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_audit AS
         ) VALUES ( v_trace_id,
                    systimestamp,
                    coalesce(g_service_name, 'unknown_service'),
-                   coalesce(g_service_version, 'unknown_version') );
+                   coalesce(g_service_version, 'unknown_version')
+               );
 
         INSERT INTO app_audit_spans (
             id,
@@ -86,7 +87,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_audit AS
         p_status IN app_audit_traces.status%TYPE
     ) AS
         PRAGMA autonomous_transaction;
-        v_trace_id t_trace_id := sys_context('OTEL_CTX', 'TRACE_ID');
+        v_trace_id app_audit_traces.id%TYPE := sys_context('OTEL_CTX', 'TRACE_ID');
     BEGIN
         UPDATE app_audit_traces
         SET
@@ -111,9 +112,9 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_audit AS
         p_attributes IN app_audit_spans.attributes%TYPE DEFAULT NULL
     ) AS
 
-        v_span_id        t_span_id := lower(dbms_crypto.randombytes(8));
-        v_trace_id       t_trace_id := sys_context('OTEL_CTX', 'TRACE_ID');
-        v_parent_span_id t_span_id := sys_context('OTEL_CTX', 'SPAN_ID');
+        v_span_id        app_audit_spans.id%TYPE := lower(dbms_crypto.randombytes(8));
+        v_trace_id       app_audit_traces.id%TYPE := sys_context('OTEL_CTX', 'TRACE_ID');
+        v_parent_span_id app_audit_spans.id%TYPE := sys_context('OTEL_CTX', 'SPAN_ID');
     BEGIN
         INSERT INTO app_audit_spans (
             id,
@@ -121,29 +122,37 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_audit AS
             parent_span_id,
             name,
             attributes,
-            start_time_ns
+            start_time_ns,
+            scope_name,
+            scope_version
         ) VALUES ( v_span_id,
                    v_trace_id,
                    v_parent_span_id,
                    p_name,
                    p_attributes,
-                   timestamp_ns() );
+                   timestamp_ns(),
+                   p_name,
+                   g_service_version
+                 );
 
         dbms_session.set_context('OTEL_CTX', 'SPAN_ID', v_span_id);
         COMMIT;
     END start_span;
 
     PROCEDURE end_span AS
-        v_span_id        t_span_id := sys_context('OTEL_CTX', 'SPAN_ID');
+        v_span_id        app_audit_spans.id%TYPE := sys_context('OTEL_CTX', 'SPAN_ID');
         PRAGMA autonomous_transaction;
-        v_parent_span_id t_span_id;
+        v_parent_span_id app_audit_spans.id%TYPE;
     BEGIN
+        SELECT parent_span_id INTO v_parent_span_id
+        FROM app_audit_spans
+        WHERE id = v_span_id;
+
         UPDATE app_audit_spans
         SET
             end_time_ns = timestamp_ns()
         WHERE
-            id = v_span_id
-        RETURNING parent_span_id INTO v_parent_span_id;
+            id = v_span_id;
 
         dbms_session.set_context('OTEL_CTX', 'SPAN_ID', v_parent_span_id);
         COMMIT;
@@ -153,7 +162,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_audit AS
         p_name       IN app_audit_events.name%TYPE,
         p_attributes IN app_audit_events.attributes%TYPE DEFAULT NULL
     ) AS
-        v_span_id t_span_id := sys_context('OTEL_CTX', 'SPAN_ID');
+        v_span_id app_audit_spans.id%TYPE := sys_context('OTEL_CTX', 'SPAN_ID');
         PRAGMA autonomous_transaction;
     BEGIN
         INSERT INTO app_audit_events (
@@ -174,7 +183,9 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_audit AS
         p_message    IN app_audit_logs.message%TYPE,
         p_attributes IN app_audit_logs.attributes%TYPE DEFAULT NULL
     ) AS
-        v_trace_id t_trace_id := sys_context('OTEL_CTX', 'TRACE_ID');
+        v_trace_id app_audit_traces.id%TYPE := sys_context('OTEL_CTX', 'TRACE_ID');
+        v_span_id app_audit_spans.id%TYPE := sys_context('OTEL_CTX', 'SPAN_ID');
+        v_scope_name app_audit_logs.scope_name%TYPE := UTL_CALL_STACK.SUBPROGRAM (1)(1);
         PRAGMA autonomous_transaction;
     BEGIN
         INSERT INTO app_audit_logs (
@@ -182,11 +193,13 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_audit AS
             span_id,
             severity_number,
             severity_text,
+            scope_name,
+            scope_version,
             message,
             attributes,
-            created_at
-        ) VALUES ( v_trace_id,
-                   NULL,
+            created_at,
+            time_ns        ) VALUES ( v_trace_id,
+                   v_span_id,
                    CASE upper(p_severity)
                        WHEN 'TRACE' THEN
                            1
@@ -204,13 +217,17 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_audit AS
                            9
                    END,
                    upper(p_severity),
-                   p_message,
-                   p_attributes,
-                   systimestamp );
+                    COALESCE(v_scope_name, g_service_name, 'unknown_scope'),
+                    COALESCE(g_service_version, 'unknown_version'),
+                    p_message,
+                    p_attributes,
+                   systimestamp,
+                   timestamp_ns() 
+                );
 
         COMMIT;
     END record_log;
-    --
+
     PROCEDURE debug (
         p_message    IN app_audit_logs.message%TYPE,
         p_attributes IN app_audit_logs.attributes%TYPE DEFAULT NULL
@@ -267,57 +284,166 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_audit AS
         );
     END fatal;
 
-    PROCEDURE to_otel_logs (
-        p_trace_id IN t_trace_id DEFAULT NULL,
-        r_otel     IN OUT NOCOPY CLOB
+    PROCEDURE otel_logs(
+        p_trace_id IN app_audit_traces.id%TYPE,
+        p_period_from IN TIMESTAMP,
+        p_period_to IN TIMESTAMP,
+        p_limit PLS_INTEGER DEFAULT 1000,
+        p_offset PLS_INTEGER DEFAULT 0,
+        r_otel OUT SYS_REFCURSOR
     ) AS
-        v_logs_json json_array_t;
-        v_cursor    SYS_REFCURSOR;
     BEGIN
-
-      -- Build logs array from app_audit_logs
-        SELECT
-            JSON_SERIALIZE(JSON_ARRAYAGG(
+        OPEN r_otel FOR
+        WITH logs AS (
+            SELECT 
                 JSON_OBJECT(
-                    'timeUnixNano' VALUE to_char(TO_NUMBER(to_char(l.created_at, 'SSSSSSSSS')) * 1000000000),
-                            'observedTimeUnixNano' VALUE to_char(TO_NUMBER(to_char(l.created_at, 'SSSSSSSSS')) * 1000000000),
-                            'severityNumber' VALUE l.severity_number,
-                            'severityText' VALUE l.severity_text,
-                            'body' VALUE
-                        JSON_OBJECT(
-                            'stringValue' VALUE l.message
-                        ),
-                            'attributes' VALUE
-                        CASE
-                            WHEN l.attributes IS NOT NULL THEN
-                                JSON_ARRAY()
-                            ELSE
-                                JSON_ARRAY()
-                        END,
-                            'traceId' VALUE l.trace_id,
-                            'spanId' VALUE coalesce(l.span_id, ''),
-                            'flags' VALUE 1
+                'attributes' VALUE JSON_ARRAY(
+                    JSON_OBJECT('key' VALUE 'service.name', 'value' VALUE JSON_OBJECT('stringValue' VALUE t.service_name)),
+                    JSON_OBJECT('key' VALUE 'service.version', 'value' VALUE JSON_OBJECT('stringValue' VALUE t.service_version))
                 )
-            ORDER BY
-                l.created_at
-            )) pretty
-        INTO r_otel
-        FROM
-                 app_audit_logs l
-            JOIN app_audit_traces t ON l.trace_id = t.id
-        WHERE
-            ( p_trace_id IS NULL
-              OR l.trace_id = p_trace_id );
-      --AND ROWNUM = 1;
-    END to_otel_logs;
+                ) AS trace_resource,
+                JSON_OBJECT(
+                'name' VALUE l.scope_name,
+                'version' VALUE l.scope_version
+                ) AS log_scope,
+                JSON_OBJECT(
+                'timeUnixNano' VALUE TO_CHAR(l.time_ns),
+                'observedTimeUnixNano' VALUE TO_CHAR(l.time_ns),
+                'severityNumber' VALUE l.severity_number,
+                'severityText' VALUE l.severity_text,
+                'body' VALUE JSON_OBJECT('stringValue' VALUE l.message),
+                'attributes' VALUE CASE WHEN l.attributes IS NOT NULL THEN JSON_ARRAY() ELSE JSON_ARRAY() END,
+                'traceId' VALUE l.trace_id,
+                'spanId' VALUE COALESCE(l.span_id, ''),
+                'flags' VALUE 1
+                ) AS log_record
+            FROM app_audit_traces t
+            JOIN app_audit_logs l ON l.trace_id = t.id
+            WHERE (p_trace_id IS NULL OR t.id = p_trace_id)
+            AND (p_period_from IS NULL OR t.created_at >= p_period_from)
+            AND (p_period_to IS NULL OR t.created_at <= p_period_to)
+            ORDER BY t.created_at DESC
+            OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY
+        )
+        SELECT
+        JSON_SERIALIZE(
+            JSON_OBJECT(
+            'resourceLogs' VALUE JSON_ARRAYAGG(
+                JSON_OBJECT(
+                'resource' VALUE JSON_QUERY(trace_resource, '$'),
+                'scopeLogs' VALUE JSON_ARRAY(
+                    JSON_OBJECT(
+                    'scope' VALUE JSON_QUERY(log_scope, '$'),
+                    'logRecords' VALUE JSON_ARRAYAGG(log_record)
+                    )
+                )
+                )
+            )
+            )
+        PRETTY
+        ) AS payload
+        FROM logs
+        GROUP BY trace_resource, log_scope;
 
-    PROCEDURE to_otel_traces (
-        p_trace_id IN t_trace_id DEFAULT NULL,
-        r_otel     IN OUT NOCOPY CLOB
+    END otel_logs;
+
+    PROCEDURE otel_spans(
+        p_trace_id IN app_audit_traces.id%TYPE,
+        p_period_from IN TIMESTAMP,
+        p_period_to IN TIMESTAMP,
+        p_limit PLS_INTEGER DEFAULT 1000,
+        p_offset PLS_INTEGER DEFAULT 0,
+        r_otel OUT SYS_REFCURSOR
     ) AS
     BEGIN
-        NULL; -- Implementation omitted for brevity
-    END to_otel_traces;
+        OPEN r_otel FOR
+        WITH spans AS (
+            SELECT 
+                JSON_OBJECT(
+                'attributes' VALUE JSON_ARRAY(
+                    JSON_OBJECT('key' VALUE 'service.name', 'value' VALUE JSON_OBJECT('stringValue' VALUE t.service_name)),
+                    JSON_OBJECT('key' VALUE 'service.version', 'value' VALUE JSON_OBJECT('stringValue' VALUE t.service_version))
+                )
+                ) AS trace_resource,
+                JSON_OBJECT(
+                'name' VALUE s.scope_name,
+                'version' VALUE s.scope_version
+                ) AS span_scope,
+                CASE WHEN s.parent_span_id IS NOT NULL THEN
+                JSON_OBJECT(
+                    'traceId' VALUE s.trace_id,
+                    'spanId' VALUE s.id,
+                    'parentSpanId' VALUE s.parent_span_id,
+                    'name' VALUE s.name,
+                    'kind' VALUE s.kind,
+                    'startTimeUnixNano' VALUE TO_CHAR(s.start_time_ns),
+                    'endTimeUnixNano' VALUE TO_CHAR(s.end_time_ns),
+                    'attributes' VALUE CASE WHEN s.attributes IS NOT NULL THEN JSON_ARRAY() ELSE JSON_ARRAY() END,
+                    'events' VALUE (
+                        SELECT JSON_ARRAYAGG(
+                            JSON_OBJECT(
+                                'timeUnixNano' VALUE TO_CHAR(e.time_ns),
+                                'name' VALUE e.name,
+                                'attributes' VALUE CASE WHEN e.attributes IS NOT NULL THEN JSON_ARRAY() ELSE JSON_ARRAY() END
+                            )
+                        )
+                        FROM app_audit_events e
+                        WHERE e.span_id = s.id
+                    ),
+                    'status' VALUE JSON_OBJECT('code' VALUE CASE s.status WHEN 'OK' THEN 'STATUS_CODE_OK' WHEN 'ERROR' THEN 'STATUS_CODE_ERROR' ELSE 'STATUS_CODE_UNSET' END)
+                )
+                ELSE 
+                JSON_OBJECT(
+                'traceId' VALUE s.trace_id,
+                'spanId' VALUE s.id,
+                'name' VALUE s.name,
+                'kind' VALUE s.kind,
+                'startTimeUnixNano' VALUE TO_CHAR(s.start_time_ns),
+                'endTimeUnixNano' VALUE TO_CHAR(s.end_time_ns),
+                'attributes' VALUE CASE WHEN s.attributes IS NOT NULL THEN JSON_ARRAY() ELSE JSON_ARRAY() END,
+                'events' VALUE (
+                    SELECT JSON_ARRAYAGG(
+                        JSON_OBJECT(
+                            'timeUnixNano' VALUE TO_CHAR(e.time_ns),
+                            'name' VALUE e.name,
+                            'attributes' VALUE CASE WHEN e.attributes IS NOT NULL THEN JSON_ARRAY() ELSE JSON_ARRAY() END
+                        )
+                    )
+                    FROM app_audit_events e
+                    WHERE e.span_id = s.id
+                ),
+                'status' VALUE JSON_OBJECT('code' VALUE CASE s.status WHEN 'OK' THEN 'STATUS_CODE_OK' WHEN 'ERROR' THEN 'STATUS_CODE_ERROR' ELSE 'STATUS_CODE_UNSET' END)
+                )
+                END AS span_record
+            FROM app_audit_traces t
+            JOIN app_audit_spans s ON s.trace_id = t.id
+            WHERE (p_trace_id IS NULL OR t.id = p_trace_id)
+            AND (p_period_from IS NULL OR t.created_at >= p_period_from)
+            AND (p_period_to IS NULL OR t.created_at <= p_period_to)
+            ORDER BY t.created_at DESC
+            OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY
+        ) 
+        SELECT
+        JSON_SERIALIZE(
+            JSON_OBJECT(
+            'resourceSpans' VALUE JSON_ARRAYAGG(
+                JSON_OBJECT(
+                'resource' VALUE JSON_QUERY(trace_resource, '$'),
+                'scopeSpans' VALUE JSON_ARRAY(
+                    JSON_OBJECT(
+                    'scope' VALUE JSON_QUERY(span_scope, '$'),
+                    'spans' VALUE JSON_ARRAYAGG(span_record)
+                    )
+                )
+                )
+            )
+            )
+        PRETTY
+        ) AS payload
+        FROM spans
+        GROUP BY trace_resource, span_scope;
+    END;    
+
 
 BEGIN
     BEGIN
