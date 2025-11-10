@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+  <changeSet id="APP_AUDIT_TABLES" author="dbtools">
+    <sqlFile path="../../../../../../src/database/odbvue/tables/app_audit.sql" relativeToChangelogFile="true" splitStatements="false"/>
+    <sqlFile path="../../../../../../src/database/odbvue/tables/app_audit_archive.sql" relativeToChangelogFile="true" splitStatements="false"/>
+  </changeSet>
+  <changeSet id="APP_AUDIT_INDEXES" author="dbtools">
+    <sqlFile path="../../../../../../src/database/odbvue/indexes/idx_app_audit_created.sql" relativeToChangelogFile="true" splitStatements="false"/>
+    <sqlFile path="../../../../../../src/database/odbvue/indexes/idx_app_audit_severity.sql" relativeToChangelogFile="true" splitStatements="false"/>
+    <sqlFile path="../../../../../../src/database/odbvue/indexes/idx_app_audit_uuid.sql" relativeToChangelogFile="true" splitStatements="false"/>
+    <sqlFile path="../../../../../../src/database/odbvue/indexes/idx_app_audit_module.sql" relativeToChangelogFile="true" splitStatements="false"/>
+  </changeSet>
+  <changeSet id="APP_AUDIT_COMMENTS" author="dbtools">
+    <sqlFile path="../../../../../../src/database/odbvue/comments/app_audit.sql" relativeToChangelogFile="true" splitStatements="false"/>
+    <sqlFile path="../../../../../../src/database/odbvue/comments/app_audit_archive.sql" relativeToChangelogFile="true" splitStatements="false"/>
+  </changeSet>
+  <changeSet id="PCK_API_AUDIT_SPEC" author="dbtools">
+    <sqlFile path="../../../../../../src/database/odbvue/package_specs/pck_api_audit.sql" relativeToChangelogFile="true" splitStatements="false"/>
+  </changeSet>
+  <changeSet id="PCK_API_AUDIT_BODY" author="dbtools">
+    <sqlFile path="../../../../../../src/database/odbvue/package_bodies/pck_api_audit.sql" relativeToChangelogFile="true" splitStatements="false"/>
+  </changeSet>
+</databaseChangeLog>
