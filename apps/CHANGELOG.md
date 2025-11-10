@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.102
+
+### Patch Changes
+
+- 1c18610: audit feature
+
 ## 0.0.100
 
 ### Patch Changes
