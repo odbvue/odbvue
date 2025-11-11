@@ -8,6 +8,14 @@ Audit Package
 <<< ../../../../../db/src/database/odbvue/tests/pck_api_audit.sql
 :::
 
+## Labels
+
+Package provides methods for managing labels
+
+::: details example
+<<< ../../../../../db/src/database/odbvue/tests/pck_api_labels.sql
+:::
+
 ## LOB
 
 Package for LOB processing. Credit: https://github.com/paulzip-dev/Base64
