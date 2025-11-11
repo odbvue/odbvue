@@ -1,4 +1,4 @@
-CREATE OR REPLACE PACKAGE odbvue.pck_api_labels AS -- Package provides methods for managing labels
+CREATE OR REPLACE PACKAGE odbvue.pck_api_app_labels AS -- Package provides methods for managing app_labels
 
     PROCEDURE link_label_nm ( -- Procedure links a label to an entity
         p_label_name   app_labels.name%TYPE, -- Name of the label
@@ -24,12 +24,8 @@ CREATE OR REPLACE PACKAGE odbvue.pck_api_labels AS -- Package provides methods f
         p_entity_id_vc app_label_links.entity_id_vc%TYPE DEFAULT NULL -- Variable character Id of the entity
     );
 
-    PROCEDURE purge_unused_labels ( -- Procedure removes labels that are not linked to any entity
-        p_batch_size IN PLS_INTEGER DEFAULT 1000 -- Number of labels to process in one batch
-    );
-
 END;
 /
 
 
--- sqlcl_snapshot {"hash":"f3a560ff901a2e580b7e786a6e0ec116b9118661","type":"PACKAGE_SPEC","name":"PCK_API_LABELS","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"348d781a33011ec69961d39543a0a036d98eaa31","type":"PACKAGE_SPEC","name":"PCK_API_APP_LABELS","schemaName":"ODBVUE","sxml":""}

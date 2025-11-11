@@ -32,6 +32,6 @@ SELECT
     ll.entity_name, 
     COALESCE(ll.entity_id_vc, TO_CHAR(ll.entity_id_nm)) AS entity_id, 
     l.name AS label_name
-FROM label_links ll 
-JOIN labels l ON ll.label_id = l.id
+FROM app_label_links ll 
+JOIN app_labels l ON ll.label_id = l.id
 ORDER BY ll.entity_name, l.code;
