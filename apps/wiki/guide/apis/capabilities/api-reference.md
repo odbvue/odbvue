@@ -32,6 +32,14 @@ Package for HTTP call processing
 <<< ../../../../../db/tests/pck_api_http.sql
 :::
 
+## Jobs
+
+Package for managing jobs
+
+::: details example
+<<< ../../../../../db/tests/pck_api_jobs.sql
+:::
+
 ## JSON
 
 Package for handling json 
