@@ -1,4 +1,4 @@
-CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_labels AS
+CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_app_labels AS
 
     FUNCTION normalize_name (
         p_name IN VARCHAR2
@@ -135,49 +135,8 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_labels AS
             NULL;
     END;
 
-    PROCEDURE purge_unused_labels (
-        p_batch_size IN PLS_INTEGER DEFAULT 1000
-    ) AS
-        v_deleted       PLS_INTEGER := 0;
-        v_deleted_total PLS_INTEGER := 0;
-    BEGIN
-        LOOP
-            DELETE FROM app_labels l
-            WHERE
-                ROWID IN (
-                    SELECT
-                        rid
-                    FROM
-                        (
-                            SELECT
-                                l2.rowid rid
-                            FROM
-                                app_labels l2
-                            WHERE
-                                NOT EXISTS (
-                                    SELECT
-                                        1
-                                    FROM
-                                        app_label_links ll
-                                    WHERE
-                                        ll.label_id = l2.id
-                                )
-                            ORDER BY
-                                l2.id
-                        )
-                    WHERE
-                        ROWNUM <= nvl(p_batch_size, 2147483647)
-                );
-
-            v_deleted := SQL%rowcount;
-            v_deleted_total := v_deleted_total + v_deleted;
-            EXIT WHEN v_deleted = 0;
-            dbms_output.put_line('Purged unused labels: ' || v_deleted_total);
-        END LOOP;
-    END;
-
 END;
 /
 
 
--- sqlcl_snapshot {"hash":"4faf3bb30594a5a2fd2ca78f02d17e608931dc9e","type":"PACKAGE_BODY","name":"PCK_API_LABELS","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"8a184932e7227545f70f04da65b5cb352aafe435","type":"PACKAGE_BODY","name":"PCK_API_APP_LABELS","schemaName":"ODBVUE","sxml":""}
