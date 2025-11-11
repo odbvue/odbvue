@@ -3,7 +3,7 @@
 Package for handling xml 
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_xml.sql
+<<< ../../../../../db/tests/pck_api_xml.sql
 :::
 
 ::: details specification

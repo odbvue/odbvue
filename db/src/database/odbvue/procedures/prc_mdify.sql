@@ -160,7 +160,7 @@ BEGIN
         line(c.comments);
         line;
         line('::: details example');
-        line('<<< ../../../../../db/src/database/odbvue/tests/'
+        line('<<< ../../../../../db/tests/'
              || lower(c.package_name) || '.sql');
         line(':::');
         line;

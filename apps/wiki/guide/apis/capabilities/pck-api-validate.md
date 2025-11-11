@@ -3,7 +3,7 @@
 Package provides methods for validating values against rules
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_validate.sql
+<<< ../../../../../db/tests/pck_api_validate.sql
 :::
 
 ::: details specification

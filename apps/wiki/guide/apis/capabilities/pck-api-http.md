@@ -3,7 +3,7 @@
 Package for HTTP call processing
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_http.sql
+<<< ../../../../../db/tests/pck_api_http.sql
 :::
 
 ::: details specification
