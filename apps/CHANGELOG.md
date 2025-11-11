@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.116
+
+### Patch Changes
+
+- ec32ed7: labels package
+
 ## 0.0.113
 
 ### Patch Changes
