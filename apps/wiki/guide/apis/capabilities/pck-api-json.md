@@ -3,7 +3,7 @@
 Package for handling json 
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_json.sql
+<<< ../../../../../db/tests/pck_api_json.sql
 :::
 
 ::: details specification

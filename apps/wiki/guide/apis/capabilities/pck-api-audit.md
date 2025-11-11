@@ -3,7 +3,7 @@
 Audit Package
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_audit.sql
+<<< ../../../../../db/tests/pck_api_audit.sql
 :::
 
 ::: details specification

@@ -3,7 +3,7 @@
 Package for handling YAML
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_yaml.sql
+<<< ../../../../../db/tests/pck_api_yaml.sql
 :::
 
 ::: details specification

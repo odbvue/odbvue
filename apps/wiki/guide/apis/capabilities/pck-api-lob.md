@@ -3,7 +3,7 @@
 Package for LOB processing. Credit: https://github.com/paulzip-dev/Base64
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_lob.sql
+<<< ../../../../../db/tests/pck_api_lob.sql
 :::
 
 ::: details specification

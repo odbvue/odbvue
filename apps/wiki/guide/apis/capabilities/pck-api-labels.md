@@ -3,7 +3,7 @@
 Package provides methods for managing labels
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_labels.sql
+<<< ../../../../../db/tests/pck_api_labels.sql
 :::
 
 ::: details specification

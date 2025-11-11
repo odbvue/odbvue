@@ -3,7 +3,7 @@
 Package for handling zip files, Credit: https://github.com/antonscheffer/as_zip
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_zip.sql
+<<< ../../../../../db/tests/pck_api_zip.sql
 :::
 
 ::: details specification

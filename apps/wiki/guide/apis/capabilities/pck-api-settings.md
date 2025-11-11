@@ -3,7 +3,7 @@
 Package provides methods for managing application settings 
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_settings.sql
+<<< ../../../../../db/tests/pck_api_settings.sql
 :::
 
 ::: details specification

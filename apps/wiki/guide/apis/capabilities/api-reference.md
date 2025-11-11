@@ -5,7 +5,7 @@
 Audit Package
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_audit.sql
+<<< ../../../../../db/tests/pck_api_audit.sql
 :::
 
 ## Labels
@@ -13,7 +13,7 @@ Audit Package
 Package provides methods for managing labels
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_labels.sql
+<<< ../../../../../db/tests/pck_api_labels.sql
 :::
 
 ## LOB
@@ -21,7 +21,7 @@ Package provides methods for managing labels
 Package for LOB processing. Credit: https://github.com/paulzip-dev/Base64
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_lob.sql
+<<< ../../../../../db/tests/pck_api_lob.sql
 :::
 
 ## HTTP
@@ -29,7 +29,7 @@ Package for LOB processing. Credit: https://github.com/paulzip-dev/Base64
 Package for HTTP call processing
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_http.sql
+<<< ../../../../../db/tests/pck_api_http.sql
 :::
 
 ## JSON
@@ -37,7 +37,7 @@ Package for HTTP call processing
 Package for handling json 
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_json.sql
+<<< ../../../../../db/tests/pck_api_json.sql
 :::
 
 ## Settings
@@ -45,7 +45,7 @@ Package for handling json
 Package provides methods for managing application settings 
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_settings.sql
+<<< ../../../../../db/tests/pck_api_settings.sql
 :::
 
 ## XML
@@ -53,7 +53,7 @@ Package provides methods for managing application settings
 Package for handling xml 
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_xml.sql
+<<< ../../../../../db/tests/pck_api_xml.sql
 :::
 
 ## Validate
@@ -61,7 +61,7 @@ Package for handling xml
 Package provides methods for validating values against rules
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_validate.sql
+<<< ../../../../../db/tests/pck_api_validate.sql
 :::
 
 ## YAML
@@ -69,7 +69,7 @@ Package provides methods for validating values against rules
 Package for handling YAML
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_yaml.sql
+<<< ../../../../../db/tests/pck_api_yaml.sql
 :::
 
 ## ZIP
@@ -77,5 +77,5 @@ Package for handling YAML
 Package for handling zip files, Credit: https://github.com/antonscheffer/as_zip
 
 ::: details example
-<<< ../../../../../db/src/database/odbvue/tests/pck_api_zip.sql
+<<< ../../../../../db/tests/pck_api_zip.sql
 :::
