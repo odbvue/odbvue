@@ -25,11 +25,18 @@ fi
 
 cd db
 
-sql /nolog << EOF
+output=$(sql /nolog << EOF
 connect $CONNECTION
 project stage
 exit
 EOF
+)
+
+if echo "$output" | grep -q "Stage process failed"; then
+    echo "Error: SQL project stage failed." >&2
+    echo "$output" >&2
+    exit 1
+fi
 
 cd ..
 
