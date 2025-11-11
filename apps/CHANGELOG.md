@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.124
+
+### Patch Changes
+
+- 5c62b17: labels
+
 ## 0.0.121
 
 ### Patch Changes
