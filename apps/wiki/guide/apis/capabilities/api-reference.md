@@ -40,6 +40,14 @@ Package for handling json
 <<< ../../../../../db/src/database/odbvue/tests/pck_api_json.sql
 :::
 
+## Settings
+
+Package provides methods for managing application settings 
+
+::: details example
+<<< ../../../../../db/src/database/odbvue/tests/pck_api_settings.sql
+:::
+
 ## XML
 
 Package for handling xml 
