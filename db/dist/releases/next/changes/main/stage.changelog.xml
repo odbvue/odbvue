@@ -23,8 +23,9 @@
     <include file="../../comments/app_label_links.sql" relativeToChangelogFile="true"/>
 
     <!-- PACKAGE SPECIFICATIONS -->
-    <include file="../../package_specs/pck_api_app_labels.sql" relativeToChangelogFile="true"/>
+    <include file="../../package_specs/pck_api_labels.sql" relativeToChangelogFile="true"/>
 
     <!-- PACKAGE BODIES -->
-    <include file="../../package_bodies/pck_api_app_labels.sql" relativeToChangelogFile="true"/>
+    <include file="../../package_bodies/pck_api_labels.sql" relativeToChangelogFile="true"/>
+
 </databaseChangeLog>
