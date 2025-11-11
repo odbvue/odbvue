@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.129
+
+### Patch Changes
+
+- 8ecfe54: reorg db tests
+
 ## 0.0.127
 
 ### Patch Changes
