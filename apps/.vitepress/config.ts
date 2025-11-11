@@ -45,11 +45,12 @@ export default defineConfig({
               items: [
                 { text: 'API Reference', link: '/guide/apis/capabilities/api-reference' },
                 { text: 'Audit', link: '/guide/apis/capabilities/pck-api-audit' },
+                { text: 'Labels', link: '/guide/apis/capabilities/pck-api-labels' },
                 { text: 'LOB', link: '/guide/apis/capabilities/pck-api-lob' },
                 { text: 'HTTP', link: '/guide/apis/capabilities/pck-api-http' },
                 { text: 'JSON', link: '/guide/apis/capabilities/pck-api-json' },
-                { text: 'XML', link: '/guide/apis/capabilities/pck-api-xml' },
                 { text: 'Validate', link: '/guide/apis/capabilities/pck-api-validate' },
+                { text: 'XML', link: '/guide/apis/capabilities/pck-api-xml' },
                 { text: 'YAML', link: '/guide/apis/capabilities/pck-api-yaml' },
                 { text: 'ZIP', link: '/guide/apis/capabilities/pck-api-zip' },
               ],
