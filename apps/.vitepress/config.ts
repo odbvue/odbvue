@@ -49,6 +49,7 @@ export default defineConfig({
                 { text: 'LOB', link: '/guide/apis/capabilities/pck-api-lob' },
                 { text: 'HTTP', link: '/guide/apis/capabilities/pck-api-http' },
                 { text: 'JSON', link: '/guide/apis/capabilities/pck-api-json' },
+                { text: 'Settings', link: '/guide/apis/capabilities/pck-api-settings' },
                 { text: 'Validate', link: '/guide/apis/capabilities/pck-api-validate' },
                 { text: 'XML', link: '/guide/apis/capabilities/pck-api-xml' },
                 { text: 'YAML', link: '/guide/apis/capabilities/pck-api-yaml' },
