@@ -39,7 +39,13 @@ project stage
 exit
 "@
 
-$sqlScript | sql /nolog
+$output = $sqlScript | sql /nolog
+
+if ($output -match "Stage process failed") {
+    Write-Host "Error: SQL project stage failed." -ForegroundColor Red
+    Write-Host $output
+    exit 1
+}
 
 Pop-Location
 
