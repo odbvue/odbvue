@@ -8,3 +8,5 @@ var/*
 **/.DS_Store
 
 .env
+
+mdify.sql
