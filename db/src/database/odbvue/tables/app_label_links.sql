@@ -1,0 +1,41 @@
+CREATE TABLE odbvue.app_label_links (
+    label_id     NUMBER NOT NULL ENABLE,
+    entity_name  VARCHAR2(100 CHAR) NOT NULL ENABLE,
+    entity_id_nm NUMBER,
+    entity_id_vc VARCHAR2(2000 CHAR)
+)
+    PARTITION BY HASH ( entity_name ) ( PARTITION sys_p3447,
+    PARTITION sys_p3448,
+    PARTITION sys_p3449,
+    PARTITION sys_p3450,
+    PARTITION sys_p3451,
+    PARTITION sys_p3452,
+    PARTITION sys_p3453,
+    PARTITION sys_p3454,
+    PARTITION sys_p3455,
+    PARTITION sys_p3456,
+    PARTITION sys_p3457,
+    PARTITION sys_p3458,
+    PARTITION sys_p3459,
+    PARTITION sys_p3460,
+    PARTITION sys_p3461,
+    PARTITION sys_p3462 );
+
+ALTER TABLE odbvue.app_label_links
+    ADD CONSTRAINT chk_app_label_links
+        CHECK ( ( entity_id_nm IS NOT NULL
+                  AND entity_id_vc IS NULL )
+                OR ( entity_id_nm IS NULL
+                     AND entity_id_vc IS NOT NULL ) ) ENABLE;
+
+ALTER TABLE odbvue.app_label_links
+    ADD CONSTRAINT chk_app_label_links_entity_name
+        CHECK ( entity_name = upper(replace(entity_name, ' ', '_')) ) ENABLE;
+
+ALTER TABLE odbvue.app_label_links
+    ADD CONSTRAINT chk_app_label_links_nm
+        CHECK ( entity_id_nm IS NULL
+                OR entity_id_nm > 0 ) ENABLE;
+
+
+-- sqlcl_snapshot {"hash":"fd9b469062348039028e4ff6ae76812c0588de4d","type":"TABLE","name":"APP_LABEL_LINKS","schemaName":"ODBVUE","sxml":"\n  <TABLE xmlns=\"http://xmlns.oracle.com/ku\" version=\"1.0\">\n   <SCHEMA>ODBVUE</SCHEMA>\n   <NAME>APP_LABEL_LINKS</NAME>\n   <RELATIONAL_TABLE>\n      <COL_LIST>\n         <COL_LIST_ITEM>\n            <NAME>LABEL_ID</NAME>\n            <DATATYPE>NUMBER</DATATYPE>\n            <NOT_NULL></NOT_NULL>\n         </COL_LIST_ITEM>\n         <COL_LIST_ITEM>\n            <NAME>ENTITY_NAME</NAME>\n            <DATATYPE>VARCHAR2</DATATYPE>\n            <LENGTH>100</LENGTH>\n            <CHAR_SEMANTICS></CHAR_SEMANTICS>\n            <COLLATE_NAME>USING_NLS_COMP</COLLATE_NAME>\n            <NOT_NULL></NOT_NULL>\n         </COL_LIST_ITEM>\n         <COL_LIST_ITEM>\n            <NAME>ENTITY_ID_NM</NAME>\n            <DATATYPE>NUMBER</DATATYPE>\n         </COL_LIST_ITEM>\n         <COL_LIST_ITEM>\n            <NAME>ENTITY_ID_VC</NAME>\n            <DATATYPE>VARCHAR2</DATATYPE>\n            <LENGTH>2000</LENGTH>\n            <CHAR_SEMANTICS></CHAR_SEMANTICS>\n            <COLLATE_NAME>USING_NLS_COMP</COLLATE_NAME>\n         </COL_LIST_ITEM>\n      </COL_LIST>\n      <CHECK_CONSTRAINT_LIST>\n         <CHECK_CONSTRAINT_LIST_ITEM>\n            <NAME>CHK_APP_LABEL_LINKS_ENTITY_NAME</NAME>\n            <CONDITION>entity_name = UPPER(REPLACE(entity_name, ' ', '_'))</CONDITION>\n         </CHECK_CONSTRAINT_LIST_ITEM>\n         <CHECK_CONSTRAINT_LIST_ITEM>\n            <NAME>CHK_APP_LABEL_LINKS</NAME>\n            <CONDITION>\n        (entity_id_nm  IS NOT NULL AND entity_id_vc IS NULL    ) OR\n        (entity_id_nm  IS NULL     AND entity_id_vc IS NOT NULL)\n        </CONDITION>\n         </CHECK_CONSTRAINT_LIST_ITEM>\n         <CHECK_CONSTRAINT_LIST_ITEM>\n            <NAME>CHK_APP_LABEL_LINKS_NM</NAME>\n            <CONDITION>entity_id_nm IS NULL OR entity_id_nm > 0</CONDITION>\n         </CHECK_CONSTRAINT_LIST_ITEM>\n      </CHECK_CONSTRAINT_LIST>\n      <DEFAULT_COLLATION>USING_NLS_COMP</DEFAULT_COLLATION>\n      <TABLE_PROPERTIES>\n         <HASH_PARTITIONING>\n            <COL_LIST>\n               <COL_LIST_ITEM>\n                  <NAME>ENTITY_NAME</NAME>\n               </COL_LIST_ITEM>\n            </COL_LIST>\n            <DEFAULT_PHYSICAL_PROPERTIES>\n               <HEAP_TABLE></HEAP_TABLE>\n            </DEFAULT_PHYSICAL_PROPERTIES>\n            <PARTITION_LIST>\n               <PARTITION_LIST_ITEM>\n                  <NAME>SYS_P3447</NAME>\n                  <SEGMENT_ATTRIBUTES>\n                     <SEGMENT_CREATION_DEFERRED></SEGMENT_CREATION_DEFERRED>\n                  </SEGMENT_ATTRIBUTES>\n               </PARTITION_LIST_ITEM>\n               <PARTITION_LIST_ITEM>\n                  <NAME>SYS_P3448</NAME>\n                  <SEGMENT_ATTRIBUTES>\n                     <SEGMENT_CREATION_DEFERRED></SEGMENT_CREATION_DEFERRED>\n                  </SEGMENT_ATTRIBUTES>\n               </PARTITION_LIST_ITEM>\n               <PARTITION_LIST_ITEM>\n                  <NAME>SYS_P3449</NAME>\n                  <SEGMENT_ATTRIBUTES>\n                     <SEGMENT_CREATION_DEFERRED></SEGMENT_CREATION_DEFERRED>\n                  </SEGMENT_ATTRIBUTES>\n               </PARTITION_LIST_ITEM>\n               <PARTITION_LIST_ITEM>\n                  <NAME>SYS_P3450</NAME>\n                  <SEGMENT_ATTRIBUTES>\n                     <SEGMENT_CREATION_IMMEDIATE></SEGMENT_CREATION_IMMEDIATE>\n                  </SEGMENT_ATTRIBUTES>\n               </PARTITION_LIST_ITEM>\n               <PARTITION_LIST_ITEM>\n                  <NAME>SYS_P3451</NAME>\n                  <SEGMENT_ATTRIBUTES>\n                     <SEGMENT_CREATION_IMMEDIATE></SEGMENT_CREATION_IMMEDIATE>\n                  </SEGMENT_ATTRIBUTES>\n               </PARTITION_LIST_ITEM>\n               <PARTITION_LIST_ITEM>\n                  <NAME>SYS_P3452</NAME>\n                  <SEGMENT_ATTRIBUTES>\n                     <SEGMENT_CREATION_DEFERRED></SEGMENT_CREATION_DEFERRED>\n                  </SEGMENT_ATTRIBUTES>\n               </PARTITION_LIST_ITEM>\n               <PARTITION_LIST_ITEM>\n                  <NAME>SYS_P3453</NAME>\n                  <SEGMENT_ATTRIBUTES>\n                     <SEGMENT_CREATION_DEFERRED></SEGMENT_CREATION_DEFERRED>\n                  </SEGMENT_ATTRIBUTES>\n               </PARTITION_LIST_ITEM>\n               <PARTITION_LIST_ITEM>\n                  <NAME>SYS_P3454</NAME>\n                  <SEGMENT_ATTRIBUTES>\n                     <SEGMENT_CREATION_DEFERRED></SEGMENT_CREATION_DEFERRED>\n                  </SEGMENT_ATTRIBUTES>\n               </PARTITION_LIST_ITEM>\n               <PARTITION_LIST_ITEM>\n                  <NAME>SYS_P3455</NAME>\n                  <SEGMENT_ATTRIBUTES>\n                     <SEGMENT_CREATION_DEFERRED></SEGMENT_CREATION_DEFERRED>\n                  </SEGMENT_ATTRIBUTES>\n               </PARTITION_LIST_ITEM>\n               <PARTITION_LIST_ITEM>\n                  <NAME>SYS_P3456</NAME>\n                  <SEGMENT_ATTRIBUTES>\n                     <SEGMENT_CREATION_DEFERRED></SEGMENT_CREATION_DEFERRED>\n                  </SEGMENT_ATTRIBUTES>\n               </PARTITION_LIST_ITEM>\n               <PARTITION_LIST_ITEM>\n                  <NAME>SYS_P3457</NAME>\n                  <SEGMENT_ATTRIBUTES>\n                     <SEGMENT_CREATION_DEFERRED></SEGMENT_CREATION_DEFERRED>\n                  </SEGMENT_ATTRIBUTES>\n               </PARTITION_LIST_ITEM>\n               <PARTITION_LIST_ITEM>\n                  <NAME>SYS_P3458</NAME>\n                  <SEGMENT_ATTRIBUTES>\n                     <SEGMENT_CREATION_DEFERRED></SEGMENT_CREATION_DEFERRED>\n                  </SEGMENT_ATTRIBUTES>\n               </PARTITION_LIST_ITEM>\n               <PARTITION_LIST_ITEM>\n                  <NAME>SYS_P3459</NAME>\n                  <SEGMENT_ATTRIBUTES>\n                     <SEGMENT_CREATION_DEFERRED></SEGMENT_CREATION_DEFERRED>\n                  </SEGMENT_ATTRIBUTES>\n               </PARTITION_LIST_ITEM>\n               <PARTITION_LIST_ITEM>\n                  <NAME>SYS_P3460</NAME>\n                  <SEGMENT_ATTRIBUTES>\n                     <SEGMENT_CREATION_DEFERRED></SEGMENT_CREATION_DEFERRED>\n                  </SEGMENT_ATTRIBUTES>\n               </PARTITION_LIST_ITEM>\n               <PARTITION_LIST_ITEM>\n                  <NAME>SYS_P3461</NAME>\n                  <SEGMENT_ATTRIBUTES>\n                     <SEGMENT_CREATION_DEFERRED></SEGMENT_CREATION_DEFERRED>\n                  </SEGMENT_ATTRIBUTES>\n               </PARTITION_LIST_ITEM>\n               <PARTITION_LIST_ITEM>\n                  <NAME>SYS_P3462</NAME>\n                  <SEGMENT_ATTRIBUTES>\n                     <SEGMENT_CREATION_DEFERRED></SEGMENT_CREATION_DEFERRED>\n                  </SEGMENT_ATTRIBUTES>\n               </PARTITION_LIST_ITEM>\n            </PARTITION_LIST>\n         </HASH_PARTITIONING>\n      </TABLE_PROPERTIES>\n   </RELATIONAL_TABLE>\n</TABLE>"}
