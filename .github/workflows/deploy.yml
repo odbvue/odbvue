@@ -208,6 +208,8 @@ jobs:
           mkdir -p ~/.ssh
           printf %s "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+          # Remove any existing host keys for this host before adding the new one
+          ssh-keygen -f ~/.ssh/known_hosts -R "${{ secrets.SSH_HOST }}" 2>/dev/null || true
           printf %s "${{ secrets.SSH_HOST_KEY }}" >> ~/.ssh/known_hosts
           # Create SSH config to handle host key changes gracefully
           cat > ~/.ssh/config << 'EOF'
