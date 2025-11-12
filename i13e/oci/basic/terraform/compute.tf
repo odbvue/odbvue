@@ -34,6 +34,9 @@ resource "oci_core_instance" "web" {
   source_details {
     source_type = "image"
     source_id   = data.oci_core_images.ol9.images[0].id
+    # Minimum boot volume size is 50GB; set explicitly to avoid provider attempts
+    # to retain a smaller inherited size (e.g., 47GB) on shape changes.
+    boot_volume_size_in_gbs = 50
   }
 
   create_vnic_details {
