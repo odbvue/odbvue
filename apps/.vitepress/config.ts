@@ -50,6 +50,7 @@ export default defineConfig({
                 { text: 'HTTP', link: '/guide/apis/capabilities/pck-api-http' },
                 { text: 'Jobs', link: '/guide/apis/capabilities/pck-api-jobs' },
                 { text: 'JSON', link: '/guide/apis/capabilities/pck-api-json' },
+                { text: 'PDF', link: '/guide/apis/capabilities/pck-api-pdf' },
                 { text: 'Settings', link: '/guide/apis/capabilities/pck-api-settings' },
                 { text: 'Validate', link: '/guide/apis/capabilities/pck-api-validate' },
                 { text: 'XML', link: '/guide/apis/capabilities/pck-api-xml' },
