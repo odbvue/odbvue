@@ -23,3 +23,6 @@ Recommended VS Code extensions:
 3. [Pod manager](https://marketplace.visualstudio.com/items?itemName=dreamcatcher45.podmanager) - container manager.
 
 4. [GitHub Copilot](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) - an AI assistant.
+
+> [TIP!]
+> [AI model comparison](https://docs.github.com/en/copilot/reference/ai-models/model-comparison)
