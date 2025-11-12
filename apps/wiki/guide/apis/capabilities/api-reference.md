@@ -48,6 +48,14 @@ Package for handling json
 <<< ../../../../../db/tests/pck_api_json.sql
 :::
 
+## Pdf
+
+Package for creating PDF documents, credits to https://github.com/antonscheffer/as_pdf
+
+::: details example
+<<< ../../../../../db/tests/pck_api_pdf.sql
+:::
+
 ## Settings
 
 Package provides methods for managing application settings 
