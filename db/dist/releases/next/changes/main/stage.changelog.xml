@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+<include file="_custom/.srcdatabaseodbvuetablesapp_settings.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
+<include file="_custom/.srcdatabaseodbvuecommentsapp_settings.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
+<include file="_custom/.srcdatabaseodbvueindexesapp_settings_name.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
+<include file="_custom/.srcdatabaseodbvuepackage_specspck_api_settings.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
+<include file="_custom/.srcdatabaseodbvuepackage_bodiespck_api_settings.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
+</databaseChangeLog>
