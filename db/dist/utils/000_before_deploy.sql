@@ -26,6 +26,8 @@ BEGIN
         DBMS_OUTPUT.PUT_LINE('  - schema already exists.');
     END IF;
 
+    -- GRANTS
+
     FOR grants IN (
         SELECT 'CREATE SESSION' AS privilege FROM dual UNION ALL
         SELECT 'CREATE TABLE' FROM dual UNION ALL
@@ -54,6 +56,21 @@ BEGIN
         END;
     END LOOP;
     DBMS_OUTPUT.PUT_LINE('  - privileges granted.');
+
+    -- RESOURCE PRINCIPAL
+
+    BEGIN
+        DBMS_OUTPUT.PUT_LINE('- enabling resource principal');
+        DBMS_CLOUD_ADMIN.ENABLE_RESOURCE_PRINCIPAL(p_schema_name);
+        DBMS_OUTPUT.PUT_LINE('  - resource principal enabled');
+    EXCEPTION 
+        WHEN OTHERS THEN 
+            IF SQLCODE = -44002 THEN
+                DBMS_OUTPUT.PUT_LINE('  - resource principal already enabled');
+            ELSE
+                DBMS_OUTPUT.PUT_LINE('  - resource principal not enabled');
+            END IF;  
+    END;
 
     -- EBR
 
