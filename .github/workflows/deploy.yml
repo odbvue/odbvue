@@ -209,6 +209,15 @@ jobs:
           printf %s "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           printf %s "${{ secrets.SSH_HOST_KEY }}" >> ~/.ssh/known_hosts
+          # Create SSH config to handle host key changes gracefully
+          cat > ~/.ssh/config << 'EOF'
+          Host ${{ secrets.SSH_HOST }}
+            StrictHostKeyChecking=accept-new
+            UserKnownHostsFile ~/.ssh/known_hosts
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+          EOF
+          chmod 600 ~/.ssh/config
       - name: Extract bundle
         run: |
           set -euo pipefail
