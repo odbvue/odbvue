@@ -48,6 +48,14 @@ Package for handling json
 <<< ../../../../../db/tests/pck_api_json.sql
 :::
 
+## Markdown
+
+Package for Markdown document generation and export to PDF and HTML
+
+::: details example
+<<< ../../../../../db/tests/pck_api_md.sql
+:::
+
 ## Pdf
 
 Package for creating PDF documents, credits to https://github.com/antonscheffer/as_pdf
