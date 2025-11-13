@@ -54,6 +54,8 @@
 │  ┌─ Email Delivery (Optional) ──────────────────────────────────────────┐  │
 │  │  Service: Email Delivery                                             │  │
 │  │  SMTP Endpoint: email-smtp.{region}.oci.oraclecloud.com:587          │  │
+│  │  Email Domain: Optional domain with DKIM/SPF (var.email_domain)      │  │
+│  │  Approved Sender: Optional sender address (var.email_sender)         │  │
 │  └──────────────────────────────────────────────────────────────────────┘  │
 │                                                                            │
 │  ┌─ Object Storage ─────────────────────────────────────────────────────┐  │
@@ -179,7 +181,7 @@ Terraform files:
 - **compute.tf** - Oracle Linux 9 VM instance with NGINX, SSH configuration, and cloud-init setup
 - **public_ip.tf** - Reserves and attaches public IP to compute instance
 - **adb.tf** - Autonomous Database (Always Free), wallet generation and download
-- **email.tf** - Optional Email Delivery approved sender (if `var.email_sender` set)
+- **email.tf** - Optional Email Delivery: approved sender, email domain with DKIM/SPF (see `var.email_sender` and `var.email_domain`)
 - **objectstorage.tf** - Object Storage bucket with restricted access
 - **outputs.tf** - Exports instance IPs, ADB connection info, and storage hints
 - **terraform.tfvars** - Configuration file with sensitive values (not in version control)
