@@ -37,6 +37,12 @@ CREATE OR REPLACE PACKAGE odbvue.pck_api_http AS -- Package for HTTP call proces
         p_body_charset VARCHAR2 -- Charset
     );
 
+    PROCEDURE request_header ( -- Procedure adds custom header to the HTTP request
+        p_req   IN OUT utl_http.req, -- HTTP request
+        p_name  VARCHAR2, -- Header name
+        p_value VARCHAR2 -- Header value
+    );
+
     PROCEDURE request_json ( -- Procedure adds JSON payload to the HTTP request
         p_req  IN OUT utl_http.req, -- HTTP request
         p_json CLOB -- JSON data
@@ -79,4 +85,4 @@ END;
 /
 
 
--- sqlcl_snapshot {"hash":"f71c741c637a473f9932fccc9fa3ce17fbb6734a","type":"PACKAGE_SPEC","name":"PCK_API_HTTP","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"2973206e4cdfd0291f2daffe7637be80f844cce4","type":"PACKAGE_SPEC","name":"PCK_API_HTTP","schemaName":"ODBVUE","sxml":""}

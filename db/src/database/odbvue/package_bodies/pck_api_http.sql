@@ -247,6 +247,20 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_http AS
         END IF;
     END;
 
+    PROCEDURE request_header (
+        p_req   IN OUT utl_http.req,
+        p_name  VARCHAR2,
+        p_value VARCHAR2
+    ) AS
+    BEGIN
+        IF c_debug = 1 THEN
+            dbms_output.put_line(p_name
+                                 || ': ' || p_value);
+        END IF;
+
+        utl_http.set_header(p_req, p_name, p_value);
+    END;
+
     PROCEDURE request_json (
         p_req  IN OUT utl_http.req,
         p_json CLOB
@@ -477,4 +491,4 @@ END;
 /
 
 
--- sqlcl_snapshot {"hash":"c0ed4c0bf0ff96aca1fbf570b9d20a3b5bf18db9","type":"PACKAGE_BODY","name":"PCK_API_HTTP","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"28189b5ce7a304220f732ce794cbf08a92628533","type":"PACKAGE_BODY","name":"PCK_API_HTTP","schemaName":"ODBVUE","sxml":""}
