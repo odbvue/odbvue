@@ -52,6 +52,7 @@ export default defineConfig({
                 { text: 'Jobs', link: '/guide/apis/capabilities/pck-api-jobs' },
                 { text: 'JSON', link: '/guide/apis/capabilities/pck-api-json' },
                 { text: 'Markdown', link: '/guide/apis/capabilities/pck-api-md' },
+                { text: 'OpenAI', link: '/guide/apis/capabilities/pck-api-openai' },
                 { text: 'PDF', link: '/guide/apis/capabilities/pck-api-pdf' },
                 { text: 'Settings', link: '/guide/apis/capabilities/pck-api-settings' },
                 { text: 'Storage', link: '/guide/apis/capabilities/pck-api-storage' },
