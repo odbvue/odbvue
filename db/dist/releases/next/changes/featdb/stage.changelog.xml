@@ -3,6 +3,8 @@
                    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
-<!--CHANGES-->
-<include file="changes/featdb/stage.changelog.xml" relativeToChangelogFile="true"/>
+<include file="odbvue/package_specs/pck_api_http.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_specs/pck_api_openai.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_bodies/pck_api_http.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_bodies/pck_api_openai.sql" relativeToChangelogFile="true"/>
 </databaseChangeLog>
