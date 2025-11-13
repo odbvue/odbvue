@@ -66,6 +66,8 @@ This setup will create and manage changes for a separate Compartment with single
 │  ┌─ Email Delivery (Optional) ──────────────────────────────────────────┐  │
 │  │  Service: Email Delivery                                             │  │
 │  │  SMTP Endpoint: email-smtp.{region}.oci.oraclecloud.com:587          │  │
+│  │  Email Domain: Optional domain with DKIM/SPF (var.email_domain)      │  │
+│  │  Approved Sender: Optional sender address (var.email_sender)         │  │
 │  └──────────────────────────────────────────────────────────────────────┘  │
 │                                                                            │
 │  ┌─ Object Storage ─────────────────────────────────────────────────────┐  │
@@ -219,7 +221,13 @@ terraform init
 <<< ../../../../../i13e/oci/basic/terraform/adb.tf
 :::
 
-#### `@/email.tf` - Optional Email Delivery approved sender (if `var.email_sender` set)
+#### `@/identity.tf` - Dynamic Group and Policy to access Object Storage from Autonomous Database
+
+::: details source
+<<< ../../../../../i13e/oci/basic/terraform/identity.tf
+:::
+
+#### `@/email.tf` - Email Delivery domain and approved sender
 
 ::: details source
 <<< ../../../../../i13e/oci/basic/terraform/email.tf
@@ -269,6 +277,7 @@ Copy `terraform.tfvars.example` to `terraform.tfvars` and update with your value
 | `adb_cpu_count` | Number of OCPUs for ADB (1 for Always Free) | `1` |
 | `adb_storage_tb` | Storage in TB for ADB (1 for Always Free) | `1` |
 | `email_sender` | Email Delivery approved sender (optional, leave empty to skip) | `admin@odbvue.com` |
+| `email_domain` | Email domain for DKIM/SPF (optional, outputs DNS records to add manually) | `odbvue.com` |
 
 ### Step 4. Apply changes to infrastructure
 
@@ -367,3 +376,99 @@ chmod +x ./deploy.sh
 ::: details source
 <<< ../../../../../i13e/oci/basic/scripts/deploy.sh
 ::: 
+
+## Email sending setup
+
+### DNS Records
+
+Terraform will output records that need to be added to DNS manually. Example:
+
+1. DKIM CNAME Record (for email authentication):
+
+- Name:  odbvue-dkim-eu-stockholm-1._domainkey.odbvue.com.
+
+- Type:  CNAME
+
+- Value: odbvue-dkim-eu-stockholm-1.odbvue.com.dkim.arn1.oracleemaildelivery.com
+
+2. SPF TXT Record (for sender policy framework):
+
+- Name:  @ (or your domain root)
+
+- Type:  TXT
+
+- Value: v=spf1 include:eu-stockholm-1.rp.oracleemaildelivery.com ~all    
+
+> [!NOTE]
+> If you already have an SPF record, ADD this to it:
+> include:eu-stockholm-1.rp.oracleemaildelivery.com
+> (Don't create multiple SPF records - merge into existing one)       
+
+
+After adding these DNS records:
+
+- Wait 10-30 minutes for DNS propagation
+
+- The domain state will change from CREATING to ACTIVE
+
+- DKIM state will change to ACTIVE
+
+- SPF will be detected automatically (is_spf = true)
+
+- Run 'terraform refresh' to check status
+
+### Database 
+
+#### 1. Create SMTP credentials (username/password)
+
+Email Delivery uses special SMTP credentials.
+
+In OCI Console click on your **user avatar** → **User Settings** → **Saved Passwords**.
+
+Choose **SMTP Credentials**.
+
+Click **Generate SMTP Credentials** and give it a description (e.g. odbvue-smtp-credentials). 
+
+Copy:
+
+- Username (looks like ocid1.user.oc1..xxxxx@ocid1.tenancy...)
+
+- Password (random string)
+
+Create credentials - from **application** schema:
+
+```sql
+set define off;
+exec pck_api_admin.create_cred('odbvue', 'APP_EMAILS_SMTP_CRED','ocid1.user.oc1..aaaa..l.com', '**************');
+COMMIT;
+```
+
+##### 2. Set up configuration
+
+In OCI Console: **Menu** → **Developer Services** → **Email Delivery** → **Configuration**.
+
+Under SMTP Sending Information you’ll see:
+
+- Public hostname endpoint – something like `smtp.email.eu-stockholm-1.oci.oraclecloud.com`
+
+- Ports – `25` and `587`.
+
+Add configuration - from **application** schema:
+
+```sql
+BEGIN
+    pck_api_settings.write('APP_EMAILS_SMTP_HOST', 'SMTP Host', 'smtp.email.eu-stockholm-1.oci.oraclecloud.com');
+    pck_api_settings.write('APP_EMAILS_SMTP_PORT', 'SMTP Port', '587');
+    pck_api_settings.write('APP_EMAILS_SMTP_CRED', 'SMTP Credentials', 'APP_EMAILS_SMTP_CRED');
+    COMMIT;
+END;
+```
+
+#### 3. Open Access Control
+
+Open access control - from **ADMIN** schema:
+
+```sql
+exec pck_api_admin.acl_append_host('odbvue', 'smtp.email.eu-stockholm-1.oci.oraclecloud.com', 587, 587, 'smtp');
+COMMIT;
+```
