@@ -53,6 +53,7 @@ export default defineConfig({
                 { text: 'Markdown', link: '/guide/apis/capabilities/pck-api-md' },
                 { text: 'PDF', link: '/guide/apis/capabilities/pck-api-pdf' },
                 { text: 'Settings', link: '/guide/apis/capabilities/pck-api-settings' },
+                { text: 'Storage', link: '/guide/apis/capabilities/pck-api-storage' },
                 { text: 'Validate', link: '/guide/apis/capabilities/pck-api-validate' },
                 { text: 'XML', link: '/guide/apis/capabilities/pck-api-xml' },
                 { text: 'YAML', link: '/guide/apis/capabilities/pck-api-yaml' },
