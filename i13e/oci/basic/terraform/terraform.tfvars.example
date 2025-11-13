@@ -16,5 +16,6 @@ adb_admin_password = "MySecurePass123!"
 # ADB Wallet Password
 adb_wallet_password = "MySecurePass123!"
 
-# Email sender
+# Email Configuration
+email_domain = "odbvue.com"
 email_sender = "admin@odbvue.com"
