@@ -20,9 +20,19 @@ cd db
 sql /nolog <<EOF
 connect $CONNECTION
 project export
-!git add .
-!git commit -m "feat(db): $COMMIT_MESSAGE"
 exit
 EOF
+
+echo "Please check if DB objects are correctly exported"
+read -p "Confirm to commit changes? (y/Y to confirm): " confirmation
+
+if [[ "$confirmation" != "y" && "$confirmation" != "Y" ]]; then
+    echo "Export aborted."
+    cd ..
+    exit 1
+fi
+
+git add .
+git commit -m "feat(db): $COMMIT_MESSAGE"
 
 cd ..

@@ -21,11 +21,21 @@ Set-Location db
 $sqlScript = @"
 connect $Connection
 project export
-!git add .
-!git commit -m "feat(db): $CommitMessage"
 exit
 "@
 
 $sqlScript | sql /nolog
+
+Write-Host "Please check if DB objects are correctly exported" -ForegroundColor Yellow
+$confirmation = Read-Host "Confirm to commit changes? (y/Y to confirm)"
+
+if ($confirmation -ne "y" -and $confirmation -ne "Y") {
+    Write-Host "Export aborted." -ForegroundColor Red
+    Set-Location ..
+    exit 1
+}
+
+git add .
+git commit -m "feat(db): $CommitMessage"
 
 Set-Location ..
