@@ -72,6 +72,14 @@ Package provides methods for managing application settings
 <<< ../../../../../db/tests/pck_api_settings.sql
 :::
 
+## Storage
+
+Package for storing and processing large binary objects
+
+::: details example
+<<< ../../../../../db/tests/pck_api_storage.sql
+:::
+
 ## XML
 
 Package for handling xml 
