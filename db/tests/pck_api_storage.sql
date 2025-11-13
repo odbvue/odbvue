@@ -22,8 +22,8 @@ BEGIN
     dbms_output.put_line('  downloaded file actual size: ' || dbms_lob.getlength(b));
 
     -- s3
-    -- pck_api_settings.write('APP_STORAGE_S3_URI', 'https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<bucket/o/');
-    pck_api_settings.write('APP_STORAGE_S3_URI', 'https://objectstorage.eu-stockholm-1.oraclecloud.com/n/axuctz2iko0g/b/odbvue-obj/o/', 'Storage URI for S3 files');
+    -- pck_api_settings.write('APP_STORAGE_S3_URI', 'Storage URI for S3 files', 'https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<bucket/o/');
+    pck_api_settings.write('APP_STORAGE_S3_URI', 'Storage URI for S3 files', 'https://objectstorage.eu-stockholm-1.oraclecloud.com/n/axuctz2iko0g/b/odbvue-obj/o/');
     pck_api_storage.upload(b, n, id, TRUE);
     dbms_output.put_line('  uploaded file ID to S3: ' || id);
     COMMIT;
