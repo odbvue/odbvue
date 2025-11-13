@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.140
+
+### Patch Changes
+
+- f07ee8e: storage api
+
 ## 0.0.135
 
 ### Patch Changes
