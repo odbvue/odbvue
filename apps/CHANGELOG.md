@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.148
+
+### Patch Changes
+
+- 286f62b: openai api
+
 ## 0.0.143
 
 ### Patch Changes
