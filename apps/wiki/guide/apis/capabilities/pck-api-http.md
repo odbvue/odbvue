@@ -80,6 +80,16 @@ Procedure adds content type header to the HTTP request
 |P_REQ|IN/OUT|PL/SQL RECORD||HTTP request|
 |P_CONTENT_TYPE|IN|VARCHAR2||Content type|
 
+## REQUEST_HEADER
+
+Procedure adds custom header to the HTTP request
+
+| Argument name | In Out | Data type | Default value | Description |
+| ------------- | ------ | --------- | ------------- | ----------- |
+|P_REQ|IN/OUT|PL/SQL RECORD||HTTP request|
+|P_NAME|IN|VARCHAR2||Header name|
+|P_VALUE|IN|VARCHAR2||Header value|
+
 ## REQUEST_JSON
 
 Procedure adds JSON payload to the HTTP request

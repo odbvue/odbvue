@@ -64,6 +64,14 @@ Package for Markdown document generation and export to PDF and HTML
 <<< ../../../../../db/tests/pck_api_md.sql
 :::
 
+## Openai
+
+Package provides implementation of Open AI API 
+
+::: details example
+<<< ../../../../../db/tests/pck_api_openai.sql
+:::
+
 ## Pdf
 
 Package for creating PDF documents, credits to https://github.com/antonscheffer/as_pdf

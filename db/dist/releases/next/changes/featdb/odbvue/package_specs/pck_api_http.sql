@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1763061070096 stripComments:false  logicalFilePath:featdb\odbvue\package_specs\pck_api_http.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_specs/pck_api_http.sql:f71c741c637a473f9932fccc9fa3ce17fbb6734a:2973206e4cdfd0291f2daffe7637be80f844cce4:alter
+
 CREATE OR REPLACE PACKAGE odbvue.pck_api_http AS -- Package for HTTP call processing
 
     FUNCTION mime_type ( -- Function returns mime type from file extention, e.g. mp3->audio/mpeg
@@ -84,5 +88,3 @@ CREATE OR REPLACE PACKAGE odbvue.pck_api_http AS -- Package for HTTP call proces
 END;
 /
 
-
--- sqlcl_snapshot {"hash":"2973206e4cdfd0291f2daffe7637be80f844cce4","type":"PACKAGE_SPEC","name":"PCK_API_HTTP","schemaName":"ODBVUE","sxml":""}

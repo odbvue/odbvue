@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1763061070025 stripComments:false  logicalFilePath:featdb\odbvue\package_bodies\pck_api_http.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_bodies/pck_api_http.sql:c0ed4c0bf0ff96aca1fbf570b9d20a3b5bf18db9:28189b5ce7a304220f732ce794cbf08a92628533:alter
+
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_http AS
 
     SUBTYPE boolean IS PLS_INTEGER RANGE 0..1;
@@ -490,5 +494,3 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_http AS
 END;
 /
 
-
--- sqlcl_snapshot {"hash":"28189b5ce7a304220f732ce794cbf08a92628533","type":"PACKAGE_BODY","name":"PCK_API_HTTP","schemaName":"ODBVUE","sxml":""}
