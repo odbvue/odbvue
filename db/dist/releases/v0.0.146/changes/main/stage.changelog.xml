@@ -6,5 +6,4 @@
 <include file="_custom/admin_pck_api_spec.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
 <include file="_custom/admin_pck_api_body.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
 <include file="_custom/admin_pck_api_grant.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
-<include file="_custom/admin_pck_api_syno.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
 </databaseChangeLog>
