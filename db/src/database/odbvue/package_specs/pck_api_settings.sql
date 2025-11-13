@@ -11,7 +11,7 @@ CREATE OR REPLACE PACKAGE odbvue.pck_api_settings AS -- Package provides methods
         r_value OUT app_settings.value%TYPE -- Value of the setting (variable character)
     );
 
-    FUNCTION read (-- Function returns value of the setting with the specified id
+    FUNCTION read ( -- Function returns value of the setting with the specified id
         p_id app_settings.id%TYPE -- Id of the setting
     ) RETURN app_settings.value%TYPE; -- Value of the setting (variable character)
 
