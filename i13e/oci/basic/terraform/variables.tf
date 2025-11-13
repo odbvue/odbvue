@@ -58,6 +58,12 @@ variable "email_sender" {
   default = ""  # optional; set to enable sender creation
 }
 
+variable "email_domain" {
+  description = "Email domain for DKIM/SPF configuration (e.g., example.com)"
+  type        = string
+  default     = ""  # optional; set to enable email domain with DKIM
+}
+
 locals {
   # Compartment and Public IP
   compartment_name            = "odbvue-test"
