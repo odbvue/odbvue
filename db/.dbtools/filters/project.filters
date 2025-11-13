@@ -24,8 +24,13 @@ Reference list of export_types from internal.fixed.filters
         'USER'                 
 */    
 
--- Limit to ODBVUE schema only
-owner in ('ODBVUE', 'ADMIN'),
+-- Limit to ODBVUE schema only, or ADMIN for packages and grants to ODBVUE
+owner = 'ODBVUE' or 
+(owner = 'ADMIN' and (object_type = 'PACKAGE' or object_type = 'PACKAGE BODY' or 
+                      (export_type = 'OBJECT_GRANT' and grantee = 'ODBVUE'))),
+
+-- Never export c##cloud$service schema
+owner != 'C##CLOUD$SERVICE',
 
 -- Restrict ORDS exports to only ODBVUE schema
 not (export_type = 'ORDS_SCHEMA' and parsing_schema != 'ODBVUE'),
