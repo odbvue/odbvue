@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.143
+
+### Patch Changes
+
+- 3e0cbec: email sending
+
 ## 0.0.140
 
 ### Patch Changes
