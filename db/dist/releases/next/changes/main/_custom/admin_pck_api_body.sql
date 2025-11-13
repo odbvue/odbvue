@@ -1,3 +1,8 @@
+-- liquibase formatted sql
+-- changeset  SqlCl:1763039357900 stripComments:false logicalFilePath:main\_custom\admin_pck_api_body.sql
+-- sqlcl_snapshot dist\releases\next\changes\main\_custom\admin_pck_api_body.sql:null:null:custom
+
+
 create or replace package BODY pck_api_admin AS 
 
 procedure acl_append_host( 
