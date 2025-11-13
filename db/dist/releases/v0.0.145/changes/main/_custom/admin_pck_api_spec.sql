@@ -2,7 +2,7 @@
 -- changeset  SqlCl:1763039347901 stripComments:false logicalFilePath:main\_custom\admin_pck_api_spec.sql
 -- sqlcl_snapshot dist\releases\next\changes\main\_custom\admin_pck_api_spec.sql:null:null:custom
 
-create or replace package pck_api_admin AUTHID CURRENT_USER AS -- Provides technical management and operations capabilities
+create or replace package admin.pck_api_admin AUTHID CURRENT_USER AS -- Provides technical management and operations capabilities
 
 procedure acl_append_host( -- Appends record to Access Control List (ACL)
     p_schema VARCHAR2, -- schema name

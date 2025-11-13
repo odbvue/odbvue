@@ -3,7 +3,7 @@
 -- sqlcl_snapshot dist\releases\next\changes\main\_custom\admin_pck_api_body.sql:null:null:custom
 
 
-create or replace package BODY pck_api_admin AS 
+create or replace package BODY admin.pck_api_admin AS 
 
 procedure acl_append_host( 
     p_schema VARCHAR2,
