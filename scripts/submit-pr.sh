@@ -40,6 +40,17 @@ fi
 
 cd ..
 
+# Manual check before staging
+echo ""
+echo "Please check if staged database content is OK"
+echo ""
+read -p "Continue? (Y/y to proceed, anything else to exit): " confirm
+
+if [[ "$confirm" != "Y" && "$confirm" != "y" ]]; then
+    echo "Aborted by user." >&2
+    exit 1
+fi
+
 # Stage database changes first
 git add db/
 

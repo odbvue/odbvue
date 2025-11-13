@@ -49,6 +49,16 @@ if ($output -match "Stage process failed") {
 
 Pop-Location
 
+# Manual check before staging
+Write-Host "" -ForegroundColor Yellow
+Write-Host "Please check if staged database content is OK" -ForegroundColor Yellow
+Write-Host "" -ForegroundColor Yellow
+$confirm = Read-Host "Continue? (Y/y to proceed, anything else to exit)"
+if ($confirm -ne 'Y' -and $confirm -ne 'y') {
+    Write-Host "Aborted by user." -ForegroundColor Red
+    exit 1
+}
+
 # Stage database changes first
 git add db/
 
