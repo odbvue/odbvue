@@ -27,7 +27,7 @@ Reference list of export_types from internal.fixed.filters
 -- Limit to ODBVUE schema only, or ADMIN for packages and grants to ODBVUE
 owner = 'ODBVUE' or 
 (owner = 'ADMIN' and (object_type = 'PACKAGE' or object_type = 'PACKAGE BODY' or 
-                      (export_type = 'OBJECT_GRANT' and grantee = 'ODBVUE'))),
+                      (export_type = 'OBJECT_GRANT' and grantee = 'ODBVUE' and grantor = 'ADMIN'))),
 
 -- Never export c##cloud$service schema
 owner != 'C##CLOUD$SERVICE',
@@ -37,6 +37,9 @@ not (export_type = 'ORDS_SCHEMA' and parsing_schema != 'ODBVUE'),
 
 -- Avoid SYS/ADMIN folders created by privilege exports; keep only grants issued by ODBVUE
 not (export_type = 'OBJECT_GRANT' and grantor != 'ODBVUE'),
+
+-- Exclude grants from c##cloud$service
+not (export_type = 'OBJECT_GRANT' and grantor = 'C##CLOUD$SERVICE'),
 
 -- Liquibase Tables
 object_type != 'TABLE' or object_name not in ('DATABASECHANGELOG',
