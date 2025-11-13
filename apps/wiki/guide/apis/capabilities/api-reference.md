@@ -8,6 +8,14 @@ Audit Package
 <<< ../../../../../db/tests/pck_api_audit.sql
 :::
 
+## Emails
+
+Package for sending emails
+
+::: details example
+<<< ../../../../../db/tests/pck_api_emails.sql
+:::
+
 ## Labels
 
 Package provides methods for managing labels
