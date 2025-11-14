@@ -9,20 +9,12 @@ param(
 git checkout main
 git pull origin main
 
-# Read version from apps/package.json and increment last number
+# Read version from apps/package.json
+# (version is already bumped by GitHub Actions changeset workflow)
 $packageJsonPath = "apps/package.json"
 $packageJson = Get-Content $packageJsonPath -Raw | ConvertFrom-Json
-$currentVersion = $packageJson.version
-
-# Parse and increment version
-$versionParts = $currentVersion -split '\.'
-$versionParts[-1] = [int]$versionParts[-1] + 1
-$VersionNoV = $versionParts -join '.'
+$VersionNoV = $packageJson.version
 $Version = "v$VersionNoV"
-
-# Save incremented version back to apps/package.json
-$packageJson.version = $VersionNoV
-$packageJson | ConvertTo-Json | Set-Content $packageJsonPath
 
 # Database project release
 if (Test-Path "db") {

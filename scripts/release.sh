@@ -15,18 +15,11 @@ done
 git checkout main
 git pull origin main
 
-# Read version from apps/package.json and increment last number
+# Read version from apps/package.json
+# (version is already bumped by GitHub Actions changeset workflow)
 PACKAGE_JSON_PATH="apps/package.json"
-CURRENT_VERSION=$(jq -r '.version' "$PACKAGE_JSON_PATH")
-
-# Parse and increment version
-IFS='.' read -r -a VERSION_PARTS <<< "$CURRENT_VERSION"
-VERSION_PARTS[-1]=$((${VERSION_PARTS[-1]} + 1))
-VERSION_NO_V=$(IFS='.'; echo "${VERSION_PARTS[*]}")
+VERSION_NO_V=$(jq -r '.version' "$PACKAGE_JSON_PATH")
 VERSION="v$VERSION_NO_V"
-
-# Save incremented version back to apps/package.json
-jq --arg version "$VERSION_NO_V" '.version = $version' "$PACKAGE_JSON_PATH" > "$PACKAGE_JSON_PATH.tmp" && mv "$PACKAGE_JSON_PATH.tmp" "$PACKAGE_JSON_PATH"
 
 # Database project release
 if [ -d "db" ]; then
