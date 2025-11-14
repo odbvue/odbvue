@@ -23,30 +23,31 @@ jobs:
 
       - name: Generate DB artifact
         id: db
-        working-directory: db
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME}"
           NAME="odbvue-db"
+          PROJECT_DIR="db"
 
           # Ensure artifact directory exists
-          mkdir -p artifact
+          mkdir -p "$PROJECT_DIR/artifact"
 
-          # Generate artifact using Liquibase project in current directory
+          # Generate artifact using Liquibase project
           sql /nolog << ENDSQL
-          project gen-artifact -name $NAME -version $VERSION -format zip
+          cd $PROJECT_DIR
+          project gen-artifact -name $NAME -version $VERSION -format zip -output-dir artifact
           exit
           ENDSQL
 
           # Verify artifact was created
-          ARTIFACT="artifact/${NAME}-${VERSION}.zip"
+          ARTIFACT="$PROJECT_DIR/artifact/${NAME}-${VERSION}.zip"
           if [ ! -f "$ARTIFACT" ]; then
             echo "::error::Artifact file not found: $ARTIFACT"
-            ls -la artifact/ || echo "artifact directory does not exist"
+            ls -la "$PROJECT_DIR/artifact/" || echo "artifact directory does not exist"
             exit 1
           fi
 
-          echo "zip=db/$ARTIFACT" >> "$GITHUB_OUTPUT"
+          echo "zip=$ARTIFACT" >> "$GITHUB_OUTPUT"
           echo "DB artifact generated: $ARTIFACT"
 
       - name: Setup pnpm/node
@@ -68,7 +69,7 @@ jobs:
           cp -r apps/dist/* build-bundle/apps/ || true
           cp -r apps/.vitepress/dist/* build-bundle/wiki/ || true
           cp -r main/* build-bundle/main/ || true
-          cp "${{ steps.db.outputs.zip }}" build-bundle/db/
+          cp db/artifact/odbvue-db-*.zip build-bundle/db/ || true
           tar -czf "release-${GITHUB_REF_NAME}.tar.gz" -C build-bundle .
           sha256sum "release-${GITHUB_REF_NAME}.tar.gz" > "release-${GITHUB_REF_NAME}.sha256"
 
