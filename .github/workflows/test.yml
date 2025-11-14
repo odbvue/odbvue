@@ -18,7 +18,7 @@ jobs:
               env:
                   APP_CONFIG: ${{ secrets.APP_CONFIG }}
               run: |
-                  sql /nolog > /tmp/test.log 2>&1 << ENDSQL
+                  sql \nolog > /tmp/test.log 2>&1 << ENDSQL
                   set serveroutput on
                   begin
                     dbms_output.put_line('Username: ' || JSON_VALUE('${{ env.APP_CONFIG }}', '$.app_username'));
