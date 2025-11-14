@@ -164,6 +164,9 @@ jobs:
           echo "Deploying version: $VERSION"
           echo "Connecting to ${ADB_TNS_ALIAS}..."
 
+          # Convert APP_CONFIG from multi-line JSON to single-line for DEFINE command
+          APP_CONFIG_SINGLE_LINE=$(echo "$APP_CONFIG" | tr '\n' ' ' | sed 's/[[:space:]]+/ /g')
+
           # Deploy to database and capture output
           DEPLOY_LOG="deploy.log"
           sql -nohistory "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" > "$DEPLOY_LOG" 2>&1 << ENDSQL || true
@@ -174,7 +177,7 @@ jobs:
           define ADB_SCHEMA_PASSWORD = '${ADB_SCHEMA_PASSWORD}'
           define VERSION = '${VERSION}'
           define EDITION = '${EDITION}'
-          define APP_CONFIG = '${APP_CONFIG}'
+          define APP_CONFIG = '${APP_CONFIG_SINGLE_LINE}'
           prompt Variables defined..
           project deploy -file "$DB_ARTIFACT" -log-path . -verbose
           prompt Artifact deployed..
