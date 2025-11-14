@@ -18,8 +18,7 @@ jobs:
               env:
                   APP_CONFIG: ${{ secrets.APP_CONFIG }}
               run: |
-                  sql -nohistory /nolog > /tmp/test.log 2>&1 << ENDSQL
-                  set pagesize 0 linesize 1000 feedback off verify off heading off echo off
+                  sql /nolog > /tmp/test.log 2>&1 << ENDSQL
                   set serveroutput on
                   begin
                     dbms_output.put_line('Username: ' || JSON_VALUE('${{ env.APP_CONFIG }}', '$.app_username'));
