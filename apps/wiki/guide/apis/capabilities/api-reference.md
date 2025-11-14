@@ -8,6 +8,14 @@ Audit Package
 <<< ../../../../../db/tests/pck_api_audit.sql
 :::
 
+## Authentication
+
+Package provides methods for issuing and validating tokens 
+
+::: details example
+<<< ../../../../../db/tests/pck_api_auth.sql
+:::
+
 ## Emails
 
 Package for sending emails
