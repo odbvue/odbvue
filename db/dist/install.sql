@@ -8,11 +8,13 @@ VARIABLE adb_schema_name VARCHAR2(128 CHAR)
 VARIABLE adb_schema_password VARCHAR2(128 CHAR)
 VARIABLE version VARCHAR2(128 CHAR)
 VARIABLE edition VARCHAR2(128 CHAR)
+VARIABLE app_config CLOB
 
 EXEC :adb_schema_name := '&ADB_SCHEMA_NAME';
 EXEC :adb_schema_password := '&ADB_SCHEMA_PASSWORD';
 EXEC :version := '&VERSION';
 EXEC :edition := '&EDITION';
+EXEC :app_config := '&APP_CONFIG';
 
 @@utils/000_before_deploy.sql
 
@@ -24,3 +26,4 @@ UNDEFINE adb_schema_name
 UNDEFINE adb_schema_password
 UNDEFINE version
 UNDEFINE edition 
+UNDEFINE app_config
