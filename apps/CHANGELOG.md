@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.150
+
+### Patch Changes
+
+- 4a9a496: auth api
+
 ## 0.0.148
 
 ### Patch Changes
