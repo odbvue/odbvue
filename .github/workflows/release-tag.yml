@@ -23,40 +23,41 @@ jobs:
 
       - name: Generate DB artifact
         id: db
+        working-directory: db
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME}"
           NAME="odbvue-db"
-          PROJECT_DIR="db"
 
           # Ensure artifact directory exists
-          mkdir -p "$PROJECT_DIR/artifact"
+          mkdir -p artifact
 
-          # Generate artifact using Liquibase project
+          # Generate artifact using Liquibase project in current directory
           sql /nolog << ENDSQL
-          cd $PROJECT_DIR
-          project gen-artifact -name $NAME -version $VERSION -format zip -verbose
+          project gen-artifact -name $NAME -version $VERSION -format zip
           exit
           ENDSQL
 
           # Verify artifact was created
-          ARTIFACT="$PROJECT_DIR/artifact/${NAME}-${VERSION}.zip"
+          ARTIFACT="artifact/${NAME}-${VERSION}.zip"
           if [ ! -f "$ARTIFACT" ]; then
             echo "::error::Artifact file not found: $ARTIFACT"
-            ls -la "$PROJECT_DIR/artifact/" || echo "artifact directory does not exist"
+            ls -la artifact/ || echo "artifact directory does not exist"
             exit 1
           fi
 
-          echo "zip=$ARTIFACT" >> "$GITHUB_OUTPUT"
+          echo "zip=db/$ARTIFACT" >> "$GITHUB_OUTPUT"
           echo "DB artifact generated: $ARTIFACT"
 
       - name: Setup pnpm/node
         uses: pnpm/action-setup@v2
+        with:
+          package_json_file: "apps/package.json"
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: apps/pnpm-lock.yaml
+          cache-dependency-path: "apps/pnpm-lock.yaml"
       - run: cd apps && pnpm install --frozen-lockfile
       - run: cd apps && pnpm build && pnpm wiki:build
 
@@ -67,9 +68,8 @@ jobs:
           cp -r apps/dist/* build-bundle/apps/ || true
           cp -r apps/.vitepress/dist/* build-bundle/wiki/ || true
           cp -r main/* build-bundle/main/ || true
-          cp db/artifact/odbvue-db-*.zip build-bundle/db/ || true
+          cp "${{ steps.db.outputs.zip }}" build-bundle/db/
           tar -czf "release-${GITHUB_REF_NAME}.tar.gz" -C build-bundle .
-          sha256sum "release-${GITHUB_REF_NAME}.tar.gz" > "release-${GITHUB_REF_NAME}.sha256"
           sha256sum "release-${GITHUB_REF_NAME}.tar.gz" > "release-${GITHUB_REF_NAME}.sha256"
 
       - name: Upload bundle
@@ -79,20 +79,6 @@ jobs:
           path: |
             release-${{ github.ref_name }}.tar.gz
             release-${{ github.ref_name }}.sha256
-
-      - name: Publish GitHub Release assets
-        if: ${{ github.ref_type == 'tag' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-          files: |
-            release-${{ github.ref_name }}.tar.gz
-            release-${{ github.ref_name }}.sha256
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish GitHub Release assets
         if: ${{ github.ref_type == 'tag' }}
