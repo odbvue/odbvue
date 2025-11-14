@@ -1,0 +1,25 @@
+name: Test
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+
+jobs:
+    test-app-config:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: gvenzl/setup-oracle-sqlcl@v1
+              with:
+                  version: latest
+            - name: Test APP_CONFIG with sqlcl
+              env:
+                  APP_CONFIG: ${{ secrets.APP_CONFIG }}
+              run: |
+                  sql -nohistory \nolog > /tmp/test.log 2>&1 << ENDSQL
+                  exec dbms_output.put_line('Username: ' || JSON_VALUE('${{ env.APP_CONFIG }}', '$.app_username'));
+                  exit
+                  ENDSQL
+                  cat /tmp/test.log
