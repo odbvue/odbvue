@@ -58,7 +58,6 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: "apps/pnpm-lock.yaml"
       - run: cd apps && pnpm install --frozen-lockfile
       - run: cd apps && pnpm build && pnpm wiki:build
 
@@ -72,6 +71,7 @@ jobs:
           cp db/artifact/odbvue-db-*.zip build-bundle/db/ || true
           tar -czf "release-${GITHUB_REF_NAME}.tar.gz" -C build-bundle .
           sha256sum "release-${GITHUB_REF_NAME}.tar.gz" > "release-${GITHUB_REF_NAME}.sha256"
+          sha256sum "release-${GITHUB_REF_NAME}.tar.gz" > "release-${GITHUB_REF_NAME}.sha256"
 
       - name: Upload bundle
         uses: actions/upload-artifact@v4
@@ -80,6 +80,20 @@ jobs:
           path: |
             release-${{ github.ref_name }}.tar.gz
             release-${{ github.ref_name }}.sha256
+
+      - name: Publish GitHub Release assets
+        if: ${{ github.ref_type == 'tag' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: |
+            release-${{ github.ref_name }}.tar.gz
+            release-${{ github.ref_name }}.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish GitHub Release assets
         if: ${{ github.ref_type == 'tag' }}

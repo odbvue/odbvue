@@ -10,4 +10,4 @@ var/*
 .env
 
 mdify.sql
-config.json
+.config.json
