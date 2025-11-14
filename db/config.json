@@ -1,0 +1,39 @@
+{
+  "app_username": "admin@odbvue.com",
+  "app_password": "MySecurePass123!",
+  "app_fullname": "OdbVue Admin",
+  "app_host": "apps.odbvue.com",
+  "smtp": {
+    "host": "mail.example.com",
+    "port": 587,
+    "username": "smtp_user",
+    "password": "smtp_password",
+    "addr": "admin@odbvue.com",
+    "name": "OdbVue Admin"
+  },
+  "jwt": {
+    "issuer": "OdbVue",
+    "audience": "OdbVue Users",
+    "secret": "MyVerySecureJwtSecretKey123!",
+    "types": [
+      {
+        "id": "ACCESS",
+        "name": "Access Token",
+        "expiration": 900,
+        "stored": "N"
+      },
+      {
+        "id": "REFRESH",
+        "name": "Refresh Token",
+        "expiration": 604800,
+        "stored": "Y"
+      },
+      {
+        "id": "VERIFY",
+        "name": "Identity Verification Token",
+        "expiration": 86400,
+        "stored": "Y"
+      }
+    ]
+  }
+}
