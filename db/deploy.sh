@@ -45,6 +45,7 @@ define ADB_SCHEMA_NAME = '${ADB_SCHEMA_NAME}'
 define ADB_SCHEMA_PASSWORD = '${ADB_SCHEMA_PASSWORD}'
 define VERSION = '${VERSION}'
 define EDITION = '${EDITION}'
+define APP_CONFIG = '${APP_CONFIG}'
 prompt Variables defined..
 project gen-artifact -name $NAME -version $VERSION -format zip
 prompt Artifact generated..
