@@ -35,7 +35,7 @@ jobs:
           # Generate artifact using Liquibase project
           sql /nolog << ENDSQL
           cd $PROJECT_DIR
-          project gen-artifact -name $NAME -version $VERSION -format zip -output-dir artifact
+          project gen-artifact -name $NAME -version $VERSION -format zip -verbose
           exit
           ENDSQL
 
