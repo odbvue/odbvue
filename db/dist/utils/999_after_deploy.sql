@@ -2,8 +2,7 @@ ALTER DATABASE DEFAULT EDITION = "&EDITION";
 /
 
 DECLARE
-    c CLOB := '&APP_CONFIG';
-
+    c CLOB := :app_config;
 BEGIN
     -- Create admin user
 
