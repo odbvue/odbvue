@@ -97,7 +97,7 @@ BEGIN
 
     -- RESOURCE PRINCIPAL
 
-    IF JSON_VALUE(c, '$.enable_resource_principal') = 'true' THEN
+    IF UPPER(JSON_VALUE(c, '$.enable_resource_principal')) = 'TRUE' THEN
         DBMS_OUTPUT.PUT_LINE('- enabling resource principal.');
         BEGIN
             DBMS_CLOUD_ADMIN.ENABLE_RESOURCE_PRINCIPAL(v_schema_username);
