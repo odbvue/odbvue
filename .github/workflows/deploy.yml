@@ -141,8 +141,6 @@ jobs:
           ADB_USER: ${{ secrets.ADB_USER }}
           ADB_PASSWORD: ${{ secrets.ADB_PASSWORD }}
           ADB_TNS_ALIAS: ${{ secrets.ADB_TNS_ALIAS }}
-          ADB_SCHEMA_NAME: ${{ secrets.ADB_SCHEMA_NAME }}
-          ADB_SCHEMA_PASSWORD: ${{ secrets.ADB_SCHEMA_PASSWORD }}
           APP_CONFIG: ${{ secrets.APP_CONFIG }}
         run: |
           set -euo pipefail
