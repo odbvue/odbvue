@@ -10,6 +10,39 @@ BEGIN
         v_app_password VARCHAR2(2000 CHAR);
         v_app_fullname VARCHAR2(2000 CHAR);
         v_app_host VARCHAR2(2000 CHAR);
+
+        PROCEDURE setting(
+            p_key IN VARCHAR2,
+            p_name IN VARCHAR2,
+            p_value IN VARCHAR2
+        ) AS 
+        BEGIN
+            DBMS_OUTPUT.PUT_LINE('  - upserting setting: ' || p_key);
+            EXECUTE IMMEDIATE 'MERGE INTO app_settings s 
+            USING (SELECT 1 AS id FROM dual) u
+            ON (s.key = :key)
+            WHEN MATCHED THEN
+                UPDATE SET
+                    name = :name,
+                    value = :value
+            WHEN NOT MATCHED THEN
+                INSERT (key, name, value)
+                VALUES (:key, :name, :value)'
+            USING
+                p_key,
+                p_name,
+                p_value,
+                p_key,
+                p_name,
+                p_value;
+
+            COMMIT;
+            DBMS_OUTPUT.PUT_LINE('    - completed.');
+        EXCEPTION
+            WHEN OTHERS THEN
+                DBMS_OUTPUT.PUT_LINE('    - failed: ' || SQLERRM);
+        END;   
+
     BEGIN
 
         DBMS_OUTPUT.PUT_LINE('- upserting admin user.');
@@ -150,22 +183,13 @@ BEGIN
                 DBMS_OUTPUT.PUT_LINE('  - credential creation failed: ' || SQLERRM);
         END;
 
-        BEGIN
-
-            EXECUTE IMMEDIATE 'pck_api_settings.write(''APP_EMAILS_SMTP_CRED'', ''App email SMTP credential'', ''' || v_smtp_credential || ''')';
-            EXECUTE IMMEDIATE 'pck_api_settings.write(''APP_EMAILS_SMTP_HOST'', ''App email SMTP host'', ''' || v_smtp_host || ''')';
-            EXECUTE IMMEDIATE 'pck_api_settings.write(''APP_EMAILS_SMTP_PORT'', ''App email SMTP port'', ''' || TO_CHAR(v_smtp_port) || ''')';
-            EXECUTE IMMEDIATE 'pck_api_settings.write(''APP_EMAILS_FROM_ADDR'', ''App email senders address'', ''' || v_smtp_addr || ''')';
-            EXECUTE IMMEDIATE 'pck_api_settings.write(''APP_EMAILS_FROM_NAME'', ''App email senders name'', ''' || v_smtp_name || ''')';
-            EXECUTE IMMEDIATE 'pck_api_settings.write(''APP_EMAILS_REPLYTO_ADDR'', ''App email reply to address'', ''' || v_smtp_addr || ''')';
-            EXECUTE IMMEDIATE 'pck_api_settings.write(''APP_EMAILS_REPLYTO_NAME'', ''App email reply to name'', ''' || v_smtp_name || ''')';
-            COMMIT;
-            DBMS_OUTPUT.PUT_LINE('  - completed.');
-
-        EXCEPTION
-            WHEN OTHERS THEN
-                DBMS_OUTPUT.PUT_LINE('  - settings upsert failed: ' || SQLERRM);
-        END;
+        setting('APP_EMAILS_SMTP_CRED', 'App email SMTP credential', v_smtp_credential);
+        setting('APP_EMAILS_SMTP_HOST', 'App email SMTP host', v_smtp_host);
+        setting('APP_EMAILS_SMTP_PORT', 'App email SMTP port', TO_CHAR(v_smtp_port));
+        setting('APP_EMAILS_FROM_ADDR', 'App email senders address', v_smtp_addr);
+        setting('APP_EMAILS_FROM_NAME', 'App email senders name', v_smtp_name);
+        setting('APP_EMAILS_REPLYTO_ADDR', 'App email reply to address', v_smtp_addr);
+        setting('APP_EMAILS_REPLYTO_NAME', 'App email reply to name', v_smtp_name);
 
     END;
 
@@ -184,16 +208,7 @@ BEGIN
                 v_s3_endpoint
             FROM dual;
 
-            BEGIN
-                
-                EXECUTE IMMEDIATE 'pck_api_settings.write(''APP_STORAGE_S3_URI'', ''S3 Endpoint'', ''' || v_s3_endpoint || ''')';
-
-                COMMIT;
-                DBMS_OUTPUT.PUT_LINE('  - settings upsert completed.');
-            EXCEPTION
-                WHEN OTHERS THEN
-                    DBMS_OUTPUT.PUT_LINE('  - settings upsert failed: ' || SQLERRM);
-            END;
+            setting('APP_STORAGE_S3_URI', 'S3 Endpoint', v_s3_endpoint);
 
         EXCEPTION
             WHEN OTHERS THEN
@@ -233,8 +248,8 @@ BEGIN
                         audience = :audience,
                         secret = :secret
                 WHEN NOT MATCHED THEN
-                    INSERT (id, issuer, audience, secret)
-                    VALUES (1, :issuer, :audience, :secret)'
+                    INSERT (issuer, audience, secret)
+                    VALUES (:issuer, :audience, :secret)'
                 USING
                     v_issuer,
                     v_audience,
