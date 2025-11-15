@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.173
+
+### Patch Changes
+
+- ac99a22: app config
+
 ## 0.0.172
 
 ### Patch Changes
