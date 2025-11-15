@@ -34,8 +34,17 @@ BEGIN
         QUOTA UNLIMITED ON DATA';
         DBMS_OUTPUT.PUT_LINE('  - schema created.');
     ELSE
-        EXECUTE IMMEDIATE 'ALTER USER ' || v_schema_username || ' IDENTIFIED BY "' || v_schema_password || '"';
-        DBMS_OUTPUT.PUT_LINE('  - schema already exists.');
+        BEGIN
+            EXECUTE IMMEDIATE 'ALTER USER ' || v_schema_username || ' IDENTIFIED BY "' || v_schema_password || '"';
+            DBMS_OUTPUT.PUT_LINE('  - schema already exists.');
+        EXCEPTION
+            WHEN OTHERS THEN
+                IF SQLCODE = -28007 THEN
+                    DBMS_OUTPUT.PUT_LINE('  - password cannot be reused. Skipping password update.');
+                ELSE
+                    RAISE;
+                END IF;
+        END;
     END IF;
 
     -- GRANTS
