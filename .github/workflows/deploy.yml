@@ -148,11 +148,11 @@ jobs:
           set -euo pipefail
 
           # Deployment variables
+          APP_CONFIG_SINGLE_LINE=$(echo "$APP_CONFIG" | tr '\n' ' ' | sed 's/[[:space:]]+/ /g')
           VERSION="${{ needs.fetch-bundle.outputs.tag }}"
           NAME="odbvue-db"
-          SCHEMA=$(echo "$APP_CONFIG" | jq -r '.schema.username')
-          VERSION_NORMALIZED=$(echo "$VERSION" | sed 's/\./_/g' | sed 's/-/_/g')
-          EDITION=$(echo "${SCHEMA}_${VERSION_NORMALIZED}" | tr '[:lower:]' '[:upper:]')
+          SCHEMA=$(echo "$APP_CONFIG_SINGLE_LINE" | jq -r '.schema.username')
+          EDITION=$(echo "${SCHEMA}_$(echo "$VERSION" | sed 's/\./_/g')" | tr '[:lower:]' '[:upper:]')
 
           # Get artifact from bundle
           DB_ARTIFACT="bundle/db/$NAME-${VERSION}.zip"
