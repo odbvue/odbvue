@@ -15,10 +15,10 @@ EXEC :schema := '&SCHEMA';
 EXEC :edition := '&EDITION';
 
 PROMPT "-variables"
-PROMPT "  - version: " || :version
-PROMPT "  - app config: " || SUBSTR(:config, 1, 10) || "..."
-PROMPT "  - schema: " || :schema
-PROMPT "  - edition: " || :edition
+PROMPT "  - version: " || '&VERSION'
+exec begin dbms_output.put_line('  - app config: ' || SUBSTR(:config, 1, 10) || '...'); end;
+PROMPT "  - schema: " || '&SCHEMA'
+PROMPT "  - edition: " || '&EDITION'
 PROMPT ""
 
 @@000_install.sql
