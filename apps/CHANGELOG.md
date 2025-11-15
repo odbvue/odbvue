@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.165
+
+### Patch Changes
+
+- e4df290: app config
+
 ## 0.0.164
 
 ### Patch Changes
