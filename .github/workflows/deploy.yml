@@ -146,12 +146,14 @@ jobs:
           APP_CONFIG: ${{ secrets.APP_CONFIG }}
         run: |
           set -euo pipefail
+
+          # Deployment variables
           VERSION="${{ needs.fetch-bundle.outputs.tag }}"
           NAME="odbvue-db"
-
-          # Calculate EDITION from schema name and version
-          EDITION="${ADB_SCHEMA_NAME}_$(echo "$VERSION" | tr . _)"
-          EDITION="${EDITION^^}"
+          APP_CONFIG_SINGLE_LINE=$(echo "$APP_CONFIG" | tr '\n' ' ' | sed 's/[[:space:]]+/ /g')
+          SCHEMA=$(echo "$APP_CONFIG_SINGLE_LINE" | grep -oP '(?<="username"\s*:\s*")[^"]*' | head -1)
+          VERSION_NORMALIZED=$(echo "$VERSION" | sed 's/\./_/g' | sed 's/-/_/g')
+          EDITION=$(echo "${SCHEMA}_${VERSION_NORMALIZED}" | tr '[:lower:]' '[:upper:]')
 
           # Get artifact from bundle
           DB_ARTIFACT="bundle/db/$NAME-${VERSION}.zip"
@@ -161,24 +163,17 @@ jobs:
             exit 1
           fi
 
-          echo "Deploying version: $VERSION"
-          echo "Connecting to ${ADB_TNS_ALIAS}..."
-
-          # Convert APP_CONFIG from multi-line JSON to single-line for DEFINE command
-          APP_CONFIG_SINGLE_LINE=$(echo "$APP_CONFIG" | tr '\n' ' ' | sed 's/[[:space:]]+/ /g')
-
           # Deploy to database and capture output
+          echo "Connecting to ${ADB_TNS_ALIAS}..."
           DEPLOY_LOG="deploy.log"
           sql -nohistory "${ADB_USER}/${ADB_PASSWORD}@${ADB_TNS_ALIAS}" > "$DEPLOY_LOG" 2>&1 << ENDSQL || true
           whenever oserror exit failure
           whenever sqlerror exit sql.sqlcode rollback
           prompt Connected..
-          define ADB_SCHEMA_NAME = '${ADB_SCHEMA_NAME}'
-          define ADB_SCHEMA_PASSWORD = '${ADB_SCHEMA_PASSWORD}'
+          define CONFIG = '${APP_CONFIG_SINGLE_LINE}'
           define VERSION = '${VERSION}'
           define EDITION = '${EDITION}'
-          define APP_CONFIG = '${APP_CONFIG_SINGLE_LINE}'
-          prompt Variables defined..
+          define SCHEMA = '${SCHEMA}'
           project deploy -file "$DB_ARTIFACT" -log-path . -verbose
           prompt Artifact deployed..
           lb tag -tag "$VERSION"

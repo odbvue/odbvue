@@ -1,10 +1,8 @@
-ALTER DATABASE DEFAULT EDITION = "&EDITION";
-/
-
 DECLARE
-    c CLOB := :app_config;
+    c CLOB := :config;
 BEGIN
-    -- Create admin user
+
+    -- ADMIN user
 
     DECLARE 
         c_salt VARCHAR2(32 CHAR) := DBMS_RANDOM.STRING('X', 32);
@@ -14,13 +12,13 @@ BEGIN
         v_app_host VARCHAR2(2000 CHAR);
     BEGIN
 
-        DBMS_OUTPUT.PUT_LINE('Upserting admin user...');
+        DBMS_OUTPUT.PUT_LINE('- upserting admin user.');
 
         SELECT 
-            JSON_VALUE(c, '$.app_username'),
-            JSON_VALUE(c, '$.app_password'),
-            JSON_VALUE(c, '$.app_fullname'),
-            JSON_VALUE(c, '$.app_host')
+            JSON_VALUE(c, '$.app.username'),
+            JSON_VALUE(c, '$.app.password'),
+            JSON_VALUE(c, '$.app.fullname'),
+            JSON_VALUE(c, '$.app.host')
         INTO 
             v_app_username,
             v_app_password,
@@ -52,17 +50,17 @@ BEGIN
 
         COMMIT;
 
-        DBMS_OUTPUT.PUT_LINE('  ...completed');
+        DBMS_OUTPUT.PUT_LINE('  - completed.');
 
     EXCEPTION
         WHEN OTHERS THEN
-            DBMS_OUTPUT.PUT_LINE('  ...failed - ' || SQLERRM);
+            DBMS_OUTPUT.PUT_LINE('  - failed: ' || SQLERRM);
     END;
 
     -- Create admin role
 
     BEGIN
-        DBMS_OUTPUT.PUT_LINE('Upserting admin role...');
+        DBMS_OUTPUT.PUT_LINE('- upserting admin role.');
         EXECUTE IMMEDIATE 'MERGE INTO app_roles r
         USING (SELECT 1 AS id FROM dual) s
         ON (r.id = s.id)
@@ -75,16 +73,16 @@ BEGIN
             VALUES (1, :role, :description)'
         USING 'ADMIN', 'Administrator access', 'ADMIN', 'Administrator access';
         COMMIT;
-        DBMS_OUTPUT.PUT_LINE('  ...completed');
+        DBMS_OUTPUT.PUT_LINE('  - completed.');
     EXCEPTION
         WHEN OTHERS THEN
-            DBMS_OUTPUT.PUT_LINE('  ...failed - ' || SQLERRM);
+            DBMS_OUTPUT.PUT_LINE('  - failed: ' || SQLERRM);
     END;
 
     -- Create admin permissions
 
     BEGIN
-        DBMS_OUTPUT.PUT_LINE('Upserting admin permissions...');
+        DBMS_OUTPUT.PUT_LINE('- upserting admin permissions.');
         EXECUTE IMMEDIATE 'MERGE INTO app_permissions p
         USING (
             SELECT 
@@ -97,15 +95,116 @@ BEGIN
         WHEN NOT MATCHED THEN 
             INSERT (id_user, id_role, permission) VALUES (s.id_user, s.id_role, ''Y'')';
         COMMIT;
-        DBMS_OUTPUT.PUT_LINE('  ...completed'); 
+        DBMS_OUTPUT.PUT_LINE('  - completed.'); 
     EXCEPTION
         WHEN OTHERS THEN
-            DBMS_OUTPUT.PUT_LINE('  ...failed - ' || SQLERRM);
+            DBMS_OUTPUT.PUT_LINE('  - failed: ' || SQLERRM);
     END;
 
-    -- Insert JWT settings
+    -- SMTP
+
+    DECLARE
+        v_smtp_host VARCHAR2(2000 CHAR);
+        v_smtp_port NUMBER;
+        v_smtp_username VARCHAR2(2000 CHAR);
+        v_smtp_password VARCHAR2(2000 CHAR);
+        v_smtp_addr VARCHAR2(2000 CHAR);
+        v_smtp_name VARCHAR2(2000 CHAR);
+
+        v_schema_name VARCHAR2(200 CHAR);
+        v_smtp_credential VARCHAR2(200 CHAR);
     BEGIN
-        DBMS_OUTPUT.PUT_LINE('Upserting JWT settings...');
+
+        DBMS_OUTPUT.PUT_LINE('- upserting SMTP settings.');   
+    
+        SELECT 
+            JSON_VALUE(c, '$.smtp.host'),
+            TO_NUMBER(JSON_VALUE(c, '$.smtp.port')),
+            JSON_VALUE(c, '$.smtp.username'),
+            JSON_VALUE(c, '$.smtp.password'),
+            JSON_VALUE(c, '$.smtp.addr'),
+            JSON_VALUE(c, '$.smtp.name')
+        INTO
+            v_smtp_host,
+            v_smtp_port,
+            v_smtp_username,
+            v_smtp_password,
+            v_smtp_addr,
+            v_smtp_name
+        FROM dual;
+
+        v_schema_name := JSON_VALUE(c, '$.schema.username');
+        v_smtp_credential := UPPER(v_schema_name || '_SMTP_CREDENTIAL');
+
+        BEGIN
+
+            DBMS_CLOUD.CREATE_CREDENTIAL(
+                credential_name => v_smtp_credential,
+                username        => v_smtp_username,
+                password        => v_smtp_password
+            );
+            COMMIT;
+            DBMS_OUTPUT.PUT_LINE('  - credential created.');
+        EXCEPTION
+            WHEN OTHERS THEN
+                DBMS_OUTPUT.PUT_LINE('  - credential creation failed: ' || SQLERRM);
+        END;
+
+        BEGIN
+
+            EXECUTE IMMEDIATE 'pck_api_settings.write(''APP_EMAILS_SMTP_CRED'', ''App email SMTP credential'', ''' || v_smtp_credential || ''')';
+            EXECUTE IMMEDIATE 'pck_api_settings.write(''APP_EMAILS_SMTP_HOST'', ''App email SMTP host'', ''' || v_smtp_host || ''')';
+            EXECUTE IMMEDIATE 'pck_api_settings.write(''APP_EMAILS_SMTP_PORT'', ''App email SMTP port'', ''' || TO_CHAR(v_smtp_port) || ''')';
+            EXECUTE IMMEDIATE 'pck_api_settings.write(''APP_EMAILS_FROM_ADDR'', ''App email senders address'', ''' || v_smtp_addr || ''')';
+            EXECUTE IMMEDIATE 'pck_api_settings.write(''APP_EMAILS_FROM_NAME'', ''App email senders name'', ''' || v_smtp_name || ''')';
+            EXECUTE IMMEDIATE 'pck_api_settings.write(''APP_EMAILS_REPLYTO_ADDR'', ''App email reply to address'', ''' || v_smtp_addr || ''')';
+            EXECUTE IMMEDIATE 'pck_api_settings.write(''APP_EMAILS_REPLYTO_NAME'', ''App email reply to name'', ''' || v_smtp_name || ''')';
+            COMMIT;
+            DBMS_OUTPUT.PUT_LINE('  - completed.');
+
+        EXCEPTION
+            WHEN OTHERS THEN
+                DBMS_OUTPUT.PUT_LINE('  - settings upsert failed: ' || SQLERRM);
+        END;
+
+    END;
+
+    -- S3
+
+    BEGIN
+        DBMS_OUTPUT.PUT_LINE('- upserting S3 settings.');
+
+        DECLARE
+            v_s3_endpoint VARCHAR2(2000 CHAR);
+        BEGIN
+
+            SELECT 
+                JSON_VALUE(c, '$.s3')
+            INTO 
+                v_s3_endpoint
+            FROM dual;
+
+            BEGIN
+                
+                EXECUTE IMMEDIATE 'pck_api_settings.write(''APP_STORAGE_S3_URI'', ''S3 Endpoint'', ''' || v_s3_endpoint || ''')';
+
+                COMMIT;
+                DBMS_OUTPUT.PUT_LINE('  - settings upsert completed.');
+            EXCEPTION
+                WHEN OTHERS THEN
+                    DBMS_OUTPUT.PUT_LINE('  - settings upsert failed: ' || SQLERRM);
+            END;
+
+        EXCEPTION
+            WHEN OTHERS THEN
+                DBMS_OUTPUT.PUT_LINE('  - failed - ' || SQLERRM);
+        END;
+    END;
+
+    -- JWT
+
+    BEGIN
+        DBMS_OUTPUT.PUT_LINE('- upserting JWT settings.');
 
         DECLARE
             v_issuer VARCHAR2(2000 CHAR);
@@ -123,24 +222,33 @@ BEGIN
                 v_secret
             FROM dual;
 
-            EXECUTE IMMEDIATE 'MERGE INTO app_token_settings s
-            USING (SELECT 1 AS rn FROM dual) t
-            ON (1 = 1)
-            WHEN MATCHED THEN
-                UPDATE SET
-                    issuer = :issuer,
-                    audience = :audience,
-                    secret = :secret
-            WHEN NOT MATCHED THEN
-                INSERT (issuer, audience, secret)
-                VALUES (:issuer, :audience, :secret)'
-            USING
-                v_issuer,
-                v_audience,
-                v_secret,
-                v_issuer,
-                v_audience,
-                v_secret;
+            BEGIN
+                
+                EXECUTE IMMEDIATE 'MERGE INTO app_token_settings s
+                USING (SELECT 1 AS id FROM dual) u
+                ON (s.id = u.id)
+                WHEN MATCHED THEN
+                    UPDATE SET
+                        issuer = :issuer,
+                        audience = :audience,
+                        secret = :secret
+                WHEN NOT MATCHED THEN
+                    INSERT (id, issuer, audience, secret)
+                    VALUES (1, :issuer, :audience, :secret)'
+                USING
+                    v_issuer,
+                    v_audience,
+                    v_secret,
+                    v_issuer,
+                    v_audience,
+                    v_secret;
+
+                COMMIT;
+                DBMS_OUTPUT.PUT_LINE('  - settings upsert completed.');
+            EXCEPTION
+                WHEN OTHERS THEN
+                    DBMS_OUTPUT.PUT_LINE('  - settings upsert failed: ' || SQLERRM);
+            END;
 
             FOR rec IN (
                 SELECT 
@@ -181,10 +289,10 @@ BEGIN
             END LOOP;
 
             COMMIT;
-            DBMS_OUTPUT.PUT_LINE('  ...completed');
+            DBMS_OUTPUT.PUT_LINE('  - completed');
         EXCEPTION
             WHEN OTHERS THEN
-                DBMS_OUTPUT.PUT_LINE('  ...failed - ' || SQLERRM);
+                DBMS_OUTPUT.PUT_LINE('  - failed - ' || SQLERRM);
         END;
     END;
 
