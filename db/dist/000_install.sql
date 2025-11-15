@@ -97,8 +97,9 @@ BEGIN
 
     -- RESOURCE PRINCIPAL
 
-    IF UPPER(JSON_VALUE(c, '$.enable_resource_principal')) = 'TRUE' THEN
+--    IF UPPER(JSON_VALUE(c, '$.enable_resource_principal')) = 'TRUE' THEN
         DBMS_OUTPUT.PUT_LINE('- enabling resource principal.');
+        DBMS_OUTPUT.PUT_LINE('- debug: ' || JSON_VALUE(c, '$.enable_resource_principal'));
         BEGIN
             DBMS_CLOUD_ADMIN.ENABLE_RESOURCE_PRINCIPAL(v_schema_username);
             DBMS_OUTPUT.PUT_LINE('  - resource principal enabled.');
@@ -110,7 +111,7 @@ BEGIN
                     DBMS_OUTPUT.PUT_LINE('  - resource principal not enabled.');
                 END IF;  
         END;
-    END IF;
+  --  END IF;
 
     -- ACL
 
