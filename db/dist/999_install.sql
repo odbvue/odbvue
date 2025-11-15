@@ -8,20 +8,17 @@ DECLARE
     ) AS 
     BEGIN
         DBMS_OUTPUT.PUT_LINE('  - upserting setting: ' || p_key);
-        EXECUTE IMMEDIATE 'MERGE INTO app_settings s 
-        USING (SELECT 1 AS id FROM dual) u
-        ON (s.key = :key)
+        EXECUTE IMMEDIATE 'MERGE INTO app_settings t 
+        USING (SELECT :1 AS key, :2 AS name, :3 AS value FROM dual) s
+        ON (t.key = s.key)
         WHEN MATCHED THEN
             UPDATE SET
-                name = :name,
-                value = :value
+                t.name = s.name,
+                t.value = s.value
         WHEN NOT MATCHED THEN
             INSERT (key, name, value)
-            VALUES (:key, :name, :value)'
+            VALUES (s.key, s.name, s.value)'
         USING
-            p_key,
-            p_name,
-            p_value,
             p_key,
             p_name,
             p_value;
@@ -180,8 +177,13 @@ BEGIN
             COMMIT;
             DBMS_OUTPUT.PUT_LINE('  - credential created.');
         EXCEPTION
+             -- credential creation failed: ORA-20022: Credential "***"."ODBVUE_SMTP_CREDENTIAL" already exists
             WHEN OTHERS THEN
-                DBMS_OUTPUT.PUT_LINE('  - credential creation failed: ' || SQLERRM);
+                IF SQLCODE = -20022 THEN
+                    DBMS_OUTPUT.PUT_LINE('  - credential already exists, skipping creation.');
+                ELSE
+                    DBMS_OUTPUT.PUT_LINE('  - credential creation failed: ' || SQLERRM);
+                END IF; 
         END;
 
         setting('APP_EMAILS_SMTP_CRED', 'App email SMTP credential', v_smtp_credential);
