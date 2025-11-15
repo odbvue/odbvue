@@ -1,5 +1,38 @@
 DECLARE
     c CLOB := :config;
+
+    PROCEDURE setting(
+        p_key IN VARCHAR2,
+        p_name IN VARCHAR2,
+        p_value IN VARCHAR2
+    ) AS 
+    BEGIN
+        DBMS_OUTPUT.PUT_LINE('  - upserting setting: ' || p_key);
+        EXECUTE IMMEDIATE 'MERGE INTO app_settings s 
+        USING (SELECT 1 AS id FROM dual) u
+        ON (s.key = :key)
+        WHEN MATCHED THEN
+            UPDATE SET
+                name = :name,
+                value = :value
+        WHEN NOT MATCHED THEN
+            INSERT (key, name, value)
+            VALUES (:key, :name, :value)'
+        USING
+            p_key,
+            p_name,
+            p_value,
+            p_key,
+            p_name,
+            p_value;
+
+        COMMIT;
+        DBMS_OUTPUT.PUT_LINE('    - completed.');
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('    - failed: ' || SQLERRM);
+    END;   
+
 BEGIN
 
     -- ADMIN user
@@ -10,38 +43,6 @@ BEGIN
         v_app_password VARCHAR2(2000 CHAR);
         v_app_fullname VARCHAR2(2000 CHAR);
         v_app_host VARCHAR2(2000 CHAR);
-
-        PROCEDURE setting(
-            p_key IN VARCHAR2,
-            p_name IN VARCHAR2,
-            p_value IN VARCHAR2
-        ) AS 
-        BEGIN
-            DBMS_OUTPUT.PUT_LINE('  - upserting setting: ' || p_key);
-            EXECUTE IMMEDIATE 'MERGE INTO app_settings s 
-            USING (SELECT 1 AS id FROM dual) u
-            ON (s.key = :key)
-            WHEN MATCHED THEN
-                UPDATE SET
-                    name = :name,
-                    value = :value
-            WHEN NOT MATCHED THEN
-                INSERT (key, name, value)
-                VALUES (:key, :name, :value)'
-            USING
-                p_key,
-                p_name,
-                p_value,
-                p_key,
-                p_name,
-                p_value;
-
-            COMMIT;
-            DBMS_OUTPUT.PUT_LINE('    - completed.');
-        EXCEPTION
-            WHEN OTHERS THEN
-                DBMS_OUTPUT.PUT_LINE('    - failed: ' || SQLERRM);
-        END;   
 
     BEGIN
 
