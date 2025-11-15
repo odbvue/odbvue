@@ -150,8 +150,7 @@ jobs:
           # Deployment variables
           VERSION="${{ needs.fetch-bundle.outputs.tag }}"
           NAME="odbvue-db"
-          APP_CONFIG_SINGLE_LINE=$(echo "$APP_CONFIG" | tr '\n' ' ' | sed 's/[[:space:]]+/ /g')
-          SCHEMA=$(echo "$APP_CONFIG_SINGLE_LINE" | grep -oP '(?<="username"\s*:\s*")[^"]*' | head -1)
+          SCHEMA=$(echo "$APP_CONFIG" | jq -r '.schema.username')
           VERSION_NORMALIZED=$(echo "$VERSION" | sed 's/\./_/g' | sed 's/-/_/g')
           EDITION=$(echo "${SCHEMA}_${VERSION_NORMALIZED}" | tr '[:lower:]' '[:upper:]')
 
