@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.162
+
+### Patch Changes
+
+- 699576d: app config
+
 ## 0.0.161
 
 ### Patch Changes
