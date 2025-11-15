@@ -117,8 +117,8 @@ BEGIN
             '$.acl[*]' 
             COLUMNS (
                 host VARCHAR2(200 CHAR) PATH '$.host',
-                lower_port PLS_INTEGER PATH '$.lower_port',
-                upper_port PLS_INTEGER PATH '$.upper_port',
+                lower_port NUMBER PATH '$.lower_port',
+                upper_port NUMBER PATH '$.upper_port',
                 privilege VARCHAR2(100 CHAR) PATH '$.privilege'
             )
         ) jt
