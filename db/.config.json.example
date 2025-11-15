@@ -1,0 +1,66 @@
+{
+  "schema": {
+    "username": "odbvue",
+    "password": "************",
+    "grants": [
+      "CREATE SESSION",
+      "CREATE TABLE",
+      "CREATE VIEW",
+      "CREATE SEQUENCE",
+      "CREATE PROCEDURE",
+      "CREATE TRIGGER",
+      "CREATE TYPE",
+      "CREATE SYNONYM",
+      "MANAGE SCHEDULER",
+      "EXECUTE ON DBMS_SCHEDULER",
+      "EXECUTE ON DBMS_CRYPTO",
+      "EXECUTE ON DBMS_CLOUD"
+    ],
+    "enable_resource_principal": true
+  },
+  "acl":[
+    {"host":"api.chucknorris.io","lower_port":443,"upper_port":443,"privilege":"http"},
+    {"host":"api.openai.com","lower_port":443,"upper_port":443,"privilege":"http"},
+    {"host":"smtp.email.eu-stockholm-1.oci.oraclecloud.com","lower_port":587,"upper_port":587,"privilege":"smtp"}
+  ],
+  "app":{
+    "username": "admin@odbvue.com",
+    "password": "************",
+    "fullname": "OdbVue Admin",
+    "host": "apps.odbvue.com"
+  },
+  "smtp": {
+    "host": "smtp.email.eu-stockholm-1.oci.oraclecloud.com",
+    "port": 587,
+    "username": "ocid1.user.oc1..aaaa..fnhq.xy.com",
+    "password": "************",
+    "addr": "admin@odbvue.com",
+    "name": "OdbVue Admin"
+  },
+  "s3": "https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<bucket>/o/",
+  "jwt": {
+    "issuer": "OdbVue",
+    "audience": "OdbVue Users",
+    "secret": "************",
+    "types": [
+      {
+        "id": "ACCESS",
+        "name": "Access Token",
+        "expiration": 900,
+        "stored": "N"
+      },
+      {
+        "id": "REFRESH",
+        "name": "Refresh Token",
+        "expiration": 604800,
+        "stored": "Y"
+      },
+      {
+        "id": "VERIFY",
+        "name": "Identity Verification Token",
+        "expiration": 86400,
+        "stored": "Y"
+      }
+    ]
+  }
+}

@@ -23,143 +23,106 @@
 >    },
 >```
 
-## SQLCl Project install
+## SQLCl Project Deployments
 
-SQLcl Project allows, besides regular changes, to have *maintenance* scripts that run before and after each release deployment, by injecting in main install script.
+SQLcl Project Deploy executes *install* scripts that run before and after changeset deployment. 
 
 ####  `./db/dist/install.sql`
 
 ::: details source
-```sql{17,21}
-set define on
-set verify off
-set feedback off
-set serveroutput on
-set sqlblanklines on
-
-VARIABLE adb_schema_name VARCHAR2(128 CHAR)
-VARIABLE adb_schema_password VARCHAR2(128 CHAR)
-VARIABLE version VARCHAR2(128 CHAR)
-VARIABLE edition VARCHAR2(128 CHAR)
-
-EXEC :adb_schema_name := '&ADB_SCHEMA_NAME';
-EXEC :adb_schema_password := '&ADB_SCHEMA_PASSWORD';
-EXEC :version := '&VERSION';
-EXEC :edition := '&EDITION';
-
-@@utils/000_before_deploy.sql
-
-lb update -log -changelog-file releases/main.changelog.xml -search-path "."
-
-@@utils/999_after_deploy.sql
-
-UNDEFINE adb_schema_name
-UNDEFINE adb_schema_password
-UNDEFINE version
-UNDEFINE edition 
-
-```
+<<< ../../../../db/dist/install.sql
 :::
 
-Ensure that schema is created on the first deployment and new edition for each deployment:
-
-#### `./db/dist/utils/000_before_deploy.sql`
+####  `./db/dist/000_install.sql`
 
 ::: details source
-```sql
-DECLARE
-  p_schema_name VARCHAR2(128) := :adb_schema_name;
-  p_schema_password VARCHAR2(128) := :adb_schema_password;
-  p_version VARCHAR2(128) := :version;
-  p_edition VARCHAR2(128) := :edition;
-  v_exists PLS_INTEGER;
-BEGIN
-
-    -- SCHEMA
-
-    SELECT COUNT(*) 
-    INTO v_exists 
-    FROM dba_users 
-    WHERE username = p_schema_name;
-    
-    DBMS_OUTPUT.PUT_LINE('- checking schema: ' || p_schema_name);
-    IF v_exists = 0 THEN
-        EXECUTE IMMEDIATE '
-        CREATE USER ' || p_schema_name || ' 
-        IDENTIFIED BY "' || REPLACE(p_schema_password,'"', '""') || '"
-        DEFAULT TABLESPACE DATA
-        TEMPORARY TABLESPACE TEMP
-        QUOTA UNLIMITED ON DATA';
-        DBMS_OUTPUT.PUT_LINE('  - schema created.');
-    ELSE
-        DBMS_OUTPUT.PUT_LINE('  - schema already exists.');
-    END IF;
-
-    FOR grants IN (
-        SELECT 'CREATE SESSION' AS privilege FROM dual UNION ALL
-        SELECT 'CREATE TABLE' FROM dual UNION ALL
-        SELECT 'CREATE VIEW' FROM dual UNION ALL
-        SELECT 'CREATE SEQUENCE' FROM dual UNION ALL
-        SELECT 'CREATE PROCEDURE' FROM dual UNION ALL
-        SELECT 'CREATE TRIGGER' FROM dual UNION ALL
-        SELECT 'CREATE TYPE' FROM dual UNION ALL
-        SELECT 'CREATE SYNONYM' FROM dual
-    ) LOOP
-        BEGIN
-            EXECUTE IMMEDIATE '
-                GRANT ' || grants.privilege || ' 
-                TO ' || p_schema_name;
-        EXCEPTION
-            WHEN OTHERS THEN
-                IF SQLCODE != -01918 THEN -- ignore "user/role does not exist"
-                    NULL;
-                ELSE
-                    RAISE;    
-                END IF;
-        END;
-    END LOOP;
-    DBMS_OUTPUT.PUT_LINE('  - privileges granted.');
-
-    -- EBR
-
-    EXECUTE IMMEDIATE 'ALTER USER ' || p_schema_name || ' ENABLE EDITIONS';  
-    BEGIN
-        DBMS_OUTPUT.PUT_LINE('Create edition: ' || p_edition);
-        EXECUTE IMMEDIATE '
-            CREATE EDITION ' || p_edition || ' 
-            ';
-        EXECUTE IMMEDIATE 'GRANT USE ON EDITION ' || p_edition || ' TO ' || p_schema_name;
-        DBMS_OUTPUT.PUT_LINE('  - Edition created.');
-    EXCEPTION
-        WHEN OTHERS THEN
-            IF SQLCODE = -955 THEN
-                DBMS_OUTPUT.PUT_LINE('  - Edition already exists.');
-            ELSE
-                DBMS_OUTPUT.PUT_LINE('  - Edition not created.');
-                RAISE;
-            END IF;
-    END;
-
-END;
-/
-
-ALTER SESSION SET EDITION = "&EDITION"
-/
-
-ALTER SESSION SET CURRENT_SCHEMA = "&ADB_SCHEMA_NAME";
-/
-
-```
+<<< ../../../../db/dist/000_install.sql
 :::
 
-While after deployment script swaps the new edition as the default.
-
-#### `./db/dist/utils/999_after_deploy.sql`
+####  `./db/dist/999_install.sql`
 
 ::: details source
-```sql
-ALTER DATABASE DEFAULT EDITION = "&EDITION";
-/
+<<< ../../../../db/dist/999_install.sql
+:::
+
+These scripts apply application configuration from Environment variables:
+
+- **VERSION** - release version. e.g. `v0.0.161`
+- **SCHEMA** - schema name. e.g. `odbvue`
+- **EDITION** - concatenation of schema and edition - `ODBVUE_V_0_0_161`
+- **CONFIG** - application configuration in JSON format (single lined). See example below.
+
+####  `./db/config.json.example`
+
+::: details source
+```json
+{
+  "schema": {
+    "username": "odbvue",
+    "password": "************",
+    "grants": [
+      "CREATE SESSION",
+      "CREATE TABLE",
+      "CREATE VIEW",
+      "CREATE SEQUENCE",
+      "CREATE PROCEDURE",
+      "CREATE TRIGGER",
+      "CREATE TYPE",
+      "CREATE SYNONYM",
+      "MANAGE SCHEDULER",
+      "EXECUTE ON DBMS_SCHEDULER",
+      "EXECUTE ON DBMS_CRYPTO",
+      "EXECUTE ON DBMS_CLOUD"
+    ],
+    "enable_resource_principal": true
+  },
+  "acl":[
+    {"host":"api.chucknorris.io","lower_port":443,"upper_port":443,"privilege":"http"},
+    {"host":"api.openai.com","lower_port":443,"upper_port":443,"privilege":"http"},
+    {"host":"smtp.email.eu-stockholm-1.oci.oraclecloud.com","lower_port":587,"upper_port":587,"privilege":"smtp"}
+  ],
+  "app":{
+    "username": "admin@odbvue.com",
+    "password": "************",
+    "fullname": "OdbVue Admin",
+    "host": "apps.odbvue.com"
+  },
+  "smtp": {
+    "host": "smtp.email.eu-stockholm-1.oci.oraclecloud.com",
+    "port": 587,
+    "username": "ocid1.user.oc1..aaaa..fnhq.xy.com",
+    "password": "************",
+    "addr": "admin@odbvue.com",
+    "name": "OdbVue Admin"
+  },
+  "s3": "https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<bucket>/o/",
+  "jwt": {
+    "issuer": "OdbVue",
+    "audience": "OdbVue Users",
+    "secret": "************",
+    "types": [
+      {
+        "id": "ACCESS",
+        "name": "Access Token",
+        "expiration": 900,
+        "stored": "N"
+      },
+      {
+        "id": "REFRESH",
+        "name": "Refresh Token",
+        "expiration": 604800,
+        "stored": "Y"
+      },
+      {
+        "id": "VERIFY",
+        "name": "Identity Verification Token",
+        "expiration": 86400,
+        "stored": "Y"
+      }
+    ]
+  }
+}
+
 ```
 :::
 

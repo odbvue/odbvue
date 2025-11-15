@@ -14,29 +14,24 @@ EXEC :config := '&CONFIG';
 EXEC :schema := '&SCHEMA';
 EXEC :edition := '&EDITION';
 
-BEGIN
-  DBMS_OUTPUT.PUT_LINE('- variables');
-  DBMS_OUTPUT.PUT_LINE('  - version: ' || :version);
-  DBMS_OUTPUT.PUT_LINE('  - app config: ' || SUBSTR(:config, 1, 10) || '...');
-  DBMS_OUTPUT.PUT_LINE('  - schema: ' || :schema);
-  DBMS_OUTPUT.PUT_LINE('  - edition: ' || :edition);
-END;
-/
+PROMPT "-variables"
+PROMPT "  - version: " || :version
+PROMPT "  - app config: " || SUBSTR(:config, 1, 10) || "..."
+PROMPT "  - schema: " || :schema
+PROMPT "  - edition: " || :edition
+PROMPT ""
 
-@@utils/000_before_deploy.sql
+@@000_install.sql
 
-ALTER SESSION SET CURRENT_SCHEMA = "&SCHEMA"
-/
-
-ALTER SESSION SET EDITION = "&EDITION"
-/
+PROMPT ""
 
 lb update -log -changelog-file releases/main.changelog.xml -search-path "."
 
-@@utils/999_after_deploy.sql
+PROMPT ""
 
-ALTER DATABASE DEFAULT EDITION = "&EDITION"
-/
+@@999_install.sql
+
+PROMPT ""
 
 UNDEFINE version
 UNDEFINE config
