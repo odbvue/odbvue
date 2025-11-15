@@ -242,21 +242,18 @@ BEGIN
 
             BEGIN
                 
-                EXECUTE IMMEDIATE 'MERGE INTO app_token_settings s
-                USING (SELECT 1 AS id FROM dual) u
-                ON (s.id = u.id)
+                EXECUTE IMMEDIATE 'MERGE INTO app_token_settings t
+                USING (SELECT :1 AS issuer, :2 AS audience, :3 AS secret FROM dual) s
+                ON (1=1)
                 WHEN MATCHED THEN
                     UPDATE SET
-                        issuer = :issuer,
-                        audience = :audience,
-                        secret = :secret
+                        t.issuer = s.issuer,
+                        t.audience = s.audience,
+                        t.secret = s.secret
                 WHEN NOT MATCHED THEN
                     INSERT (issuer, audience, secret)
-                    VALUES (:issuer, :audience, :secret)'
+                    VALUES (s.issuer, s.audience, s.secret)'
                 USING
-                    v_issuer,
-                    v_audience,
-                    v_secret,
                     v_issuer,
                     v_audience,
                     v_secret;
