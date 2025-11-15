@@ -2,24 +2,24 @@ DECLARE
     c CLOB := :config;
 
     PROCEDURE setting(
-        p_key IN VARCHAR2,
+        p_id IN VARCHAR2,
         p_name IN VARCHAR2,
         p_value IN VARCHAR2
     ) AS 
     BEGIN
-        DBMS_OUTPUT.PUT_LINE('  - upserting setting: ' || p_key);
+        DBMS_OUTPUT.PUT_LINE('  - upserting setting: ' || p_id);
         EXECUTE IMMEDIATE 'MERGE INTO app_settings t 
-        USING (SELECT :1 AS key, :2 AS name, :3 AS value FROM dual) s
-        ON (t.key = s.key)
+        USING (SELECT :1 AS id, :2 AS name, :3 AS value FROM dual) s
+        ON (t.id = s.id)
         WHEN MATCHED THEN
             UPDATE SET
                 t.name = s.name,
                 t.value = s.value
         WHEN NOT MATCHED THEN
-            INSERT (key, name, value)
-            VALUES (s.key, s.name, s.value)'
+            INSERT (id, name, value)
+            VALUES (s.id, s.name, s.value)'
         USING
-            p_key,
+            p_id,
             p_name,
             p_value;
 
