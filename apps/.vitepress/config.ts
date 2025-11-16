@@ -80,8 +80,9 @@ export default defineConfig({
               text: 'Advanced UI Components',
               collapsed: true,
               items: [
-                { text: 'Charts', link: '/guide/apps/advanced-ui-components/chart' },
+                { text: 'Chart', link: '/guide/apps/advanced-ui-components/chart' },
                 { text: 'Editor', link: '/guide/apps/advanced-ui-components/editor' },
+                { text: 'Pad', link: '/guide/apps/advanced-ui-components/pad' },
               ],
             },
           ],

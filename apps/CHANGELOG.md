@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.178
+
+### Patch Changes
+
+- 6fc073c: pad component
+
 ## 0.0.177
 
 ### Patch Changes
