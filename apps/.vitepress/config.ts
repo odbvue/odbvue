@@ -76,6 +76,11 @@ export default defineConfig({
             { text: 'Auto imports', link: '/guide/apps/auto-imports' },
             { text: 'Layouts', link: '/guide/apps/layouts' },
             { text: 'Application Features', link: '/guide/apps/application-features' },
+            {
+              text: 'Advanced UI Components',
+              collapsed: true,
+              items: [{ text: 'Charts', link: '/guide/apps/advanced-ui-components/chart' }],
+            },
           ],
         },
         {
