@@ -77,6 +77,12 @@ const compontents = ref([
     text: 'Rich text editor component powered by TipTap with configurable formatting toolbar and HTML/Markdown conversion',
   },
   {
+    icon: '$mdiMap',
+    to: '/sandbox/sandbox-map',
+    title: 'Map',
+    text: 'Interactive map component powered by Google Maps with marker management, geolocation support, and customizable center/zoom controls',
+  },
+  {
     icon: '$mdiMusic',
     to: '/sandbox/sandbox-media',
     title: 'Media',
