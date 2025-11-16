@@ -51,6 +51,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/sandbox/sandbox-chart': RouteRecordInfo<
+      '/sandbox/sandbox-chart',
+      '/sandbox/sandbox-chart',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
   }
 
   /**
@@ -85,6 +92,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/sandbox/index.vue': {
       routes:
         | '/sandbox/'
+      views:
+        | never
+    }
+    'src/pages/sandbox/sandbox-chart.vue': {
+      routes:
+        | '/sandbox/sandbox-chart'
       views:
         | never
     }
