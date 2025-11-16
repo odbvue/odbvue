@@ -79,6 +79,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/sandbox/sandbox-share': RouteRecordInfo<
+      '/sandbox/sandbox-share',
+      '/sandbox/sandbox-share',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
   }
 
   /**
@@ -137,6 +144,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/sandbox/sandbox-pad.vue': {
       routes:
         | '/sandbox/sandbox-pad'
+      views:
+        | never
+    }
+    'src/pages/sandbox/sandbox-share.vue': {
+      routes:
+        | '/sandbox/sandbox-share'
       views:
         | never
     }

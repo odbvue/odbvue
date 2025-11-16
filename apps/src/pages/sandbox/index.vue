@@ -77,16 +77,22 @@ const compontents = ref([
     text: 'Rich text editor component powered by TipTap with configurable formatting toolbar and HTML/Markdown conversion',
   },
   {
+    icon: '$mdiMusic',
+    to: '/sandbox/sandbox-media',
+    title: 'Media',
+    text: 'Universal media component for video playback, video recording, audio playback, and audio recording with device management and snapshot capture',
+  },
+  {
     icon: '$mdiDraw',
     to: '/sandbox/sandbox-pad',
     title: 'Pad',
     text: 'Interactive drawing and sketching component with support for multiple stroke types, shapes, colors, and undo/redo functionality',
   },
   {
-    icon: '$mdiMusic',
-    to: '/sandbox/sandbox-media',
-    title: 'Media',
-    text: 'Universal media component for video playback, video recording, audio playback, and audio recording with device management and snapshot capture',
+    icon: '$mdiShare',
+    to: '/sandbox/sandbox-share',
+    title: 'Share',
+    text: 'Social media sharing and clipboard functionality component with support for multiple platforms and customizable button styling',
   },
 ])
 </script>
