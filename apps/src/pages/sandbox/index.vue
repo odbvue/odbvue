@@ -82,5 +82,11 @@ const compontents = ref([
     title: 'Pad',
     text: 'Interactive drawing and sketching component with support for multiple stroke types, shapes, colors, and undo/redo functionality',
   },
+  {
+    icon: '$mdiMusic',
+    to: '/sandbox/sandbox-media',
+    title: 'Media',
+    text: 'Universal media component for video playback, video recording, audio playback, and audio recording with device management and snapshot capture',
+  },
 ])
 </script>
