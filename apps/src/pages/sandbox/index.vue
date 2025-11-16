@@ -35,10 +35,22 @@
       </v-row>
     </v-card-text>
   </v-card>
+  <v-container fluid>
+    <h2 class="mb-4">Components</h2>
+    <v-row>
+      <v-col cols="12" md="6" lg="4" v-for="comp in compontents" :key="comp.to">
+        <v-card :to="comp.to">
+          <v-card-title><v-icon :icon="comp.icon" />{{ comp.text }}</v-card-title>
+        </v-card>
+      </v-col>
+    </v-row>
+  </v-container>
 </template>
 
 <script setup lang="ts">
 const cardBackground = useCardBackground('#ccccee')
 const { t } = useI18n()
 const app = useAppStore()
+
+const compontents = ref([{ icon: '$mdiChartLine', to: '/sandbox/sandbox-chart', text: 'Chart' }])
 </script>
