@@ -1,5 +1,0 @@
----
-'odbvue': patch
----
-
-chart component
