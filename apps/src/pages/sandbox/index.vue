@@ -76,5 +76,11 @@ const compontents = ref([
     title: 'Editor',
     text: 'Rich text editor component powered by TipTap with configurable formatting toolbar and HTML/Markdown conversion',
   },
+  {
+    icon: '$mdiDraw',
+    to: '/sandbox/sandbox-pad',
+    title: 'Pad',
+    text: 'Interactive drawing and sketching component with support for multiple stroke types, shapes, colors, and undo/redo functionality',
+  },
 ])
 </script>

@@ -16,5 +16,6 @@ declare module 'vue' {
     TestComponent: typeof import('./src/components/TestComponent.vue')['default']
     VOvChart: typeof import('./src/components/VOvChart.vue')['default']
     VOvEditor: typeof import('./src/components/VOvEditor.vue')['default']
+    VOvPad: typeof import('./src/components/VOvPad.vue')['default']
   }
 }
