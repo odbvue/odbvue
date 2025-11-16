@@ -1,0 +1,5 @@
+---
+'odbvue': patch
+---
+
+share component
