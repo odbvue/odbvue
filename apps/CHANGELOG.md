@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.177
+
+### Patch Changes
+
+- 798654a: editor component
+
 ## 0.0.176
 
 ### Patch Changes
