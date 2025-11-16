@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.180
+
+### Patch Changes
+
+- 4c8f17a: share component
+
 ## 0.0.179
 
 ### Patch Changes
