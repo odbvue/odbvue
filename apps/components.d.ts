@@ -15,6 +15,7 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     VOvChart: typeof import('./src/components/VOvChart.vue')['default']
     VOvEditor: typeof import('./src/components/VOvEditor.vue')['default']
+    VOvMap: typeof import('./src/components/VOvMap.vue')['default']
     VOvMedia: typeof import('./src/components/VOvMedia.vue')['default']
     VOvPad: typeof import('./src/components/VOvPad.vue')['default']
     VOvShare: typeof import('./src/components/VOvShare.vue')['default']
