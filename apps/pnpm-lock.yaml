@@ -59,6 +59,9 @@ importers:
       vue-router:
         specifier: ^4.5.1
         version: 4.6.3(vue@3.5.22(typescript@5.9.3))
+      vue-socials:
+        specifier: ^2.0.5
+        version: 2.0.5(vue@3.5.22(typescript@5.9.3))
       vuetify:
         specifier: ^3.10.7
         version: 3.10.7(typescript@5.9.3)(vite-plugin-vuetify@2.1.2)(vue@3.5.22(typescript@5.9.3))
@@ -3373,6 +3376,11 @@ packages:
     resolution: {integrity: sha512-ARBedLm9YlbvQomnmq91Os7ck6efydTSpRP3nuOKCvgJOHNrhRoJDSKtee8kcL1Vf7nz6U+PMBL+hTvR3bTVQg==}
     peerDependencies:
       vue: ^3.5.0
+
+  vue-socials@2.0.5:
+    resolution: {integrity: sha512-fCPElOwYbSYAuB2S/3DJfaXM4YNKXt0Ll8Ncn6aE4I8Ei1bbKO4rlZazHE2M8dKKs/0OwWx2+C+rEGFxlEOPfQ==}
+    peerDependencies:
+      vue: ^3.0.5
 
   vue-tsc@3.1.1:
     resolution: {integrity: sha512-fyixKxFniOVgn+L/4+g8zCG6dflLLt01Agz9jl3TO45Bgk87NZJRmJVPsiK+ouq3LB91jJCbOV+pDkzYTxbI7A==}
@@ -6913,6 +6921,10 @@ snapshots:
   vue-router@4.6.3(vue@3.5.22(typescript@5.9.3)):
     dependencies:
       '@vue/devtools-api': 6.6.4
+      vue: 3.5.22(typescript@5.9.3)
+
+  vue-socials@2.0.5(vue@3.5.22(typescript@5.9.3)):
+    dependencies:
       vue: 3.5.22(typescript@5.9.3)
 
   vue-tsc@3.1.1(typescript@5.9.3):

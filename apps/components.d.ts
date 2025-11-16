@@ -17,5 +17,6 @@ declare module 'vue' {
     VOvEditor: typeof import('./src/components/VOvEditor.vue')['default']
     VOvMedia: typeof import('./src/components/VOvMedia.vue')['default']
     VOvPad: typeof import('./src/components/VOvPad.vue')['default']
+    VOvShare: typeof import('./src/components/VOvShare.vue')['default']
   }
 }
