@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.179
+
+### Patch Changes
+
+- 87a0a8a: media component
+
 ## 0.0.178
 
 ### Patch Changes
