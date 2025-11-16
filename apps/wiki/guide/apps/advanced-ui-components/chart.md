@@ -1,4 +1,4 @@
-# Chart Component
+# Chart
 
 Universal wrapper component for rendering Chart.js charts with responsive resizing and click handling.
 

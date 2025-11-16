@@ -79,7 +79,10 @@ export default defineConfig({
             {
               text: 'Advanced UI Components',
               collapsed: true,
-              items: [{ text: 'Charts', link: '/guide/apps/advanced-ui-components/chart' }],
+              items: [
+                { text: 'Charts', link: '/guide/apps/advanced-ui-components/chart' },
+                { text: 'Editor', link: '/guide/apps/advanced-ui-components/editor' },
+              ],
             },
           ],
         },
