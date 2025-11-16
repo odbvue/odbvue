@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.181
+
+### Patch Changes
+
+- e73c36b: map component
+
 ## 0.0.180
 
 ### Patch Changes
