@@ -41,16 +41,8 @@
           <hr class="mt-4 mb-4" />
           In LA:
           <br />
-          <v-btn
-            @click="
-              center = { lat: 34.0522, lng: -118.2437 }
-              map?.setMarkers([
-                { lat: 34.0522, lng: -118.2437, title: 'Los Angeles', color: 'purple' },
-              ])
-            "
-            >Add marker</v-btn
-          >
-          <v-btn @click="map?.delMarkers([{ lat: 34.0522, lng: -118.2437 }])">Remove marker</v-btn>
+          <v-btn @click="markerAtLA(true)">Add marker</v-btn>
+          <v-btn @click="markerAtLA(false)">Remove marker</v-btn>
         </v-col>
       </v-row>
     </v-container>
@@ -103,5 +95,23 @@ function loadingChanged(newLoading: boolean) {
 
 function clickChanged(newLocation: { lat: number; lng: number }) {
   console.log('clickChanged', newLocation)
+}
+
+function markerAtLA(isSet: boolean) {
+  if (!map.value) return
+  center.value = { lat: 34.0522, lng: -118.2437 }
+
+  const laMarker: TOvMapMarker = {
+    lat: 34.0522,
+    lng: -118.2437,
+    title: 'Los Angeles',
+    color: 'orange',
+  }
+
+  if (isSet) {
+    map.value.setMarkers([laMarker])
+  } else {
+    map.value.delMarkers([laMarker])
+  }
 }
 </script>
