@@ -3,7 +3,7 @@ import path from 'node:path'
 import type { Plugin, ViteDevServer } from 'vite'
 
 const i18nLocales = ['en', 'fr', 'de']
-const i18nRefreshInterval = 30000 // 30 seconds by default
+const i18nRefreshInterval = 300000 // 300 seconds by default
 
 type I18nCache = {
   module?: string
