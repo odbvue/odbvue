@@ -58,9 +58,23 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/sandbox/sandbox-dialog': RouteRecordInfo<
+      '/sandbox/sandbox-dialog',
+      '/sandbox/sandbox-dialog',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/sandbox/sandbox-editor': RouteRecordInfo<
       '/sandbox/sandbox-editor',
       '/sandbox/sandbox-editor',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/sandbox/sandbox-form': RouteRecordInfo<
+      '/sandbox/sandbox-form',
+      '/sandbox/sandbox-form',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -89,6 +103,13 @@ declare module 'vue-router/auto-routes' {
     '/sandbox/sandbox-share': RouteRecordInfo<
       '/sandbox/sandbox-share',
       '/sandbox/sandbox-share',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/sandbox/sandbox-table': RouteRecordInfo<
+      '/sandbox/sandbox-table',
+      '/sandbox/sandbox-table',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -136,9 +157,21 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/pages/sandbox/sandbox-dialog.vue': {
+      routes:
+        | '/sandbox/sandbox-dialog'
+      views:
+        | never
+    }
     'src/pages/sandbox/sandbox-editor.vue': {
       routes:
         | '/sandbox/sandbox-editor'
+      views:
+        | never
+    }
+    'src/pages/sandbox/sandbox-form.vue': {
+      routes:
+        | '/sandbox/sandbox-form'
       views:
         | never
     }
@@ -163,6 +196,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/sandbox/sandbox-share.vue': {
       routes:
         | '/sandbox/sandbox-share'
+      views:
+        | never
+    }
+    'src/pages/sandbox/sandbox-table.vue': {
+      routes:
+        | '/sandbox/sandbox-table'
       views:
         | never
     }

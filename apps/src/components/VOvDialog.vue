@@ -1,0 +1,122 @@
+<template>
+  <v-dialog
+    v-model="dialog"
+    :persistent="props.persistent"
+    :fullscreen="props.fullscreen"
+    :scrollable="props.scrollable"
+    :width="previousBreakpointWidth"
+  >
+    <v-card
+      :title="props.title"
+      :subtitle="props.subtitle"
+      :prepend-icon="props.icon"
+      :color="props.color"
+    >
+      <v-card-text>
+        <span v-if="props.content && !hasContentProps">{{ props.content }}</span>
+        <v-chip v-if="props.content && hasContentProps" v-bind="contentProps">{{
+          props.content
+        }}</v-chip>
+        <slot
+          name="content"
+          :onClose="
+            () => {
+              dialog = false
+            }
+          "
+        ></slot>
+      </v-card-text>
+      <v-card-actions>
+        <v-btn
+          v-for="(action, index) in actionsArray"
+          :key="index"
+          v-bind="actionProps(action)"
+          @click="handleAction(action)"
+        >
+          {{ actionProps(action).text || action }}
+        </v-btn>
+        <slot name="actions"></slot>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+</template>
+
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { useDisplay } from 'vuetify'
+import { OvFormat, OvActionFormat, type OvAction } from '.'
+
+const { name, thresholds } = useDisplay()
+const previousBreakpointWidth = computed<string>(() => {
+  const breakpoints = ['xs', 'sm', 'md', 'lg', 'xl', 'xxl'] as const
+  const currentIndex = breakpoints.indexOf(name.value as 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'xxl')
+  const previousIndex = currentIndex > 0 ? currentIndex - 1 : 0
+  const previousName = breakpoints[previousIndex]
+  const width = thresholds.value[previousName as keyof typeof thresholds.value] ?? 0
+  return width > 0 ? `${width}px` : '100%'
+})
+
+const dialog = ref(false)
+
+defineExpose({
+  dialog,
+})
+
+const props = defineProps<{
+  persistent?: boolean
+  fullscreen?: boolean
+  scrollable?: boolean
+
+  title?: string
+  subtitle?: string
+  icon?: string
+  color?: string
+
+  content?: string
+  contentFormat?: OvFormat | OvFormat[]
+
+  actions?: OvAction | OvAction[]
+  actionFormat?: OvFormat | OvFormat[]
+  actionSubmit?: string | string[]
+  actionCancel?: string | string[]
+}>()
+
+const emit = defineEmits<{
+  (e: 'action', action: OvAction): void
+  (e: 'submit', action: OvAction): void
+  (e: 'cancel'): void
+}>()
+
+const contentProps = computed(() => {
+  return OvFormat(props.content, props.contentFormat)
+})
+
+const hasContentProps = computed(() => {
+  return Object.keys(contentProps.value).length > 0
+})
+
+const actionsArray = computed(() => {
+  return Array.isArray(props.actions) ? props.actions : props.actions ? [props.actions] : []
+})
+
+const actionProps = (action: OvAction) => {
+  return OvActionFormat(action, action, props.actionFormat)
+}
+
+function handleAction(action: OvAction) {
+  const actionName = typeof action === 'string' ? action : action.name
+  const actionCancelNames = [props.actionCancel].flat()
+  const actionSubmitNames = [props.actionSubmit].flat()
+  if (actionCancelNames.includes(actionName)) {
+    emit('cancel')
+    dialog.value = false
+    return
+  }
+  if (actionSubmitNames.includes(actionName)) {
+    emit('submit', action)
+    dialog.value = false
+    return
+  }
+  emit('action', action)
+}
+</script>
