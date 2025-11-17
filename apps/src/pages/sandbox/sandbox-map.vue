@@ -1,52 +1,60 @@
 <template>
-  <v-container>
-    <v-row>
-      <v-col cols="12" lg="6" class="map-column">
-        <v-ov-map
-          ref="map"
-          width="100%"
-          height="400px"
-          :zoom
-          :center
-          :markers
-          @marked="markersChanged"
-          @centered="centerChanged"
-          @zoomed="zoomChanged"
-          @located="locationChanged"
-          @loading="loadingChanged"
-          @clicked="clickChanged"
-        />
-      </v-col>
-      <v-col cols="12" lg="6">
-        {{ zoom }}
-        <br />
-        <v-btn @click="zoom++">Zoom in</v-btn>
-        <v-btn @click="zoom--">Zoom out</v-btn>
-        <hr class="mt-4 mb-4" />
-        {{ location }}
-        <br />
-        <v-btn @click="center = { lat: 0, lng: 0 }">Center</v-btn>
-        <v-btn
-          @click="
-            center = { lat: map?.location.lat ?? center.lat, lng: map?.location.lng ?? center.lng }
-          "
-          >Current</v-btn
-        >
-        <v-btn @click="center = { lat: 40.7128, lng: -74.006 }">New York</v-btn>
-        <v-btn @click="center = { lat: 34.0522, lng: -118.2437 }">Los Angeles</v-btn>
-        <hr class="mt-4 mb-4" />
-        <v-btn
-          @click="
-            map?.setMarkers([
-              { lat: 34.0522, lng: -118.2437, title: 'Los Angeles', color: 'purple' },
-            ])
-          "
-          >Add marker</v-btn
-        >
-        <v-btn @click="map?.delMarkers([{ lat: 34.0522, lng: -118.2437 }])">Remove marker</v-btn>
-      </v-col>
-    </v-row>
-  </v-container>
+  <v-defaults-provider :defaults="{ VBtn: { class: 'ma-1' } }">
+    <v-container fluid>
+      <v-row>
+        <v-col cols="12" lg="6" class="map-column">
+          <v-ov-map
+            ref="map"
+            width="100%"
+            height="400px"
+            :zoom
+            :center
+            :markers
+            @marked="markersChanged"
+            @centered="centerChanged"
+            @zoomed="zoomChanged"
+            @located="locationChanged"
+            @loading="loadingChanged"
+            @clicked="clickChanged"
+          />
+        </v-col>
+        <v-col cols="12" lg="6">
+          Zoom: {{ zoom }}
+          <br />
+          <v-btn @click="zoom++">Zoom in</v-btn>
+          <v-btn @click="zoom--">Zoom out</v-btn>
+          <hr class="mt-4 mb-4" />
+          Location: {{ location }}
+          <br />
+          <v-btn @click="center = { lat: 0, lng: 0 }">Center</v-btn>
+          <v-btn
+            @click="
+              center = {
+                lat: map?.location.lat ?? center.lat,
+                lng: map?.location.lng ?? center.lng,
+              }
+            "
+            >Current</v-btn
+          >
+          <v-btn @click="center = { lat: 40.7128, lng: -74.006 }">New York</v-btn>
+          <v-btn @click="center = { lat: 34.0522, lng: -118.2437 }">Los Angeles</v-btn>
+          <hr class="mt-4 mb-4" />
+          In LA:
+          <br />
+          <v-btn
+            @click="
+              center = { lat: 34.0522, lng: -118.2437 }
+              map?.setMarkers([
+                { lat: 34.0522, lng: -118.2437, title: 'Los Angeles', color: 'purple' },
+              ])
+            "
+            >Add marker</v-btn
+          >
+          <v-btn @click="map?.delMarkers([{ lat: 34.0522, lng: -118.2437 }])">Remove marker</v-btn>
+        </v-col>
+      </v-row>
+    </v-container>
+  </v-defaults-provider>
 </template>
 
 <script setup lang="ts">
