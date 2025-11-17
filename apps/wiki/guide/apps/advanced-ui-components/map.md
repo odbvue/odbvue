@@ -26,9 +26,9 @@ pnpm add vue3-google-map
 
 ## Configuration
 
-Set your Google Maps API key in the environment variables:
+Set your Google Maps API key in the environment `.env` variables:
 
-```env
+```ini
 VITE_GOOGLE_MAP_API_KEY=your_api_key_here
 ```
 
