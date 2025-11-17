@@ -82,6 +82,7 @@ export default defineConfig({
               items: [
                 { text: 'Chart', link: '/guide/apps/advanced-ui-components/chart' },
                 { text: 'Editor', link: '/guide/apps/advanced-ui-components/editor' },
+                { text: 'Form', link: '/guide/apps/advanced-ui-components/form' },
                 { text: 'Map', link: '/guide/apps/advanced-ui-components/map' },
                 { text: 'Media', link: '/guide/apps/advanced-ui-components/media' },
                 { text: 'Pad', link: '/guide/apps/advanced-ui-components/pad' },

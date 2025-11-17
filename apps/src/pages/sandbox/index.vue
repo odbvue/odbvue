@@ -49,7 +49,7 @@
     <v-row>
       <v-col cols="12" md="6" lg="4" v-for="comp in compontents" :key="comp.to">
         <v-card :to="comp.to" :style="cardBackgroundComponents" class="pa-4 h-100" hover>
-          <v-card-title><v-icon :icon="comp.icon" />{{ comp.title }}</v-card-title>
+          <v-card-title><v-icon :icon="comp.icon" class="mr-2" />{{ comp.title }}</v-card-title>
           <v-card-text>{{ comp.text }}</v-card-text>
         </v-card>
       </v-col>
@@ -75,6 +75,12 @@ const compontents = ref([
     to: '/sandbox/sandbox-editor',
     title: 'Editor',
     text: 'Rich text editor component powered by TipTap with configurable formatting toolbar and HTML/Markdown conversion',
+  },
+  {
+    icon: '$mdiFormTextarea',
+    to: '/sandbox/sandbox-form',
+    title: 'Form',
+    text: 'Flexible form component with built-in validation, customizable fields, and action handling. Supports text, email, password, textarea, number, select, checkbox, switch, rating, file, and date/time inputs',
   },
   {
     icon: '$mdiMap',
