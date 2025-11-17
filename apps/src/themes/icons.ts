@@ -6,7 +6,9 @@
 
 import {
 	mdiAccount,
+	mdiAlert,
 	mdiCamera,
+	mdiCard,
 	mdiChartLine,
 	mdiCheck,
 	mdiChevronLeft,
@@ -68,7 +70,9 @@ import {
 
 export default {
   mdiAccount,
+  mdiAlert,
   mdiCamera,
+  mdiCard,
   mdiChartLine,
   mdiCheck,
   mdiChevronLeft,

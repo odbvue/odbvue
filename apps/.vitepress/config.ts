@@ -81,6 +81,7 @@ export default defineConfig({
               collapsed: true,
               items: [
                 { text: 'Chart', link: '/guide/apps/advanced-ui-components/chart' },
+                { text: 'Dialog', link: '/guide/apps/advanced-ui-components/dialog' },
                 { text: 'Editor', link: '/guide/apps/advanced-ui-components/editor' },
                 { text: 'Form', link: '/guide/apps/advanced-ui-components/form' },
                 { text: 'Map', link: '/guide/apps/advanced-ui-components/map' },

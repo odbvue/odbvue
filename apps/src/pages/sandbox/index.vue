@@ -3,9 +3,12 @@
     <v-row>
       <v-col cols="12">
         <h2 class="mb-4">UI Features</h2>
-        <v-card :style="cardBackground">
-          <v-card-title> <v-icon icon="$mdiMinus" />{{ t('sandbox.title') }} </v-card-title>
-          <v-card-subtitle>{{ t('sandbox.description') }}</v-card-subtitle>
+        <v-card
+          prepend-icon="$mdiMinus"
+          :style="cardBackground"
+          :title="t('sandbox.title')"
+          :subtitle="t('sandbox.description')"
+        >
           <v-card-text>
             <v-row>
               <v-col cols="12" md="10">
@@ -48,10 +51,15 @@
     <h2 class="mb-4">UI Components</h2>
     <v-row>
       <v-col cols="12" md="6" lg="4" v-for="comp in compontents" :key="comp.to">
-        <v-card :to="comp.to" :style="cardBackgroundComponents" class="pa-4 h-100" hover>
-          <v-card-title><v-icon :icon="comp.icon" class="mr-2" />{{ comp.title }}</v-card-title>
-          <v-card-text>{{ comp.text }}</v-card-text>
-        </v-card>
+        <v-card
+          :to="comp.to"
+          :style="cardBackgroundComponents"
+          :prepend-icon="comp.icon"
+          :title="comp.title"
+          :text="comp.text"
+          class="pa-4 h-100"
+          hover
+        />
       </v-col>
     </v-row>
   </v-container>
@@ -69,6 +77,12 @@ const compontents = ref([
     to: '/sandbox/sandbox-chart',
     title: 'Chart',
     text: 'Universal wrapper component for rendering Chart.js charts with responsive resizing and click handling',
+  },
+  {
+    icon: '$mdiCard',
+    to: '/sandbox/sandbox-dialog',
+    title: 'Dialog',
+    text: 'Modal dialog component with customizable title, content, actions, and layout options. Built on Vuetify Dialog component with support for persistent, fullscreen, and scrollable modes',
   },
   {
     icon: '$mdiPen',

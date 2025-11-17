@@ -58,6 +58,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/sandbox/sandbox-dialog': RouteRecordInfo<
+      '/sandbox/sandbox-dialog',
+      '/sandbox/sandbox-dialog',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/sandbox/sandbox-editor': RouteRecordInfo<
       '/sandbox/sandbox-editor',
       '/sandbox/sandbox-editor',
@@ -147,6 +154,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/sandbox/sandbox-chart.vue': {
       routes:
         | '/sandbox/sandbox-chart'
+      views:
+        | never
+    }
+    'src/pages/sandbox/sandbox-dialog.vue': {
+      routes:
+        | '/sandbox/sandbox-dialog'
       views:
         | never
     }
