@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.182
+
+### Patch Changes
+
+- c8cfe45: table, form and dialog ui components
+
 ## 0.0.181
 
 ### Patch Changes
