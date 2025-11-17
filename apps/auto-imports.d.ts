@@ -7,6 +7,10 @@
 export {}
 declare global {
   const EffectScope: typeof import('vue').EffectScope
+  const OvActionFormat: typeof import('./src/components/index').OvActionFormat
+  const OvFormat: typeof import('./src/components/index').OvFormat
+  const OvRuleValidate: typeof import('./src/components/index').OvRuleValidate
+  const OvTextAlign: typeof import('./src/components/index').OvTextAlign
   const computed: typeof import('vue').computed
   const createApp: typeof import('vue').createApp
   const customRef: typeof import('vue').customRef
