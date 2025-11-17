@@ -106,5 +106,11 @@ const compontents = ref([
     title: 'Share',
     text: 'Social media sharing and clipboard functionality component with support for multiple platforms and customizable button styling',
   },
+  {
+    icon: '$mdiTable',
+    to: '/sandbox/sandbox-table',
+    title: 'Table',
+    text: 'Powerful data table component with integrated search, filtering, sorting, pagination, and row/table-level actions. Supports responsive mobile layout, custom cell formatting, and inline editing with modal forms',
+  },
 ])
 </script>
