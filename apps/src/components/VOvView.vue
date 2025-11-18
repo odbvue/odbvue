@@ -50,9 +50,10 @@
   </v-defaults-provider>
 </template>
 <script setup lang="ts">
-import { useDisplay } from 'vuetify'
+import { computed } from 'vue'
+import { useDisplay, useDefaults } from 'vuetify'
 import type { OvViewOptions, OvViewData } from '.'
-import { renderViewItem, OvTextAlign } from '.'
+import { renderViewItem, OvTextAlign, OvActionFormat } from '.'
 
 const { defaults } = useDefaults({
   name: 'VOvForm',
