@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.183
+
+### Patch Changes
+
+- bdc8af4: view component
+
 ## 0.0.182
 
 ### Patch Changes
