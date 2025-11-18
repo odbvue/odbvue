@@ -26,14 +26,21 @@
           "
         ></slot>
       </v-card-text>
-      <v-card-actions>
+      <v-card-actions v-if="actionsArray || closeable">
         <v-btn
           v-for="(action, index) in actionsArray"
           :key="index"
           v-bind="actionProps(action)"
           @click="handleAction(action)"
         >
-          {{ actionProps(action).text || action }}
+          {{ t(String(actionProps(action).text || action)) }}
+        </v-btn>
+        <v-btn
+          v-if="props.closeable"
+          color="secondary"
+          @click="dialog = false"
+        >
+          {{ t('close') }}
         </v-btn>
         <slot name="actions"></slot>
       </v-card-actions>
@@ -58,6 +65,8 @@ const previousBreakpointWidth = computed<string>(() => {
 
 const dialog = ref(false)
 
+const { t } = useI18n()
+
 defineExpose({
   dialog,
 })
@@ -66,6 +75,7 @@ const props = defineProps<{
   persistent?: boolean
   fullscreen?: boolean
   scrollable?: boolean
+  closeable?: boolean
 
   title?: string
   subtitle?: string

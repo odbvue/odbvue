@@ -32,6 +32,7 @@ Modal dialog component with customizable title, content, actions, and layout opt
 | `persistent` | `boolean` | `false` | Prevent dialog from closing when clicking outside |
 | `fullscreen` | `boolean` | `false` | Display dialog in fullscreen mode |
 | `scrollable` | `boolean` | `false` | Enable scrolling for long content |
+| `closeable` | `boolean` | `false` | Adds close button that closes the dialog |
 | `title` | `string` | - | Dialog title text |
 | `subtitle` | `string` | - | Dialog subtitle text (displayed below title) |
 | `icon` | `string` | - | Icon to display in dialog header |
