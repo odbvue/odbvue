@@ -64,5 +64,8 @@
   "apply": "Apply",
   "details": "Details",
   "ok": "Ok",
-  "status-all": "Status-all"
+  "status-all": "Status-all",
+  "agree": "Agree",
+  "disagree": "Disagree",
+  "not sure": "Not sure"
 }

@@ -37,11 +37,7 @@
         >
           {{ t(String(actionProps(action).text || action)) }}
         </v-btn>
-        <v-btn
-          v-if="props.closeable"
-          color="secondary"
-          @click="dialogOpen = false"
-        >
+        <v-btn v-if="props.closeable" color="secondary" @click="dialogOpen = false">
           {{ t('close') }}
         </v-btn>
         <slot name="actions"></slot>
@@ -53,6 +49,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useDisplay } from 'vuetify'
+import { useI18n } from 'vue-i18n'
 import { OvFormat, OvActionFormat, type OvAction } from '.'
 
 const { name, thresholds } = useDisplay()
@@ -92,7 +89,7 @@ const props = defineProps<{
 }>()
 
 const dialogOpen = computed({
-  get: () => props.activator ? internalOpen.value : (props.modelValue ?? false),
+  get: () => (props.activator ? internalOpen.value : (props.modelValue ?? false)),
   set: (value: boolean) => {
     if (props.activator) {
       internalOpen.value = value

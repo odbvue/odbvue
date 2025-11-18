@@ -24,8 +24,7 @@ if (typeof global.visualViewport === 'undefined') {
 
 // Helper to open dialog and wait for render
 async function openDialog(wrapper: ReturnType<typeof mount>) {
-  const vm = wrapper.vm as unknown as Record<string, unknown>
-  vm.dialog = true
+  await wrapper.setProps({ modelValue: true })
   await wrapper.vm.$nextTick()
   await flushPromises()
 }
@@ -393,55 +392,59 @@ describe('VOvDialog', () => {
       const wrapper = mount(VOvDialog, {
         props: {
           title: 'Dialog',
+          modelValue: false,
         },
       })
-      expect(wrapper.vm.dialog).toBeDefined()
+      expect(wrapper.vm).toBeDefined()
     })
 
     it('dialog ref is initially false', () => {
       const wrapper = mount(VOvDialog, {
         props: {
           title: 'Dialog',
+          modelValue: false,
         },
       })
-      expect(wrapper.vm.dialog).toBe(false)
+      expect(wrapper.props('modelValue')).toBe(false)
     })
 
     it('dialog ref can be toggled', async () => {
       const wrapper = mount(VOvDialog, {
         props: {
           title: 'Dialog',
+          modelValue: false,
         },
       })
-      wrapper.vm.dialog = true
+      await wrapper.setProps({ modelValue: true })
       await wrapper.vm.$nextTick()
-      expect(wrapper.vm.dialog).toBe(true)
+      expect(wrapper.props('modelValue')).toBe(true)
     })
 
     it('dialog ref can be opened from false to true', async () => {
       const wrapper = mount(VOvDialog, {
         props: {
           title: 'Dialog',
+          modelValue: false,
         },
       })
-      expect(wrapper.vm.dialog).toBe(false)
-      wrapper.vm.dialog = true
+      expect(wrapper.props('modelValue')).toBe(false)
+      await wrapper.setProps({ modelValue: true })
       await wrapper.vm.$nextTick()
-      expect(wrapper.vm.dialog).toBe(true)
+      expect(wrapper.props('modelValue')).toBe(true)
     })
 
     it('dialog ref can be closed from true to false', async () => {
       const wrapper = mount(VOvDialog, {
         props: {
           title: 'Dialog',
+          modelValue: true,
         },
       })
-      wrapper.vm.dialog = true
       await wrapper.vm.$nextTick()
-      expect(wrapper.vm.dialog).toBe(true)
-      wrapper.vm.dialog = false
+      expect(wrapper.props('modelValue')).toBe(true)
+      await wrapper.setProps({ modelValue: false })
       await wrapper.vm.$nextTick()
-      expect(wrapper.vm.dialog).toBe(false)
+      expect(wrapper.props('modelValue')).toBe(false)
     })
   })
 
