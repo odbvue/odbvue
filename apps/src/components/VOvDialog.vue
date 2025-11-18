@@ -1,6 +1,8 @@
 <template>
   <v-dialog
-    v-model="dialog"
+    :model-value="dialogOpen"
+    @update:model-value="dialogOpen = $event"
+    :activator="props.activator"
     :persistent="props.persistent"
     :fullscreen="props.fullscreen"
     :scrollable="props.scrollable"
@@ -21,7 +23,7 @@
           name="content"
           :onClose="
             () => {
-              dialog = false
+              dialogOpen = false
             }
           "
         ></slot>
@@ -38,7 +40,7 @@
         <v-btn
           v-if="props.closeable"
           color="secondary"
-          @click="dialog = false"
+          @click="dialogOpen = false"
         >
           {{ t('close') }}
         </v-btn>
@@ -63,15 +65,13 @@ const previousBreakpointWidth = computed<string>(() => {
   return width > 0 ? `${width}px` : '100%'
 })
 
-const dialog = ref(false)
-
 const { t } = useI18n()
 
-defineExpose({
-  dialog,
-})
+const internalOpen = ref(false)
 
 const props = defineProps<{
+  modelValue?: boolean
+  activator?: string
   persistent?: boolean
   fullscreen?: boolean
   scrollable?: boolean
@@ -91,7 +91,19 @@ const props = defineProps<{
   actionCancel?: string | string[]
 }>()
 
+const dialogOpen = computed({
+  get: () => props.activator ? internalOpen.value : (props.modelValue ?? false),
+  set: (value: boolean) => {
+    if (props.activator) {
+      internalOpen.value = value
+    } else {
+      emit('update:modelValue', value)
+    }
+  },
+})
+
 const emit = defineEmits<{
+  (e: 'update:modelValue', value: boolean): void
   (e: 'action', action: OvAction): void
   (e: 'submit', action: OvAction): void
   (e: 'cancel'): void
@@ -119,12 +131,12 @@ function handleAction(action: OvAction) {
   const actionSubmitNames = [props.actionSubmit].flat()
   if (actionCancelNames.includes(actionName)) {
     emit('cancel')
-    dialog.value = false
+    dialogOpen.value = false
     return
   }
   if (actionSubmitNames.includes(actionName)) {
     emit('submit', action)
-    dialog.value = false
+    dialogOpen.value = false
     return
   }
   emit('action', action)
