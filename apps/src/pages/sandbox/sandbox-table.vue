@@ -99,7 +99,14 @@ const options = ref<OvTableOptions>({
   key: 'name',
   columns: [
     { name: 'name' },
-    { name: 'email' },
+    {
+      name: 'email',
+      format: {
+        icon: '$mdiEmail',
+        href: 'mailto:{{value}}',
+        target: '_blank',
+      },
+    },
     { name: 'phone', maxLength: 0 },
     { name: 'website', format: { text: 'site' }, maxLength: 20 },
     {

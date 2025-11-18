@@ -89,6 +89,7 @@ export default defineConfig({
                 { text: 'Pad', link: '/guide/apps/advanced-ui-components/pad' },
                 { text: 'Share', link: '/guide/apps/advanced-ui-components/share' },
                 { text: 'Table', link: '/guide/apps/advanced-ui-components/table' },
+                { text: 'View', link: '/guide/apps/advanced-ui-components/view' },
               ],
             },
           ],

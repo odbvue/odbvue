@@ -110,7 +110,15 @@
             <tbody v-if="!mobile">
               <tr v-for="item in page" :key="String(item[options.key])">
                 <td v-for="column in columns" :key="column.name" :class="column.class">
-                  <component :is="renderTableCell(item, column.name)" />
+                  <v-ov-view
+                    :data="item"
+                    :options="{ items: [columnViewOptions.get(column.name)] }"
+                    @details="(name: string, value: string) => showDialog(name, value)"
+                    @action="
+                      (name: string, value: string) =>
+                        handleRowAction(column.name, name, item[options.key])
+                    "
+                  />
                 </td>
               </tr>
               <tr v-for="n in emptyRowsCount" :key="n">
@@ -121,7 +129,15 @@
               <tr v-for="column in columns" :key="column.name">
                 <th class="w-0">{{ column.title }}</th>
                 <td :class="column.class">
-                  <component :is="renderTableCell(item, column.name)" />
+                  <v-ov-view
+                    :data="item"
+                    :options="{ items: [columnViewOptions.get(column.name)] }"
+                    @details="(name: string, value: string) => showDialog(name, value)"
+                    @action="
+                      (name: string, value: string) =>
+                        handleRowAction(column.name, name, item[options.key])
+                    "
+                  />
                 </td>
               </tr>
               <tr>
@@ -158,6 +174,14 @@
         </v-col>
       </v-row>
 
+      <v-ov-dialog
+        v-model="dialog"
+        closeable
+        scrollable
+        :title="t(dialogTitle)"
+        :content="dialogContent"
+      />
+
       <v-dialog v-model="form" :width="mobile ? '100%' : '75%'">
         <v-card>
           <v-card-title>{{ formTitle }}</v-card-title>
@@ -183,14 +207,13 @@
 </template>
 
 <script setup lang="ts">
-import { h, ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useDefaults, useDisplay } from 'vuetify'
 import {
   type OvTableOptions,
   type OvTableData,
   type OvFormOptions,
   type OvFormData,
-  OvFormat,
   OvActionFormat,
 } from './index'
 
@@ -282,6 +305,21 @@ const columns = computed(() => {
   })
 })
 
+const columnViewOptions = computed(() => {
+  return new Map(
+    options.columns.map((column) => [
+      column.name,
+      {
+        name: column.name,
+        format: column.format,
+        actions: column.actions,
+        actionFormat: column.actionFormat,
+        maxLength: column.maxLength ?? options.maxLength,
+      },
+    ]),
+  )
+})
+
 const actions = computed(() => {
   return (options.actions || []).map((action) => {
     const props = OvActionFormat(undefined, action, options.actionFormat)
@@ -293,74 +331,27 @@ const actions = computed(() => {
   })
 })
 
-import { VIcon, VChip, VBtn } from 'vuetify/components'
-function renderTableCell(item: Record<string, unknown>, columnName: string) {
-  const column = options.columns.find((column) => column.name == columnName)
-  if (!column) return
-  return () => {
-    const rawValue = item[column.name] ? String(item[column.name]) : ''
+//dialog
 
-    const maxLen = column.maxLength == 0 ? 0 : column.maxLength || options.maxLength || 32767
-    const value = rawValue.slice(0, maxLen)
-    const isTrimmed = column.maxLength == 0 || rawValue.length > value.length
+const dialog = ref(false)
+const dialogTitle = ref('')
+const dialogContent = ref('')
 
-    const children = []
-
-    if (column.format) {
-      const chipProps = OvFormat(item[column.name], column.format)
-      const hasIcon = chipProps.icon as string | undefined
-      const slots: Record<string, () => unknown> = {}
-
-      if (chipProps.to && typeof chipProps.to === 'string') {
-        chipProps.to = chipProps.to.replace('${value}', String(rawValue))
-      }
-
-      if (hasIcon) {
-        slots.prepend = () =>
-          h(VIcon, {
-            icon: hasIcon,
-            start: true,
-          })
-      }
-      slots.default = () => (chipProps.icon ? '' : value)
-      children.push(h(VChip, chipProps, slots))
-    } else {
-      if (value) children.push(h('span', {}, value as string))
-    }
-    if (isTrimmed) {
-      children.push(
-        h(VBtn, {
-          icon: '$mdiDotsHorizontal',
-          onClick: () => {
-            formOptions.value = {
-              fields: [{ type: 'textarea', name: column.name, value: String(item[column.name]) }],
-              actions: ['ok'],
-              actionCancel: 'ok',
-            }
-            formData.value = {}
-            formTitle.value = t('details')
-            formIsFilter.value = false
-            form.value = true
-          },
-        }),
-      )
-    }
-
-    column.actions?.forEach((action) => {
-      if (typeof action === 'string') action = { name: action }
-      const value = action.key ? item[action.key] : undefined
-      const props = OvActionFormat(value, action, options.actionFormat)
-      children.push(
-        h(VBtn, {
-          ...props,
-          onClick: () => handleRowAction(column.name, action.name, item[options.key]),
-        }),
-      )
-    })
-
-    return h('span', {}, children)
-  }
+function showDialog(title: string, content: string) {
+  dialogTitle.value = title
+  dialogContent.value = content
+  dialog.value = true
 }
+
+// form
+
+const form = ref(false)
+const formTitle = ref('')
+const formOptions = ref<OvFormOptions>({ fields: [] })
+const formData = ref<OvTableData>({})
+const formIsFilter = ref(false)
+const formActionName = ref('')
+const formRowIndex = ref(-1)
 
 // search
 
@@ -550,16 +541,6 @@ async function handleSortUpdate(sortName: string, sortAction: string) {
     await fetch()
   }
 }
-
-// form
-
-const form = ref(false)
-const formTitle = ref('')
-const formOptions = ref<OvFormOptions>({ fields: [] })
-const formData = ref<OvTableData>({})
-const formIsFilter = ref(false)
-const formActionName = ref('')
-const formRowIndex = ref(-1)
 
 // actions
 

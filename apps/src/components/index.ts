@@ -191,8 +191,27 @@ export type OvTableOptions = {
   align?: OvAlign
 }
 
+export type OvViewItem = {
+  name: string
+  label?: string
+  format?: OvFormat | OvFormat[]
+  actions?: OvAction[]
+  actionFormat?: OvFormat | OvFormat[]
+  maxLength?: number
+}
+
+export type OvViewOptions = {
+  cols?: number
+  items: OvViewItem[]
+  actions?: OvAction[]
+  actionFormat?: OvFormat | OvFormat[]
+  actionAlign?: OvAlign
+  maxLength?: number
+}
+
 export type OvFormData = Record<string, unknown>
 export type OvTableData = Record<string, unknown>
+export type OvViewData = Record<string, unknown>
 
 export const OvRuleValidate = (
   value?: unknown,
@@ -302,4 +321,98 @@ export const OvActionFormat = (
   fmt.text = fmt.icon ? undefined : fmt.text || action.name
   fmt.name = action.name
   return { ...actionFmt, ...fmt }
+}
+
+import { h } from 'vue'
+import { VLabel, VIcon, VChip, VBtn } from 'vuetify/components'
+
+export const renderViewItem = (
+  value: unknown,
+  item?: OvViewItem,
+  data?: OvViewData,
+  options?: OvViewOptions,
+  onEmit?: (event: string, ...args: unknown[]) => void,
+) => {
+  return () => {
+    const valueStr = String(value ?? '')
+    const valueDsp = valueStr.slice(0, item?.maxLength ?? options?.maxLength ?? 32767)
+    const isTrimmed = item?.maxLength === 0 || valueStr.length > valueDsp.length
+    const chipProps = OvFormat(valueStr, item?.format)
+
+    const children: (ReturnType<typeof h> | string)[] = []
+
+    if (!chipProps.hidden) {
+      if (item?.label) {
+        children.push(
+          h(
+            VLabel,
+            {
+              size: 'x-small',
+            },
+            {
+              default: () => item?.label,
+            },
+          ),
+        )
+        children.push(h('br'))
+      }
+
+      if (item?.format) {
+        const slots: Record<string, () => unknown> = {
+          default: () => valueDsp,
+        }
+
+        if (chipProps.href && typeof chipProps.href === 'string') {
+          chipProps.href = chipProps.href.replace('{{value}}', valueStr)
+        }
+
+        if (chipProps.to && typeof chipProps.to === 'string') {
+          chipProps.to = chipProps.to.replace('{{value}}', valueStr)
+        }
+
+        if (chipProps.icon) {
+          slots.prepend = () =>
+            h(VIcon, {
+              icon: chipProps.icon as string,
+              start: true,
+            })
+        }
+
+        children.push(h(VChip, chipProps, slots))
+      } else if (valueDsp) {
+        children.push(h('span', {}, valueDsp))
+      }
+
+      if (isTrimmed) {
+        children.push(
+          h(VBtn, {
+            icon: '$mdiDotsHorizontal',
+            variant: 'text',
+            onClick: () => {
+              onEmit?.('details', item?.label ?? item?.name ?? '', valueStr)
+            },
+          }),
+        )
+      }
+    }
+
+    item?.actions?.forEach((action) => {
+      const actionObj = typeof action === 'string' ? { name: action } : action
+      const actionVal = actionObj.key ? (data ?? {})[actionObj.key] : value
+      const props = OvActionFormat(actionVal, actionObj, options?.actionFormat)
+      const hidden = (props as Record<string, unknown>)['hidden'] === true
+      if (!hidden) {
+        children.push(
+          h(VBtn, {
+            ...props,
+            onClick: () => {
+              onEmit?.('action', actionObj.name, valueStr)
+            },
+          }),
+        )
+      }
+    })
+
+    return h('span', {}, children)
+  }
 }

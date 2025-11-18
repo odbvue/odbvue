@@ -126,5 +126,11 @@ const compontents = ref([
     title: 'Table',
     text: 'Powerful data table component with integrated search, filtering, sorting, pagination, and row/table-level actions. Supports responsive mobile layout, custom cell formatting, and inline editing with modal forms',
   },
+  {
+    icon: '$mdiViewDashboard',
+    to: '/sandbox/sandbox-view',
+    title: 'View',
+    text: 'Lightweight display component for rendering structured data with conditional formatting, icons, labels, and item-level actions. Perfect for presenting read-only details or quick-access data with visual enhancements',
+  },
 ])
 </script>

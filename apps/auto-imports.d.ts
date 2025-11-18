@@ -50,6 +50,7 @@ declare global {
   const reactive: typeof import('vue').reactive
   const readonly: typeof import('vue').readonly
   const ref: typeof import('vue').ref
+  const renderViewItem: typeof import('./src/components/index').renderViewItem
   const resolveComponent: typeof import('vue').resolveComponent
   const shallowReactive: typeof import('vue').shallowReactive
   const shallowReadonly: typeof import('vue').shallowReadonly
@@ -107,6 +108,6 @@ declare global {
   export type { Share, WindowFeatures, ShareOptions } from './src/components/VOvShare.vue'
   import('./src/components/VOvShare.vue')
   // @ts-ignore
-  export type { OvRule, OvAction, OvFormTextareaField, OvFormRatingField, OvFormSelectionField, OvFormFieldError, OvAlign, OvFormOptions, OvTableColumn, OvTableOptions, OvFormData, OvTableData } from './src/components/index'
+  export type { OvRule, OvAction, OvFormTextareaField, OvFormRatingField, OvFormSelectionField, OvFormFieldError, OvAlign, OvFormOptions, OvTableColumn, OvTableOptions, OvViewItem, OvViewOptions, OvFormData, OvTableData, OvViewData } from './src/components/index'
   import('./src/components/index')
 }
