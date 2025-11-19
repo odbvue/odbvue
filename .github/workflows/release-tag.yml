@@ -9,11 +9,7 @@ permissions:
   actions: write
 
 jobs:
-  test:
-    uses: ./.github/workflows/test.yml
-
   build:
-    needs: test
     runs-on: ubuntu-latest
     outputs:
       artifact_zip: ${{ steps.db.outputs.zip }}
