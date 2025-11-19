@@ -104,6 +104,7 @@
         variant="text"
         :prepend-icon="app.settings.themeIcon"
         @click="app.settings.toggleTheme()"
+        data-cy="theme-toggle"
       ></v-btn>
       <v-progress-linear
         :active="app.ui.loading"

@@ -1,10 +1,10 @@
 import 'vuetify/styles'
 import { createVuetify } from 'vuetify'
 import { md3 } from 'vuetify/blueprints'
-import { light, dark } from '@/themes/themes.json'
-import { defaults } from '@/themes/defaults'
 import { aliases, mdi } from 'vuetify/iconsets/mdi-svg'
-import icons from '@/themes/icons'
+import { light, dark } from '../themes/themes.json'
+import { defaults } from '../themes/defaults'
+import icons from '../themes/icons'
 
 export default createVuetify({
   blueprint: md3,

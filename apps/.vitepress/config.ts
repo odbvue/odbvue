@@ -96,6 +96,15 @@ export default defineConfig({
           ],
         },
         {
+          text: 'QA',
+          items: [
+            { text: 'Overview', link: '/guide/qa/overview' },
+            { text: 'Unit tests', link: '/guide/qa/unit-tests' },
+            { text: 'E2E tests', link: '/guide/qa/e2e-tests' },
+            { text: 'CI/CD', link: '/guide/qa/cicd-tests' },
+          ],
+        },
+        {
           text: 'Wiki',
           items: [
             { text: 'Setting up VitePress', link: '/guide/wiki/setting-up-vitepress' },
