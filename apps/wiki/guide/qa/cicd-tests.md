@@ -18,8 +18,8 @@ A dedicated test workflow (`test.yml`) that runs on:
 
 ### Workflow Structure
 
-#### `.github\workflows\test.yml`
+#### `.github/workflows/test.yml`
 
 ::: details source
-<<< ../../../../.github\workflows\test.yml
+<<< ../../../../.github/workflows/test.yml
 :::
