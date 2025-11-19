@@ -93,6 +93,11 @@ export default defineConfig({
               ],
             },
             { text: 'Consuming Web Services', link: '/guide/apps/consuming-web-services' },
+            {
+              text: 'Authentication',
+              collapsed: true,
+              items: [{ text: 'Concepts', link: '/guide/apps/authentication/concepts' }],
+            },
           ],
         },
         {
