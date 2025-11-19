@@ -13,12 +13,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v2
         with:
-          package_json_file: 'apps/package.json'
+          package_json_file: "apps/package.json"
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: 'apps/pnpm-lock.yaml'
+          cache-dependency-path: "apps/pnpm-lock.yaml"
       - run: cd apps && pnpm install --frozen-lockfile
       - run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
@@ -50,3 +50,7 @@ jobs:
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test:
+    needs: release
+    uses: ./.github/workflows/test.yml
