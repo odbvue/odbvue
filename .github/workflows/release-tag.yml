@@ -9,7 +9,27 @@ permissions:
   actions: write
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          package_json_file: "apps/package.json"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: "apps/pnpm-lock.yaml"
+
+      - run: cd apps && pnpm install --frozen-lockfile
+
+      - run: cd apps && pnpm test:unit
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     outputs:
       artifact_zip: ${{ steps.db.outputs.zip }}

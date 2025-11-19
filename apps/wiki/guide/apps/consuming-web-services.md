@@ -74,7 +74,7 @@ export default defineConfig(async (configEnv) => {
             inline: ['vuetify'],
           },
         },
-        setupFiles: ['./setup-vitest.ts'],
+        setupFiles: ['./vitest.config.setup.ts'],
       },
     },
   )
