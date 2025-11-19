@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.189
+
+### Patch Changes
+
+- e851b6e: qa fix doc
+
 ## 0.0.188
 
 ### Patch Changes
