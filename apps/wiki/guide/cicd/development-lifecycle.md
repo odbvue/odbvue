@@ -154,16 +154,14 @@ cd ..
 
 DML - Data Manipulation Language - insert and update data scripts  
 
-Create SQL script files manually in `db/src/<your-feature-name>` and stage:
+Create SQL script file placeholder manually for the next changeset:
 
-#### `./scripts/db-add-custom.sh [path-to-file] [commit-message]`
+#### `./scripts/db-add-custom.sh [path-to-file]`
 
 ```bash
 cd db
 sql /nolog
 project stage add-custom -file-name [path-to-file]
-!git add .
-!git commit -m "feat(db): [commit-message]"
 exit
 cd ..
 ```
