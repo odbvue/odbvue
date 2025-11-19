@@ -92,6 +92,7 @@ export default defineConfig({
                 { text: 'View', link: '/guide/apps/advanced-ui-components/view' },
               ],
             },
+            { text: 'Consuming Web Services', link: '/guide/apps/consuming-web-services' },
           ],
         },
         {

@@ -4,7 +4,7 @@
       <v-container>
         <v-row>
           <v-col cols="4">
-            <v-img eager class="rounded-lg border-thin" :alt="title" src="./logo.svg"> </v-img>
+            <v-img eager class="rounded-lg border-thin" :alt="app.title" src="./logo.svg"> </v-img>
           </v-col>
         </v-row>
       </v-container>
@@ -22,7 +22,7 @@
     </v-navigation-drawer>
     <v-app-bar>
       <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
-      <v-toolbar-title>{{ title }}</v-toolbar-title>
+      <v-toolbar-title>{{ app.title }}</v-toolbar-title>
       <v-btn v-if="mobile">
         <v-icon :icon="'$mdiDotsVertical'"></v-icon>
         <v-menu activator="parent">
@@ -164,7 +164,7 @@
     </v-main>
     <v-footer app>
       <v-row>
-        <v-col> {{ version }} </v-col>
+        <v-col> {{ app.version }} </v-col>
         <v-col class="text-right">
           <v-btn
             icon
@@ -185,9 +185,9 @@
 </template>
 
 <script setup lang="ts">
-import { version, title } from '../../package.json'
 const { mobile } = useDisplay()
 const { t } = useI18n()
+
 const app = useAppStore()
 const drawer = ref(false)
 

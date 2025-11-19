@@ -169,34 +169,40 @@ Pattern in as follows:
 This:
 
 ```plsql
-CREATE OR REPLACE EDITIONABLE PACKAGE pck_demo AS -- Application 
-
-    PROCEDURE get_test( -- get test 1
-        r_test OUT VARCHAR2 -- Test Result
+CREATE OR REPLACE EDITIONABLE PACKAGE pck_app AS -- Package for the main application 
+    
+    PROCEDURE get_context ( -- Returns application context
+        r_version OUT VARCHAR2 -- Application version
     );
 
-    PROCEDURE get_test( -- get test 2
-        p_param1 IN VARCHAR2, -- Parameter 1 
-        p_param2 IN NUMBER, -- Parameter 2
-        p_param3 IN VARCHAR2 DEFAULT 'TEST', -- Parameter 3
-        p_param4 IN NUMBER DEFAULT 123, -- Parameter 4
-        r_tests OUT SYS_REFCURSOR, -- Test Results [{key: val}]
-        r_test OUT VARCHAR2 -- Test Result
-    );
+END pck_app;
+/
 
-    PROCEDURE delete_test; -- Delete test
+CREATE OR REPLACE EDITIONABLE PACKAGE BODY pck_app AS
 
-END pck_demo;
+    g_version VARCHAR2(30 CHAR) := '...';
+
+    PROCEDURE get_context (
+        r_version OUT VARCHAR2
+    ) IS
+    BEGIN
+        r_version := g_version;
+
+    END get_context;
+
+BEGIN
+    SELECT REPLACE(LOWER(REGEXP_REPLACE(SYS_CONTEXT('USERENV', 'CURRENT_EDITION_NAME'), '^[A-Z0-9#$_]+_V_', 'v')), '_', '.')
+    INTO g_version
+    FROM dual;
+END pck_app;
 /
 ```
 
 becomes this:
 
 ```log
-Creating module: demo
-  Creating endpoint: GET test/
-  Creating endpoint: GET test/:param1/:param2
-  Creating endpoint: DELETE test/
+Creating module: app
+  Creating endpoint: GET context/
 ```
 
 and is publicly accessible.
@@ -204,19 +210,24 @@ and is publicly accessible.
 Requesting:
 
 ```bash
-curl -X GET "https://localhost:8443/ords/odbvue/demo/test/a/1" -k
+curl -X GET "https://localhost:8443/ords/odbvue/context/" -k
 ```
 
 returns:
 
 ```json
-{"tests":[{"key":"param1","val":"a"},{"key":"param2","val":"1"},{"key":"param3","val":null},{"key":"param4","val":null}],"test":"Test B"}
+{"version":"v0.0.61"}
 ```
 
 > [!TIP]
 > Pattern is as follows:
 > - for GET `https://localhost:8443/ords/[schema-name]/[package-name]/[procedure-name]/[non-defualted-attributes]?[defaulted-attributes]`
 > - same for POST/PUT/DELETE, just `[defaulted-attributes]` shall be passed in request body 
+
+> [!TIP]
+> ORDS automatically generates Open API manifest:
+> - local: `https://localhost:8443/ords/<schema>/open-api-catalog/`
+> - oci: `https://<domain>.adb.<region>.oraclecloudapps.com/ords/<schema>/open-api-catalog/`
 
 ### Implementation underneath
 

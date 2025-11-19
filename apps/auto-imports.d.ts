@@ -72,6 +72,7 @@ declare global {
   const useGoTo: typeof import('vuetify').useGoTo
   const useHead: typeof import('@unhead/vue').useHead
   const useHeadSafe: typeof import('@unhead/vue').useHeadSafe
+  const useHttp: typeof import('./src/composables/http').useHttp
   const useI18n: typeof import('vue-i18n').useI18n
   const useId: typeof import('vue').useId
   const useLayout: typeof import('vuetify').useLayout
