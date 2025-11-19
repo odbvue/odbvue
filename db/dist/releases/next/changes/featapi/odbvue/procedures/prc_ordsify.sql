@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1763540916153 stripComments:false  logicalFilePath:featapi\odbvue\procedures\prc_ordsify.sql
+-- sqlcl_snapshot db/src/database/odbvue/procedures/prc_ordsify.sql:98413c810610e25414044feb849463b2e9bf8144:c93f4282c7d658aee295ac6f23b78d71b50cc931:alter
+
 CREATE OR REPLACE PROCEDURE odbvue.prc_ordsify (
     p_package      VARCHAR2 DEFAULT NULL,
     p_version_name VARCHAR2 DEFAULT NULL,
@@ -452,5 +456,3 @@ BEGIN
 END;
 /
 
-
--- sqlcl_snapshot {"hash":"c93f4282c7d658aee295ac6f23b78d71b50cc931","type":"PROCEDURE","name":"PRC_ORDSIFY","schemaName":"ODBVUE","sxml":""}
