@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.186
+
+### Patch Changes
+
+- a15f80d: sqlcl version bump
+
 ## 0.0.185
 
 ### Patch Changes
