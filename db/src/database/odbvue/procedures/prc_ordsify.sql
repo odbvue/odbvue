@@ -178,7 +178,7 @@ BEGIN
             p_enabled             => TRUE,
             p_schema              => v_schema_name,
             p_url_mapping_type    => 'BASE_PATH',
-            p_url_mapping_pattern => v_schema_name,
+            p_url_mapping_pattern => lower(v_schema_name),
             p_auto_rest_auth      => FALSE
         );
 
@@ -275,11 +275,11 @@ BEGIN
                         defaulted,
                         in_out
                     FROM
-                        all_arguments
+                        all_arguments a
                     WHERE
                             package_name = m.object_name
                         AND object_name = p.procedure_name
-                        AND overload = p.overload
+                        AND nvl(a.overload, '0') = nvl(p.overload, '0')
                         AND owner = upper(v_schema_name)
                     ORDER BY
                         position
@@ -382,11 +382,11 @@ BEGIN
                         in_out,
                         data_type
                     FROM
-                        all_arguments
+                        all_arguments a
                     WHERE
                             package_name = m.object_name
                         AND object_name = p.procedure_name
-                        AND overload = p.overload
+                        AND nvl(a.overload, '0') = nvl(p.overload, '0')
                         AND owner = upper(v_schema_name)
                     ORDER BY
                         position
@@ -453,4 +453,4 @@ END;
 /
 
 
--- sqlcl_snapshot {"hash":"98413c810610e25414044feb849463b2e9bf8144","type":"PROCEDURE","name":"PRC_ORDSIFY","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"c93f4282c7d658aee295ac6f23b78d71b50cc931","type":"PROCEDURE","name":"PRC_ORDSIFY","schemaName":"ODBVUE","sxml":""}
