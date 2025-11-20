@@ -99,6 +99,7 @@ export default defineConfig({
               items: [
                 { text: 'Concepts', link: '/guide/apps/authentication/concepts' },
                 { text: 'Services', link: '/guide/apps/authentication/services' },
+                { text: 'Application', link: '/guide/apps/authentication/application' },
               ],
             },
           ],

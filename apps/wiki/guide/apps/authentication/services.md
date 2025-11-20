@@ -115,8 +115,10 @@ CREATE OR REPLACE PACKAGE odbvue.pck_app AS -- Package for the main application
         r_refresh_token OUT app_tokens.token%TYPE -- Refresh token
     );
 
+    PROCEDURE post_heartbeat; -- Procedure to keep the session alive
 END pck_app;
 /
+
 ```
 :::
 
@@ -221,6 +223,13 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
             pck_api_auth.http_401;
     END;
 
+    PROCEDURE post_heartbeat AS
+    BEGIN
+        IF pck_api_auth.uuid IS NULL THEN
+            pck_api_auth.http_401;
+        END IF;
+    END post_heartbeat;
+
 BEGIN
     SELECT
         replace(
@@ -238,7 +247,6 @@ BEGIN
 
 END pck_app;
 /
-
 ```
 :::
 

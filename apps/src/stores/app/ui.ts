@@ -1,4 +1,5 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
+import { ref, computed } from 'vue'
 
 export const useUiStore = defineStore('ui', () => {
   const loading = ref(false)

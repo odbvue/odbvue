@@ -18,8 +18,9 @@ CREATE OR REPLACE PACKAGE odbvue.pck_app AS -- Package for the main application
         r_refresh_token OUT app_tokens.token%TYPE -- Refresh token
     );
 
+    PROCEDURE post_heartbeat; -- Procedure to keep the session alive
 END pck_app;
 /
 
 
--- sqlcl_snapshot {"hash":"65ff2c8bb84ef1d61e6523daf17fcecff9d0c196","type":"PACKAGE_SPEC","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"9b395e8bfb324723c8cd24a781f15456d04234a5","type":"PACKAGE_SPEC","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}

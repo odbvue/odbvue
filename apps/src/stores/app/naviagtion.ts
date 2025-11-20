@@ -53,7 +53,10 @@ export const useNavigationStore = defineStore('navigation', () => {
   })
 
   const pages = computed(() => {
-    return allPages.filter((page) => page.level < 2).filter((page) => page.path !== '/:path(.*)')
+    return allPages
+      .filter((page) => page.level < 2)
+      .filter((page) => page.path !== '/:path(.*)')
+      .filter((page) => page.role !== 'guest')
   })
 
   return {

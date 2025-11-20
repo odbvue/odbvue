@@ -95,6 +95,13 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
             pck_api_auth.http_401;
     END;
 
+    PROCEDURE post_heartbeat AS
+    BEGIN
+        IF pck_api_auth.uuid IS NULL THEN
+            pck_api_auth.http_401;
+        END IF;
+    END post_heartbeat;
+
 BEGIN
     SELECT
         replace(
@@ -114,4 +121,4 @@ END pck_app;
 /
 
 
--- sqlcl_snapshot {"hash":"a5c882cf138aa288e2ac3bf98d7757507e51cf81","type":"PACKAGE_BODY","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"d215930038ff12db2240d54ab2b19e29797c9eb2","type":"PACKAGE_BODY","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
