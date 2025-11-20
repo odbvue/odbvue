@@ -1,3 +1,5 @@
 {
-  "choose.language": "Choisir la langue"
+  "choose.language": "Choisir la langue",
+  "logout": "Logout",
+  "login": "Login"
 }

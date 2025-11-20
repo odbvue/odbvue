@@ -68,5 +68,6 @@
   "agree": "Agree",
   "disagree": "Disagree",
   "not sure": "Not sure",
-  "delete": "Delete"
+  "delete": "Delete",
+  "logout": "Logout"
 }
