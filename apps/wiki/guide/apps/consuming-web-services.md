@@ -21,7 +21,7 @@ VITE_API_URI = https://127.0.0.1:8443/ords/<schema>/
 
 ## Server Proxy
 
-To prevent [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) problem in local development, need to implement a defined path in `./vite.config.ts`
+To prevent [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) problem in local development, need to implement a proxy in `./vite.config.ts`
 
 ```ts
 // ...
@@ -32,8 +32,15 @@ export default defineConfig(({ mode }) => {
   const isProduction = mode === 'production'
 
   return {
-    define: {
-      __API_URL__: JSON.stringify(env.VITE_API_URI)
+    server: {
+      proxy: {
+        '/api': {
+          target: env.VITE_API_URI,
+          changeOrigin: true,
+          secure: isProduction ? true : false,
+          rewrite: (path) => path.replace(/^\/api/, ''),
+        },
+      },
     },
     plugins: [
       // ...
@@ -98,7 +105,7 @@ pnpm add ofetch
 ```ts
 import { $fetch } from 'ofetch'
 
-const baseURL = import.meta.env.VITE_API_URI
+const baseURL = (import.meta.env.DEV ? '/api/' : import.meta.env.VITE_API_URI)
 
 export function useHttp() {
   return $fetch.create({
