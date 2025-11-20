@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.190
+
+### Patch Changes
+
+- 80dbeaf: authentication
+
 ## 0.0.189
 
 ### Patch Changes
