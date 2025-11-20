@@ -1,4 +1,4 @@
-import { test, expect, APIRequestContext } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 
 const apiUrl = process.env.VITE_API_URI
 const baseRequestOptions = { ignoreHTTPSErrors: true }
@@ -7,7 +7,6 @@ let token: string
 
 test.beforeAll(async ({ playwright }) => {
   const context = await playwright.chromium.launchPersistentContext('', {})
-  const page = context.pages()[0] || (await context.newPage())
   const request = context.request
   const response = await request.post(`${apiUrl}app/login/`, {
     data: {
