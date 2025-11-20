@@ -156,10 +156,10 @@ if (import.meta.hot) {
 
 2. Enhance Settings store with locale and size capabilities
 
-#### `@/stores/settings.ts`
+#### `@/stores/app/settings.ts`
 
 ::: details source
-<<<../../../src/stores/settings.ts
+<<<../../../src/stores/app/settings.ts
 :::
 
 3. Add Setting capabilities im application 
@@ -272,7 +272,7 @@ const app = useAppStore()
 
 1. Create a new store for populating navigation menu and breadcrumbs.
 
-#### `@/stores/navigation.ts `
+#### `@/stores/app/navigation.ts `
 
 ::: details source
 ```ts
@@ -642,7 +642,7 @@ router.afterEach(async (to) => {
 
 1. Create store for managing UI state
 
-#### `@/stores/ui.ts`
+#### `@/stores/app/ui.ts`
 
 :::details source
 ```ts

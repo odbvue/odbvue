@@ -87,7 +87,7 @@ This will create file `auto-imports.d.ts` containing auto imports for:
 <script setup lang="ts">
 import { useCardBackground } from '@/composables/ui' // [!code --]
 import { useI18n } from 'vue-i18n' // [!code --]
-import { useSettingsStore } from '@/stores/settings' // [!code --]
+import { useSettingsStore } from '@/stores/app/settings' // [!code --]
 
 const cardBackground = useCardBackground('#0000ff')
 const { t } = useI18n()
