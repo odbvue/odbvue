@@ -8,6 +8,20 @@ set -euo pipefail
 # - Choose version bump: patch, minor, or major
 # - Write a concise summary
 
+# Load environment variables
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [ -f "$SCRIPT_DIR/.env" ]; then
+    ENV_FILE="$SCRIPT_DIR/.env"
+elif [ -f "$SCRIPT_DIR/../.env" ]; then
+    ENV_FILE="$SCRIPT_DIR/../.env"
+else
+    echo "Error: .env file not found"
+    exit 1
+fi
+
+source "$ENV_FILE"
+
 # Check for uncommitted changes
 if [[ -n $(git status -s) ]]; then
   echo "Error: You have uncommitted changes. Please commit or stash them first." >&2

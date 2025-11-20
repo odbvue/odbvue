@@ -19,10 +19,27 @@
           <v-list-item-title>{{ page.title }}</v-list-item-title>
         </v-list-item>
       </v-list>
+      <v-divider v-if="app.auth.isAuthenticated" />
+      <v-list v-if="app.auth.isAuthenticated">
+        <v-list-item>
+          <strong>{{ app.auth.user?.fullname }}</strong>
+        </v-list-item>
+        <v-list-item link prepend-icon="$mdiLogout" @click="app.auth.logout()">
+          <v-list-item-title>{{ t('logout') }}</v-list-item-title>
+        </v-list-item>
+      </v-list>
     </v-navigation-drawer>
     <v-app-bar>
       <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
       <v-toolbar-title>{{ app.title }}</v-toolbar-title>
+      <v-btn v-show="!app.auth.isAuthenticated" to="/login" class="mr-2">
+        <v-icon icon="$mdiAccount"></v-icon>
+        {{ t('login') }}
+      </v-btn>
+      <v-btn v-show="app.auth.isAuthenticated" @click="app.auth.logout()" class="mr-2">
+        <v-icon icon="$mdiLogout"></v-icon>
+        {{ t('logout') }}
+      </v-btn>
       <v-btn v-if="mobile">
         <v-icon :icon="'$mdiDotsVertical'"></v-icon>
         <v-menu activator="parent">

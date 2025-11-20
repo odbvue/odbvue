@@ -4,6 +4,9 @@ COMMENT ON TABLE odbvue.app_users IS
 COMMENT ON COLUMN odbvue.app_users.accessed IS
     'Date and time when user performed last successful login';
 
+COMMENT ON COLUMN odbvue.app_users.attempted IS
+    'Timestamp of the last login attempt';
+
 COMMENT ON COLUMN odbvue.app_users.attempts IS
     'Number of authentication attempts';
 
@@ -29,4 +32,4 @@ COMMENT ON COLUMN odbvue.app_users.uuid IS
     'Unique user identifier';
 
 
--- sqlcl_snapshot {"hash":"86c3f80ddd51a5d9209eb97ec9f4c5c52b101d7e","type":"COMMENT","name":"app_users","schemaName":"odbvue","sxml":""}
+-- sqlcl_snapshot {"hash":"20bfb6d872326ff5048b5a6873c5130f27ba7860","type":"COMMENT","name":"app_users","schemaName":"odbvue","sxml":""}

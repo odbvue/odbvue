@@ -63,6 +63,14 @@
       </v-col>
     </v-row>
   </v-container>
+  <v-container fluid>
+    <h2 class="mb-4">API</h2>
+    <v-row>
+      <v-col cols="12">
+        <v-btn @click="postHeartbeat()">{{ heartbeatStatus }}</v-btn>
+      </v-col>
+    </v-row>
+  </v-container>
 </template>
 
 <script setup lang="ts">
@@ -70,6 +78,13 @@ const cardBackground = useCardBackground('#ccccee')
 const cardBackgroundComponents = useCardBackground('#eeeedd')
 const { t } = useI18n()
 const app = useAppStore()
+
+const heartbeatStatus = ref('Status: N/A')
+const api = useHttp()
+const postHeartbeat = async () => {
+  const { status } = await api.post('app/heartbeat/')
+  heartbeatStatus.value = `Status: ${status}`
+}
 
 const compontents = ref([
   {

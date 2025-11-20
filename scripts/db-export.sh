@@ -1,4 +1,19 @@
 #!/bin/bash
+set -euo pipefail
+
+# Load environment variables
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [ -f "$SCRIPT_DIR/.env" ]; then
+    ENV_FILE="$SCRIPT_DIR/.env"
+elif [ -f "$SCRIPT_DIR/../.env" ]; then
+    ENV_FILE="$SCRIPT_DIR/../.env"
+else
+    echo "Error: .env file not found"
+    exit 1
+fi
+
+source "$ENV_FILE"
 
 # Check if required parameters are provided
 if [ $# -lt 1 ]; then

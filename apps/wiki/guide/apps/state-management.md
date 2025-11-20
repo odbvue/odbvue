@@ -26,7 +26,7 @@ app.use(createPinia().use(createPiniaLocalStoragePlugin()))
 // ...
 ```
 
-3. Create app store `@/stores/settings.ts`
+3. Create app store `@/stores/app/settings.ts`
 
 ```ts
 import { defineStore, acceptHMRUpdate } from 'pinia'
@@ -87,7 +87,7 @@ if (import.meta.hot) {
 <script setup lang="ts">
 import { useCardBackground } from '@/composables/ui'
 import { useI18n } from 'vue-i18n'
-import { useSettingsStore } from '@/stores/settings'
+import { useSettingsStore } from '@/stores/app/settings'
 
 const cardBackground = useCardBackground('#0000ff')
 const { t } = useI18n()

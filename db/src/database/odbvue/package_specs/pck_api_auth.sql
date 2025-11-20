@@ -3,15 +3,11 @@ CREATE OR REPLACE PACKAGE odbvue.pck_api_auth AS -- Package provides methods for
         p_password VARCHAR2 -- Password
     ) RETURN VARCHAR2; -- Hashed password
 
-    FUNCTION auth ( -- Function authenticates user
-        p_username app_users.username%TYPE, -- Username
-        p_password app_users.password%TYPE -- Password
-    ) RETURN app_users.uuid%TYPE; -- User unique ID
-
     PROCEDURE auth ( -- Procedure authenticates user
         p_username app_users.username%TYPE, -- Username
         p_password app_users.password%TYPE, -- Password
-        r_uuid     OUT app_users.uuid%TYPE -- User unique ID
+        r_uuid     OUT app_users.uuid%TYPE, -- User unique ID
+        r_status   OUT PLS_INTEGER -- Status (200 - ok, 401 - unauthorized, 403 - forbidden, 429 - too many requests)
     );
 
     PROCEDURE issue_token ( -- Procedure issues a JWT token
@@ -63,6 +59,11 @@ CREATE OR REPLACE PACKAGE odbvue.pck_api_auth AS -- Package provides methods for
         p_permission app_permissions.permission%TYPE -- Permission
     ) RETURN PLS_INTEGER; -- Permission (0 - no permission, 1 - has permission)
 
+    PROCEDURE http ( -- Procedure sends HTTP status
+        p_status PLS_INTEGER, -- HTTP status code
+        p_error  VARCHAR2 DEFAULT NULL -- Error message
+    );
+
     PROCEDURE http_401 ( -- Procedure sends HTTP 401 Unauthorized status
         p_error VARCHAR2 DEFAULT NULL -- Error message
     );
@@ -71,9 +72,13 @@ CREATE OR REPLACE PACKAGE odbvue.pck_api_auth AS -- Package provides methods for
         p_error VARCHAR2 DEFAULT NULL -- Error message
     );
 
+    PROCEDURE http_429 ( -- Procedure sends HTTP 429 Too Many Requests status
+        p_error VARCHAR2 DEFAULT NULL -- Error message
+    );
+
     PROCEDURE reload_settings; -- Procedure reloads token settings from the database
 END;
 /
 
 
--- sqlcl_snapshot {"hash":"68d7fd014f811012a02179d4b660494968a00c7c","type":"PACKAGE_SPEC","name":"PCK_API_AUTH","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"32a85bd52f884d7ea0c09f707dc191d8e2aa85fe","type":"PACKAGE_SPEC","name":"PCK_API_AUTH","schemaName":"ODBVUE","sxml":""}

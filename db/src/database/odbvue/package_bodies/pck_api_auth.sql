@@ -1,9 +1,12 @@
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_auth AS 
     -- PRIVATE
 
-    g_issuer      VARCHAR2(200);
-    g_audience    VARCHAR2(200);
-    g_secret      VARCHAR2(2000);
+    g_auth_jwt_issuer    VARCHAR2(200);
+    g_auth_jwt_audience  VARCHAR2(200);
+    g_auth_jwt_secret    VARCHAR2(2000);
+    g_auth_safe_attempts PLS_INTEGER;
+    g_auth_base_delay    PLS_INTEGER;
+    g_auth_max_delay     PLS_INTEGER;
     TYPE t_token_type IS RECORD (
             id         VARCHAR2(30),
             name       VARCHAR2(200),
@@ -12,7 +15,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_auth AS
     );
     TYPE t_token_types IS
         TABLE OF t_token_type INDEX BY VARCHAR2(30);
-    g_token_types t_token_types;
+    g_token_types        t_token_types;
 
     FUNCTION jwt_b64 (
         p_string VARCHAR2
@@ -160,41 +163,116 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_auth AS
         );
     END;
 
-    FUNCTION auth (
-        p_username app_users.username%TYPE,
-        p_password app_users.password%TYPE
-    ) RETURN app_users.uuid%TYPE AS
-        v_uuid app_users.uuid%TYPE;
-    BEGIN
-        BEGIN
-            SELECT
-                uuid
-            INTO v_uuid
-            FROM
-                app_users
-            WHERE
-                    username = upper(trim(p_username))
-                AND password = substr(password, 1, 32)
-                               || dbms_crypto.hash(
-                    utl_raw.cast_to_raw(trim(p_password) || substr(password, 1, 32)),
-                    4
-                );
-
-        EXCEPTION
-            WHEN no_data_found THEN
-                NULL;
-        END;
-
-        RETURN v_uuid;
-    END;
-
     PROCEDURE auth (
         p_username app_users.username%TYPE,
         p_password app_users.password%TYPE,
-        r_uuid     OUT app_users.uuid%TYPE
+        r_uuid     OUT app_users.uuid%TYPE,
+        r_status   OUT PLS_INTEGER
     ) AS
+
+        PRAGMA autonomous_transaction;
+        v_uuid      app_users.uuid%TYPE;
+        v_pass      PLS_INTEGER;
+        v_delay     PLS_INTEGER;
+        v_attempts  app_users.attempts%TYPE;
+        v_attempted app_users.attempted%TYPE;
+        v_status    app_users.status%TYPE;
     BEGIN
-        r_uuid := auth(p_username, p_password);
+        BEGIN
+            SELECT
+                uuid,
+                CASE
+                    WHEN password = substr(password, 1, 32)
+                                    || dbms_crypto.hash(
+                        utl_raw.cast_to_raw(trim(p_password) || substr(password, 1, 32)),
+                        4
+                    ) THEN
+                        1
+                    ELSE
+                        0
+                END AS pass,
+                attempts,
+                attempted,
+                status
+            INTO
+                v_uuid,
+                v_pass,
+                v_attempts,
+                v_attempted,
+                v_status
+            FROM
+                app_users
+            WHERE
+                username = upper(trim(p_username));
+
+        EXCEPTION
+            WHEN no_data_found THEN
+                v_uuid := NULL;
+                v_pass := 0;
+                v_attempts := 0;
+                v_attempted := NULL;
+                v_status := NULL;
+        END;
+
+        v_delay :=
+            CASE
+                WHEN v_uuid IS NULL THEN
+                    0
+                WHEN v_attempts <= g_auth_safe_attempts THEN
+                    0
+                ELSE
+                    least(power((v_attempts - g_auth_safe_attempts), 2) * g_auth_base_delay,
+                          g_auth_max_delay)
+            END;
+
+        r_status :=
+            CASE
+                WHEN v_uuid IS NOT NULL
+                     AND v_status IN ( 'D' ) THEN
+                    403
+                WHEN v_uuid IS NOT NULL
+                     AND v_delay > 0
+                     AND v_attempted IS NOT NULL
+                     AND v_attempted + numtodsinterval(v_delay, 'SECOND') > systimestamp THEN
+                    429
+                WHEN v_uuid IS NOT NULL
+                     AND v_pass = 1 THEN
+                    200
+                ELSE
+                    401
+            END;
+
+        r_uuid :=
+            CASE
+                WHEN r_status = 200 THEN
+                    v_uuid
+                ELSE
+                    NULL
+            END;
+        IF r_status = 200 THEN
+            v_attempts := 0;
+            v_attempted := NULL;
+        ELSE
+            v_attempts := v_attempts + 1;
+            v_attempted := systimestamp;
+        END IF;
+
+        UPDATE app_users
+        SET
+            accessed =
+                CASE
+                    WHEN r_status = 200 THEN
+                        systimestamp
+                    ELSE
+                        accessed
+                END,
+            attempts = v_attempts,
+            attempted = v_attempted
+        WHERE
+                uuid = v_uuid
+            AND v_uuid IS NOT NULL;
+
+        COMMIT;
     END;
 
     FUNCTION issue_token (
@@ -208,8 +286,8 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_auth AS
         PRAGMA autonomous_transaction;
     BEGIN
         v_exp := systimestamp + v_type.expiration / 86400;
-        v_token := jwt_sign(g_issuer, p_uuid, g_audience, v_type.stored, v_exp,
-                            g_secret);
+        v_token := jwt_sign(g_auth_jwt_issuer, p_uuid, g_auth_jwt_audience, v_type.stored, v_exp,
+                            g_auth_jwt_secret);
 
         IF v_type.stored = 'Y' THEN
             INSERT INTO app_tokens (
@@ -301,10 +379,10 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_auth AS
         IF p_token IS NULL THEN
             RETURN NULL;
         END IF;
-        jwt_decode(p_token, g_secret, v_iss, v_sub, v_aud,
+        jwt_decode(p_token, g_auth_jwt_secret, v_iss, v_sub, v_aud,
                    v_stf, v_exp);
-        IF ( v_iss <> g_issuer )
-        OR ( v_aud <> g_audience ) THEN
+        IF ( v_iss <> g_auth_jwt_issuer )
+        OR ( v_aud <> g_auth_jwt_audience ) THEN
             RETURN NULL;
         END IF;
 
@@ -487,51 +565,59 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_auth AS
         RETURN v_perm;
     END;
 
-    PROCEDURE http_401 (
-        p_error VARCHAR2 DEFAULT NULL
+    PROCEDURE http (
+        p_status PLS_INTEGER,
+        p_error  VARCHAR2 DEFAULT NULL
     ) AS
+        v_reason VARCHAR2(200 CHAR);
     BEGIN
+        v_reason :=
+            CASE p_status
+                WHEN 401 THEN
+                    'Unauthorized'
+                WHEN 403 THEN
+                    'Forbidden'
+                WHEN 429 THEN
+                    'Too Many Requests'
+                ELSE
+                    'Error'
+            END;
+
         owa_util.status_line(
-            nstatus       => 401,
-            creason       => 'Unauthorized',
+            nstatus       => p_status,
+            creason       => v_reason,
             bclose_header => FALSE
         );
 
         owa_util.mime_header('application/json', FALSE);
         owa_util.http_header_close;
         htp.p('{"error": "'
-              || coalesce(p_error, 'Unauthorized') || '"}');
+              || coalesce(p_error, v_reason) || '"}');
+    END;
+
+    PROCEDURE http_401 (
+        p_error VARCHAR2 DEFAULT NULL
+    ) AS
+    BEGIN
+        http(401, p_error);
     END;
 
     PROCEDURE http_403 (
         p_error VARCHAR2 DEFAULT NULL
     ) AS
     BEGIN
-        owa_util.status_line(
-            nstatus       => 403,
-            creason       => 'Forbidden',
-            bclose_header => FALSE
-        );
+        http(403, p_error);
+    END;
 
-        owa_util.mime_header('application/json', FALSE);
-        owa_util.http_header_close;
-        htp.p('{"error": "'
-              || coalesce(p_error, 'Forbidden') || '"}');
+    PROCEDURE http_429 (
+        p_error VARCHAR2 DEFAULT NULL
+    ) AS
+    BEGIN
+        http(429, p_error);
     END;
 
     PROCEDURE reload_settings AS
     BEGIN
-        SELECT
-            issuer,
-            audience,
-            secret
-        INTO
-            g_issuer,
-            g_audience,
-            g_secret
-        FROM
-            app_token_settings;
-
         g_token_types.DELETE;
         FOR rec IN (
             SELECT
@@ -545,6 +631,12 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_auth AS
             g_token_types(rec.id) := rec;
         END LOOP;
 
+        g_auth_safe_attempts := pck_api_settings.read('APP_AUTH_SAFE_ATTEMPTS');
+        g_auth_base_delay := pck_api_settings.read('APP_AUTH_BASE_DELAY');
+        g_auth_max_delay := pck_api_settings.read('APP_AUTH_MAX_DELAY');
+        g_auth_jwt_issuer := pck_api_settings.read('APP_AUTH_JWT_ISSUER');
+        g_auth_jwt_audience := pck_api_settings.read('APP_AUTH_JWT_AUDIENCE');
+        g_auth_jwt_secret := pck_api_settings.read('APP_AUTH_JWT_SECRET');
     END;
 
 BEGIN
@@ -553,4 +645,4 @@ END;
 /
 
 
--- sqlcl_snapshot {"hash":"3716c1a9b2e35a2704ed42d286d7015d7164bfae","type":"PACKAGE_BODY","name":"PCK_API_AUTH","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"59fea303febad0c71f2d5aa3d679cdfb144b90f6","type":"PACKAGE_BODY","name":"PCK_API_AUTH","schemaName":"ODBVUE","sxml":""}

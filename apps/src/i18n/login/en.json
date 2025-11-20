@@ -1,0 +1,16 @@
+{
+  "login": "Login",
+  "logout": "Logout",
+  "submit": "Submit",
+  "dev": "Dev",
+  "username": "Username",
+  "password": "Password",
+  "username.is.required": "Username is required",
+  "username.must.be.a.valid.email.address": "Username must be a valid email address",
+  "password.is.required": "Password is required",
+  "unauthorized": "Unauthorized",
+  "too.many.requests": "Too many requests",
+  "Username": "Username",
+  "Nom d'utilisateur": "Nom d'utilisateur",
+  "Mot de passe": "Mot de passe"
+}

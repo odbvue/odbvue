@@ -23,7 +23,12 @@ describe('useHttp', () => {
   it('returns a fetch instance', () => {
     const http = useHttp()
     expect(http).toBeDefined()
-    expect(typeof http).toBe('object')
+    expect(typeof http).toBe('function')
+    expect(http.get).toBeDefined()
+    expect(http.post).toBeDefined()
+    expect(http.put).toBeDefined()
+    expect(http.delete).toBeDefined()
+    expect(http.patch).toBeDefined()
   })
 
   it('creates instance with baseURL configuration', () => {

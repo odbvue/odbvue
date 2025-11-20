@@ -213,6 +213,7 @@ BEGIN
 
             setting('APP_STORAGE_S3_URI', 'S3 Endpoint', v_s3_endpoint);
 
+            DBMS_OUTPUT.PUT_LINE('  - settings upsert completed.');
         EXCEPTION
             WHEN OTHERS THEN
                 DBMS_OUTPUT.PUT_LINE('  - failed - ' || SQLERRM);
@@ -240,30 +241,11 @@ BEGIN
                 v_secret
             FROM dual;
 
-            BEGIN
-                
-                EXECUTE IMMEDIATE 'MERGE INTO app_token_settings t
-                USING (SELECT :1 AS issuer, :2 AS audience, :3 AS secret FROM dual) s
-                ON (1=1)
-                WHEN MATCHED THEN
-                    UPDATE SET
-                        t.issuer = s.issuer,
-                        t.audience = s.audience,
-                        t.secret = s.secret
-                WHEN NOT MATCHED THEN
-                    INSERT (issuer, audience, secret)
-                    VALUES (s.issuer, s.audience, s.secret)'
-                USING
-                    v_issuer,
-                    v_audience,
-                    v_secret;
+            setting('APP_AUTH_JWT_ISSUER', 'App authentication JWT Issuer', v_issuer);
+            setting('APP_AUTH_JWT_AUDIENCE', 'App authentication JWT Audience', v_audience);
+            setting('APP_AUTH_JWT_SECRET', 'App authentication JWT Secret', v_secret);
 
-                COMMIT;
-                DBMS_OUTPUT.PUT_LINE('  - settings upsert completed.');
-            EXCEPTION
-                WHEN OTHERS THEN
-                    DBMS_OUTPUT.PUT_LINE('  - settings upsert failed: ' || SQLERRM);
-            END;
+            DBMS_OUTPUT.PUT_LINE('  - settings upsert completed.');
 
             FOR rec IN (
                 SELECT 

@@ -21,7 +21,7 @@ VITE_API_URI = https://127.0.0.1:8443/ords/<schema>/
 
 ## Server Proxy
 
-To prevent [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) problem in local development, need to implement a defined path in `./vite.config.ts`
+To prevent [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) problem in local development, need to implement a proxy in `./vite.config.ts`
 
 ```ts
 // ...
@@ -32,8 +32,15 @@ export default defineConfig(({ mode }) => {
   const isProduction = mode === 'production'
 
   return {
-    define: {
-      __API_URL__: JSON.stringify(env.VITE_API_URI)
+    server: {
+      proxy: {
+        '/api': {
+          target: env.VITE_API_URI,
+          changeOrigin: true,
+          secure: isProduction ? true : false,
+          rewrite: (path) => path.replace(/^\/api/, ''),
+        },
+      },
     },
     plugins: [
       // ...
@@ -95,17 +102,102 @@ pnpm add ofetch
 
 #### `@/composables/http.ts`
 
+::: details source
 ```ts
 import { $fetch } from 'ofetch'
+import type { FetchOptions } from 'ofetch'
 
-const baseURL = import.meta.env.VITE_API_URI
+const baseURL = import.meta.env.DEV ? '/api/' : import.meta.env.VITE_API_URI
 
-export function useHttp() {
-  return $fetch.create({
-    baseURL
-  })
+interface HttpResponse<T = unknown> {
+  data: T | null
+  error: Error | null
+  status: number | null
 }
+
+interface HttpClient {
+  <T>(request: string, options?: FetchOptions<'json'>): Promise<HttpResponse<T>>
+  get<T>(url: string, options?: FetchOptions<'json'>): Promise<HttpResponse<T>>
+  post<T>(url: string, body?: unknown, options?: FetchOptions<'json'>): Promise<HttpResponse<T>>
+  put<T>(url: string, body?: unknown, options?: FetchOptions<'json'>): Promise<HttpResponse<T>>
+  delete<T>(url: string, options?: FetchOptions<'json'>): Promise<HttpResponse<T>>
+  patch<T>(url: string, body?: unknown, options?: FetchOptions<'json'>): Promise<HttpResponse<T>>
+}
+
+async function executeRequest<T>(
+  client: ReturnType<typeof $fetch.create>,
+  request: string,
+  options?: FetchOptions<'json'>,
+): Promise<HttpResponse<T>> {
+  let data: T | null = null
+  let error: Error | null = null
+  let status: number | null = null
+
+  try {
+    const response = await client<T>(request, options)
+    data = response
+    error = null
+    status = 200
+  } catch (err) {
+    error = err instanceof Error ? err : new Error(String(err))
+    data = null
+    if (err instanceof Error && 'statusCode' in err) {
+      const errorWithStatus = err as Record<string, unknown>
+      status = typeof errorWithStatus.statusCode === 'number' ? errorWithStatus.statusCode : null
+    } else {
+      status = null
+    }
+  }
+
+  return {
+    data,
+    error,
+    status,
+  }
+}
+
+export function useHttp(): HttpClient {
+  const client = $fetch.create({
+    baseURL,
+  })
+
+  const http = async <T>(
+    request: string,
+    options?: FetchOptions<'json'>,
+  ): Promise<HttpResponse<T>> => executeRequest<T>(client, request, options)
+
+  http.get = async <T>(url: string, options?: FetchOptions<'json'>) =>
+    executeRequest<T>(client, url, { ...options, method: 'GET' })
+
+  http.post = async <T>(url: string, body?: unknown, options?: FetchOptions<'json'>) =>
+    executeRequest<T>(client, url, {
+      ...options,
+      method: 'POST',
+      body: body as Record<string, unknown>,
+    })
+
+  http.put = async <T>(url: string, body?: unknown, options?: FetchOptions<'json'>) =>
+    executeRequest<T>(client, url, {
+      ...options,
+      method: 'PUT',
+      body: body as Record<string, unknown>,
+    })
+
+  http.delete = async <T>(url: string, options?: FetchOptions<'json'>) =>
+    executeRequest<T>(client, url, { ...options, method: 'DELETE' })
+
+  http.patch = async <T>(url: string, body?: unknown, options?: FetchOptions<'json'>) =>
+    executeRequest<T>(client, url, {
+      ...options,
+      method: 'PATCH',
+      body: body as Record<string, unknown>,
+    })
+
+  return http as HttpClient
+}
+
 ```
+:::
 
 ## Consuming Service
 
@@ -134,8 +226,9 @@ export const useAppStore = defineStore('app', () => {
   const api = useHttp()
 
   onMounted(async () => {
-    const { version: dbVersion} = await api('app/context/')
-    const isDev =  import.meta.env.DEV ? '-dev' : ''
+    const { data } = await api<{ version: string }>('app/context/')
+    const dbVersion = data?.version
+    const isDev = import.meta.env.DEV ? '-dev' : ''
     version.value = `v${packageVersion}-${dbVersion}${isDev}`
   })
 
@@ -178,5 +271,9 @@ Further, on, calling web service is as lightweight as
 
 ```ts
   const api = useHttp()
-  const { result } = await api('app/<method>/')
+
+  const { data, error, status } = await api('app/<method>/')
+
+  const { data, error, status } = await api.post('app/<method>/',{key: value}, {})
+
 ```

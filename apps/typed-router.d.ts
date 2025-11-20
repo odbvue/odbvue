@@ -44,6 +44,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/login': RouteRecordInfo<
+      '/login',
+      '/login',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/sandbox/': RouteRecordInfo<
       '/sandbox/',
       '/sandbox',
@@ -149,6 +156,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/about.md': {
       routes:
         | '/about'
+      views:
+        | never
+    }
+    'src/pages/login.vue': {
+      routes:
+        | '/login'
       views:
         | never
     }

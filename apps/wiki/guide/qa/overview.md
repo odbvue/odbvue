@@ -18,14 +18,17 @@ Keep it simple. Test what matters. Avoid duplicating tests for dependency packag
 ### E2E Tests
 - **Scope**: Core business scenarios
 - **Framework**: Playwright
-- **Command**: `pnpm test:e2e`
-- **Examples**:
+- **UI Tests Command**: `pnpm test:e2e`
   - User workflows (navigation, forms, data management)
   - Critical features and integrations
-  - Cross-browser compatibility when needed
+  - Cross-browser compatibility testing
+- **API Tests Command**: `pnpm test:api`
+  - Backend API endpoints and authentication
+  - Integration between frontend and backend
+  - Error handling and status codes
 
 ## CI/CD Integration
-Both unit and e2E tests run in GitHub Actions pipeline:
+Both unit and E2E tests run in GitHub Actions pipeline:
 - Required for all PRs
 - Blocking gates before merge
 - Fails on any test failure

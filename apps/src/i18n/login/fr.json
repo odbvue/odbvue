@@ -1,0 +1,17 @@
+{
+  "login": "Connexion",
+  "logout": "Déconnexion",
+  "submit": "Soumettre",
+  "dev": "Dév",
+  "username": "Nom d'utilisateur",
+  "password": "Mot de passe",
+  "username.is.required": "Le nom d'utilisateur est requis",
+  "username.must.be.a.valid.email.address": "Le nom d'utilisateur doit être une adresse e-mail valide",
+  "password.is.required": "Le mot de passe est requis",
+  "unauthorized": "Non autorisé",
+  "too.many.requests": "Trop de requêtes",
+  "Username": "Username",
+  "Password": "Password",
+  "Nom d'utilisateur": "Nom d'utilisateur",
+  "Mot de passe": "Mot de passe"
+}

@@ -63,6 +63,7 @@ declare global {
   const unref: typeof import('vue').unref
   const useAppStore: typeof import('./src/stores/index').useAppStore
   const useAttrs: typeof import('vue').useAttrs
+  const useAuthStore: typeof import('./src/stores/app/auth').useAuthStore
   const useCardBackground: typeof import('./src/composables/ui').useCardBackground
   const useCssModule: typeof import('vue').useCssModule
   const useCssVars: typeof import('vue').useCssVars
@@ -79,7 +80,7 @@ declare global {
   const useLink: typeof import('vue-router').useLink
   const useLocale: typeof import('vuetify').useLocale
   const useModel: typeof import('vue').useModel
-  const useNavigationStore: typeof import('./src/stores/naviagtion').useNavigationStore
+  const useNavigationStore: typeof import('./src/stores/app/naviagtion').useNavigationStore
   const useRoute: typeof import('vue-router').useRoute
   const useRouter: typeof import('vue-router').useRouter
   const useRtl: typeof import('vuetify').useRtl
@@ -87,11 +88,11 @@ declare global {
   const useServerHead: typeof import('@unhead/vue').useServerHead
   const useServerHeadSafe: typeof import('@unhead/vue').useServerHeadSafe
   const useServerSeoMeta: typeof import('@unhead/vue').useServerSeoMeta
-  const useSettingsStore: typeof import('./src/stores/settings').useSettingsStore
+  const useSettingsStore: typeof import('./src/stores/app/settings').useSettingsStore
   const useSlots: typeof import('vue').useSlots
   const useTemplateRef: typeof import('vue').useTemplateRef
   const useTheme: typeof import('vuetify').useTheme
-  const useUiStore: typeof import('./src/stores/ui').useUiStore
+  const useUiStore: typeof import('./src/stores/app/ui').useUiStore
   const watch: typeof import('vue').watch
   const watchEffect: typeof import('vue').watchEffect
   const watchPostEffect: typeof import('vue').watchPostEffect

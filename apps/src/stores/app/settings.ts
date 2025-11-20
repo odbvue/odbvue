@@ -77,7 +77,7 @@ export const useSettingsStore = defineStore(
   {
     storage: {
       adapter: 'localStorage',
-      include: ['locale', 'fontSize', 'theme'],
+      include: ['locale', 'theme', 'fontSize'],
     },
   },
 )

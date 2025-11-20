@@ -5,6 +5,30 @@ param(
     [string]$Connection
 )
 
+# Load environment variables
+$scriptDir = $PSScriptRoot
+$envInScripts = Join-Path -Path $scriptDir -ChildPath ".env"
+$envInParent = Join-Path -Path (Join-Path -Path $scriptDir -ChildPath "..") -ChildPath ".env"
+
+if (Test-Path $envInScripts) {
+    $envPath = (Resolve-Path $envInScripts).Path
+}
+elseif (Test-Path $envInParent) {
+    $envPath = (Resolve-Path $envInParent).Path
+}
+else {
+    Write-Host "Error: .env file not found" -ForegroundColor Red
+    exit 1
+}
+
+Get-Content $envPath | ForEach-Object {
+    if ($_ -match '^\s*([^#=]+)=(.*)$') {
+        $key = $matches[1].Trim()
+        $value = $matches[2].Trim().Trim('"', "'")
+        [Environment]::SetEnvironmentVariable($key, $value, "Process")
+    }
+}
+
 # Try to get connection from environment variable if not provided
 if ([string]::IsNullOrWhiteSpace($Connection)) {
     $Connection = $env:ODBVUE_DB_DEV

@@ -25,23 +25,14 @@ Dependencies:
 
 ## AUTH
 
-Function authenticates user
-
-| Argument name | In Out | Data type | Default value | Description |
-| ------------- | ------ | --------- | ------------- | ----------- |
-||OUT|CHAR||User unique ID|
-|P_USERNAME|IN|VARCHAR2||Username|
-|P_PASSWORD|IN|VARCHAR2||Password|
-
-## AUTH
-
-Function authenticates user
+Procedure authenticates user
 
 | Argument name | In Out | Data type | Default value | Description |
 | ------------- | ------ | --------- | ------------- | ----------- |
 |P_USERNAME|IN|VARCHAR2||Username|
 |P_PASSWORD|IN|VARCHAR2||Password|
 |R_UUID|OUT|CHAR||User unique ID|
+|R_STATUS|OUT|BINARY_INTEGER||Status (200 - ok, 401 - unauthorized, 403 - forbidden, 429 - too many requests)|
 
 ## CLEANUP
 
@@ -50,6 +41,15 @@ Procedure removes expired tokens
 | Argument name | In Out | Data type | Default value | Description |
 | ------------- | ------ | --------- | ------------- | ----------- |
 |P_BATCH_SIZE|IN|BINARY_INTEGER|10000|Batch size|
+
+## HTTP
+
+Procedure sends HTTP status
+
+| Argument name | In Out | Data type | Default value | Description |
+| ------------- | ------ | --------- | ------------- | ----------- |
+|P_STATUS|IN|BINARY_INTEGER||HTTP status code|
+|P_ERROR|IN|VARCHAR2|NULL|Error message|
 
 ## HTTP_401
 
@@ -62,6 +62,14 @@ Procedure sends HTTP 401 Unauthorized status
 ## HTTP_403
 
 Procedure sends HTTP 403 Forbidden status
+
+| Argument name | In Out | Data type | Default value | Description |
+| ------------- | ------ | --------- | ------------- | ----------- |
+|P_ERROR|IN|VARCHAR2|NULL|Error message|
+
+## HTTP_429
+
+Procedure sends HTTP 429 Too Many Requests status
 
 | Argument name | In Out | Data type | Default value | Description |
 | ------------- | ------ | --------- | ------------- | ----------- |
@@ -113,7 +121,7 @@ Function returns user unique ID from cookie passed in the request
 
 | Argument name | In Out | Data type | Default value | Description |
 | ------------- | ------ | --------- | ------------- | ----------- |
-||OUT|CHAR||Permission count for the role (0 - no role)|
+||OUT|CHAR||Token|
 |P_COOKIE_NAME|IN|VARCHAR2|'refresh_token'|Cookie name|
 |P_CHECK_EXPIRATION|IN|CHAR|'Y'|Check token expiration (Y/N)|
 
