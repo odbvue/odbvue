@@ -369,9 +369,9 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_auth AS
         p_check_expiration CHAR DEFAULT 'Y'
     ) RETURN app_users.uuid%TYPE AS
 
-        v_iss  app_token_settings.issuer%TYPE;
+        v_iss  VARCHAR2(200 CHAR);
         v_sub  app_users.uuid%TYPE;
-        v_aud  app_token_settings.audience%TYPE;
+        v_aud  VARCHAR2(200 CHAR);
         v_stf  app_tokens.token%TYPE;
         v_exp  PLS_INTEGER;
         v_uuid app_users.uuid%TYPE;
@@ -645,4 +645,4 @@ END;
 /
 
 
--- sqlcl_snapshot {"hash":"59fea303febad0c71f2d5aa3d679cdfb144b90f6","type":"PACKAGE_BODY","name":"PCK_API_AUTH","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"34d55a33753035b1099653c74d03160980e48a1e","type":"PACKAGE_BODY","name":"PCK_API_AUTH","schemaName":"ODBVUE","sxml":""}
