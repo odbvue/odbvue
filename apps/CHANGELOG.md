@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.191
+
+### Patch Changes
+
+- 8338408: bugfix(db): auth package - remnove app_tokens_settings table dependency
+
 ## 0.0.190
 
 ### Patch Changes
