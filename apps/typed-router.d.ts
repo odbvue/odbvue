@@ -128,6 +128,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/signup': RouteRecordInfo<
+      '/signup',
+      '/signup',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
   }
 
   /**
@@ -228,6 +235,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/sandbox/sandbox-view.vue': {
       routes:
         | '/sandbox/sandbox-view'
+      views:
+        | never
+    }
+    'src/pages/signup.vue': {
+      routes:
+        | '/signup'
       views:
         | never
     }

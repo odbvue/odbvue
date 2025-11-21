@@ -4,6 +4,10 @@
       <v-col cols="12" :md="4">
         <h1 class="mb-4">{{ t('login') }}</h1>
         <v-ov-form :options :data :t @submit="submit" @action="dev" />
+        <br />
+        <br />
+        {{ t('not.registered.yet') }}
+        <a href="/signup">{{ t('sign.up') }}</a>
       </v-col>
     </v-row>
   </v-container>
