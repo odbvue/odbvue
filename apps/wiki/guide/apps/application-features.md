@@ -860,6 +860,23 @@ const app = useAppStore()
 ```
 :::
 
+5. Modify Router to clear all UI alerts on new routes
+
+#### `@/router/index.ts`
+
+```ts{7}
+//...
+router.beforeEach(async (to) => {
+  const appTitle = title || 'OdbVue'
+  const pageTitle = useNavigationStore().title(to.path)
+  const documentTitle = pageTitle ? `${appTitle} - ${pageTitle}` : appTitle
+  useHead({ title: documentTitle })
+  useUiStore().clearMessages()
+  return true
+})
+// ...
+```
+
 ## Page Not Found
 
 Create Page Not Found page
