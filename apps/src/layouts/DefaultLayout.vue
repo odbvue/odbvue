@@ -22,7 +22,7 @@
       <v-divider v-if="app.auth.isAuthenticated" />
       <v-list v-if="app.auth.isAuthenticated">
         <v-list-item>
-          <strong>{{ app.auth.user?.fullname }}</strong>
+          <strong>{{ app.user?.fullname }}</strong>
         </v-list-item>
         <v-list-item link prepend-icon="$mdiLogout" @click="app.auth.logout()">
           <v-list-item-title>{{ t('logout') }}</v-list-item-title>
@@ -132,6 +132,17 @@
       ></v-progress-linear>
     </v-app-bar>
     <v-main class="ma-4" id="main" tabindex="-1">
+      <v-breadcrumbs :items="app.navigation.breadcrumbs">
+        <template v-slot:title="{ item, index }">
+          <v-breadcrumbs-item
+            v-if="index !== app.navigation.breadcrumbs.length - 1"
+            :to="item.href"
+          >
+            {{ item.title }}
+          </v-breadcrumbs-item>
+          <v-breadcrumbs-item v-else>{{ item.title }}</v-breadcrumbs-item>
+        </template>
+      </v-breadcrumbs>
       <v-alert
         type="info"
         :text="app.ui.info ? t(app.ui.info) : ''"
@@ -157,17 +168,6 @@
         class="mb-2"
       ></v-alert>
       <div id="route-announcer" aria-live="polite" class="sr-only"></div>
-      <v-breadcrumbs :items="app.navigation.breadcrumbs">
-        <template v-slot:title="{ item, index }">
-          <v-breadcrumbs-item
-            v-if="index !== app.navigation.breadcrumbs.length - 1"
-            :to="item.href"
-          >
-            {{ item.title }}
-          </v-breadcrumbs-item>
-          <v-breadcrumbs-item v-else>{{ item.title }}</v-breadcrumbs-item>
-        </template>
-      </v-breadcrumbs>
       <a class="skip-link" href="#main" @click.prevent="focusMain">Skip to content</a>
       <slot />
       <v-snackbar v-model="app.ui.snackbar">

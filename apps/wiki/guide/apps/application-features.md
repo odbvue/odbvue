@@ -780,6 +780,7 @@ if (import.meta.hot) {
       ></v-progress-linear>
     </v-app-bar>
     <v-main class="ma-4" id="main" tabindex="-1">
+      <!-- ... -->
       <v-alert
         type="info"
         :text="app.ui.info ? t(app.ui.info) : ''"
