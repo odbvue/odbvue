@@ -3,12 +3,25 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
     g_version VARCHAR2(30 CHAR) := '...';
 
     PROCEDURE get_context (
-        r_version OUT VARCHAR2,
-        r_user    OUT SYS_REFCURSOR
+        r_version  OUT VARCHAR2,
+        r_user     OUT SYS_REFCURSOR,
+        r_consents OUT SYS_REFCURSOR
     ) IS
         v_uuid app_users.uuid%TYPE := pck_api_auth.uuid;
     BEGIN
         r_version := g_version;
+        OPEN r_consents FOR SELECT
+                                                    id          AS "id",
+                                                    language_id AS "language",
+                                                    name        AS "name",
+                                                    created     AS "created"
+                                                FROM
+                                                    app_consents
+                            WHERE
+                                active = 'Y'
+                            ORDER BY
+                                created DESC;
+
         IF v_uuid IS NULL THEN
             RETURN;
         END IF;
@@ -95,6 +108,176 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
             pck_api_auth.http_401;
     END;
 
+    PROCEDURE get_consent (
+        p_id      app_consents.id%TYPE,
+        r_consent OUT CLOB
+    ) AS
+    BEGIN
+        SELECT
+            content
+        INTO r_consent
+        FROM
+            app_consents
+        WHERE
+            id = p_id;
+
+    END get_consent;
+
+    PROCEDURE post_signup (
+        p_username      app_users.username%TYPE,
+        p_password      app_users.password%TYPE,
+        p_fullname      app_users.fullname%TYPE,
+        p_consent       app_consents.id%TYPE,
+        r_access_token  OUT app_tokens.token%TYPE,
+        r_refresh_token OUT app_tokens.token%TYPE,
+        r_errors        OUT SYS_REFCURSOR,
+        r_error         OUT VARCHAR2
+    ) AS
+
+        v_consent_id     app_consents.id%TYPE;
+        v_uuid           app_users.uuid%TYPE;
+        v_email_template CLOB;
+        v_verify_token   app_tokens.token%TYPE;
+        v_email_id       app_emails.id%TYPE;
+
+        PROCEDURE errors (
+            p_name    VARCHAR2,
+            p_message VARCHAR2
+        ) AS
+        BEGIN
+            OPEN r_errors FOR SELECT
+                                  p_name    AS "name",
+                                  p_message AS "message"
+                              FROM
+                                  dual;
+
+        END errors;
+
+        FUNCTION audit_attrs RETURN app_audit.attributes%TYPE IS
+        BEGIN
+            RETURN pck_api_audit.attributes('username', p_username, 'password', '********', 'fullname',
+                                            p_fullname, 'consent', p_consent, 'error', r_error,
+                                            'uuid', v_uuid);
+        END audit_attrs;
+
+    BEGIN
+        r_error := pck_api_validate.validate(p_username,
+                                             JSON_ARRAY(
+                                        JSON_OBJECT(
+                                            'type' VALUE 'email',
+                                            'message' VALUE 'username.must.be.valid.email.address'
+                                        )
+                                    ));
+
+        IF r_error IS NOT NULL THEN
+            errors('username', r_error);
+            pck_api_audit.warn('Signup', audit_attrs);
+            r_error := NULL;
+            RETURN;
+        END IF;
+
+        r_error := pck_api_validate.validate(p_password,
+                                             JSON_ARRAY(
+                                        JSON_OBJECT(
+                                            'type' VALUE 'regexp',
+                                                    'params' VALUE pck_api_settings.read('APP_AUTH_PASSWORD_REQUIREMENTS'),
+                                                    'message' VALUE pck_api_settings.read('APP_AUTH_PASSWORD_MESSAGE')
+                                        )
+                                    ));
+
+        IF r_error IS NOT NULL THEN
+            errors('password', r_error);
+            pck_api_audit.warn('Signup', audit_attrs);
+            r_error := NULL;
+            RETURN;
+        END IF;
+
+        r_error := pck_api_validate.validate(p_fullname,
+                                             JSON_ARRAY(
+                                        JSON_OBJECT(
+                                            'type' VALUE 'required',
+                                            'message' VALUE 'full.name.is.required'
+                                        )
+                                    ));
+
+        IF r_error IS NOT NULL THEN
+            errors('fullname', r_error);
+            pck_api_audit.warn('Signup', audit_attrs);
+            r_error := NULL;
+            RETURN;
+        END IF;
+
+        BEGIN
+            SELECT
+                id
+            INTO v_consent_id
+            FROM
+                app_consents
+            WHERE
+                p_consent IS NOT NULL
+                AND id = p_consent;
+
+        EXCEPTION
+            WHEN no_data_found THEN
+                r_error := 'consent.is.invalid';
+                pck_api_audit.warn('Signup', audit_attrs);
+                RETURN;
+        END;
+
+        BEGIN
+            INSERT INTO app_users (
+                username,
+                password,
+                fullname
+            ) VALUES ( upper(trim(p_username)),
+                       pck_api_auth.pwd(p_password),
+                       TRIM(p_fullname) ) RETURNING uuid INTO v_uuid;
+
+            INSERT INTO app_user_consents (
+                user_id,
+                consent_id
+            ) VALUES ( v_uuid,
+                       v_consent_id );
+
+            COMMIT;
+        EXCEPTION
+            WHEN dup_val_on_index THEN
+                r_error := 'username.already.exists';
+                errors('username', r_error);
+                pck_api_audit.warn('Signup', audit_attrs);
+                r_error := NULL;
+                RETURN;
+        END;
+
+        r_access_token := pck_api_auth.issue_token(v_uuid, 'ACCESS');
+        r_refresh_token := pck_api_auth.issue_token(v_uuid, 'REFRESH');
+        pck_api_auth.revoke_token(v_uuid, 'VERIFY');
+        v_verify_token := pck_api_auth.issue_token(v_uuid, 'VERIFY');
+        v_email_template := pck_api_settings.read('APP_EMAIL_VERIFY_TEMPLATE');
+        v_email_template := replace(v_email_template,
+                                    '{{APP_DOMAIN_NAME}}',
+                                    pck_api_settings.read('APP_DOMAIN_NAME'));
+        v_email_template := replace(v_email_template, '{{APP_EMAIL_VERIFY_TOKEN}}', v_verify_token);
+        pck_api_emails.mail(v_email_id,
+                            trim(p_username),
+                            p_fullname,
+                            'Message from OdbVue',
+                            v_email_template);
+        BEGIN
+            pck_api_emails.send(v_email_id);
+        EXCEPTION
+            WHEN OTHERS THEN
+                NULL;
+        END;
+        pck_api_audit.info('Signup', audit_attrs);
+    EXCEPTION
+        WHEN OTHERS THEN
+            r_access_token := NULL;
+            r_refresh_token := NULL;
+            r_error := 'something.went.wrong';
+            pck_api_audit.error('Signup error', audit_attrs);
+    END post_signup;
+
     PROCEDURE post_heartbeat AS
     BEGIN
         IF pck_api_auth.uuid IS NULL THEN
@@ -121,4 +304,4 @@ END pck_app;
 /
 
 
--- sqlcl_snapshot {"hash":"d215930038ff12db2240d54ab2b19e29797c9eb2","type":"PACKAGE_BODY","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"d07feaf294cc9d36ba18de22d0f1b92265c2569a","type":"PACKAGE_BODY","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
