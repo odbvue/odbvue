@@ -1,6 +1,6 @@
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_validate AS
 
-    FUNCTION regexp_like_2 ( -- experimental
+    FUNCTION regexp_like_2 ( -- experimental feature
         p_value   IN VARCHAR2,
         p_pattern IN VARCHAR2
     ) RETURN BOOLEAN IS
@@ -595,4 +595,4 @@ END pck_api_validate;
 /
 
 
--- sqlcl_snapshot {"hash":"f098d7e4bff9fbc256136a9971229199ea77cab4","type":"PACKAGE_BODY","name":"PCK_API_VALIDATE","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"d18abf4d291ac056d4b9ddb0b9fae1eeef8f13b7","type":"PACKAGE_BODY","name":"PCK_API_VALIDATE","schemaName":"ODBVUE","sxml":""}
