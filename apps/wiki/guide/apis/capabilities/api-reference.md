@@ -16,6 +16,14 @@ Package provides methods for issuing and validating tokens
 <<< ../../../../../db/tests/pck_api_auth.sql
 :::
 
+## Classifiers
+
+Package provides classifier lookup
+
+::: details example
+<<< ../../../../../db/tests/pck_api_classifiers.sql
+:::
+
 ## Emails
 
 Package for sending emails

@@ -46,6 +46,7 @@ export default defineConfig({
                 { text: 'API Reference', link: '/guide/apis/capabilities/api-reference' },
                 { text: 'Audit', link: '/guide/apis/capabilities/pck-api-audit' },
                 { text: 'Authentication', link: '/guide/apis/capabilities/pck-api-auth' },
+                { text: 'Classifiers', link: '/guide/apis/capabilities/pck-api-classifiers' },
                 { text: 'Emails', link: '/guide/apis/capabilities/pck-api-emails' },
                 { text: 'Labels', link: '/guide/apis/capabilities/pck-api-labels' },
                 { text: 'LOB', link: '/guide/apis/capabilities/pck-api-lob' },
