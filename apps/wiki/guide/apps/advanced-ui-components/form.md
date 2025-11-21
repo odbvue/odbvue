@@ -43,6 +43,13 @@ Flexible form component with built-in validation, customizable fields, and actio
 | `cancel` | - | Emitted when cancel action is clicked |
 | `reset` | - | Emitted when form is reset to initial values |
 | `action` | `actionName: string, OvFormData` | Emitted when custom action is triggered |
+| `change` | `fieldName: string, value: unknown, allValues: OvFormData` | Emitted whenever a field value changes |
+
+### Slots
+
+| Slot | Scope | Description |
+|------|-------|-------------|
+| `field-{fieldName}` | `{ value, field }` | Customize field label rendering (e.g., `field-consent`, `field-email`). Slot is located in the field's label area. Name format: `field-{fieldName}` where `{fieldName}` matches the field's `name` property. Scope provides `value` (current field value) and `field` (field configuration object). |
 
 ### Form Options
 
@@ -437,3 +444,4 @@ The form uses Vuetify defaults provider for consistent styling:
 - All labels and messages respect the `t` translation function
 - Long-running form submissions should use the `loading` prop to prevent double-submission
 - Mobile devices always render single-column layout regardless of `cols` setting
+- The `change` event is emitted for each field when its value changes, enabling real-time reactivity and dynamic form behavior
