@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.193
+
+### Patch Changes
+
+- 6f34fab: consents
+
 ## 0.0.192
 
 ### Patch Changes
