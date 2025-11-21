@@ -1,6 +1,7 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
 import { ref } from 'vue'
 import Cookies from 'js-cookie'
+import { useAppStore } from '../index'
 import { useUiStore } from './ui'
 import { useHttp } from '@/composables/http'
 
@@ -14,16 +15,8 @@ export const useAuthStore = defineStore(
     type AuthResponse = {
       access_token: string
       refresh_token: string
-    }
-
-    type ContextResponse = {
-      version: string
-      user: {
-        uuid: string
-        username: string
-        fullname: string
-        created: string
-      }[]
+      error?: string
+      errors?: { name: string; message: string }[]
     }
 
     const refreshCookieOptions = {
@@ -34,16 +27,8 @@ export const useAuthStore = defineStore(
       expires: 7,
     }
 
-    const defaultUser = {
-      uuid: '',
-      username: '',
-      fullname: '',
-      created: '',
-    }
-
     const accessToken = ref('')
     const isAuthenticated = ref(false)
-    const user = ref({ ...defaultUser })
 
     function refreshToken() {
       return Cookies.get('refresh_token')
@@ -65,29 +50,25 @@ export const useAuthStore = defineStore(
         }
         const errorMessage = errorMessages[(status as 401 | 403 | 429) ?? 401]
         isAuthenticated.value = false
-        user.value = { ...defaultUser }
         setError(errorMessage)
       } else {
         accessToken.value = data.access_token
         Cookies.set('refresh_token', data.refresh_token, refreshCookieOptions)
-
-        const { data: contextData } = await api<ContextResponse>('app/context/')
-        user.value = contextData?.user[0] ?? { ...defaultUser }
-
         isAuthenticated.value = true
         clearMessages()
       }
 
+      await useAppStore().init()
       stopLoading()
       return isAuthenticated.value
     }
 
-    const logout = () => {
+    const logout = async () => {
       accessToken.value = ''
       Cookies.remove('refresh_token', { path: '/', domain: window.location.hostname })
       isAuthenticated.value = false
-      user.value = { ...defaultUser }
-      api.post('app/logout/')
+      await api.post('app/logout/')
+      await useAppStore().init()
       clearMessages()
     }
 
@@ -126,20 +107,54 @@ export const useAuthStore = defineStore(
       }
     }
 
+    type SignupResponse = {
+      access_token: string
+      refresh_token: string
+      error?: string
+      errors?: { name: string; message: string }[]
+    }
+
+    const signup = async (
+      username: string,
+      password: string,
+      fullname: string,
+      consent: string,
+    ): Promise<SignupResponse | null> => {
+      startLoading()
+      const { data, error } = await api.post<SignupResponse>('app/signup/', {
+        username,
+        password,
+        fullname,
+        consent,
+      })
+      const success = data && !data?.error && !error && !data?.errors
+      if (success) {
+        accessToken.value = data.access_token
+        Cookies.set('refresh_token', data.refresh_token, refreshCookieOptions)
+        isAuthenticated.value = true
+        clearMessages()
+        await useAppStore().init()
+      } else {
+        if (data?.error || error) setError(data?.error || 'something.went.wrong')
+      }
+      stopLoading()
+      return data
+    }
+
     return {
       accessToken,
       refreshToken,
       isAuthenticated,
-      user,
       login,
       logout,
       refresh,
+      signup,
     }
   },
   {
     storage: {
       adapter: 'localStorage',
-      include: ['isAuthenticated', 'user'],
+      include: ['isAuthenticated'],
     },
   } as Record<string, unknown>,
 )

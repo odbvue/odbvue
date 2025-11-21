@@ -41,6 +41,7 @@ export const useAuthStore = defineStore(
     type AuthResponse = {
       access_token: string
       refresh_token: string
+      error? : string
     }
 
     type ContextResponse = {
@@ -306,7 +307,7 @@ Add to Default Layout:
       <v-divider v-if="app.auth.isAuthenticated" />
       <v-list v-if="app.auth.isAuthenticated">
         <v-list-item>
-          <strong>{{ app.auth.user?.fullname }}</strong>
+          <strong>{{ app.user?.fullname }}</strong>
         </v-list-item>
         <v-list-item link prepend-icon="$mdiLogout" @click="app.auth.logout()">
           <v-list-item-title>{{ t('logout') }}</v-list-item-title>
