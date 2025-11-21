@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1763766491354 stripComments:false  logicalFilePath:featdb\odbvue\package_specs\pck_api_validate.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_specs/pck_api_validate.sql:895fb912587a926520a4ba092a4375e7071c42cb:d73f1a49eb43a8b3b8b4f87d0cc015d968ec10ab:alter
+
 CREATE OR REPLACE PACKAGE odbvue.pck_api_validate AS -- Package provides methods for validating values against rules
 
     FUNCTION validate ( -- Function validates the provided value against the specified rules in JSON format
@@ -7,5 +11,3 @@ CREATE OR REPLACE PACKAGE odbvue.pck_api_validate AS -- Package provides methods
 END pck_api_validate;
 /
 
-
--- sqlcl_snapshot {"hash":"d73f1a49eb43a8b3b8b4f87d0cc015d968ec10ab","type":"PACKAGE_SPEC","name":"PCK_API_VALIDATE","schemaName":"ODBVUE","sxml":""}
