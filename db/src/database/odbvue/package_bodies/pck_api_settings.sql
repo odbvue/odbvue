@@ -45,6 +45,11 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_settings AS
         WHERE
             id = p_id;
 
+    EXCEPTION
+        WHEN no_data_found THEN
+            raise_application_error(-20001, 'Setting with ID "'
+                                            || p_id
+                                            || '" not found.');
     END read;
 
     FUNCTION read (
@@ -70,4 +75,4 @@ END;
 /
 
 
--- sqlcl_snapshot {"hash":"ce2a0d3edfb9d4ab933460dd04445a63091a2e69","type":"PACKAGE_BODY","name":"PCK_API_SETTINGS","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"b0186a057468befb8fa984e66015bd28d8ae367e","type":"PACKAGE_BODY","name":"PCK_API_SETTINGS","schemaName":"ODBVUE","sxml":""}
