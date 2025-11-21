@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.192
+
+### Patch Changes
+
+- 0230828: classifiers
+
 ## 0.0.191
 
 ### Patch Changes
