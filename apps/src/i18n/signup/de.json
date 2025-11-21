@@ -1,0 +1,14 @@
+{
+  "login": "Login",
+  "logout": "Logout",
+  "consent": "Consent",
+  "sign.up": "Sign up",
+  "username": "Username",
+  "fullname": "Fullname",
+  "password": "Password",
+  "Password": "Password",
+  "password.repeat": "Password repeat",
+  "i.agree.to.the": "I agree to the",
+  "terms.and.conditions": "Terms and conditions",
+  "close": "Close"
+}

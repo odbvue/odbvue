@@ -1,0 +1,15 @@
+{
+  "sign.up": "Sign up",
+  "fullname": "Fullname",
+  "password.repeat": "Password repeat",
+  "fullname.is.required": "Fullname is required",
+  "consent": "Consent",
+  "consent.is.required": "Consent is required",
+  "i.agree.to.the": "I agree to the",
+  "terms.and.conditions": "Terms and conditions",
+  "Fullname": "Fullname",
+  "passwords.must.match": "Passwords must match",
+  "password.must.be.12-120.characters.long.with.at.least.one.upper.case.letter.,.lower.case.letter.,.number.and.special.symbol": "Password must be 12-120 characters long with at least one upper case letter , lower case letter , number and special symbol",
+  "username.already.exists": "Username already exists",
+  "something.went.wrong": "Something went wrong"
+}

@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1763765420689 stripComments:false  logicalFilePath:featsignup\odbvue\package_specs\pck_app.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_specs/pck_app.sql:9b395e8bfb324723c8cd24a781f15456d04234a5:b554e185fa030bfa1f8e5c3d994c3e0ac75d216f:alter
+
 CREATE OR REPLACE PACKAGE odbvue.pck_app AS -- Package for the main application     
     PROCEDURE get_context ( -- Returns application context
         r_version  OUT VARCHAR2, -- Application version
@@ -39,5 +43,3 @@ CREATE OR REPLACE PACKAGE odbvue.pck_app AS -- Package for the main application
 END pck_app;
 /
 
-
--- sqlcl_snapshot {"hash":"b554e185fa030bfa1f8e5c3d994c3e0ac75d216f","type":"PACKAGE_SPEC","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}

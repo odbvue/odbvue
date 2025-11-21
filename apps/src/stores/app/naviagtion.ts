@@ -1,5 +1,6 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
 import { useRouter, useRoute } from 'vue-router'
+import { computed } from 'vue'
 
 export const useNavigationStore = defineStore('navigation', () => {
   const routes = useRouter().getRoutes()

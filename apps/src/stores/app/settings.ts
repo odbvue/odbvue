@@ -79,7 +79,7 @@ export const useSettingsStore = defineStore(
       adapter: 'localStorage',
       include: ['locale', 'theme', 'fontSize'],
     },
-  },
+  } as Record<string, unknown>,
 )
 
 if (import.meta.hot) {

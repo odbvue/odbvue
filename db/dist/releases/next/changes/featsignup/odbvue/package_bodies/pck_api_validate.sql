@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1763765420435 stripComments:false  logicalFilePath:featsignup\odbvue\package_bodies\pck_api_validate.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_bodies/pck_api_validate.sql:6c3cdda87035ad083bca0fca27237d822d755593:bae6e95aefff9dd5d62a1f882d3d4ba30349529c:alter
+
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_validate AS
 
     FUNCTION regexp_like_2 (
@@ -594,5 +598,3 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_validate AS
 END pck_api_validate;
 /
 
-
--- sqlcl_snapshot {"hash":"bae6e95aefff9dd5d62a1f882d3d4ba30349529c","type":"PACKAGE_BODY","name":"PCK_API_VALIDATE","schemaName":"ODBVUE","sxml":""}

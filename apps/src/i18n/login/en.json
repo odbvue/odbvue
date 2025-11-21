@@ -10,7 +10,5 @@
   "password.is.required": "Password is required",
   "unauthorized": "Unauthorized",
   "too.many.requests": "Too many requests",
-  "Username": "Username",
-  "Nom d'utilisateur": "Nom d'utilisateur",
-  "Mot de passe": "Mot de passe"
+  "not.registered.yet": "Not registered yet"
 }

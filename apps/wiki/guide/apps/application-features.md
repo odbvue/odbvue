@@ -278,6 +278,7 @@ const app = useAppStore()
 ```ts
 import { defineStore, acceptHMRUpdate } from 'pinia'
 import { useRouter, useRoute } from 'vue-router'
+import { computed } from 'vue'
 
 export const useNavigationStore = defineStore('navigation', () => {
   const routes = useRouter().getRoutes()
@@ -700,7 +701,6 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   function startLoading() {
-    clearMessages()
     loading.value = true
   }
 
@@ -780,6 +780,7 @@ if (import.meta.hot) {
       ></v-progress-linear>
     </v-app-bar>
     <v-main class="ma-4" id="main" tabindex="-1">
+      <!-- ... -->
       <v-alert
         type="info"
         :text="app.ui.info ? t(app.ui.info) : ''"
@@ -858,6 +859,23 @@ const app = useAppStore()
 </script>
 ```
 :::
+
+5. Modify Router to clear all UI alerts on new routes
+
+#### `@/router/index.ts`
+
+```ts{7}
+//...
+router.beforeEach(async (to) => {
+  const appTitle = title || 'OdbVue'
+  const pageTitle = useNavigationStore().title(to.path)
+  const documentTitle = pageTitle ? `${appTitle} - ${pageTitle}` : appTitle
+  useHead({ title: documentTitle })
+  useUiStore().clearMessages()
+  return true
+})
+// ...
+```
 
 ## Page Not Found
 

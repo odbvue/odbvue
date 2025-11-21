@@ -24,7 +24,13 @@
               :rules="field.rules()"
               :error-messages="field.errors()"
               @keyup.enter="handleFieldEnter(field.name)"
-            />
+            >
+              <template #label>
+                <slot :name="`field-${field.name}`" :value="values[field.name]" :field="field">
+                  {{ field.props.label }}
+                </slot>
+              </template>
+            </component>
           </v-col>
         </v-row>
         <v-row v-if="actions.length > 0">
@@ -107,6 +113,7 @@ const emits = defineEmits<{
   (event: 'reset'): void
   (event: 'submit', formData: OvFormData): void
   (event: 'validate', formData: OvFormData, errors?: unknown): void
+  (event: 'change', fieldName: string, value: unknown, allValues: OvFormData): void
 }>()
 
 watch(
@@ -235,10 +242,14 @@ const fields = computed(() => {
           .map((error: OvFormFieldError) => t(error.message || ''))
       },
       rules: () =>
-        (field.rules || []).map(
-          (rule) => (value: unknown) =>
-            OvRuleValidate(value, rule.type, rule.params, t(rule.message)),
-        ),
+        (field.rules || []).map((rule) => (value: unknown) => {
+          let params = rule.params
+          // For 'same-as' rule, resolve the field name to its actual value
+          if (rule.type === 'same-as' && typeof params === 'string') {
+            params = values.value[params]
+          }
+          return OvRuleValidate(value, rule.type, params, t(rule.message))
+        }),
     }
   })
 })
@@ -255,6 +266,20 @@ const actions = computed(() => {
 })
 
 const values = ref<OvFormData>({})
+const previousValues = ref<OvFormData>({})
+
+watch(
+  () => values.value,
+  (newValues: OvFormData) => {
+    Object.keys(newValues).forEach((fieldName) => {
+      if (newValues[fieldName] !== previousValues.value[fieldName]) {
+        emits('change', fieldName, newValues[fieldName], newValues)
+      }
+    })
+    previousValues.value = { ...newValues }
+  },
+  { deep: true },
+)
 
 const handleAction = async (actionName: string) => {
   const action = actions.value.find((actionItem) => actionItem.name === actionName)

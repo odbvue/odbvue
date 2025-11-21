@@ -12,6 +12,7 @@ router.beforeEach(async (to) => {
   const pageTitle = useNavigationStore().title(to.path)
   const documentTitle = pageTitle ? `${appTitle} - ${pageTitle}` : appTitle
   useHead({ title: documentTitle })
+  useUiStore().clearMessages()
   return true
 })
 
