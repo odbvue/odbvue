@@ -53,7 +53,7 @@ Column names are in single.
 
 Primary key is named: `id`. Data type: `NUMBER(19, 0)`.
 
-Foreign keys are named: `id_table_name`.
+Foreign keys are named: `table_name_id`.
 
 `NOT NULL` constraints must be defined, where needed.
 
