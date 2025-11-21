@@ -53,7 +53,6 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   function startLoading() {
-    clearMessages()
     loading.value = true
   }
 

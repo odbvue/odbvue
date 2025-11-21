@@ -61,7 +61,7 @@ export const useSettingsStore = defineStore(
       adapter: 'localStorage',
       include: ['theme'],
     },
-  },
+  } as Record<string, unknown>,
 )
 
 if (import.meta.hot) {
