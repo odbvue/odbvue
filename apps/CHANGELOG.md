@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.194
+
+### Patch Changes
+
+- ef8f11a: sign-up
+
 ## 0.0.193
 
 ### Patch Changes

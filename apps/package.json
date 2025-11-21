@@ -1,7 +1,7 @@
 {
           "name": "odbvue",
           "title": "OdbVue",
-          "version": "0.0.193",
+          "version": "0.0.194",
           "private": true,
           "type": "module",
           "packageManager": "pnpm@10.22.0",
