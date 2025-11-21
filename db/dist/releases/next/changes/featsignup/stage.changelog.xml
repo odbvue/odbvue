@@ -5,4 +5,8 @@
                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
 <include file="_custom/010_signup.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
 <include file="_custom/020_consents.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
+<include file="odbvue/package_bodies/pck_api_validate.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_specs/pck_app.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_bodies/pck_api_settings.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_bodies/pck_app.sql" relativeToChangelogFile="true"/>
 </databaseChangeLog>
