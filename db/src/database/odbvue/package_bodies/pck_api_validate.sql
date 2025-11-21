@@ -1,5 +1,77 @@
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_validate AS
 
+    FUNCTION regexp_like_2 (
+        p_value   IN VARCHAR2,
+        p_pattern IN VARCHAR2
+    ) RETURN BOOLEAN IS
+
+        v_pattern         VARCHAR2(32767) := p_pattern;
+        v_sub_pattern     VARCHAR2(32767);
+        v_start_pos       PLS_INTEGER;
+        v_end_pos         PLS_INTEGER;
+        v_paren_count     PLS_INTEGER;
+        v_char            CHAR(1);
+        v_len             PLS_INTEGER;
+        v_in_class        BOOLEAN;
+        v_escaped         BOOLEAN;
+        v_cleaned_pattern VARCHAR2(32767);
+    BEGIN
+        -- Check if regexp contains (?=...) lookaheads and do in loops each part
+        LOOP
+            v_start_pos := instr(v_pattern, '(?=');
+            EXIT WHEN v_start_pos = 0;
+            v_paren_count := 1;
+            v_len := length(v_pattern);
+            v_end_pos := 0;
+            v_in_class := FALSE;
+            v_escaped := FALSE;
+            FOR i IN v_start_pos + 3..v_len LOOP
+                v_char := substr(v_pattern, i, 1);
+                IF v_escaped THEN
+                    v_escaped := FALSE;
+                ELSE
+                    IF v_char = '\' THEN
+                        v_escaped := TRUE;
+                    ELSIF v_in_class THEN
+                        IF v_char = ']' THEN
+                            v_in_class := FALSE;
+                        END IF;
+                    ELSE
+                        IF v_char = '[' THEN
+                            v_in_class := TRUE;
+                        ELSIF v_char = '(' THEN
+                            v_paren_count := v_paren_count + 1;
+                        ELSIF v_char = ')' THEN
+                            v_paren_count := v_paren_count - 1;
+                        END IF;
+                    END IF;
+                END IF;
+
+                IF v_paren_count = 0 THEN
+                    v_end_pos := i;
+                    EXIT;
+                END IF;
+            END LOOP;
+
+            IF v_end_pos = 0 THEN
+                RETURN FALSE;
+            END IF;
+            v_sub_pattern := substr(v_pattern, v_start_pos + 3, v_end_pos -(v_start_pos + 3));
+
+            -- Clean up escaped brackets in character classes - remove them entirely
+            v_cleaned_pattern := regexp_replace(v_sub_pattern, '\\\[\\\]', '', 1, 0,
+                                                '');
+            IF NOT regexp_like(p_value, v_cleaned_pattern) THEN
+                RETURN FALSE;
+            END IF;
+            v_pattern := substr(v_pattern, 1, v_start_pos - 1)
+                         || substr(v_pattern, v_end_pos + 1);
+
+        END LOOP;
+
+        RETURN regexp_like(p_value, v_pattern);
+    END;
+
     FUNCTION num_try (
         p_str IN VARCHAR2,
         p_ok  OUT BOOLEAN
@@ -12,7 +84,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_validate AS
         END IF;
         BEGIN
       -- force dot decimal regardless of session NLS
-            v_num := TO_NUMBER ( p_str, 'TM9', 'NLS_NUMERIC_CHARACTERS=.,' );
+            v_num := TO_NUMBER ( TRIM(BOTH '"' FROM p_str) );
             p_ok := TRUE;
             RETURN v_num;
         EXCEPTION
@@ -239,15 +311,15 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_validate AS
         IF e IS NULL THEN
             RETURN NULL;
         END IF;
-        IF e.is_scalar THEN
+        IF e.is_array
+        OR e.is_object THEN
             RETURN e.to_string;
-        ELSIF e.is_object
-        OR e.is_array THEN
-            RETURN e.to_string; -- JSON text
-        ELSE
-            RETURN NULL;
         END IF;
-
+        RETURN replace(
+            trim(BOTH '"' FROM e.to_string),
+            '\\',
+            '\'
+        );
     END;
 
     FUNCTION eval_rule (
@@ -423,7 +495,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_validate AS
             WHEN 'regexp' THEN
                 v_str := elem_to_string(p_params);
                 IF v_str IS NULL
-                   OR NOT regexp_like(p_value, v_str) THEN
+                   OR NOT regexp_like_2(p_value, v_str) THEN
                     RETURN v_msg;
                 END IF;
 
@@ -523,4 +595,4 @@ END pck_api_validate;
 /
 
 
--- sqlcl_snapshot {"hash":"6c3cdda87035ad083bca0fca27237d822d755593","type":"PACKAGE_BODY","name":"PCK_API_VALIDATE","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"bae6e95aefff9dd5d62a1f882d3d4ba30349529c","type":"PACKAGE_BODY","name":"PCK_API_VALIDATE","schemaName":"ODBVUE","sxml":""}
