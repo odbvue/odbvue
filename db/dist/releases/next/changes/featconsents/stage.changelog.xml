@@ -3,5 +3,19 @@
                    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+<include file="odbvue/tables/app_consents.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/tables/app_user_consents.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_specs/pck_api_consents.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_bodies/pck_api_consents.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/comments/app_consents.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/comments/app_user_consents.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_app_consents_active.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_app_consents_language.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_app_user_consents_consent.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_app_user_consents_given.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_app_user_consents_revoked.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/ref_constraints/cfk_app_consents_language.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/ref_constraints/cfk_app_user_consents_consent.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/ref_constraints/cfk_app_user_consents_user.sql" relativeToChangelogFile="true"/>
 <include file="_custom/010_consents.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
 </databaseChangeLog>
