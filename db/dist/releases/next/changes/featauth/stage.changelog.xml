@@ -3,6 +3,20 @@
                    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+<include file="odbvue/tables/app_countries.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/tables/app_currencies.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/tables/app_languages.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_specs/pck_api_classifiers.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_bodies/pck_api_classifiers.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/comments/app_countries.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/comments/app_currencies.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/comments/app_languages.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_app_countries_active.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_app_countries_name.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_app_currencies_active.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_app_currencies_name.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_app_languages_active.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_app_languages_name.sql" relativeToChangelogFile="true"/>
 <include file="_custom/010_app_classifiers_languages.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
 <include file="_custom/020_app_classifiers_countries.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
 <include file="_custom/020_app_classifiers_currencies.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
