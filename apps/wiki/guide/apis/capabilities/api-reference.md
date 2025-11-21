@@ -24,6 +24,14 @@ Package provides classifier lookup
 <<< ../../../../../db/tests/pck_api_classifiers.sql
 :::
 
+## Consents
+
+Package for managing user consents
+
+::: details example
+<<< ../../../../../db/tests/pck_api_consents.sql
+:::
+
 ## Emails
 
 Package for sending emails
