@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.199
+
+### Patch Changes
+
+- 7a5b92c: recover password
+
 ## 0.0.198
 
 ### Patch Changes
