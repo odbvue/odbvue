@@ -293,6 +293,14 @@ BEGIN
         END;
     END;
 
+    BEGIN
+        DBMS_OUTPUT.PUT_LINE('- creating rest services.');
+        prc_ordsify;
+        DBMS_OUTPUT.PUT_LINE('  - completed.');
+    EXCEPTION 
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('  - failed: ' || SQLERRM);
+    END;   
 END;
 /
 

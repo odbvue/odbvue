@@ -239,6 +239,8 @@ BEGIN
             p_comments       => v_comment
         );
 
+        -- methods
+
         FOR p IN (
             SELECT
                 o.procedure_name,
@@ -335,7 +337,8 @@ BEGIN
                         ),
                         'DELETE_'
                     ),
-                    '_TOKEN'
+                    '_',
+                    '-'
                 ))
                              || '/'
                              ||
@@ -453,4 +456,4 @@ END;
 /
 
 
--- sqlcl_snapshot {"hash":"c93f4282c7d658aee295ac6f23b78d71b50cc931","type":"PROCEDURE","name":"PRC_ORDSIFY","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"3b8fce91b9c7ae71314a469485d07a20acec4eff","type":"PROCEDURE","name":"PRC_ORDSIFY","schemaName":"ODBVUE","sxml":""}
