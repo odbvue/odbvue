@@ -20,3 +20,15 @@ output "adb_connection_strings_note" {
 output "object_storage_bucket_url_hint" {
   value = "Use the namespace (${data.oci_objectstorage_namespace.ns.namespace}) and bucket 'odbvue-obj'. Objects are public (read)."
 }
+
+output "vault_secret_ocid" {
+  description = "OCI Vault Secret OCID containing the DBMS_CRYPTO master key. Use this in PL/SQL."
+  value       = oci_vault_secret.plsql_master_secret.id
+  sensitive   = false
+}
+
+output "vault_master_key_ocid" {
+  description = "KMS master key OCID used to encrypt the vault secret."
+  value       = oci_kms_key.master_key.id
+  sensitive   = false
+}

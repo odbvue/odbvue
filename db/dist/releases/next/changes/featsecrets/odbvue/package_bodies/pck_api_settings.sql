@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1763841490707 stripComments:false  logicalFilePath:featsecrets\odbvue\package_bodies\pck_api_settings.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_bodies/pck_api_settings.sql:b0186a057468befb8fa984e66015bd28d8ae367e:1d7f4792bba75414714e9b5642ff2fe72f92338a:alter
+
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_settings AS
 
     g_master_key RAW(32);
@@ -136,5 +140,3 @@ BEGIN
 END;
 /
 
-
--- sqlcl_snapshot {"hash":"1d7f4792bba75414714e9b5642ff2fe72f92338a","type":"PACKAGE_BODY","name":"PCK_API_SETTINGS","schemaName":"ODBVUE","sxml":""}

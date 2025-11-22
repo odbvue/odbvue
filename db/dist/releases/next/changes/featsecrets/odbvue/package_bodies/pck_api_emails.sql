@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1763841490616 stripComments:false  logicalFilePath:featsecrets\odbvue\package_bodies\pck_api_emails.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_bodies/pck_api_emails.sql:f184344bff2a8d743b15f7cce39378527f41e460:7ca06a4cb0dced0bd40a00ca5d84bb8fcadfcb34:alter
+
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_emails AS
 
     PROCEDURE mail (
@@ -394,5 +398,3 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_emails AS
 END;
 /
 
-
--- sqlcl_snapshot {"hash":"7ca06a4cb0dced0bd40a00ca5d84bb8fcadfcb34","type":"PACKAGE_BODY","name":"PCK_API_EMAILS","schemaName":"ODBVUE","sxml":""}

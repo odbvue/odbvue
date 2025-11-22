@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1763841490733 stripComments:false  logicalFilePath:featsecrets\odbvue\package_specs\pck_api_settings.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_specs/pck_api_settings.sql:84c85557bdb80392b4079f6a0ce9b887becb4abf:02ca166ff7acc5301b31cfc9b97dd50766def49f:alter
+
 CREATE OR REPLACE PACKAGE odbvue.pck_api_settings AS -- Package provides methods for managing application settings 
     PROCEDURE write ( -- Procedure sets value of the setting with the specified id
         p_id      app_settings.id%TYPE, -- Id of the setting
@@ -29,5 +33,3 @@ CREATE OR REPLACE PACKAGE odbvue.pck_api_settings AS -- Package provides methods
 END;
 /
 
-
--- sqlcl_snapshot {"hash":"02ca166ff7acc5301b31cfc9b97dd50766def49f","type":"PACKAGE_SPEC","name":"PCK_API_SETTINGS","schemaName":"ODBVUE","sxml":""}
