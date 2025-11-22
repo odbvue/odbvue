@@ -103,6 +103,8 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_emails AS
         c_smtp_host VARCHAR2(2000 CHAR);
         c_smtp_port PLS_INTEGER;
         c_smtp_cred VARCHAR2(2000 CHAR);
+        c_smtp_user VARCHAR2(2000 CHAR);
+        c_smtp_pass VARCHAR2(2000 CHAR);
         v_conn      utl_smtp.connection;
         c_boundary  VARCHAR2(50) := '----=*#abc1234321cba#*=';
         c_blob_mime VARCHAR2(254) := 'text/plain';
@@ -194,15 +196,20 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_emails AS
         c_smtp_host := pck_api_settings.read('APP_EMAILS_SMTP_HOST');
         c_smtp_port := TO_NUMBER ( pck_api_settings.read('APP_EMAILS_SMTP_PORT') );
         c_smtp_cred := pck_api_settings.read('APP_EMAILS_SMTP_CRED');
+        c_smtp_user := pck_api_settings.read('APP_EMAILS_SMTP_USERNAME');
+        c_smtp_pass := pck_api_settings.read('APP_EMAILS_SMTP_PASSWORD');
         IF c_smtp_host IS NULL THEN
             raise_application_error(-20003, 'SMTP host is not set in settings (APP_EMAILS_SMTP_HOST)');
         END IF;
         IF c_smtp_port IS NULL THEN
             raise_application_error(-20004, 'SMTP port is not set in settings (APP_EMAILS_SMTP_PORT)');
         END IF;
-        IF c_smtp_cred IS NULL THEN
-            raise_application_error(-20005, 'SMTP credentials are not set in settings (APP_EMAILS_SMTP_CRED)');
+        IF c_smtp_user IS NULL
+           OR c_smtp_pass IS NULL THEN
+            raise_application_error(-20005, 'SMTP credentials are not set in settings (APP_EMAILS_SMTP_USERNAME / APP_EMAILS_SMTP_PASSWORD)'
+            );
         END IF;
+
         FOR e IN (
             SELECT
                 id,
@@ -216,8 +223,9 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_emails AS
             BEGIN
                 v_conn := utl_smtp.open_connection(c_smtp_host, c_smtp_port);
                 utl_smtp.starttls(v_conn);
-                utl_smtp.set_credential(v_conn, c_smtp_cred,
-                                        schemes => 'PLAIN');
+                --UTL_SMTP.SET_CREDENTIAL(v_conn, c_smtp_cred, schemes => 'PLAIN');
+                utl_smtp.auth(v_conn, c_smtp_user, c_smtp_pass,
+                              schemes => 'PLAIN');
                 FOR a IN (
                     SELECT
                         addr_addr
@@ -387,4 +395,4 @@ END;
 /
 
 
--- sqlcl_snapshot {"hash":"f184344bff2a8d743b15f7cce39378527f41e460","type":"PACKAGE_BODY","name":"PCK_API_EMAILS","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"7ca06a4cb0dced0bd40a00ca5d84bb8fcadfcb34","type":"PACKAGE_BODY","name":"PCK_API_EMAILS","schemaName":"ODBVUE","sxml":""}
