@@ -19,8 +19,15 @@ CREATE OR REPLACE PACKAGE odbvue.pck_api_settings AS -- Package provides methods
         p_id app_settings.id%TYPE -- Id of the setting
     );
 
+    FUNCTION enc ( -- Function encrypts the provided value
+        p_value IN VARCHAR2 -- Value to be encrypted
+    ) RETURN VARCHAR2; -- Encrypted value
+
+    FUNCTION dec ( -- Function decrypts the provided value
+        p_value IN VARCHAR2 -- Value to be decrypted
+    ) RETURN VARCHAR2; -- Decrypted value
 END;
 /
 
 
--- sqlcl_snapshot {"hash":"84c85557bdb80392b4079f6a0ce9b887becb4abf","type":"PACKAGE_SPEC","name":"PCK_API_SETTINGS","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"02ca166ff7acc5301b31cfc9b97dd50766def49f","type":"PACKAGE_SPEC","name":"PCK_API_SETTINGS","schemaName":"ODBVUE","sxml":""}

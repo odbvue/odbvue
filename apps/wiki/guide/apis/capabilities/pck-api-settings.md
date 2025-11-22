@@ -20,6 +20,24 @@ Dependencies:
 | --------------- | --------------- |
 |TABLE|APP_SETTINGS|
 
+## DEC
+
+Function decrypts the provided value
+
+| Argument name | In Out | Data type | Default value | Description |
+| ------------- | ------ | --------- | ------------- | ----------- |
+||OUT|VARCHAR2||Value of the setting (variable character)|
+|P_VALUE|IN|VARCHAR2||Value to be encrypted|
+
+## ENC
+
+Function encrypts the provided value
+
+| Argument name | In Out | Data type | Default value | Description |
+| ------------- | ------ | --------- | ------------- | ----------- |
+||OUT|VARCHAR2||Value of the setting (variable character)|
+|P_VALUE|IN|VARCHAR2||Value to be encrypted|
+
 ## READ
 
 Procedure returns value of the setting with the specified id

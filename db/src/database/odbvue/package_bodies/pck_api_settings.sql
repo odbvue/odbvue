@@ -1,5 +1,7 @@
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_settings AS
 
+    g_master_key RAW(32);
+
     PROCEDURE write (
         p_id      app_settings.id%TYPE,
         p_name    app_settings.name%TYPE,
@@ -71,8 +73,63 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_settings AS
 
     END remove;
 
+    FUNCTION enc (
+        p_value IN VARCHAR2
+    ) RETURN VARCHAR2 IS
+    BEGIN
+        RETURN utl_raw.cast_to_varchar2(utl_encode.base64_encode(dbms_crypto.encrypt(
+            utl_raw.cast_to_raw(p_value),
+            dbms_crypto.aes_cbc_pkcs5,
+            g_master_key
+        )));
+    END enc;
+
+    FUNCTION dec (
+        p_value IN VARCHAR2
+    ) RETURN VARCHAR2 IS
+    BEGIN
+        RETURN utl_raw.cast_to_varchar2(dbms_crypto.decrypt(
+            utl_encode.base64_decode(utl_raw.cast_to_raw(p_value)),
+            dbms_crypto.aes_cbc_pkcs5,
+            g_master_key
+        ));
+    END dec;
+
+    PROCEDURE initialize_master_key IS
+
+        v_resp  dbms_cloud_types.resp;
+        v_json  CLOB;
+        v_b64   VARCHAR2(32767);
+        v_raw   RAW(32767);
+        v_local VARCHAR2(32767);
+        v_uri   VARCHAR2(2000 CHAR) := read('APP_SETTINGS_MASTER_KEY_URI');
+    BEGIN
+        v_resp := dbms_cloud.send_request(
+            credential_name => 'OCI$RESOURCE_PRINCIPAL',
+            uri             => v_uri,
+            method          => dbms_cloud.method_get
+        );
+
+        v_json := dbms_cloud.get_response_text(v_resp);
+        v_b64 := JSON_VALUE(v_json, '$.secretBundleContent.content');
+        g_master_key := utl_encode.base64_decode(utl_raw.cast_to_raw(v_b64));
+    EXCEPTION
+        WHEN OTHERS THEN
+            BEGIN
+                pck_api_audit.warn('Master Key');
+                v_local := read('APP_SETTINGS_MASTER_KEY_LOCAL');
+                g_master_key := utl_raw.cast_to_raw(v_local);
+            EXCEPTION
+                WHEN OTHERS THEN
+                    pck_api_audit.fatal('Master Key');
+                    raise_application_error(-20001, 'Failed to initialize master key from local setting: ' || sqlerrm);
+            END;
+    END initialize_master_key;
+
+BEGIN
+    initialize_master_key;
 END;
 /
 
 
--- sqlcl_snapshot {"hash":"b0186a057468befb8fa984e66015bd28d8ae367e","type":"PACKAGE_BODY","name":"PCK_API_SETTINGS","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"1d1c9bf1fd93bcb2d3030cb39912839848423595","type":"PACKAGE_BODY","name":"PCK_API_SETTINGS","schemaName":"ODBVUE","sxml":""}
