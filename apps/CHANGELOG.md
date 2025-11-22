@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.197
+
+### Patch Changes
+
+- 0720630: confirm email
+
 ## 0.0.196
 
 ### Patch Changes
