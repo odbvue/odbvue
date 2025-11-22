@@ -3,6 +3,14 @@
                    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+<include file="c##cloud$service/object_grants/object_grants_as_grantor.c##cloud$service.package_spec.dbms_cloud_oci_sc_secrets.sql" relativeToChangelogFile="true"/>
+<include file="c##cloud$service/object_grants/object_grants_as_grantor.c##cloud$service.type_spec.dbms_cloud_oci_sc_secrets_get_secret_bundle_response_t.sql" relativeToChangelogFile="true"/>
+<include file="c##cloud$service/object_grants/object_grants_as_grantor.c##cloud$service.type_spec.dbms_cloud_oci_secrets_secret_bundle_t.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/tables/app_settings.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_specs/pck_api_settings.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_bodies/pck_api_emails.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_bodies/pck_api_settings.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/comments/app_settings.sql" relativeToChangelogFile="true"/>
 <include file="_custom/010_settings_oci_vault.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
 <include file="_custom/020_settings_smtp.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
 </databaseChangeLog>
