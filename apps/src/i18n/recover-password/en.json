@@ -1,0 +1,7 @@
+{
+  "recover.password": "Recover password",
+  "send": "Send",
+  "username.must.be.a.valid.e-mail.address": "Username must be a valid e-mail address",
+  "wrong.username": "Wrong username",
+  "password.recovery.email.sent": "Password recovery email sent"
+}

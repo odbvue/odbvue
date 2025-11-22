@@ -157,6 +157,52 @@ export const useAuthStore = defineStore(
       return !data?.error
     }
 
+    const recoverPassword = async (username: string): Promise<boolean> => {
+      startLoading()
+      const { data, error } = await api.post<{ error: string }>('app/recover-password/', {
+        username,
+      })
+      if (data?.error || error) {
+        setError(data?.error || 'something.went.wrong')
+      } else {
+        setInfo('password.recovery.email.sent')
+      }
+      stopLoading()
+      return !data?.error
+    }
+
+    type ResetPasswordResponse = {
+      access_token: string
+      refresh_token: string
+      error?: string
+      errors?: { name: string; message: string }[]
+    }
+
+    const resetPassword = async (
+      username: string,
+      password: string,
+      token: string,
+    ): Promise<ResetPasswordResponse | null> => {
+      startLoading()
+      const { data, error } = await api.post<ResetPasswordResponse>('app/reset-password/', {
+        username,
+        password,
+        token,
+      })
+      const success = data && !data?.error && !error && !data?.errors
+      if (success) {
+        accessToken.value = data.access_token
+        Cookies.set('refresh_token', data.refresh_token, refreshCookieOptions)
+        isAuthenticated.value = true
+        clearMessages()
+        await useAppStore().init()
+      } else {
+        if (data?.error || error) setError(data?.error || 'something.went.wrong')
+      }
+      stopLoading()
+      return data
+    }
+
     return {
       accessToken,
       refreshToken,
@@ -166,6 +212,8 @@ export const useAuthStore = defineStore(
       refresh,
       signup,
       confirmEmail,
+      recoverPassword,
+      resetPassword,
     }
   },
   {

@@ -2,6 +2,52 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
 
     g_version VARCHAR2(30 CHAR) := '...';
 
+    -- PRIVATE
+
+    PROCEDURE send_email (
+        p_template   app_settings.id%TYPE,
+        p_username   app_users.username%TYPE,
+        p_fullname   app_users.fullname%TYPE,
+        p_subject    app_emails.subject%TYPE,
+        p_attributes CLOB
+    ) AS
+        v_id       app_emails.id%TYPE;
+        v_template CLOB;
+    BEGIN
+        v_template := pck_api_settings.read(p_template);
+        FOR a IN (
+            SELECT
+                key,
+                value
+            FROM
+                JSON_TABLE ( p_attributes, '$[*]'
+                    COLUMNS (
+                        key VARCHAR2 ( 200 CHAR ) PATH '$.key',
+                        value VARCHAR2 ( 2000 CHAR ) PATH '$.value'
+                    )
+                )
+        ) LOOP
+            v_template := replace(v_template, '{{'
+                                              || a.key
+                                              || '}}', a.value);
+        END LOOP;
+
+        pck_api_emails.mail(v_id,
+                            trim(p_username),
+                            p_fullname,
+                            p_subject,
+                            v_template);
+        pck_api_emails.send(v_id);
+    EXCEPTION
+        WHEN OTHERS THEN
+            pck_api_audit.error('Send email',
+                                pck_api_audit.attributes('username', p_username, 'fullname', p_fullname, 'subject',
+                                                         p_subject, 'template', p_template, 'attributes', p_attributes,
+                                                         'error', sqlerrm));
+    END;
+
+    -- PUBLIC
+
     PROCEDURE get_context (
         r_version  OUT VARCHAR2,
         r_user     OUT SYS_REFCURSOR,
@@ -253,22 +299,23 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
         r_refresh_token := pck_api_auth.issue_token(v_uuid, 'REFRESH');
         pck_api_auth.revoke_token(v_uuid, 'VERIFY');
         v_verify_token := pck_api_auth.issue_token(v_uuid, 'VERIFY');
-        v_email_template := pck_api_settings.read('APP_EMAIL_VERIFY_TEMPLATE');
-        v_email_template := replace(v_email_template,
-                                    '{{APP_DOMAIN_NAME}}',
-                                    pck_api_settings.read('APP_DOMAIN_NAME'));
-        v_email_template := replace(v_email_template, '{{APP_EMAIL_VERIFY_TOKEN}}', v_verify_token);
-        pck_api_emails.mail(v_email_id,
-                            trim(p_username),
-                            p_fullname,
-                            'Message from OdbVue',
-                            v_email_template);
-        BEGIN
-            pck_api_emails.send(v_email_id);
-        EXCEPTION
-            WHEN OTHERS THEN
-                NULL;
-        END;
+        send_email(
+            p_template   => 'APP_EMAIL_VERIFY_TEMPLATE',
+            p_username   => p_username,
+            p_fullname   => p_fullname,
+            p_subject    => 'Message from OdbVue',
+            p_attributes => JSON_ARRAY(
+                JSON_OBJECT(
+                    'key' VALUE 'APP_EMAIL_VERIFY_TOKEN',
+                    'value' VALUE v_verify_token
+                ),
+           JSON_OBJECT(
+                    'key' VALUE 'APP_DOMAIN_NAME',
+                       'value' VALUE pck_api_settings.read('APP_DOMAIN_NAME')
+                )
+            )
+        );
+
         pck_api_audit.info('Signup', audit_attrs);
     EXCEPTION
         WHEN OTHERS THEN
@@ -322,6 +369,170 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
                                 pck_api_audit.attributes('uuid', v_uuid));
     END;
 
+    PROCEDURE post_recover_password (
+        p_username app_users.username%TYPE,
+        r_error    OUT VARCHAR2
+    ) AS
+
+        v_uuid     app_users.uuid%TYPE;
+        v_fullname app_users.fullname%TYPE;
+        v_token    app_tokens.token%TYPE;
+    BEGIN
+        UPDATE app_users
+        SET
+            status = 'N'
+        WHERE
+            username = TRIM(upper(p_username))
+        RETURNING uuid,
+                  fullname INTO v_uuid, v_fullname;
+
+        IF SQL%rowcount = 0 THEN
+            r_error := 'wrong.username';
+            pck_api_audit.warn('Recover password',
+                               pck_api_audit.attributes('username', p_username, 'error', r_error));
+
+            RETURN;
+        END IF;
+
+        pck_api_auth.revoke_token(v_uuid, 'VERIFY');
+        v_token := pck_api_auth.issue_token(v_uuid, 'VERIFY');
+        send_email(
+            p_template   => 'APP_EMAIL_RECOVER_TEMPLATE',
+            p_username   => p_username,
+            p_fullname   => v_fullname,
+            p_subject    => 'Recover your password',
+            p_attributes => JSON_ARRAY(
+                JSON_OBJECT(
+                    'key' VALUE 'APP_PASSWORD_RESET_TOKEN',
+                    'value' VALUE v_token
+                ),
+           JSON_OBJECT(
+                    'key' VALUE 'APP_DOMAIN_NAME',
+                       'value' VALUE pck_api_settings.read('APP_DOMAIN_NAME')
+                )
+            )
+        );
+
+        pck_api_audit.info('Recover password',
+                           pck_api_audit.attributes('username', p_username, 'uuid', v_uuid));
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            r_error := 'something.went.wrong';
+            pck_api_audit.error('Recover password',
+                                pck_api_audit.attributes('username', p_username, 'uuid', v_uuid, 'error',
+                                                         r_error));
+
+    END post_recover_password;
+
+    PROCEDURE post_reset_password (
+        p_username     app_users.username%TYPE,
+        p_password     app_users.password%TYPE,
+        p_token        app_tokens.token%TYPE,
+        r_accesstoken  OUT VARCHAR2,
+        r_refreshtoken OUT VARCHAR2,
+        r_errors       OUT SYS_REFCURSOR,
+        r_error        OUT VARCHAR2
+    ) AS
+
+        v_uuid     app_users.uuid%TYPE;
+        c_salt     VARCHAR2(32 CHAR) := dbms_random.string('X', 32);
+        v_password app_users.password%TYPE := c_salt
+                                              || dbms_crypto.hash(
+            utl_raw.cast_to_raw(trim(p_password) || c_salt),
+            4
+        );
+
+        PROCEDURE errors (
+            p_name    VARCHAR2,
+            p_message VARCHAR2
+        ) AS
+        BEGIN
+            OPEN r_errors FOR SELECT
+                                  p_name    AS "name",
+                                  p_message AS "message"
+                              FROM
+                                  dual;
+
+        END errors;
+
+    BEGIN
+        r_error := pck_api_validate.validate(p_password,
+                                             JSON_ARRAY(
+                                        JSON_OBJECT(
+                                            'type' VALUE 'regexp',
+                                                    'params' VALUE pck_api_settings.read('APP_AUTH_PASSWORD_REQUIREMENTS'),
+                                                    'message' VALUE pck_api_settings.read('APP_AUTH_PASSWORD_MESSAGE')
+                                        )
+                                    ));
+
+        IF r_error IS NOT NULL THEN
+            errors('password', r_error);
+            pck_api_audit.warn('Signup',
+                               pck_api_audit.attributes('username', p_username, 'error', r_error));
+
+            r_error := NULL;
+            RETURN;
+        END IF;
+
+        BEGIN
+            SELECT
+                uuid
+            INTO v_uuid
+            FROM
+                app_users
+            WHERE
+                uuid IN (
+                    SELECT
+                        uuid
+                    FROM
+                        app_tokens
+                    WHERE
+                            token = p_token
+                        AND type_id = 'VERIFY'
+                        AND expiration > systimestamp
+                )
+                AND username = TRIM(upper(p_username));
+
+        EXCEPTION
+            WHEN no_data_found THEN
+                r_error := 'invalid.token';
+                pck_api_audit.warn('Reset password',
+                                   pck_api_audit.attributes('username', p_username, 'error', r_error, 'uudi',
+                                                            v_uuid));
+
+                RETURN;
+        END;
+
+        UPDATE app_users
+        SET
+            password = v_password,
+            attempts = 0,
+            attempted = NULL,
+            status = 'A',
+            accessed = systimestamp
+        WHERE
+            uuid = v_uuid;
+
+        COMMIT;
+        pck_api_auth.revoke_token(v_uuid, 'VERIFY');
+        pck_api_auth.revoke_token(v_uuid, 'REFRESH');
+        r_accesstoken := pck_api_auth.issue_token(v_uuid, 'ACCESS');
+        r_refreshtoken := pck_api_auth.issue_token(v_uuid, 'REFRESH');
+        pck_api_audit.info('Reset password successful',
+                           pck_api_audit.attributes('username', p_username, 'uuid', v_uuid));
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            r_accesstoken := NULL;
+            r_refreshtoken := NULL;
+            r_error := 'something.went.wrong';
+            pck_api_audit.error('Reset password error',
+                                pck_api_audit.attributes('username', p_username, 'uuid', v_uuid, 'error',
+                                                         r_error));
+
+    END post_reset_password;
+
     PROCEDURE post_heartbeat AS
     BEGIN
         IF pck_api_auth.uuid IS NULL THEN
@@ -348,4 +559,4 @@ END pck_app;
 /
 
 
--- sqlcl_snapshot {"hash":"9c0cb8547f35adbf8e37c8003cebb4d8889ddda6","type":"PACKAGE_BODY","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"8d6c630b27f910541be3ceafdd8a4089419bc8c9","type":"PACKAGE_BODY","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}

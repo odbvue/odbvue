@@ -8,6 +8,8 @@
         <br />
         {{ t('not.registered.yet') }}
         <a href="/signup">{{ t('sign.up') }}</a>
+        |
+        <a href="/recover-password">{{ t('forgot.password') }}</a>
       </v-col>
     </v-row>
   </v-container>

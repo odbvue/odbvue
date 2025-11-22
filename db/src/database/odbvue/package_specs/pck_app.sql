@@ -40,9 +40,24 @@ CREATE OR REPLACE PACKAGE odbvue.pck_app AS -- Package for the main application
         r_error OUT VARCHAR2 -- Error (NULL if sucess)
     );
 
+    PROCEDURE post_recover_password ( -- Procedure initiates sending of email to recover password
+        p_username app_users.username%TYPE, -- Username (e-mail address)
+        r_error    OUT VARCHAR2 -- Error (NULL if sucess)
+    );
+
+    PROCEDURE post_reset_password ( -- Procedure resets user password
+        p_username     app_users.username%TYPE, -- Username (e-mail address)
+        p_password     app_users.password%TYPE, -- Password
+        p_token        app_tokens.token%TYPE, --  Password recovery token (sent by e-mail)
+        r_accesstoken  OUT VARCHAR2, -- Access token
+        r_refreshtoken OUT VARCHAR2, -- Refresh token
+        r_errors       OUT SYS_REFCURSOR, -- Errors [{name, message}] (NULL if success)
+        r_error        OUT VARCHAR2 -- Error (NULL if success)
+    );
+
     PROCEDURE post_heartbeat; -- Procedure to keep the session alive
 END pck_app;
 /
 
 
--- sqlcl_snapshot {"hash":"a8da9cb56c6baa1a273dd0913805bea204108d30","type":"PACKAGE_SPEC","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"11e783214391b4ae2f3051ca4975629d7a18d79b","type":"PACKAGE_SPEC","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}

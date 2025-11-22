@@ -1,1 +1,15 @@
-{}
+{
+  "login": "Anmelden",
+  "logout": "Abmelden",
+  "submit": "Absenden",
+  "dev": "Entwickler",
+  "username": "Benutzername",
+  "password": "Passwort",
+  "username.is.required": "Benutzername erforderlich",
+  "username.must.be.a.valid.email.address": "Benutzername muss eine gültige E-Mail-Adresse sein",
+  "password.is.required": "Passwort erforderlich",
+  "unauthorized": "Nicht autorisiert",
+  "too.many.requests": "Zu viele Anfragen",
+  "not.registered.yet": "Noch nicht registriert",
+  "forgot.password": "Passwort vergessen"
+}

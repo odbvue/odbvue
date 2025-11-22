@@ -58,6 +58,20 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/recover-password': RouteRecordInfo<
+      '/recover-password',
+      '/recover-password',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/reset-password/[token]': RouteRecordInfo<
+      '/reset-password/[token]',
+      '/reset-password/:token',
+      { token: ParamValue<true> },
+      { token: ParamValue<false> },
+      | never
+    >,
     '/sandbox/': RouteRecordInfo<
       '/sandbox/',
       '/sandbox',
@@ -182,6 +196,18 @@ declare module 'vue-router/auto-routes' {
     'src/pages/login.vue': {
       routes:
         | '/login'
+      views:
+        | never
+    }
+    'src/pages/recover-password.vue': {
+      routes:
+        | '/recover-password'
+      views:
+        | never
+    }
+    'src/pages/reset-password/[token].vue': {
+      routes:
+        | '/reset-password/[token]'
       views:
         | never
     }

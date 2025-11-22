@@ -1,14 +1,15 @@
 {
-  "login": "Login",
-  "logout": "Logout",
-  "consent": "Consent",
-  "sign.up": "Sign up",
-  "username": "Username",
-  "fullname": "Fullname",
-  "password": "Password",
-  "Password": "Password",
-  "password.repeat": "Password repeat",
-  "i.agree.to.the": "I agree to the",
-  "terms.and.conditions": "Terms and conditions",
-  "close": "Close"
+  "sign.up": "Registrieren",
+  "fullname": "Vollständiger Name",
+  "password.repeat": "Passwort wiederholen",
+  "fullname.is.required": "Vollständiger Name erforderlich",
+  "consent": "Zustimmung",
+  "consent.is.required": "Zustimmung erforderlich",
+  "i.agree.to.the": "Ich stimme den",
+  "terms.and.conditions": "Allgemeinen Geschäftsbedingungen",
+  "Fullname": "Vollständiger Name",
+  "passwords.must.match": "Passwörter müssen übereinstimmen",
+  "password.must.be.12-120.characters.long.with.at.least.one.upper.case.letter.,.lower.case.letter.,.number.and.special.symbol": "Passwort muss 12-120 Zeichen lang sein und mindestens einen Großbuchstaben, einen Kleinbuchstaben, eine Zahl und ein Sonderzeichen enthalten",
+  "username.already.exists": "Benutzername existiert bereits",
+  "something.went.wrong": "Etwas ist schief gelaufen"
 }
