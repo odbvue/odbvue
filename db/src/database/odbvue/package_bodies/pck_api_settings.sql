@@ -40,7 +40,12 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_settings AS
     ) IS
     BEGIN
         SELECT
-            value
+            CASE
+                WHEN secret = 'Y' THEN
+                    dec(value)
+                ELSE
+                    value
+            END
         INTO r_value
         FROM
             app_settings
@@ -132,4 +137,4 @@ END;
 /
 
 
--- sqlcl_snapshot {"hash":"1d1c9bf1fd93bcb2d3030cb39912839848423595","type":"PACKAGE_BODY","name":"PCK_API_SETTINGS","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"1d7f4792bba75414714e9b5642ff2fe72f92338a","type":"PACKAGE_BODY","name":"PCK_API_SETTINGS","schemaName":"ODBVUE","sxml":""}
