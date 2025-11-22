@@ -278,6 +278,50 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
             pck_api_audit.error('Signup error', audit_attrs);
     END post_signup;
 
+    PROCEDURE post_confirm_email (
+        p_token app_tokens.token%TYPE,
+        r_error OUT VARCHAR2
+    ) AS
+        v_uuid app_users.uuid%TYPE;
+    BEGIN
+        BEGIN
+            SELECT
+                uuid
+            INTO v_uuid
+            FROM
+                app_tokens
+            WHERE
+                    token = p_token
+                AND type_id = 'VERIFY'
+                AND expiration > systimestamp;
+
+        EXCEPTION
+            WHEN no_data_found THEN
+                r_error := 'Invalid token';
+                pck_api_auth.revoke_token(p_token => p_token);
+                pck_api_audit.warn('Confirm email',
+                                   pck_api_audit.attributes('uuid', v_uuid));
+                RETURN;
+        END;
+
+        UPDATE app_users
+        SET
+            status = 'A'
+        WHERE
+            uuid = v_uuid;
+
+        COMMIT;
+        pck_api_auth.revoke_token(p_token => p_token);
+        pck_api_audit.info('Confirm email',
+                           pck_api_audit.attributes('uuid', v_uuid));
+    EXCEPTION
+        WHEN OTHERS THEN
+            r_error := 'something.went.wrong';
+            pck_api_auth.revoke_token(p_token => p_token);
+            pck_api_audit.error('Confirm email',
+                                pck_api_audit.attributes('uuid', v_uuid));
+    END;
+
     PROCEDURE post_heartbeat AS
     BEGIN
         IF pck_api_auth.uuid IS NULL THEN
@@ -304,4 +348,4 @@ END pck_app;
 /
 
 
--- sqlcl_snapshot {"hash":"d07feaf294cc9d36ba18de22d0f1b92265c2569a","type":"PACKAGE_BODY","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"9c0cb8547f35adbf8e37c8003cebb4d8889ddda6","type":"PACKAGE_BODY","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}

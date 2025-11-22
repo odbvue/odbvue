@@ -8,7 +8,7 @@ import { useHttp } from '@/composables/http'
 export const useAuthStore = defineStore(
   'auth',
   () => {
-    const { startLoading, stopLoading, setError, clearMessages } = useUiStore()
+    const { startLoading, stopLoading, setError, clearMessages, setInfo } = useUiStore()
 
     const api = useHttp()
 
@@ -30,9 +30,7 @@ export const useAuthStore = defineStore(
     const accessToken = ref('')
     const isAuthenticated = ref(false)
 
-    function refreshToken() {
-      return Cookies.get('refresh_token')
-    }
+    const refreshToken = () => Cookies.get('refresh_token')
 
     const login = async (username: string, password: string): Promise<boolean> => {
       startLoading()
@@ -141,6 +139,24 @@ export const useAuthStore = defineStore(
       return data
     }
 
+    type ConfirmEmailResponse = {
+      error?: string
+    }
+
+    const confirmEmail = async (confirmToken: string): Promise<boolean> => {
+      startLoading()
+      const { data, error } = await api.post<ConfirmEmailResponse>('app/confirm-email/', {
+        token: confirmToken,
+      })
+      if (data?.error || error) {
+        setError(data?.error || 'something.went.wrong')
+      } else {
+        setInfo('email.confirmation.success')
+      }
+      stopLoading()
+      return !data?.error
+    }
+
     return {
       accessToken,
       refreshToken,
@@ -149,6 +165,7 @@ export const useAuthStore = defineStore(
       logout,
       refresh,
       signup,
+      confirmEmail,
     }
   },
   {

@@ -35,9 +35,14 @@ CREATE OR REPLACE PACKAGE odbvue.pck_app AS -- Package for the main application
         r_error         OUT VARCHAR2 -- Error (NULL if success)
     );
 
+    PROCEDURE post_confirm_email ( -- Procedure confirms email address
+        p_token app_tokens.token%TYPE, --  Email confirmation token (sent by e-mail)
+        r_error OUT VARCHAR2 -- Error (NULL if sucess)
+    );
+
     PROCEDURE post_heartbeat; -- Procedure to keep the session alive
 END pck_app;
 /
 
 
--- sqlcl_snapshot {"hash":"b554e185fa030bfa1f8e5c3d994c3e0ac75d216f","type":"PACKAGE_SPEC","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"a8da9cb56c6baa1a273dd0913805bea204108d30","type":"PACKAGE_SPEC","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}

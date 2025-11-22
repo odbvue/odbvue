@@ -103,6 +103,7 @@ export default defineConfig({
                 { text: 'Services', link: '/guide/apps/authentication/services' },
                 { text: 'Application', link: '/guide/apps/authentication/application' },
                 { text: 'Sign Up', link: '/guide/apps/authentication/sign-up' },
+                { text: 'Confirm Email', link: '/guide/apps/authentication/confirm-email' },
               ],
             },
           ],
