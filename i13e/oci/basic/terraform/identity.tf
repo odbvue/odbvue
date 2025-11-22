@@ -32,6 +32,19 @@ resource "oci_identity_policy" "p_objectstore_compartment_manage" {
   ]
 }
 
+# Policy granting ADB access to read vault secrets and use KMS keys
+resource "oci_identity_policy" "p_vault_read" {
+  compartment_id = local.tenancy_ocid
+  name           = "odbvue-policy-vault-read"
+  description    = "Allow ADBs in ${local.compartment_name} to read vault secrets and use KMS keys for DBMS_CRYPTO"
+
+  statements = [
+    "Allow dynamic-group ${oci_identity_dynamic_group.dg_adb.name} to read secret-bundles in compartment ${local.compartment_name}",
+    "Allow dynamic-group ${oci_identity_dynamic_group.dg_adb.name} to read vaults in compartment ${local.compartment_name}",
+    "Allow dynamic-group ${oci_identity_dynamic_group.dg_adb.name} to use keys in compartment ${local.compartment_name}"
+  ]
+}
+
 output "dynamic_group_adb_name" {
   value       = oci_identity_dynamic_group.dg_adb.name
   description = "Dynamic group name for Autonomous Databases"
@@ -40,5 +53,10 @@ output "dynamic_group_adb_name" {
 output "policy_objectstore_compartment_manage_name" {
   value       = oci_identity_policy.p_objectstore_compartment_manage.name
   description = "Policy name granting manage on buckets/objects in the compartment for ADBs"
+}
+
+output "policy_vault_read_name" {
+  value       = oci_identity_policy.p_vault_read.name
+  description = "Policy name granting read access to vault secrets and keys for ADBs"
 }
 

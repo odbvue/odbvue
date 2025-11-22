@@ -76,6 +76,13 @@ This setup will create and manage changes for a separate Compartment with single
 │  │  Versioning: Enabled (optional)                                      │  │
 │  └───────────────────────────────────────────────────── ────────────────┘  │
 │                                                                            │
+│  ┌─ KMS Vault & Secrets ────────────────────────────────────────────────┐  │
+│  │  Vault: odbvue-master-vault                                          │  │
+│  │  Master Key (AES-256): odbvue-master-key                             │  │
+│  │  Secret: odbvue-plsql-master-key (32-byte encryption key)            │  │
+│  │  Purpose: Secure storage for DBMS_CRYPTO master key                  │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                            │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -243,6 +250,12 @@ terraform init
 
 ::: details source
 <<< ../../../../../i13e/oci/basic/terraform/outputs.tf
+:::
+
+#### `@/vault.tf` - OCI KMS Vault, master encryption key, and secret storage for DBMS_CRYPTO
+
+::: details source
+<<< ../../../../../i13e/oci/basic/terraform/vault.tf
 :::
 
 #### `@/terraform.tfvars.example` - Template showing required variables
@@ -416,4 +429,32 @@ After adding these DNS records:
 - SPF will be detected automatically (is_spf = true)
 
 - Run 'terraform refresh' to check status
+
+
+## Vault & Secrets Management
+
+### Overview
+
+The infrastructure includes an **OCI KMS Vault** that securely stores the master encryption key used by PL/SQL's `DBMS_CRYPTO` for encrypting sensitive application settings.
+
+**Architecture:**
+- **KMS Vault** (`odbvue-master-vault`) - Secured container for cryptographic keys
+- **Master Key** (`odbvue-master-key`) - AES-256 symmetric key used to encrypt vault secrets
+- **Secret** (`odbvue-plsql-master-secret`) - 32-byte base64-encoded encryption key for DBMS_CRYPTO
+
+### Security Features
+
+- **Key Encryption** - The 32-byte master key is encrypted by OCI KMS before storage  
+- **Audit Logging** - All vault access is logged to OCI Cloud Audit  
+- **Resource Principal** - ADB authenticates using IAM resource principal (no credentials in code)  
+- **Lifecycle Protection** - Resources have `prevent_destroy` lifecycle rules  
+
+### Terraform Outputs
+
+After `terraform apply`, retrieve the vault secret OCID:
+
+```bash
+terraform output vault_secret_ocid
+# Output: ocid1.vaultsecret.oc1.eu-stockholm-1.xxxxx
+```
 
