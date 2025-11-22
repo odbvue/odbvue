@@ -237,8 +237,8 @@ const options = <OvFormOptions>{
     {
       type: 'text',
       name: 'username',
-      label: t('username'),
-      placeholder: t('username'),
+      label: 'username',
+      placeholder: 'username',
       rules: [
         { type: 'required', params: true, message: 'username.is.required' },
         { type: 'email', params: true, message: 'username.must.be.a.valid.email.address' },
@@ -247,8 +247,8 @@ const options = <OvFormOptions>{
     {
       type: 'password',
       name: 'password',
-      label: t('password'),
-      placeholder: t('password'),
+      label: 'password',
+      placeholder: 'password',
       rules: [{ type: 'required', params: true, message: 'password.is.required' }],
     },
   ],
