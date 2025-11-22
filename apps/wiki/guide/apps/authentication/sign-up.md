@@ -558,9 +558,7 @@ export const useAuthStore = defineStore(
     const accessToken = ref('')
     const isAuthenticated = ref(false)
 
-    function refreshToken() {
-      return Cookies.get('refresh_token')
-    }
+     const refreshToken = () => Cookies.get('refresh_token')
 
     const login = async (username: string, password: string): Promise<boolean> => {
       startLoading()

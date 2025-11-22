@@ -44,6 +44,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/confirm-email/[id]': RouteRecordInfo<
+      '/confirm-email/[id]',
+      '/confirm-email/:id',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
+      | never
+    >,
     '/login': RouteRecordInfo<
       '/login',
       '/login',
@@ -163,6 +170,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/about.md': {
       routes:
         | '/about'
+      views:
+        | never
+    }
+    'src/pages/confirm-email/[id].vue': {
+      routes:
+        | '/confirm-email/[id]'
       views:
         | never
     }
