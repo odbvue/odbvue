@@ -104,6 +104,7 @@ export default defineConfig({
                 { text: 'Application', link: '/guide/apps/authentication/application' },
                 { text: 'Sign Up', link: '/guide/apps/authentication/sign-up' },
                 { text: 'Confirm Email', link: '/guide/apps/authentication/confirm-email' },
+                { text: 'Recover Password', link: '/guide/apps/authentication/recover-password' },
               ],
             },
           ],

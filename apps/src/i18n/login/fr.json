@@ -10,5 +10,6 @@
   "password.is.required": "Le mot de passe est requis",
   "unauthorized": "Non autorisé",
   "too.many.requests": "Trop de requêtes",
-  "not.registered.yet": "Pas encore inscrit"
+  "not.registered.yet": "Pas encore inscrit",
+  "forgot.password": "Mot de passe oublié"
 }

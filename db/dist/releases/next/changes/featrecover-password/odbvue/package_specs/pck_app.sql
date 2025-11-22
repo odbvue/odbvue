@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1763849036972 stripComments:false  logicalFilePath:featrecover-password\odbvue\package_specs\pck_app.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_specs/pck_app.sql:a8da9cb56c6baa1a273dd0913805bea204108d30:11e783214391b4ae2f3051ca4975629d7a18d79b:alter
+
 CREATE OR REPLACE PACKAGE odbvue.pck_app AS -- Package for the main application     
     PROCEDURE get_context ( -- Returns application context
         r_version  OUT VARCHAR2, -- Application version
@@ -59,5 +63,3 @@ CREATE OR REPLACE PACKAGE odbvue.pck_app AS -- Package for the main application
 END pck_app;
 /
 
-
--- sqlcl_snapshot {"hash":"11e783214391b4ae2f3051ca4975629d7a18d79b","type":"PACKAGE_SPEC","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}

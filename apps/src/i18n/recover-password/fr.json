@@ -1,0 +1,7 @@
+{
+  "recover.password": "Récupérer le mot de passe",
+  "send": "Envoyer",
+  "username.must.be.a.valid.e-mail.address": "Le nom d'utilisateur doit être une adresse e-mail valide",
+  "wrong.username": "Nom d'utilisateur incorrect",
+  "password.recovery.email.sent": "E-mail de récupération de mot de passe envoyé"
+}

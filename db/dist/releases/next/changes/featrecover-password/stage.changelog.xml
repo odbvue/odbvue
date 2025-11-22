@@ -3,6 +3,7 @@
                    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
-<!--CHANGES-->
-<include file="changes/featrecover-password/stage.changelog.xml" relativeToChangelogFile="true"/>
+<include file="_custom/010_settings_recover_template.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
+<include file="odbvue/package_specs/pck_app.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_bodies/pck_app.sql" relativeToChangelogFile="true"/>
 </databaseChangeLog>
