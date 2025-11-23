@@ -95,16 +95,16 @@ $THEN
   c_null_txt_tab tp_txt_tab;
 $END
   --
-    FUNCTION get ( -- Get PDF property value
+    FUNCTION read ( -- Get PDF property value
         p_what PLS_INTEGER -- Property code
     ) RETURN NUMBER; -- Property value
 
-    FUNCTION get_string ( -- Get PDF property string value
+    FUNCTION read_string ( -- Get PDF property string value
         p_what PLS_INTEGER, -- Property code
         p_idx  PLS_INTEGER := NULL -- Index
     ) RETURN VARCHAR2; -- String value
 
-    FUNCTION get_font_index ( -- Get font index
+    FUNCTION read_font_index ( -- Get font index
         p_fontname VARCHAR2 := NULL, -- Font name
         p_family   VARCHAR2 := NULL, -- Font family
         p_style    VARCHAR2 := NULL -- Font style
@@ -132,7 +132,7 @@ $END
         p_fontsize   NUMBER := NULL -- Font size
     ) RETURN NUMBER; -- Text length
   --
-    PROCEDURE put_txt ( -- Put text at position
+    PROCEDURE insert_txt ( -- Put text at position
         p_x                NUMBER, -- X coordinate
         p_y                NUMBER, -- Y coordinate
         p_txt              VARCHAR2 CHARACTER SET any_cs, -- Text content
@@ -301,7 +301,7 @@ $END
         p_file_name VARCHAR2 -- File name
     ) RETURN PLS_INTEGER; -- Image index
 
-    PROCEDURE put_image ( -- Put image by index
+    PROCEDURE write_image ( -- Put image by index
         p_img_idx   PLS_INTEGER, -- Image index
         p_x         NUMBER, -- X coordinate (left)
         p_y         NUMBER, -- Y coordinate (bottom)
@@ -312,7 +312,7 @@ $END
         p_page_proc PLS_INTEGER := NULL -- Page procedure
     );
 
-    PROCEDURE put_image ( -- Put image from blob
+    PROCEDURE write_image ( -- Put image from blob
         p_img    BLOB, -- Image blob
         p_x      NUMBER, -- X coordinate (left)
         p_y      NUMBER, -- Y coordinate (bottom)
@@ -322,7 +322,7 @@ $END
         p_valign VARCHAR2 := NULL -- Vertical alignment
     );
 
-    PROCEDURE put_image ( -- Put image from file
+    PROCEDURE write_image ( -- Put image from file
         p_dir       VARCHAR2, -- Directory name
         p_file_name VARCHAR2, -- File name
         p_x         NUMBER, -- X coordinate (left)
@@ -581,4 +581,4 @@ END pck_api_pdf;
 /
 
 
--- sqlcl_snapshot {"hash":"525c17d61bb28aae9e51c007e87a3ac942720cf8","type":"PACKAGE_SPEC","name":"PCK_API_PDF","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"dc5dcc2c058e730abf6313291f2ecdec152f2b04","type":"PACKAGE_SPEC","name":"PCK_API_PDF","schemaName":"ODBVUE","sxml":""}

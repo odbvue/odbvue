@@ -2410,7 +2410,7 @@ end' ) );   -- self + 5
                     );
             when 9
             then
-              put_image( l_page_proc.nums( 1 )
+              write_image( l_page_proc.nums( 1 )
                        , l_page_proc.nums( 2 )
                        , l_page_proc.nums( 3 )
                        , l_page_proc.nums( 4 )
@@ -2420,7 +2420,7 @@ end' ) );   -- self + 5
                        );
             when 10
             then
-              put_txt( l_page_proc.nums( 1 )
+              insert_txt( l_page_proc.nums( 1 )
                      , l_page_proc.nums( 2 )
                      , replace(
                        replace( case when l_page_proc.nchar is not null
@@ -2984,7 +2984,7 @@ $END
     end if;
   end ellips;
   --
-  function get( p_what pls_integer )
+  function read( p_what pls_integer )
   return number
   is
   begin
@@ -3010,9 +3010,9 @@ $END
         when c_get_total_pages       then g_pdf.pages.count
         when c_get_current_page      then g_pdf.current_page
       end;
-  end get;
+  end read;
   --
-  function get_string
+  function read_string
     ( p_what pls_integer
     , p_idx  pls_integer := null
     )
@@ -3025,9 +3025,9 @@ $END
         when c_get_font_style  then g_pdf.fonts( coalesce( p_idx, g_pdf.current_font ) ).style
         when c_get_font_family then g_pdf.fonts( coalesce( p_idx, g_pdf.current_font ) ).family
       end;
-  end get_string;
+  end read_string;
   --
-  function get_font_index
+  function read_font_index
     ( p_fontname varchar2 := null
     , p_family   varchar2 := null
     , p_style    varchar2 := null
@@ -3062,7 +3062,7 @@ $END
       l_index := g_pdf.fonts.next( l_index );
     end loop;
     return l_index;
-  end get_font_index;
+  end read_font_index;
   --
   procedure set_font
     ( p_index       pls_integer
@@ -3103,7 +3103,7 @@ $END
     )
   is
   begin
-    set_font( p_index       => get_font_index( p_fontname => p_fontname )
+    set_font( p_index       => read_font_index( p_fontname => p_fontname )
             , p_fontsize_pt => p_fontsize_pt
             );
   end set_font;
@@ -3115,7 +3115,7 @@ $END
     )
   is
   begin
-    set_font( p_index       => get_font_index( p_family => coalesce( p_family
+    set_font( p_index       => read_font_index( p_family => coalesce( p_family
                                                                    , case when g_pdf.current_font is not null then g_pdf.fonts( g_pdf.current_font ).family end
                                                                    )
                                              , p_style  => p_style
@@ -4119,7 +4119,7 @@ $END
     return l_idx;
   end load_image;
   --
-  procedure put_image
+  procedure write_image
     ( p_img_idx   pls_integer
     , p_x         number               -- left
     , p_y         number               -- bottom
@@ -4183,9 +4183,9 @@ $END
                    , p_chars => tp_varchar2s( p_align, p_valign )
                    );
     end if;
-  end put_image;
+  end write_image;
   --
-  procedure put_image
+  procedure write_image
     ( p_img    blob
     , p_x         number               -- left
     , p_y         number               -- bottom
@@ -4200,7 +4200,7 @@ $END
     then
       return;
     end if;
-    put_image( load_image( p_img )
+    write_image( load_image( p_img )
              , p_x
              , p_y
              , p_width
@@ -4210,7 +4210,7 @@ $END
              );
   end;
   --
-  procedure put_image
+  procedure write_image
     ( p_dir       varchar2
     , p_file_name varchar2
     , p_x         number               -- left
@@ -4226,7 +4226,7 @@ $END
     l_blob := file2blob( p_dir
                        , p_file_name
                        );
-    put_image( l_blob
+    write_image( l_blob
              , p_x
              , p_y
              , p_width
@@ -4235,7 +4235,7 @@ $END
              , p_valign
              );
     dbms_lob.freetemporary( l_blob );
-  end put_image;
+  end write_image;
   --
   procedure add_embedded_file
     ( p_name    varchar2
@@ -5209,7 +5209,7 @@ dbms_output.put_line( '********************* name *********** ' || substr( l_buf
     end if;
   end put_raw;
   --
-  procedure put_txt
+  procedure insert_txt
     ( p_x                number
     , p_y                number
     , p_txt              varchar2 character set any_cs
@@ -5241,7 +5241,7 @@ dbms_output.put_line( '********************* name *********** ' || substr( l_buf
                      );
       end if;
     end if;
-  end put_txt;
+  end insert_txt;
   --
   procedure wti
     ( p_txt               varchar2 character set any_cs
@@ -5347,11 +5347,11 @@ dbms_output.put_line( '********************* name *********** ' || substr( l_buf
       then
         case lower( substr( p_align, 1, 1 ) )
           when 'r' then
-            put_txt( p_xmax - l_len, p_y, p_txt, null, p_font_index, p_fontsize, p_color );
+            insert_txt( p_xmax - l_len, p_y, p_txt, null, p_font_index, p_fontsize, p_color );
           when 'c' then
-            put_txt( ( p_x + p_xmax - l_len ) / 2, p_y, p_txt, null, p_font_index, p_fontsize, p_color );
+            insert_txt( ( p_x + p_xmax - l_len ) / 2, p_y, p_txt, null, p_font_index, p_fontsize, p_color );
           else
-            put_txt( p_x, p_y, p_txt, null, p_font_index, p_fontsize, p_color );
+            insert_txt( p_x, p_y, p_txt, null, p_font_index, p_fontsize, p_color );
         end case;
       end if;
       p_new_x := p_x + l_len;
@@ -5472,7 +5472,7 @@ dbms_output.put_line( '********************* name *********** ' || substr( l_buf
       l_font := g_pdf.fonts( l_font_index );
       l_fontsize := coalesce( p_fontsize, l_font.fontsize, c_default_fontsize );
       l_top := ( 0.5 * l_font.linegap + l_font.ascent ) * l_fontsize / 1000;
-      put_txt( p_x, p_y, p_txt, null, l_font_index, p_fontsize, p_color );
+      insert_txt( p_x, p_y, p_txt, null, l_font_index, p_fontsize, p_color );
       link_int( p_url, p_x, p_y + l_top
               , p_x + str_len( p_txt || '  ', l_font_index, l_fontsize )
               , p_y + l_top - l_fontsize
@@ -6068,7 +6068,7 @@ $END
               else
                 l_img_pad := coalesce( l_line_width, 0.5 );
               end if;
-              put_image( to_blob( l_r )
+              write_image( to_blob( l_r )
                        , l_x + l_img_pad, l_y + l_max_top - l_max_height + l_img_pad
                        , l_widths( c ) - 2 * l_img_pad
                        , l_max_height - 2 * l_img_pad
@@ -6091,7 +6091,7 @@ $END
               end if;
               dbms_lob.createtemporary( l_b, true );
               dbms_sql.column_value( p_cursor, c, l_b );
-              put_image( l_b
+              write_image( l_b
                        , l_x + l_img_pad, l_y + l_max_top - l_max_height + l_img_pad
                        , l_widths( c ) - 2 * l_img_pad
                        , l_max_height - 2 * l_img_pad
@@ -6357,4 +6357,4 @@ end pck_api_pdf;
 
 
 
--- sqlcl_snapshot {"hash":"40d055a8124df53dfe970b342b59ae77a18a7bcf","type":"PACKAGE_BODY","name":"PCK_API_PDF","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"8b2e419742adbfdfa99fe2edcc4a90b36e01c1c3","type":"PACKAGE_BODY","name":"PCK_API_PDF","schemaName":"ODBVUE","sxml":""}

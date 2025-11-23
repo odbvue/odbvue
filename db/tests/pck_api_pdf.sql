@@ -17,7 +17,7 @@ BEGIN
   
   -- Write title
   pck_api_pdf.set_font(p_family => 'helvetica', p_style => 'B', p_fontsize_pt => 24);
-  pck_api_pdf.put_txt(
+  pck_api_pdf.insert_txt(
     p_x => 50,
     p_y => 750,
     p_txt => 'Simple PDF Example',
