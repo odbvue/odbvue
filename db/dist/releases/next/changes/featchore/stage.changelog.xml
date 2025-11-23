@@ -4,4 +4,6 @@
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
 <include file="_custom/010_drop_demo_package.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
+<include file="odbvue/package_specs/pck_api_pdf.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_bodies/pck_api_pdf.sql" relativeToChangelogFile="true"/>
 </databaseChangeLog>
