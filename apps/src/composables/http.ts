@@ -148,8 +148,18 @@ async function executeRequest<T>(
 }
 
 export function useHttp(): HttpClient {
+  let retryCount = 0
+
   const client = $fetch.create({
     baseURL,
+    retry: 3,
+    retryStatusCodes: [500, 502, 503, 504],
+    retryDelay: () => {
+      retryCount++
+      const base = 300 * Math.pow(2, retryCount - 1)
+      const jitter = Math.random() * 150
+      return base + jitter
+    },
   })
 
   const http = async <T>(
