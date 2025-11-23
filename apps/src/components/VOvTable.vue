@@ -12,78 +12,82 @@
               </tr>
 
               <tr v-if="options.filter || options.sort">
-                <td :colspan="colspan - 1">
-                  <v-chip
-                    v-for="chip in filterChips"
-                    :key="`${chip.name}-${chip.value}`"
-                    :prepend-icon="chip.icon"
-                    class="ma-1"
-                    color="primary"
-                    closable
-                    rounded
-                    start
-                    @click:close="handleFilterRemove(chip.name, chip.value)"
-                  >
-                    <strong>{{ chip.value }}</strong
-                    >&nbsp;({{ chip.label }})
-                  </v-chip>
+                <td :colspan="colspan">
+                  <div class="d-flex gap-2">
+                    <div>
+                      <v-chip
+                        v-for="chip in filterChips"
+                        :key="`${chip.name}-${chip.value}`"
+                        :prepend-icon="chip.icon"
+                        class="ma-1"
+                        color="primary"
+                        closable
+                        rounded
+                        start
+                        @click:close="handleFilterRemove(chip.name, chip.value)"
+                      >
+                        <strong>{{ chip.value }}</strong
+                        >&nbsp;({{ chip.label }})
+                      </v-chip>
 
-                  <v-chip
-                    v-for="sort in sortChips"
-                    :key="sort.name"
-                    :prepend-icon="sort.icon"
-                    class="ma-1"
-                    color="secondary"
-                    closable
-                    rounded
-                    @click="handleSortUpdate(sort.name, sort.value == 'asc' ? 'desc' : 'asc')"
-                    @click:close="handleSortUpdate(sort.name, 'close')"
-                  >
-                    <strong>{{ sort.label }}</strong>
-                  </v-chip>
-                </td>
-                <td class="w-0 text-no-wrap text-right">
-                  <v-btn
-                    v-if="options.filter"
-                    v-bind="OvActionFormat(undefined, 'filter', options.actionFormat)"
-                    icon="$mdiFilterPlus"
-                    color="primary"
-                    @click="handleFilterShow()"
-                  />
+                      <v-chip
+                        v-for="sort in sortChips"
+                        :key="sort.name"
+                        :prepend-icon="sort.icon"
+                        class="ma-1"
+                        color="secondary"
+                        closable
+                        rounded
+                        @click="handleSortUpdate(sort.name, sort.value == 'asc' ? 'desc' : 'asc')"
+                        @click:close="handleSortUpdate(sort.name, 'close')"
+                      >
+                        <strong>{{ sort.label }}</strong>
+                      </v-chip>
+                    </div>
+                    <div class="flex-grow-1 d-flex justify-end">
+                      <v-btn
+                        v-if="options.filter"
+                        v-bind="OvActionFormat(undefined, 'filter', options.actionFormat)"
+                        icon="$mdiFilterPlus"
+                        color="primary"
+                        @click="handleFilterShow()"
+                      />
 
-                  <v-btn
-                    v-if="options.sort"
-                    v-bind="OvActionFormat(undefined, 'sort', options.actionFormat)"
-                    icon="$mdiSort"
-                    color="secondary"
-                  >
-                    <v-icon icon="$mdiSort"> </v-icon>
-                    <v-menu activator="parent">
-                      <v-list>
-                        <v-list-item
-                          v-for="sort in sortItems"
-                          :key="sort.name"
-                          :title="sort.label"
-                          prepend-icon="$mdiMenuLeft"
-                          link
-                        >
-                          <v-menu submenu activator="parent">
-                            <v-list>
-                              <v-list-item
-                                v-for="action in sort.actions"
-                                :key="action.name"
-                                :prepend-icon="action.icon"
-                                :title="action.label"
-                                :disabled="action.disabled"
-                                @click="handleSortUpdate(sort.name, action.name)"
-                                link
-                              ></v-list-item>
-                            </v-list>
-                          </v-menu>
-                        </v-list-item>
-                      </v-list>
-                    </v-menu>
-                  </v-btn>
+                      <v-btn
+                        v-if="options.sort"
+                        v-bind="OvActionFormat(undefined, 'sort', options.actionFormat)"
+                        icon="$mdiSort"
+                        color="secondary"
+                      >
+                        <v-icon icon="$mdiSort"> </v-icon>
+                        <v-menu activator="parent">
+                          <v-list>
+                            <v-list-item
+                              v-for="sort in sortItems"
+                              :key="sort.name"
+                              :title="sort.label"
+                              prepend-icon="$mdiMenuLeft"
+                              link
+                            >
+                              <v-menu submenu activator="parent">
+                                <v-list>
+                                  <v-list-item
+                                    v-for="action in sort.actions"
+                                    :key="action.name"
+                                    :prepend-icon="action.icon"
+                                    :title="action.label"
+                                    :disabled="action.disabled"
+                                    @click="handleSortUpdate(sort.name, action.name)"
+                                    link
+                                  ></v-list-item>
+                                </v-list>
+                              </v-menu>
+                            </v-list-item>
+                          </v-list>
+                        </v-menu>
+                      </v-btn>
+                    </div>
+                  </div>
                 </td>
               </tr>
 
