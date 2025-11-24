@@ -71,6 +71,9 @@ importers:
       vue-socials:
         specifier: ^2.0.5
         version: 2.0.5(vue@3.5.24(typescript@5.9.3))
+      vue3-google-login:
+        specifier: ^2.0.34
+        version: 2.0.34(vue@3.5.24(typescript@5.9.3))
       vue3-google-map:
         specifier: ^0.25.1
         version: 0.25.1(vue@3.5.24(typescript@5.9.3))
@@ -3440,6 +3443,11 @@ packages:
     hasBin: true
     peerDependencies:
       typescript: '>=5.0.0'
+
+  vue3-google-login@2.0.34:
+    resolution: {integrity: sha512-YLEYcv8eKzA7BLsTciDogvxXxyJga4879HkmvWjYsm1t0mJ0Vx5A1EWKMx0YCtMQ2VwQJGy3F8aOw6zO+KkUhA==}
+    peerDependencies:
+      vue: ^3.0.3
 
   vue3-google-map@0.25.1:
     resolution: {integrity: sha512-y0LH5MU5Y66p5qndFkdBn0txbFrkBEsgnvPUonjQ8zQ1G5cLci/V+4Fy3e9h7g9OSurOcGkpUW2EMvf2aJ94eQ==}
@@ -7026,6 +7034,10 @@ snapshots:
       '@volar/typescript': 2.4.23
       '@vue/language-core': 3.1.5(typescript@5.9.3)
       typescript: 5.9.3
+
+  vue3-google-login@2.0.34(vue@3.5.24(typescript@5.9.3)):
+    dependencies:
+      vue: 3.5.24(typescript@5.9.3)
 
   vue3-google-map@0.25.1(vue@3.5.24(typescript@5.9.3)):
     dependencies:

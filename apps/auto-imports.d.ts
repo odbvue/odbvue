@@ -65,6 +65,7 @@ declare global {
   const useAttrs: typeof import('vue').useAttrs
   const useAuthStore: typeof import('./src/stores/app/auth').useAuthStore
   const useCardBackground: typeof import('./src/composables/ui').useCardBackground
+  const useConsent: typeof import('./src/composables/consent').useConsent
   const useCssModule: typeof import('vue').useCssModule
   const useCssVars: typeof import('vue').useCssVars
   const useDate: typeof import('vuetify').useDate

@@ -45,6 +45,7 @@
                     "vue-i18n": "^11.2.1",
                     "vue-router": "^4.6.3",
                     "vue-socials": "^2.0.5",
+                    "vue3-google-login": "^2.0.34",
                     "vue3-google-map": "^0.25.1",
                     "vuetify": "^3.10.11"
           },

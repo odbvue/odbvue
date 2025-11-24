@@ -73,7 +73,7 @@ WHEN NOT MATCHED THEN
 
 2. Refactor App package to handle sign-up
 
-#### `.db/src/database/odbvue/package_specs/pck_app.sql
+#### `.db/src/database/odbvue/package_specs/pck_app.sql`
 
 ::: details source
 ```plsql
@@ -691,9 +691,19 @@ if (import.meta.hot) {
 ```
 :::
 
+## Consents
+
+New Consents composable. 
+
+#### `@/composables/consent.ts`
+
+::: details source
+<<< ../../../../src/composables/consent.ts
+:::
+
 ## Views
 
-1. Create sign-up view
+1. Sign-up view
 
 #### `@/pages/signup.vue`
 
@@ -701,7 +711,7 @@ if (import.meta.hot) {
 <<< ../../../../src/pages/signup.vue
 :::
 
-2. Add sign-up link to Login page 
+2. Sign-up link to Login page 
 
 #### `@/pages/login.vue`
 

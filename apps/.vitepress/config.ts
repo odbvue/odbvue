@@ -100,11 +100,11 @@ export default defineConfig({
               collapsed: true,
               items: [
                 { text: 'Concepts', link: '/guide/apps/authentication/concepts' },
-                { text: 'Services', link: '/guide/apps/authentication/services' },
-                { text: 'Application', link: '/guide/apps/authentication/application' },
+                { text: 'Login', link: '/guide/apps/authentication/login' },
                 { text: 'Sign Up', link: '/guide/apps/authentication/sign-up' },
                 { text: 'Confirm Email', link: '/guide/apps/authentication/confirm-email' },
                 { text: 'Recover Password', link: '/guide/apps/authentication/recover-password' },
+                { text: 'Google Auth', link: '/guide/apps/authentication/google-auth' },
               ],
             },
           ],
