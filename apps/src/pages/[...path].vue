@@ -9,6 +9,6 @@
   </v-container>
 </template>
 
-<route>
-  { meta: { layout: 'fullscreen' } }
+<route lang="json">
+{ "meta": { "layout": "fullscreen", "role": "public" } }
 </route>

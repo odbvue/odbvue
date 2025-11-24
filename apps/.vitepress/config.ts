@@ -107,6 +107,7 @@ export default defineConfig({
                 { text: 'Google Auth', link: '/guide/apps/authentication/google-auth' },
               ],
             },
+            { text: 'Authorization', link: '/guide/apps/authorization' },
           ],
         },
         {

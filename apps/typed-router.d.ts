@@ -44,6 +44,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/admin': RouteRecordInfo<
+      '/admin',
+      '/admin',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/confirm-email/[id]': RouteRecordInfo<
       '/confirm-email/[id]',
       '/confirm-email/:id',
@@ -184,6 +191,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/about.md': {
       routes:
         | '/about'
+      views:
+        | never
+    }
+    'src/pages/admin.vue': {
+      routes:
+        | '/admin'
       views:
         | never
     }

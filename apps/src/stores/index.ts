@@ -1,9 +1,9 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { version as packageVersion, title as packageTitle } from '../../package.json'
 import { useHttp } from '@/composables/http'
 import { useSettingsStore } from './app/settings'
-import { useNavigationStore } from './app/naviagtion'
+import { useNavigationStore } from './app/navigation'
 import { useUiStore } from './app/ui'
 import { useAuthStore } from './app/auth'
 
@@ -22,6 +22,12 @@ export const useAppStore = defineStore(
         username: string
         fullname: string
         created: string
+        privileges: {
+          role: string
+          permission: string
+          validfrom: string
+          validto: string
+        }[]
       }[]
       consents: {
         id: string
@@ -31,9 +37,22 @@ export const useAppStore = defineStore(
       }[]
     }
 
+    const defaultUser = {
+      uuid: '',
+      username: '',
+      fullname: '',
+      created: '',
+      privileges: [] as {
+        role: string
+        permission: string
+        validfrom: string
+        validto: string
+      }[],
+    }
+
     const version = ref(`v${packageVersion}`)
     const title = ref(packageTitle)
-    const user = ref({ uuid: '', username: '', fullname: '', created: '' })
+    const user = ref(defaultUser)
     const consents = ref<ContextResponse['consents']>([])
 
     const api = useHttp()
@@ -43,13 +62,9 @@ export const useAppStore = defineStore(
       const dbVersion = data?.version
       const isDev = import.meta.env.DEV ? '-dev' : ''
       version.value = `v${packageVersion}-${dbVersion}${isDev}`
-      user.value = data?.user?.[0] ?? { uuid: '', username: '', fullname: '', created: '' }
+      user.value = data?.user?.[0] ?? defaultUser
       consents.value = data?.consents ?? []
     }
-
-    onMounted(async () => {
-      await init()
-    })
 
     return {
       init,

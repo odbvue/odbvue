@@ -255,9 +255,9 @@ pnpm i @types/js-cookie
 
 ```
 
-## Store
+## Stores
 
-Authentication store
+### Authentication store
 
 #### `@/stores/app/auth.ts`
 
@@ -266,30 +266,22 @@ Authentication store
 import { defineStore, acceptHMRUpdate } from 'pinia'
 import { ref } from 'vue'
 import Cookies from 'js-cookie'
+import { useAppStore } from '../index'
 import { useUiStore } from './ui'
 import { useHttp } from '@/composables/http'
 
 export const useAuthStore = defineStore(
   'auth',
   () => {
-    const { startLoading, stopLoading, setError, clearMessages } = useUiStore()
+    const { startLoading, stopLoading, setError, clearMessages, setInfo } = useUiStore()
 
     const api = useHttp()
 
     type AuthResponse = {
       access_token: string
       refresh_token: string
-      error? : string
-    }
-
-    type ContextResponse = {
-      version: string
-      user: {
-        uuid: string
-        username: string
-        fullname: string
-        created: string
-      }[]
+      error?: string
+      errors?: { name: string; message: string }[]
     }
 
     const refreshCookieOptions = {
@@ -300,16 +292,8 @@ export const useAuthStore = defineStore(
       expires: 7,
     }
 
-    const defaultUser = {
-      uuid: '',
-      username: '',
-      fullname: '',
-      created: '',
-    }
-
     const accessToken = ref('')
     const isAuthenticated = ref(false)
-    const user = ref({ ...defaultUser })
 
     const refreshToken = () => Cookies.get('refresh_token')
 
@@ -329,29 +313,25 @@ export const useAuthStore = defineStore(
         }
         const errorMessage = errorMessages[(status as 401 | 403 | 429) ?? 401]
         isAuthenticated.value = false
-        user.value = { ...defaultUser }
         setError(errorMessage)
       } else {
         accessToken.value = data.access_token
         Cookies.set('refresh_token', data.refresh_token, refreshCookieOptions)
-
-        const { data: contextData } = await api<ContextResponse>('app/context/')
-        user.value = contextData?.user[0] ?? { ...defaultUser }
-
         isAuthenticated.value = true
         clearMessages()
       }
 
+      await useAppStore().init()
       stopLoading()
       return isAuthenticated.value
     }
 
-    const logout = () => {
+    const logout = async () => {
       accessToken.value = ''
       Cookies.remove('refresh_token', { path: '/', domain: window.location.hostname })
       isAuthenticated.value = false
-      user.value = { ...defaultUser }
-      api.post('app/logout/')
+      await api.post('app/logout/')
+      await useAppStore().init()
       clearMessages()
     }
 
@@ -394,7 +374,6 @@ export const useAuthStore = defineStore(
       accessToken,
       refreshToken,
       isAuthenticated,
-      user,
       login,
       logout,
       refresh,
@@ -403,7 +382,7 @@ export const useAuthStore = defineStore(
   {
     storage: {
       adapter: 'localStorage',
-      include: ['isAuthenticated', 'user'],
+      include: ['isAuthenticated'],
     },
   } as Record<string, unknown>,
 )
@@ -414,20 +393,68 @@ if (import.meta.hot) {
 ``` 
 :::
 
-Authentication store included in the Application Store
+### Application Store
 
 #### `@/stores/index.ts`
 
+::: details source
 ```ts
 // ...
-  const getAuth = () => useAuthStore()
-// ...
-  return { 
+
+export const useAppStore = defineStore(
+  'app',
+  () => {
     // ...
-    auth: getAuth(),
-  }
-// ...
+    const getAuth = () => useAuthStore()
+
+    type ContextResponse = {
+      version: string
+      user?: {
+        uuid: string
+        username: string
+        fullname: string
+        created: string
+      }[]
+    }
+
+    const defaultUser = {
+      uuid: '',
+      username: '',
+      fullname: '',
+      created: '',
+    }
+
+    // ...
+    const user = ref(defaultUser)
+=
+    // ...
+
+    async function init() {
+      // ...
+      user.value = data?.user?.[0] ?? defaultUser
+    }
+
+    return {
+      // ...
+      user,
+      // ...
+      auth: getAuth(),
+    }
+  },
+  {
+    storage: {
+      adapter: 'localStorage',
+      include: ['user'],
+    },
+  } as Record<string, unknown>,
+)
+
+if (import.meta.hot) {
+  import.meta.hot.accept(acceptHMRUpdate(useAppStore, import.meta.hot))
+}
+
 ```
+:::
 
 ## Handling Refresh Token
 

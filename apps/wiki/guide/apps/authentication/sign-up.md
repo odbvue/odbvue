@@ -443,31 +443,15 @@ Refactored Main and auth stores:
 
 ::: details source
 ```ts
-import { defineStore, acceptHMRUpdate } from 'pinia'
-import { ref, onMounted } from 'vue'
-import { version as packageVersion, title as packageTitle } from '../../package.json'
-import { useHttp } from '@/composables/http'
-import { useSettingsStore } from './app/settings'
-import { useNavigationStore } from './app/naviagtion'
-import { useUiStore } from './app/ui'
-import { useAuthStore } from './app/auth'
+// ...
 
 export const useAppStore = defineStore(
   'app',
   () => {
-    const getSettings = () => useSettingsStore()
-    const getNavigation = () => useNavigationStore()
-    const getUi = () => useUiStore()
-    const getAuth = () => useAuthStore()
+    // ..
 
     type ContextResponse = {
-      version: string
-      user?: {
-        uuid: string
-        username: string
-        fullname: string
-        created: string
-      }[]
+      // ..
       consents: {
         id: string
         language: string
@@ -476,19 +460,13 @@ export const useAppStore = defineStore(
       }[]
     }
 
-    const version = ref(`v${packageVersion}`)
-    const title = ref(packageTitle)
-    const user = ref({ uuid: '', username: '', fullname: '', created: '' })
+    // ..
     const consents = ref<ContextResponse['consents']>([])
 
     const api = useHttp()
 
     async function init() {
-      const { data } = await api<ContextResponse>('app/context/')
-      const dbVersion = data?.version
-      const isDev = import.meta.env.DEV ? '-dev' : ''
-      version.value = `v${packageVersion}-${dbVersion}${isDev}`
-      user.value = data?.user?.[0] ?? { uuid: '', username: '', fullname: '', created: '' }
+      // ..
       consents.value = data?.consents ?? []
     }
 
@@ -497,28 +475,14 @@ export const useAppStore = defineStore(
     })
 
     return {
-      init,
-      version,
-      title,
-      user,
+      // ..
       consents,
-      settings: getSettings(),
-      navigation: getNavigation(),
-      ui: getUi(),
-      auth: getAuth(),
+      // ..
     }
   },
-  {
-    storage: {
-      adapter: 'localStorage',
-      include: ['user'],
-    },
-  } as Record<string, unknown>,
+  // ..
 )
-
-if (import.meta.hot) {
-  import.meta.hot.accept(acceptHMRUpdate(useAppStore, import.meta.hot))
-}
+// ..
 ```
 :::
 
@@ -526,112 +490,12 @@ if (import.meta.hot) {
 
 ::: details source
 ```ts
-import { defineStore, acceptHMRUpdate } from 'pinia'
-import { ref } from 'vue'
-import Cookies from 'js-cookie'
-import { useAppStore } from '../index'
-import { useUiStore } from './ui'
-import { useHttp } from '@/composables/http'
+// ..
 
 export const useAuthStore = defineStore(
   'auth',
   () => {
-    const { startLoading, stopLoading, setError, clearMessages } = useUiStore()
-
-    const api = useHttp()
-
-    type AuthResponse = {
-      access_token: string
-      refresh_token: string
-      error?: string
-      errors?: { name: string; message: string }[]
-    }
-
-    const refreshCookieOptions = {
-      path: '/',
-      secure: true,
-      sameSite: 'Strict' as const,
-      domain: window.location.hostname,
-      expires: 7,
-    }
-
-    const accessToken = ref('')
-    const isAuthenticated = ref(false)
-
-     const refreshToken = () => Cookies.get('refresh_token')
-
-    const login = async (username: string, password: string): Promise<boolean> => {
-      startLoading()
-
-      const { data, error, status } = await api.post<AuthResponse>('app/login/', {
-        username,
-        password,
-      })
-
-      if (error || !data) {
-        const errorMessages = {
-          401: 'unauthorized',
-          403: 'forbidden',
-          429: 'too.many.requests',
-        }
-        const errorMessage = errorMessages[(status as 401 | 403 | 429) ?? 401]
-        isAuthenticated.value = false
-        setError(errorMessage)
-      } else {
-        accessToken.value = data.access_token
-        Cookies.set('refresh_token', data.refresh_token, refreshCookieOptions)
-        isAuthenticated.value = true
-        clearMessages()
-      }
-
-      await useAppStore().init()
-      stopLoading()
-      return isAuthenticated.value
-    }
-
-    const logout = async () => {
-      accessToken.value = ''
-      Cookies.remove('refresh_token', { path: '/', domain: window.location.hostname })
-      isAuthenticated.value = false
-      await api.post('app/logout/')
-      await useAppStore().init()
-      clearMessages()
-    }
-
-    const refresh = async (): Promise<boolean> => {
-      const token = refreshToken()
-      if (!token) {
-        logout()
-        return false
-      }
-
-      try {
-        const { data, error, status } = await api.post<AuthResponse>('app/refresh/', null, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        if (error || !data) {
-          const errorMessages = {
-            401: 'session.expired',
-            403: 'forbidden',
-          }
-          const errorMessage = errorMessages[(status as 401 | 403) ?? 401]
-          setError(errorMessage)
-          logout()
-          return false
-        }
-
-        accessToken.value = data.access_token
-        Cookies.set('refresh_token', data.refresh_token, refreshCookieOptions)
-        isAuthenticated.value = true
-        return true
-      } catch {
-        logout()
-        return false
-      }
-    }
+    // ..
 
     type SignupResponse = {
       access_token: string
@@ -668,26 +532,13 @@ export const useAuthStore = defineStore(
     }
 
     return {
-      accessToken,
-      refreshToken,
-      isAuthenticated,
-      login,
-      logout,
-      refresh,
+      // ..
       signup,
     }
   },
-  {
-    storage: {
-      adapter: 'localStorage',
-      include: ['isAuthenticated'],
-    },
-  } as Record<string, unknown>,
+  // ..
 )
-
-if (import.meta.hot) {
-  import.meta.hot.accept(acceptHMRUpdate(useAuthStore, import.meta.hot))
-}
+//..
 ```
 :::
 

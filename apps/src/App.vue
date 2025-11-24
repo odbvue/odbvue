@@ -40,4 +40,6 @@ const LayoutComponent = computed(() => {
 
   return defineAsyncComponent(loader)
 })
+
+onMounted(async () => await useAppStore().init())
 </script>
