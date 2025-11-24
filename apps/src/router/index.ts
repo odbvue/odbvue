@@ -8,12 +8,19 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
+  const app = useAppStore()
   const appTitle = title || 'OdbVue'
-  const pageTitle = useNavigationStore().title(to.path)
+  const pageTitle = app.navigation.title(to.path)
   const documentTitle = pageTitle ? `${appTitle} - ${pageTitle}` : appTitle
   useHead({ title: documentTitle })
-  useUiStore().clearMessages()
-  return true
+  app.ui.clearMessages()
+  const result: string | boolean = app.navigation.guard(to.path)
+  if (result) {
+    app.ui.clearMessages()
+  } else {
+    app.ui.setError('unauthorized')
+  }
+  return result === '/login' ? { path: result, query: { redirect: to.path } } : result
 })
 
 router.afterEach(async (to) => {

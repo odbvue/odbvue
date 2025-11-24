@@ -74,6 +74,16 @@
 </template>
 
 <script setup lang="ts">
+definePage({
+  meta: {
+    title: 'Sandbox',
+    description: 'A sandbox page to test various UI components and features',
+    icon: '$mdiFlask',
+    color: '#DDEEFF',
+    role: 'restricted',
+  },
+})
+
 const cardBackground = useCardBackground('#ccccee')
 const cardBackgroundComponents = useCardBackground('#eeeedd')
 const { t } = useI18n()

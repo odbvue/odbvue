@@ -225,14 +225,26 @@ export const useAppStore = defineStore('app', () => {
 
   const api = useHttp()
 
-  onMounted(async () => {
-    const { data } = await api<{ version: string }>('app/context/')
+  type ContextResponse = {
+    version: string
+  }
+
+  async function init() {
+    const { data } = await api<ContextResponse>('app/context/')
     const dbVersion = data?.version
     const isDev = import.meta.env.DEV ? '-dev' : ''
     version.value = `v${packageVersion}-${dbVersion}${isDev}`
-  })
+  }
 
-  return { version, title, settings: getSettings(), navigation: getNavigation(), ui: getUi() }
+  return {
+    init,
+    version,
+    title,
+    settings: getSettings(),
+    navigation: getNavigation(),
+    ui: getUi(),
+  }
+
 })
 
 if (import.meta.hot) {
@@ -242,8 +254,20 @@ if (import.meta.hot) {
 }
 
 ```
+3. Add Main store initialization in App
 
-3. Replace default layout to use version and title from the mains store
+#### `@/App.vue`
+
+```ts
+<script>
+// ...
+onMounted(async () => await useAppStore().init())
+</script>
+
+```
+
+
+4. Replace default layout to use version and title from the mains store
 
 #### `@/layouts/DefaultLayout.vue`
 

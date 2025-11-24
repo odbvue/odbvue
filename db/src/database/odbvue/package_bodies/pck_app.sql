@@ -72,10 +72,28 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
             RETURN;
         END IF;
         OPEN r_user FOR SELECT
-                                            uuid     AS "uuid",
-                                            username AS "username",
-                                            fullname AS "fullname",
-                                            created  AS "created"
+                                            uuid           AS "uuid",
+                                            username       AS "username",
+                                            fullname       AS "fullname",
+                                            created        AS "created",
+                                            coalesce((
+                                                SELECT
+                                                    JSON_ARRAYAGG(
+                                                        JSON_OBJECT(
+                                                            'role' VALUE r.role,
+                                                            'permission' VALUE p.permission,
+                                                            'validfrom' VALUE p.valid_from,
+                                                            'validto' VALUE p.valid_to
+                                                        )
+                                                    )
+                                                FROM
+                                                         app_permissions p
+                                                    JOIN app_roles r ON r.id = p.id_role
+                                                    JOIN app_users u ON u.id = p.id_user
+                                                WHERE
+                                                    u.uuid = v_uuid
+                                            ),
+                                                     '[]') AS "{}privileges"
                                         FROM
                                             app_users
                         WHERE
@@ -559,4 +577,4 @@ END pck_app;
 /
 
 
--- sqlcl_snapshot {"hash":"8d6c630b27f910541be3ceafdd8a4089419bc8c9","type":"PACKAGE_BODY","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"44b58e6cc270bb602aa49a596dc9cadedd35ab44","type":"PACKAGE_BODY","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
