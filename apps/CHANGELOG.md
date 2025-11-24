@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.202
+
+### Patch Changes
+
+- c424782: authorization
+
 ## 0.0.201
 
 ### Patch Changes
