@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.201
+
+### Patch Changes
+
+- fc05dbf: google auth
+
 ## 0.0.200
 
 ### Patch Changes
