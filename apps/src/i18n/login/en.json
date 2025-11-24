@@ -11,5 +11,7 @@
   "unauthorized": "Unauthorized",
   "too.many.requests": "Too many requests",
   "not.registered.yet": "Not registered yet",
-  "forgot.password": "Forgot password"
+  "forgot.password": "Forgot password",
+  "consent.is.invalid": "Consent is invalid",
+  "accept": "Accept"
 }

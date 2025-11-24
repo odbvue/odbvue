@@ -3,35 +3,32 @@
     <v-row justify="center">
       <v-col cols="12" :md="4">
         <h1 class="mb-4">{{ t('sign.up') }}</h1>
-        <v-ov-form :options :data :t @submit="submit">
-          <template #field-consent>
-            <span>
-              {{ t('i.agree.to.the') }}
-              <a href="#" @click.prevent="showConsent = true">
-                {{ t('terms.and.conditions') }}
-              </a>
-            </span>
-          </template>
-        </v-ov-form>
+        <v-ov-form :options :data :t @submit="submit" />
+        <br />
+        <br />
+        <GoogleLogin :clientId="googleClientId" :callback="callback" />
       </v-col>
     </v-row>
   </v-container>
-  <v-ov-dialog v-model="showConsent" scrollable closeable :title="t('consent')">
+
+  <v-ov-dialog v-model="showDialog" scrollable :title="t('consent')">
     <template #content>
       <div class="markdown-body ma-2" v-html="consentHtml"></div>
+    </template>
+    <template #actions>
+      <v-btn @click="handleCancel">{{ t('cancel') }}</v-btn>
+      <v-btn variant="flat" @click="handleSubmit">{{ t('accept') }}</v-btn>
     </template>
   </v-ov-dialog>
 </template>
 
 <script setup lang="ts">
-import MarkdownIt from 'markdown-it'
-
 definePage({ meta: { role: 'guest' } })
 
 const app = useAppStore()
 const router = useRouter()
 const route = useRoute()
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const options = ref(<OvFormOptions>{
   fields: [
@@ -69,12 +66,6 @@ const options = ref(<OvFormOptions>{
         { type: 'same-as', params: 'password', message: 'passwords.must.match' },
       ],
     },
-    {
-      type: 'checkbox',
-      name: 'consent',
-      label: 'consent',
-      rules: [{ type: 'required', params: true, message: 'consent.is.required' }],
-    },
   ],
   actions: [
     {
@@ -91,41 +82,63 @@ const data = ref({
   fullname: '',
   password: '',
   password2: '',
-  consent: '',
 })
 
+const { showDialog, consentHtml, askConsent, handleSubmit, handleCancel } = useConsent()
+
 const submit = async (newData: typeof data.value) => {
+  const consentId = await askConsent()
+  if (!consentId) {
+    data.value = {
+      username: newData.username,
+      fullname: newData.fullname,
+      password: '',
+      password2: '',
+    }
+    return
+  }
   const signupResponse = await app.auth.signup(
     newData.username,
     newData.password,
     newData.fullname,
-    consentId.value,
+    consentId,
   )
   options.value.errors = signupResponse?.errors || []
   if (!signupResponse?.error && !signupResponse?.errors) {
     router.push((route.query.redirect as string) || '/')
   } else {
-    data.value.password = ''
-    data.value.password2 = ''
+    data.value = {
+      username: newData.username,
+      fullname: newData.fullname,
+      password: '',
+      password2: '',
+    }
   }
 }
 
-const md = new MarkdownIt()
-const showConsent = ref(false)
-const consentId = ref('')
-const consentMd = ref('')
-const consentHtml = computed(() => md.render(consentMd.value))
+import { GoogleLogin } from 'vue3-google-login'
+import { decodeCredential, type CallbackTypes } from 'vue3-google-login'
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
-const loadConsent = async () => {
-  app.ui.startLoading()
-  const foundConsent = app.consents.find((c) => c.language === locale.value)
-  if (foundConsent) {
-    consentId.value = foundConsent.id
-    const { data } = await useHttp().get<{ consent: string }>(`app/consent/${consentId.value}`)
-    consentMd.value = data?.consent ?? ''
+const callback = async (response: CallbackTypes.CredentialPopupResponse) => {
+  const consentId = await askConsent()
+  if (!consentId) {
+    return
   }
-  app.ui.stopLoading()
+  const userData = decodeCredential(response.credential) as {
+    email: string
+    sub: string
+    name: string
+  }
+  const signupResponse = await app.auth.signup(
+    userData.email,
+    `GoogleOAuth2.0${userData.sub}`,
+    userData.name,
+    consentId,
+  )
+  options.value.errors = signupResponse?.errors || []
+  if (!signupResponse?.error && !signupResponse?.errors) {
+    router.push((route.query.redirect as string) || '/')
+  }
 }
-
-watchEffect(loadConsent)
 </script>

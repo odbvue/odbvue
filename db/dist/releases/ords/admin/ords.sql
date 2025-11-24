@@ -1,5 +1,5 @@
 -- liquibase formatted sql
--- changeset ADMIN:1763936339970 stripComments:false  logicalFilePath:ords/admin/ords.sql
+-- changeset ADMIN:1763974562459 stripComments:false  logicalFilePath:ords/admin/ords.sql
 -- sqlcl_snapshot {"hash":"ac28a61abbef996f7ae237710e3f6e6e8c1fb836","type":"ORDS_SCHEMA","name":"ords","schemaName":"ADMIN","sxml":""}
 --
         

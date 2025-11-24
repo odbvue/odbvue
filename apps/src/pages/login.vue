@@ -10,6 +10,9 @@
         <a href="/signup">{{ t('sign.up') }}</a>
         |
         <a href="/recover-password">{{ t('forgot.password') }}</a>
+        <br />
+        <br />
+        <GoogleLogin :clientId="googleClientId" :callback="callback" />
       </v-col>
     </v-row>
   </v-container>
@@ -18,14 +21,14 @@
 <script setup lang="ts">
 definePage({ meta: { role: 'guest' } })
 
-const appStore = useAppStore()
+const app = useAppStore()
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
 
 const devAction = import.meta.env.DEV ? ['dev'] : []
 
-const options = <OvFormOptions>{
+const options = ref<OvFormOptions>({
   fields: [
     {
       type: 'text',
@@ -48,7 +51,7 @@ const options = <OvFormOptions>{
   actions: ['submit', ...devAction],
   actionAlign: 'right',
   actionSubmit: 'submit',
-}
+})
 
 const data = ref({
   username: '',
@@ -56,7 +59,21 @@ const data = ref({
 })
 
 const submit = async (newData: typeof data.value) => {
-  if (await appStore.auth.login(newData.username, newData.password))
+  if (await app.auth.login(newData.username, newData.password))
+    router.push((route.query.redirect as string) || '/')
+}
+
+import { GoogleLogin } from 'vue3-google-login'
+import { decodeCredential, type CallbackTypes } from 'vue3-google-login'
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
+
+const callback = async (response: CallbackTypes.CredentialPopupResponse) => {
+  const userData = decodeCredential(response.credential) as {
+    email: string
+    sub: string
+    name: string
+  }
+  if (await app.auth.login(userData.email, `GoogleOAuth2.0${userData.sub}`))
     router.push((route.query.redirect as string) || '/')
 }
 
