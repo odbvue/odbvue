@@ -106,6 +106,7 @@ export default defineConfig(({ mode }) => {
       Components({}),
       AutoImportMdiIcons({}),
       VitePWA({
+       injectRegister: 'inline',
        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
        manifest: {
           name: "OdbVue",
