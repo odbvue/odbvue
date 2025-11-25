@@ -18,6 +18,7 @@ router.beforeEach(async (to) => {
     const documentTitle = pageTitle ? `${appTitle} - ${pageTitle}` : appTitle
     useHead({ title: documentTitle })
   } else {
+    window.scrollTo(0, 0)
     app.ui.setError('unauthorized')
   }
   return result === '/login' ? { path: result, query: { redirect: to.path } } : result
