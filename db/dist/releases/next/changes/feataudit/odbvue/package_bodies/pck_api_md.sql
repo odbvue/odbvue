@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1764057376972 stripComments:false  logicalFilePath:feataudit\odbvue\package_bodies\pck_api_md.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_bodies/pck_api_md.sql:4402a261f6dea8f77a6f66bc191f2ab9547d6977:fe2e485f7969980c3d72115fd93e1ccb2dadc2fd:alter
+
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_md AS
 
   -- tiny helper to ensure we always have a CLOB to append to
@@ -1419,5 +1423,3 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_md AS
 END pck_api_md;
 /
 
-
--- sqlcl_snapshot {"hash":"fe2e485f7969980c3d72115fd93e1ccb2dadc2fd","type":"PACKAGE_BODY","name":"PCK_API_MD","schemaName":"ODBVUE","sxml":""}

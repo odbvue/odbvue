@@ -1,11 +1,12 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { version as packageVersion, title as packageTitle } from '../../package.json'
 import { useHttp } from '@/composables/http'
 import { useSettingsStore } from './app/settings'
 import { useNavigationStore } from './app/navigation'
 import { useUiStore } from './app/ui'
 import { useAuthStore } from './app/auth'
+import { useAuditStore } from './app/audit'
 
 export const useAppStore = defineStore(
   'app',
@@ -14,6 +15,7 @@ export const useAppStore = defineStore(
     const getNavigation = () => useNavigationStore()
     const getUi = () => useUiStore()
     const getAuth = () => useAuthStore()
+    const getAudit = () => useAuditStore()
 
     type ContextResponse = {
       version: string
@@ -35,6 +37,10 @@ export const useAppStore = defineStore(
         name: string
         created: string
       }[]
+      config: {
+        key: string
+        value: string
+      }[]
     }
 
     const defaultUser = {
@@ -54,6 +60,12 @@ export const useAppStore = defineStore(
     const title = ref(packageTitle)
     const user = ref(defaultUser)
     const consents = ref<ContextResponse['consents']>([])
+    const config = ref<ContextResponse['config']>([])
+
+    const appPerformanceThresholdMs = computed(() => {
+      const setting = config.value.find((c) => c.key === 'APP_PERFORMANCE_THRESHOLD_MS')
+      return setting ? parseInt(setting.value, 10) : 250
+    })
 
     const api = useHttp()
 
@@ -64,6 +76,7 @@ export const useAppStore = defineStore(
       version.value = `v${packageVersion}-${dbVersion}${isDev}`
       user.value = data?.user?.[0] ?? defaultUser
       consents.value = data?.consents ?? []
+      config.value = data?.config ?? []
     }
 
     return {
@@ -72,10 +85,13 @@ export const useAppStore = defineStore(
       title,
       user,
       consents,
+      config,
+      appPerformanceThresholdMs,
       settings: getSettings(),
       navigation: getNavigation(),
       ui: getUi(),
       auth: getAuth(),
+      audit: getAudit(),
     }
   },
   {

@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1764057377303 stripComments:false  logicalFilePath:feataudit\odbvue\package_bodies\pck_app.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_bodies/pck_app.sql:44b58e6cc270bb602aa49a596dc9cadedd35ab44:9949b247c1d7ef788ed3dc20df298fba7d912314:alter
+
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
 
     g_version VARCHAR2(30 CHAR) := '...';
@@ -592,5 +596,3 @@ BEGIN
 END pck_app;
 /
 
-
--- sqlcl_snapshot {"hash":"9949b247c1d7ef788ed3dc20df298fba7d912314","type":"PACKAGE_BODY","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}

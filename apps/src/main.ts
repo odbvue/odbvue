@@ -9,8 +9,11 @@ import vuetify from './plugins/vuetify'
 import i18n from './plugins/i18n'
 import { createPiniaPluginStorage } from '@erlihs/pinia-plugin-storage'
 import { createHead } from '@unhead/vue/client'
+import { errorHandler } from './plugins/errors'
 
 const app = createApp(App)
+
+app.config.errorHandler = errorHandler
 
 app.use(createPinia().use(createPiniaPluginStorage()))
 app.use(router)

@@ -71,6 +71,34 @@
       </v-col>
     </v-row>
   </v-container>
+  <v-container fluid>
+    <h2 class="mb-4">Audit</h2>
+    <v-row>
+      <v-col cols="12">
+        <v-card class="mt-6">
+          <v-card-title>Test audit</v-card-title>
+          <v-card-text
+            >Test audit capabilities. In stash: <strong>{{ app.audit.count }}</strong></v-card-text
+          >
+          <v-card-actions>
+            <v-btn
+              color="info"
+              @click="app.audit.inf('This is info message', 'This is info message details')"
+              >Test info</v-btn
+            >
+            <v-btn
+              color="warning"
+              @click="app.audit.wrn('This is warning message', 'This is warning message details')"
+              >Test warning</v-btn
+            >
+            <v-btn color="error" @click="error()">Test error</v-btn>
+            <v-spacer></v-spacer>
+            <v-btn @click="app.audit.save()">Save</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-col>
+    </v-row>
+  </v-container>
 </template>
 
 <script setup lang="ts">
@@ -94,6 +122,10 @@ const api = useHttp()
 const postHeartbeat = async () => {
   const { status } = await api.post('app/heartbeat/')
   heartbeatStatus.value = `Status: ${status}`
+}
+
+function error() {
+  throw new Error('This is an error')
 }
 
 const compontents = ref([

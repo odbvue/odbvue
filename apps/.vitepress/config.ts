@@ -108,6 +108,8 @@ export default defineConfig({
               ],
             },
             { text: 'Authorization', link: '/guide/apps/authorization' },
+            { text: 'Audit', link: '/guide/apps/auditing' },
+            { text: 'Performance', link: '/guide/apps/performance' },
           ],
         },
         {

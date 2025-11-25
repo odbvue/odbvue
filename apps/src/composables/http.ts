@@ -1,6 +1,8 @@
 import { $fetch } from 'ofetch'
 import type { FetchOptions } from 'ofetch'
 import { useAuthStore } from '@/stores/app/auth'
+import { useAppStore } from '@/stores'
+import { useAuditStore } from '@/stores/app/audit'
 
 const baseURL = import.meta.env.DEV ? '/api/' : import.meta.env.VITE_API_URI
 
@@ -49,13 +51,23 @@ async function executeRequest<T>(
 
   try {
     const authHeaders = getAuthHeaders()
+    const startTime = performance.now()
     const response = await client<T>(request, {
       ...options,
       headers: {
         ...authHeaders,
         ...(options?.headers as Record<string, string>),
+        'request-startTime': startTime.toString(),
       },
     })
+
+    // Check performance threshold
+    const duration = performance.now() - startTime
+    const appStore = useAppStore()
+    if (duration >= appStore.appPerformanceThresholdMs) {
+      const appAudit = useAuditStore()
+      appAudit.wrn('Slow API call', `API ${request} took ${duration}ms`)
+    }
     data = response
     error = null
     status = 200

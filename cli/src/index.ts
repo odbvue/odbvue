@@ -4,11 +4,44 @@ import { Command } from 'commander';
 import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync, unlinkSync, existsSync } from 'fs';
 import chalk from 'chalk';
+import { platform } from 'os';
+import { createInterface } from 'readline';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Get root directory (parent of cli folder)
+const rootDir = path.resolve(__dirname, '../../');
+const cliDir = path.resolve(__dirname, '../');
+
+// Load environment variables from .env files
+const loadEnvFile = (envPath: string) => {
+  if (!existsSync(envPath)) {
+    return;
+  }
+
+  try {
+    const envContent = readFileSync(envPath, 'utf-8');
+    envContent.split('\n').forEach((line) => {
+      const match = line.match(/^\s*([^#=]+)=(.*)$/);
+      if (match) {
+        const key = match[1].trim();
+        const value = match[2].trim().replace(/^['"]|['"]$/g, '');
+        if (!process.env[key]) {
+          process.env[key] = value;
+        }
+      }
+    });
+  } catch (error) {
+    // Ignore errors reading .env files
+  }
+};
+
+// Load .env from cli directory first, then root directory
+loadEnvFile(path.resolve(cliDir, '.env'));
+loadEnvFile(path.resolve(rootDir, '.env'));
 
 // Read version from package.json
 const packageJsonPath = path.resolve(__dirname, '../package.json');
@@ -23,10 +56,21 @@ const logger = {
   warn: (msg: string) => console.warn(chalk.yellow(`⚠ ${msg}`)),
 };
 
-const program = new Command();
+// Prompt utility for user input
+const prompt = (question: string): Promise<string> => {
+  return new Promise((resolve) => {
+    const rl = createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer);
+    });
+  });
+};
 
-// Get root directory (parent of cli folder)
-const rootDir = path.resolve(__dirname, '../../');
+const program = new Command();
 
 program
   .name('ov')
@@ -58,6 +102,262 @@ program
       logger.success(`Feature branch 'feat/${name}' created and checked out.`);
     } catch (error) {
       logger.error(`Failed to create feature branch: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// DB Export command
+program
+  .command('db-export')
+  .alias('de')
+  .description('Export database objects and commit changes')
+  .option('-c, --connection <connection>', 'Database connection (uses ODBVUE_DB_CONN if not provided)')
+  .action(async (options) => {
+    try {
+      const connection = options.connection || process.env.ODBVUE_DB_CONN;
+
+      if (!connection) {
+        logger.error('Database connection not provided and ODBVUE_DB_CONN environment variable not set.');
+        logger.info('Usage: ov db-export [-c, --connection <connection>]');
+        process.exit(1);
+      }
+
+      logger.info(`Exporting database objects with connection: ${connection}...`);
+
+      const dbDir = path.resolve(rootDir, 'db');
+      const sqlScript = `connect ${connection}\nproject export\nexit\n`;
+
+      try {
+        // Create a temporary file with the SQL script for cross-platform compatibility
+        const tempScriptPath = path.resolve(dbDir, '.sql_export_temp');
+        writeFileSync(tempScriptPath, sqlScript);
+
+        try {
+          const isWindows = platform() === 'win32';
+          const shell = isWindows ? 'powershell.exe' : '/bin/bash';
+          const piping = isWindows
+            ? `type "${tempScriptPath}" | sql /nolog`
+            : `cat "${tempScriptPath}" | sql /nolog`;
+
+          execSync(piping, {
+            cwd: dbDir,
+            stdio: 'inherit',
+            shell,
+          });
+        } finally {
+          // Clean up temporary file
+          try {
+            unlinkSync(tempScriptPath);
+          } catch {
+            // Ignore cleanup errors
+          }
+        }
+      } catch (error) {
+        logger.error(`Database export failed: ${error}`);
+        process.exit(1);
+      }
+
+      logger.warn('Please verify if DB objects are correctly exported');
+
+      const commitResponse = await prompt('Would you like to commit changes? (Y/N): ');
+
+      if (commitResponse.toLowerCase() !== 'y') {
+        logger.info('Export completed without committing changes.');
+        return;
+      }
+
+      const commitMessage = await prompt('Enter commit message: ');
+
+      if (!commitMessage.trim()) {
+        logger.error('Commit message cannot be empty.');
+        process.exit(1);
+      }
+
+      logger.info('Committing changes...');
+
+      execSync('git add .', { cwd: dbDir, stdio: 'inherit' });
+      execSync(`git commit -m "feat(db): ${commitMessage}"`, { cwd: dbDir, stdio: 'inherit' });
+
+      logger.success('Database export completed and changes committed.');
+    } catch (error) {
+      logger.error(`Failed to export database: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// DB Add Custom command
+program
+  .command('db-add-custom <file>')
+  .alias('da')
+  .description('Stage custom database file')
+  .action((file: string) => {
+    try {
+      logger.info(`Staging custom database file: ${file}...`);
+
+      const dbDir = path.resolve(rootDir, 'db');
+      const sqlScript = `project stage add-custom -file-name ${file}\nexit\n`;
+
+      try {
+        // Create a temporary file with the SQL script for cross-platform compatibility
+        const tempScriptPath = path.resolve(dbDir, '.sql_custom_temp');
+        writeFileSync(tempScriptPath, sqlScript);
+
+        try {
+          const isWindows = platform() === 'win32';
+          const shell = isWindows ? 'powershell.exe' : '/bin/bash';
+          const piping = isWindows
+            ? `type "${tempScriptPath}" | sql /nolog`
+            : `cat "${tempScriptPath}" | sql /nolog`;
+
+          execSync(piping, {
+            cwd: dbDir,
+            stdio: 'inherit',
+            shell,
+          });
+        } finally {
+          // Clean up temporary file
+          try {
+            unlinkSync(tempScriptPath);
+          } catch {
+            // Ignore cleanup errors
+          }
+        }
+      } catch (error) {
+        logger.error(`Database custom file staging failed: ${error}`);
+        process.exit(1);
+      }
+
+      logger.success(`Custom database file '${file}' staged successfully.`);
+    } catch (error) {
+      logger.error(`Failed to stage custom database file: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Submit PR command
+program
+  .command('submit-pr')
+  .alias('sp')
+  .description('Submit PR with database changes and changeset')
+  .option('-c, --connection <connection>', 'Database connection (uses ODBVUE_DB_CONN if not provided)')
+  .action(async (options) => {
+    try {
+      // Check for uncommitted changes
+      const status = execSync('git status --porcelain', {
+        cwd: rootDir,
+        encoding: 'utf-8',
+      }).trim();
+
+      if (status) {
+        logger.error('You have uncommitted changes. Please commit or stash them first.');
+        process.exit(1);
+      }
+
+      const connection = options.connection || process.env.ODBVUE_DB_CONN;
+
+      if (!connection) {
+        logger.error('Database connection not provided and ODBVUE_DB_CONN environment variable not set.');
+        logger.info('Usage: ov submit-pr [-c, --connection <connection>]');
+        logger.info('Set ODBVUE_DB_CONN in your .env file or provide -c option');
+        process.exit(1);
+      }
+
+      logger.info(`Staging database changes with connection: ${connection}...`);
+
+      const dbDir = path.resolve(rootDir, 'db');
+      const sqlScript = `connect ${connection}\nproject stage\nexit\n`;
+
+      try {
+        // Create a temporary file with the SQL script for cross-platform compatibility
+        const tempScriptPath = path.resolve(dbDir, '.sql_submit_temp');
+        writeFileSync(tempScriptPath, sqlScript);
+
+        try {
+          const isWindows = platform() === 'win32';
+          const shell = isWindows ? 'powershell.exe' : '/bin/bash';
+          const piping = isWindows
+            ? `type "${tempScriptPath}" | sql /nolog`
+            : `cat "${tempScriptPath}" | sql /nolog`;
+
+          execSync(piping, {
+            cwd: dbDir,
+            stdio: 'inherit',
+            shell,
+          });
+        } finally {
+          // Clean up temporary file
+          try {
+            unlinkSync(tempScriptPath);
+          } catch {
+            // Ignore cleanup errors
+          }
+        }
+      } catch (error) {
+        logger.error(`Database project stage failed: ${error}`);
+        process.exit(1);
+      }
+
+      logger.warn('Please check if staged database content is OK');
+      const confirmStage = await prompt('Continue? (Y/N): ');
+
+      if (confirmStage.toLowerCase() !== 'y') {
+        logger.info('Aborted by user.');
+        process.exit(1);
+      }
+
+      logger.info('Staging database changes...');
+      execSync('git add db/', { cwd: rootDir, stdio: 'inherit' });
+
+      const appsDir = path.resolve(rootDir, 'apps');
+
+      logger.info('Creating changeset...');
+      execSync('pnpm changeset', { cwd: appsDir, stdio: 'inherit' });
+
+      logger.info('Committing changes...');
+      execSync('git add .', { cwd: rootDir, stdio: 'inherit' });
+
+      // Get the latest changeset file to extract summary
+      const changesetDir = path.resolve(appsDir, '.changeset');
+      let commitMessage = 'changeset: Update version';
+
+      try {
+        const changesetFiles = execSync('ls -t .changeset/*.md 2>/dev/null | head -1', {
+          cwd: appsDir,
+          encoding: 'utf-8',
+          shell: '/bin/bash',
+        })
+          .trim()
+          .split('\n')
+          .filter((f: string) => f);
+
+        if (changesetFiles.length > 0) {
+          const latestFile = path.resolve(appsDir, changesetFiles[0]);
+          if (existsSync(latestFile)) {
+            const content = readFileSync(latestFile, 'utf-8');
+            const lines = content.split('\n').filter((line: string) => line.trim());
+            if (lines.length > 0) {
+              commitMessage = `changeset: ${lines[lines.length - 1]}`;
+            }
+          }
+        }
+      } catch {
+        // Use default message if extraction fails
+      }
+
+      execSync(`git commit -m "${commitMessage}"`, { cwd: rootDir, stdio: 'inherit' });
+
+      logger.info('Pushing changes...');
+      const branch = execSync('git rev-parse --abbrev-ref HEAD', {
+        cwd: rootDir,
+        encoding: 'utf-8',
+      }).trim();
+
+      execSync(`git push -u origin ${branch}`, { cwd: rootDir, stdio: 'inherit' });
+
+      logger.success(`Pushed to origin/${branch}`);
+      logger.success('PR submission completed successfully!');
+    } catch (error) {
+      logger.error(`Failed to submit PR: ${error}`);
       process.exit(1);
     }
   });
