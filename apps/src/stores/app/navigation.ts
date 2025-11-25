@@ -100,7 +100,6 @@ export const useNavigationStore = defineStore(
       })
       if (!page) return false
       if (page.role === 'public') return true
-      console.log('GUARD', { page, isAuthenticated: app.auth.isAuthenticated, user: app.user })
       if (!app.auth.isAuthenticated && page.role == 'guest') return true
       if (app.auth.isAuthenticated && page.role == 'restricted') return true
       if (
