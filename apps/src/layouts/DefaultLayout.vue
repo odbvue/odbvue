@@ -5,7 +5,8 @@
         <v-row>
           <v-col cols="4">
             <a href="/" class="d-block">
-              <v-img eager class="rounded-lg border-thin" :alt="app.title" src="./logo.svg"> </v-img>
+              <v-img eager class="rounded-lg border-thin" :alt="app.title" src="./logo.svg">
+              </v-img>
             </a>
           </v-col>
         </v-row>
@@ -17,6 +18,7 @@
           :key="page.path"
           :prepend-icon="page.icon"
           :to="page.path"
+          @click="drawer = false"
         >
           <v-list-item-title>{{ page.title }}</v-list-item-title>
         </v-list-item>
@@ -26,7 +28,14 @@
         <v-list-item>
           <strong>{{ app.user?.fullname }}</strong>
         </v-list-item>
-        <v-list-item link prepend-icon="$mdiLogout" @click="app.auth.logout()">
+        <v-list-item
+          link
+          prepend-icon="$mdiLogout"
+          @click="
+            app.auth.logout()
+            drawer = false
+          "
+        >
           <v-list-item-title>{{ t('logout') }}</v-list-item-title>
         </v-list-item>
       </v-list>

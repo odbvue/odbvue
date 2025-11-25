@@ -383,6 +383,7 @@ if (import.meta.hot) {
           :key="page.path"
           :prepend-icon="page.icon"
           :to="page.path"
+          @click="drawer = false"
         >
           <v-list-item-title>{{ page.title }}</v-list-item-title>
         </v-list-item>

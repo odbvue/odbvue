@@ -567,7 +567,7 @@ Adjusted Default Layout:
         <v-list-item>
           <strong>{{ app.user?.fullname }}</strong>
         </v-list-item>
-        <v-list-item link prepend-icon="$mdiLogout" @click="app.auth.logout()">
+        <v-list-item link prepend-icon="$mdiLogout" @click="app.auth.logout(); drawer = false">
           <v-list-item-title>{{ t('logout') }}</v-list-item-title>
         </v-list-item>
       </v-list>
