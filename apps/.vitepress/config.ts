@@ -6,7 +6,21 @@ export default defineConfig({
 
   title: 'OdbVue',
   description: 'Take Ownership of Your Future',
-  head: [['link', { rel: 'icon', href: '/favicon.ico' }]],
+  head: [
+    [
+      'script',
+      {
+        async: '',
+        src: 'https://www.googletagmanager.com/gtag/js?id=G-DWY78X1WCH',
+      },
+    ],
+    [
+      'script',
+      {},
+      "window.dataLayer = window.dataLayer || [];\nfunction gtag(){dataLayer.push(arguments);}\ngtag('js', new Date());\ngtag('config', 'G-DWY78X1WCH');",
+    ],
+    ['link', { rel: 'icon', href: '/favicon.ico' }],
+  ],
   themeConfig: {
     logo: '/logo.svg',
 
@@ -110,6 +124,7 @@ export default defineConfig({
             { text: 'Authorization', link: '/guide/apps/authorization' },
             { text: 'Audit', link: '/guide/apps/auditing' },
             { text: 'Performance', link: '/guide/apps/performance' },
+            { text: 'Analytics', link: '/guide/apps/analytics' },
           ],
         },
         {
