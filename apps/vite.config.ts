@@ -14,6 +14,7 @@ import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { AutoImportMdiIcons } from './src/plugins/icons'
 import { unheadVueComposablesImports } from '@unhead/vue'
+import { VitePWA } from 'vite-plugin-pwa'
 
 async function extractMetaFromMarkdown(absolutePath: string): Promise<Record<string, unknown> | null> {
   try {
@@ -48,6 +49,11 @@ export default defineConfig(({ mode }) => {
   const isProduction = mode === 'production'
 
   return {
+    build: {
+      rollupOptions: {
+        external: ['workbox-window'],
+      },
+    },
     server: {
       proxy: {
         '/api': {
@@ -99,6 +105,38 @@ export default defineConfig(({ mode }) => {
       }),
       Components({}),
       AutoImportMdiIcons({}),
+      VitePWA({
+       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+       manifest: {
+          name: "OdbVue",
+          short_name: "OV",
+          description: "OdbVue - Take Ownership of Your Future",
+          theme_color: "#00629e",
+          icons: [
+            {
+              src: "pwa-64x64.png",
+              sizes: "64x64",
+              type: "image/png"
+            },
+            {
+              src: "pwa-192x192.png",
+              sizes: "192x192",
+              type: "image/png"
+            },
+            {
+              src: "pwa-512x512.png",
+              sizes: "512x512",
+              type: "image/png"
+            },
+            {
+              src: "maskable-icon-512x512.png",
+              sizes: "512x512",
+              type: "image/png",
+              purpose: "maskable"
+            }
+          ]
+        },
+      }),
       vueDevTools(),
     ],
     resolve: {

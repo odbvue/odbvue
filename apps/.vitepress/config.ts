@@ -125,6 +125,7 @@ export default defineConfig({
             { text: 'Audit', link: '/guide/apps/auditing' },
             { text: 'Performance', link: '/guide/apps/performance' },
             { text: 'Analytics', link: '/guide/apps/analytics' },
+            { text: 'Progressive Web App', link: '/guide/apps/pwa' },
           ],
         },
         {
