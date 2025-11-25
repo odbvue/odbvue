@@ -5,7 +5,7 @@
     "version" : "25.3.2.0"
   },
   "schemas" : [ "odbvue" ],
-  "lastReleaseVersion" : "v0.0.208",
+  "lastReleaseVersion" : "v0.0.209",
   "export" : {
     "format" : {
       "enable" : true
