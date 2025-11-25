@@ -575,22 +575,25 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
     END post_audit;
 
 BEGIN
+    WITH edition AS (
+        SELECT
+            lower(sys_context('USERENV', 'CURRENT_EDITION_NAME')) AS name
+        FROM
+            dual
+    )
     SELECT
         replace(
-            lower(regexp_replace(
-                sys_context('USERENV', 'CURRENT_EDITION_NAME'),
-                '^[A-Z0-9#$_]+_V_',
-                'v'
-            )),
+            substr(name,
+                   instr(name, '_v') + 1),
             '_',
             '.'
-        )
+        ) AS version
     INTO g_version
     FROM
-        dual;
+        edition;
 
 END pck_app;
 /
 
 
--- sqlcl_snapshot {"hash":"9949b247c1d7ef788ed3dc20df298fba7d912314","type":"PACKAGE_BODY","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"4ae30eefb10be1f2082d59a8c457acf1f774b0a6","type":"PACKAGE_BODY","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
