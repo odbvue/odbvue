@@ -239,7 +239,7 @@ program
   .command('submit-pr')
   .alias('sp')
   .description('Submit PR with database changes and changeset')
-  .option('-c, --connection <connection>', 'Database connection (uses ODBVUE_DB_DEV if not provided)')
+  .option('-c, --connection <connection>', 'Database connection (uses ODBVUE_DB_CONN if not provided)')
   .action(async (options) => {
     try {
       // Check for uncommitted changes
@@ -253,11 +253,12 @@ program
         process.exit(1);
       }
 
-      const connection = options.connection || process.env.ODBVUE_DB_DEV;
+      const connection = options.connection || process.env.ODBVUE_DB_CONN;
 
       if (!connection) {
-        logger.error('Database connection not provided and ODBVUE_DB_DEV environment variable not set.');
+        logger.error('Database connection not provided and ODBVUE_DB_CONN environment variable not set.');
         logger.info('Usage: ov submit-pr [-c, --connection <connection>]');
+        logger.info('Set ODBVUE_DB_CONN in your .env file or provide -c option');
         process.exit(1);
       }
 
