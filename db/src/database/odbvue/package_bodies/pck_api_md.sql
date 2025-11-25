@@ -625,7 +625,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_md AS
                 p_fontsize_pt => l_font_size
             );
 
-            pck_api_pdf.put_txt(
+            pck_api_pdf.insert_txt(
                 p_x        => l_margin_left,
                 p_y        => l_y,
                 p_txt      => p_text,
@@ -1420,4 +1420,4 @@ END pck_api_md;
 /
 
 
--- sqlcl_snapshot {"hash":"4402a261f6dea8f77a6f66bc191f2ab9547d6977","type":"PACKAGE_BODY","name":"PCK_API_MD","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"fe2e485f7969980c3d72115fd93e1ccb2dadc2fd","type":"PACKAGE_BODY","name":"PCK_API_MD","schemaName":"ODBVUE","sxml":""}
