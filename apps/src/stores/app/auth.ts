@@ -4,6 +4,7 @@ import Cookies from 'js-cookie'
 import { useAppStore } from '../index'
 import { useUiStore } from './ui'
 import { useHttp } from '@/composables/http'
+import { useRouter } from 'vue-router'
 
 export const useAuthStore = defineStore(
   'auth',
