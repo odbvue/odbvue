@@ -28,14 +28,7 @@
         <v-list-item>
           <strong>{{ app.user?.fullname }}</strong>
         </v-list-item>
-        <v-list-item
-          link
-          prepend-icon="$mdiLogout"
-          @click="
-            app.auth.logout()
-            drawer = false
-          "
-        >
+        <v-list-item link prepend-icon="$mdiLogout" @click="logout()">
           <v-list-item-title>{{ t('logout') }}</v-list-item-title>
         </v-list-item>
       </v-list>
@@ -241,6 +234,11 @@ const { t } = useI18n()
 
 const app = useAppStore()
 const drawer = ref(false)
+
+const logout = () => {
+  app.auth.logout()
+  drawer.value = false
+}
 
 function focusMain() {
   const el = document.getElementById('main')

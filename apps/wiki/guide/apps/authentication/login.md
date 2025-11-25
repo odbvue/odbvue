@@ -567,7 +567,7 @@ Adjusted Default Layout:
         <v-list-item>
           <strong>{{ app.user?.fullname }}</strong>
         </v-list-item>
-        <v-list-item link prepend-icon="$mdiLogout" @click="app.auth.logout(); drawer = false">
+        <v-list-item link prepend-icon="$mdiLogout" @click="logout()">
           <v-list-item-title>{{ t('logout') }}</v-list-item-title>
         </v-list-item>
       </v-list>
@@ -583,7 +583,16 @@ Adjusted Default Layout:
         {{ t('logout') }}
       </v-btn>
       <!-- // -->
-    </v-app-bar>  
+    </v-app-bar> 
+
+<script setup lang="ts">
+// ..
+const logout = () => {
+  app.auth.logout()
+  drawer.value = false
+}   
+//..
+</script>
 ```
 
 ## Test

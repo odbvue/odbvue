@@ -206,14 +206,13 @@ Guard in Router
 // ...
 router.beforeEach(async (to) => {
   const app = useAppStore()
-  const appTitle = title || 'OdbVue'
-  const pageTitle = app.navigation.title(to.path)
-  const documentTitle = pageTitle ? `${appTitle} - ${pageTitle}` : appTitle
-  useHead({ title: documentTitle })
   app.ui.clearMessages()
   const result: string | boolean = app.navigation.guard(to.path)
   if (result) {
-    app.ui.clearMessages()
+    const appTitle = title || 'OdbVue'
+    const pageTitle = app.navigation.title(to.path)
+    const documentTitle = pageTitle ? `${appTitle} - ${pageTitle}` : appTitle
+    useHead({ title: documentTitle })
   } else {
     app.ui.setError('unauthorized')
   }
