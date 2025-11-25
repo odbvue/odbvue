@@ -51,7 +51,8 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
     PROCEDURE get_context (
         r_version  OUT VARCHAR2,
         r_user     OUT SYS_REFCURSOR,
-        r_consents OUT SYS_REFCURSOR
+        r_consents OUT SYS_REFCURSOR,
+        r_config   OUT SYS_REFCURSOR
     ) IS
         v_uuid app_users.uuid%TYPE := pck_api_auth.uuid;
     BEGIN
@@ -67,6 +68,14 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
                                 active = 'Y'
                             ORDER BY
                                 created DESC;
+
+        OPEN r_config FOR SELECT
+                                              id    AS "key",
+                                              value AS "value"
+                                          FROM
+                                              app_settings
+                         WHERE
+                             id IN ( 'APP_PERFORMANCE_THERESHOLD_MS' );
 
         IF v_uuid IS NULL THEN
             RETURN;
@@ -558,6 +567,13 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
         END IF;
     END post_heartbeat;
 
+    PROCEDURE post_audit (
+        p_data IN CLOB
+    ) AS
+    BEGIN
+        pck_api_audit.bulk(p_data);
+    END post_audit;
+
 BEGIN
     SELECT
         replace(
@@ -577,4 +593,4 @@ END pck_app;
 /
 
 
--- sqlcl_snapshot {"hash":"44b58e6cc270bb602aa49a596dc9cadedd35ab44","type":"PACKAGE_BODY","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"9949b247c1d7ef788ed3dc20df298fba7d912314","type":"PACKAGE_BODY","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}

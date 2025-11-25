@@ -41,5 +41,14 @@ const LayoutComponent = computed(() => {
   return defineAsyncComponent(loader)
 })
 
-onMounted(async () => await useAppStore().init())
+onMounted(async () => {
+  const app = useAppStore()
+  await app.init()
+  app.audit.startAutoSave()
+})
+
+onUnmounted(() => {
+  const app = useAppStore()
+  app.audit.stopAutoSave()
+})
 </script>

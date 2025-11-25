@@ -2,7 +2,8 @@ CREATE OR REPLACE PACKAGE odbvue.pck_app AS -- Package for the main application
     PROCEDURE get_context ( -- Returns application context
         r_version  OUT VARCHAR2, -- Application version
         r_user     OUT SYS_REFCURSOR, -- User data [{uuid, username, fullname, created}]
-        r_consents OUT SYS_REFCURSOR -- Consents [{id, language, name, created}]
+        r_consents OUT SYS_REFCURSOR, -- Consents [{id, language, name, created}]
+        r_config   OUT SYS_REFCURSOR -- Configuration [{key, value}]
     );
 
     PROCEDURE post_login ( -- Procedure authenticates user and returns tokens (PUBLIC)
@@ -56,8 +57,13 @@ CREATE OR REPLACE PACKAGE odbvue.pck_app AS -- Package for the main application
     );
 
     PROCEDURE post_heartbeat; -- Procedure to keep the session alive
+
+    PROCEDURE post_audit ( -- Procedure to log audit events
+        p_data IN CLOB -- Audit data [{severity, message, attributes, created}]
+    );
+
 END pck_app;
 /
 
 
--- sqlcl_snapshot {"hash":"11e783214391b4ae2f3051ca4975629d7a18d79b","type":"PACKAGE_SPEC","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"96da94279d8c04982dff57d45a2b92fd1ba8969e","type":"PACKAGE_SPEC","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}

@@ -8,6 +8,7 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
+  to.meta.performance = performance.now()
   const app = useAppStore()
   const appTitle = title || 'OdbVue'
   const pageTitle = app.navigation.title(to.path)
@@ -38,6 +39,12 @@ router.afterEach(async (to) => {
     heading.setAttribute('tabindex', '-1')
     heading.focus({ preventScroll: true })
     heading.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+  //
+  const duration: number = performance.now() - (to.meta.performance as number)
+  if (duration >= useAppStore().appPerformanceThresholdMs) {
+    const appAudit = useAuditStore()
+    appAudit.wrn('Slow Page Load', `Route ${to.path} took ${duration}ms`)
   }
 })
 

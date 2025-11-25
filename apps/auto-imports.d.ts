@@ -63,6 +63,7 @@ declare global {
   const unref: typeof import('vue').unref
   const useAppStore: typeof import('./src/stores/index').useAppStore
   const useAttrs: typeof import('vue').useAttrs
+  const useAuditStore: typeof import('./src/stores/app/audit').useAuditStore
   const useAuthStore: typeof import('./src/stores/app/auth').useAuthStore
   const useCardBackground: typeof import('./src/composables/ui').useCardBackground
   const useConsent: typeof import('./src/composables/consent').useConsent
