@@ -10,15 +10,15 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   to.meta.performance = performance.now()
   const app = useAppStore()
-  const appTitle = title || 'OdbVue'
-  const pageTitle = app.navigation.title(to.path)
-  const documentTitle = pageTitle ? `${appTitle} - ${pageTitle}` : appTitle
-  useHead({ title: documentTitle })
   app.ui.clearMessages()
   const result: string | boolean = app.navigation.guard(to.path)
   if (result) {
-    app.ui.clearMessages()
+    const appTitle = title || 'OdbVue'
+    const pageTitle = app.navigation.title(to.path)
+    const documentTitle = pageTitle ? `${appTitle} - ${pageTitle}` : appTitle
+    useHead({ title: documentTitle })
   } else {
+    window.scrollTo(0, 0)
     app.ui.setError('unauthorized')
   }
   return result === '/login' ? { path: result, query: { redirect: to.path } } : result

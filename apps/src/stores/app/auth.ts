@@ -61,6 +61,7 @@ export const useAuthStore = defineStore(
       return isAuthenticated.value
     }
 
+    const router = useRouter()
     const logout = async () => {
       accessToken.value = ''
       Cookies.remove('refresh_token', { path: '/', domain: window.location.hostname })
@@ -68,6 +69,7 @@ export const useAuthStore = defineStore(
       await api.post('app/logout/')
       await useAppStore().init()
       clearMessages()
+      router.push('/')
     }
 
     const refresh = async (): Promise<boolean> => {

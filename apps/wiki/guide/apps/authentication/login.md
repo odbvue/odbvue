@@ -326,6 +326,7 @@ export const useAuthStore = defineStore(
       return isAuthenticated.value
     }
 
+    const router = useRouter()
     const logout = async () => {
       accessToken.value = ''
       Cookies.remove('refresh_token', { path: '/', domain: window.location.hostname })
@@ -333,6 +334,7 @@ export const useAuthStore = defineStore(
       await api.post('app/logout/')
       await useAppStore().init()
       clearMessages()
+      router.push('/')
     }
 
     const refresh = async (): Promise<boolean> => {
@@ -567,7 +569,7 @@ Adjusted Default Layout:
         <v-list-item>
           <strong>{{ app.user?.fullname }}</strong>
         </v-list-item>
-        <v-list-item link prepend-icon="$mdiLogout" @click="app.auth.logout()">
+        <v-list-item link prepend-icon="$mdiLogout" @click="logout()">
           <v-list-item-title>{{ t('logout') }}</v-list-item-title>
         </v-list-item>
       </v-list>
@@ -583,7 +585,16 @@ Adjusted Default Layout:
         {{ t('logout') }}
       </v-btn>
       <!-- // -->
-    </v-app-bar>  
+    </v-app-bar> 
+
+<script setup lang="ts">
+// ..
+const logout = () => {
+  app.auth.logout()
+  drawer.value = false
+}   
+//..
+</script>
 ```
 
 ## Test
