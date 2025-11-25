@@ -182,7 +182,25 @@
     </v-main>
     <v-footer app>
       <v-row>
-        <v-col> {{ app.version }} </v-col>
+        <v-col>
+          {{ app.version }}
+          <v-btn
+            v-if="needRefresh"
+            variant="outlined"
+            density="compact"
+            class="ml-2"
+            @click="refresh = true"
+          >
+            Upgrade
+          </v-btn>
+          <v-snackbar v-model="refresh" multi-line vertical>
+            New version is available, click OK to upgrade now.
+            <template v-slot:actions>
+              <v-btn color="primary" variant="text" @click="updateServiceWorker()"> Ok </v-btn>
+              <v-btn color="secondary" variant="text" @click="refresh = false"> Cancel </v-btn>
+            </template>
+          </v-snackbar>
+        </v-col>
         <v-col class="text-right">
           <v-btn
             icon
@@ -203,6 +221,10 @@
 </template>
 
 <script setup lang="ts">
+import { useRegisterSW } from 'virtual:pwa-register/vue'
+const { needRefresh, updateServiceWorker } = useRegisterSW()
+const refresh = ref(false)
+
 const { mobile } = useDisplay()
 const { t } = useI18n()
 
