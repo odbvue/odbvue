@@ -107,6 +107,22 @@ export default defineConfig(({ mode }) => {
       AutoImportMdiIcons({}),
       VitePWA({
        injectRegister: 'script',
+       registerType: 'prompt',
+       workbox: {
+         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
+         runtimeCaching: [
+           {
+             urlPattern: /^https:\/\/.*/i,
+             handler: 'NetworkFirst',
+             options: {
+               cacheName: 'offlineCache',
+               expiration: {
+                 maxEntries: 200
+               }
+             }
+           }
+         ]
+       },
        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
        manifest: {
           name: "OdbVue",
