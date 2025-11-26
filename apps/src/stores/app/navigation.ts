@@ -3,6 +3,9 @@ import { useRouter, useRoute } from 'vue-router'
 import { computed, type ComputedRef } from 'vue'
 import { useAppStore } from '../index'
 
+type Visibility = 'always' | 'when-authenticated' | 'when-unauthenticated' | 'never' | 'with-role'
+type Access = 'always' | 'when-authenticated' | 'when-unauthenticated' | 'never' | 'with-role'
+
 type Page = {
   path: string
   level: number
@@ -11,7 +14,9 @@ type Page = {
   description: string
   icon: string
   color: string
-  role: string
+  visibility: Visibility
+  access: Access
+  roles: string[]
 }
 
 type Breadcrumb = {
@@ -50,7 +55,9 @@ export const useNavigationStore = defineStore(
         description: route.meta?.description?.toString() || '',
         icon: (route.meta?.icon as string) || '$mdiMinus',
         color: (route.meta?.color as string) || '',
-        role: (route.meta?.role as string) || '',
+        visibility: (route.meta?.visibility as Visibility) || 'never',
+        access: (route.meta?.access as Access) || 'never',
+        roles: (route.meta?.roles as string[]) || [],
       }
     })
 
@@ -79,17 +86,22 @@ export const useNavigationStore = defineStore(
       return crumbs
     })
 
-    const pages: ComputedRef<Page[]> = computed(() => {
+    const hasVisibility = (page: Page): boolean => {
       const app = useAppStore()
-      return allPages
-        .filter((page) => page.level < 2)
-        .filter((page) => page.path !== '/:path(.*)')
-        .filter((page) => page.role !== 'guest')
-        .filter(
-          (page) =>
-            (!app.auth.isAuthenticated && ['restricted', 'public'].includes(page.role)) ||
-            app.auth.isAuthenticated,
+      if (page.visibility === 'always') return true
+      if (page.visibility === 'when-authenticated' && app.auth.isAuthenticated) return true
+      if (page.visibility === 'when-unauthenticated' && !app.auth.isAuthenticated) return true
+      if (page.visibility === 'with-role' && app.auth.isAuthenticated) {
+        return app.user.privileges.some(
+          (privilege: { role: string; permission: string; validfrom: string; validto: string }) =>
+            page.roles.some((role) => privilege.role.toLowerCase() === role.toLowerCase()),
         )
+      }
+      return false
+    }
+
+    const pages: ComputedRef<Page[]> = computed(() => {
+      return allPages.filter((page) => page.level < 2).filter((page) => hasVisibility(page))
     })
 
     const guard = computed(() => (path: string) => {
@@ -99,19 +111,17 @@ export const useNavigationStore = defineStore(
         return regexPath.test(path)
       })
       if (!page) return false
-      if (page.role === 'public') return true
-      if (!app.auth.isAuthenticated && page.role == 'guest') return true
-      if (app.auth.isAuthenticated && page.role == 'restricted') return true
-      if (
-        app.auth.isAuthenticated &&
-        app.user.privileges.some(
+      if (page.access === 'always') return true
+      if (page.access === 'when-authenticated' && app.auth.isAuthenticated) return true
+      if (page.access === 'when-unauthenticated' && !app.auth.isAuthenticated) return true
+      if (page.access === 'with-role' && app.auth.isAuthenticated) {
+        const hasRole = app.user.privileges.some(
           (privilege: { role: string; permission: string; validfrom: string; validto: string }) =>
-            privilege.role.toLowerCase() == page.role.toLowerCase(),
+            page.roles.some((role) => privilege.role.toLowerCase() === role.toLowerCase()),
         )
-      )
-        return true
-      if (!app.auth.isAuthenticated && page.role == 'restricted') return '/login'
-      return false
+        if (hasRole) return true
+      }
+      return hasVisibility(page) ? '/login' : '/'
     })
 
     return {

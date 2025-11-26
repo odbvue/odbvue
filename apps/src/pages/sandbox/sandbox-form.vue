@@ -15,7 +15,12 @@
 </template>
 
 <script setup lang="ts">
-definePage({ meta: { role: 'restricted' } })
+definePage({
+  meta: {
+    visibility: 'always',
+    access: 'when-authenticated',
+  },
+})
 
 const { t } = useI18n()
 const loading = ref(false)

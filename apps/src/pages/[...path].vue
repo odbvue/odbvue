@@ -10,5 +10,11 @@
 </template>
 
 <route lang="json">
-{ "meta": { "layout": "fullscreen", "role": "public" } }
+{
+  "meta": {
+    "layout": "fullscreen",
+    "visibility": "never",
+    "access": "always"
+  }
+}
 </route>

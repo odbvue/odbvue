@@ -21,6 +21,13 @@
   </v-container>
 </template>
 <script setup lang="ts">
+definePage({
+  meta: {
+    visibility: 'always',
+    access: 'when-authenticated',
+  },
+})
+
 import type { OvViewOptions } from '@/components'
 
 function action(name: string, value: unknown) {

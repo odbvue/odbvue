@@ -24,7 +24,12 @@
 </template>
 
 <script setup lang="ts">
-definePage({ meta: { role: 'restricted' } })
+definePage({
+  meta: {
+    visibility: 'always',
+    access: 'when-authenticated',
+  },
+})
 
 const editor = ref()
 
