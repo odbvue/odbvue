@@ -7,6 +7,7 @@
 import {
 	mdiAccount,
 	mdiAlert,
+	mdiAlertCircle,
 	mdiCalendar,
 	mdiCamera,
 	mdiCard,
@@ -93,6 +94,7 @@ import {
 export default {
   mdiAccount,
   mdiAlert,
+  mdiAlertCircle,
   mdiCalendar,
   mdiCamera,
   mdiCard,

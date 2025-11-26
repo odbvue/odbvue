@@ -2,5 +2,8 @@
   "created": "Created",
   "severity": "Severity",
   "message": "Message",
-  "attributes": "Attributes"
+  "attributes": "Attributes",
+  "Severity": "Severity",
+  "Username": "Username",
+  "Message": "Message"
 }

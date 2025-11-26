@@ -37,26 +37,9 @@ async function fetch(
   offset: number,
   limit: number,
   search: string,
-  filter: string,
+  filter: OvFilterValue,
   sort: string,
 ) {
-  function filterValueToObject(filter: string) {
-    const filterParts = filter.split(',')
-    const filterObj: Record<string, string | string[]> = {}
-    filterParts.forEach((part) => {
-      const match = part.match(/([^[]+)\[([^\]]+)\]/)
-      if (match && match[1] && match[2]) {
-        const [, key, value] = match as RegExpExecArray & { [1]: string; [2]: string }
-        if (value.includes(',')) {
-          filterObj[key] = value.split(',')
-        } else {
-          filterObj[key] = value
-        }
-      }
-    })
-    return filterObj
-  }
-
   loading.value = true
   await new Promise((resolve) => setTimeout(resolve, 1500))
 
@@ -69,10 +52,9 @@ async function fetch(
       ),
     )
 
-  if (filter) {
-    const filterObj = filterValueToObject(filter)
+  if (Object.keys(filter).length > 0) {
     newData = newData.filter((item) =>
-      Object.entries(filterObj).every(([key, value]) => {
+      Object.entries(filter).every(([key, value]) => {
         const itemValue = item[key as keyof typeof item]
         return Array.isArray(value)
           ? value.includes(itemValue as string)

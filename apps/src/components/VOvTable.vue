@@ -218,6 +218,7 @@ import {
   type OvTableData,
   type OvFormOptions,
   type OvFormData,
+  type OvFilterValue,
   OvActionFormat,
 } from './index'
 
@@ -268,7 +269,7 @@ const emits = defineEmits<{
     offset: number,
     limit: number,
     search?: string,
-    filter?: string,
+    filter?: OvFilterValue,
     sort?: string,
   ): void
 }>()
@@ -388,22 +389,21 @@ const filterChips = computed(() => {
 })
 
 const filterValue = computed(() => {
-  if (!options.filter) return ''
+  if (!options.filter) return {}
 
   return filter.value
     .filter((field) => field.value !== undefined)
-    .reduce((result, field) => {
+    .reduce((result: OvFilterValue, field) => {
       const values = Array.isArray(field.value)
         ? field.value.filter((v) => v !== undefined)
         : [field.value]
 
       if (values.length > 0) {
-        result.push(`${field.name}[${values.join(',')}]`)
+        result[field.name] = values.map(String)
       }
 
       return result
-    }, [] as string[])
-    .join(',')
+    }, {})
 })
 
 async function handleFilterRemove(filterName: string, filterValue?: unknown) {
