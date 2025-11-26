@@ -266,10 +266,8 @@ describe('VOvMedia', () => {
       await flushPromises()
       const deviceEmits = wrapper.emitted('device')
       expect(deviceEmits).toBeTruthy()
-      if (deviceEmits && deviceEmits[0]) {
-        expect(deviceEmits[0][0]).toHaveProperty('devices')
-        expect(deviceEmits[0][0]).toHaveProperty('device')
-      }
+      expect(deviceEmits?.[0]?.[0]).toHaveProperty('devices')
+      expect(deviceEmits?.[0]?.[0]).toHaveProperty('device')
     })
 
     it('emits started event when camera starts', async () => {

@@ -517,10 +517,9 @@ describe('VOvTable', () => {
       await flushPromises()
 
       const buttons = wrapper.findAllComponents({ name: 'VBtn' })
-      if (buttons.length > 0 && buttons[0]) {
-        await buttons[0].trigger('click')
-        await flushPromises()
-      }
+      expect(buttons.length).toBeGreaterThan(0)
+      await buttons[0]!.trigger('click')
+      await flushPromises()
       expect(wrapper.vm).toBeDefined()
     })
 
@@ -910,9 +909,7 @@ describe('VOvTable', () => {
       await flushPromises()
       const emitted = wrapper.emitted('fetch')
       expect(emitted).toBeDefined()
-      if (emitted) {
-        expect(emitted.length).toBeGreaterThan(0)
-      }
+      expect(emitted?.length).toBeGreaterThan(0)
     })
 
     it('emits action event with correct parameters', async () => {
