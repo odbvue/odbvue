@@ -171,6 +171,8 @@ type OvTableSort = {
   value?: 'asc' | 'desc'
 }
 
+export type OvFilterValue = Record<string, string[]>
+
 export type OvTableOptions = {
   key: string
   columns: OvTableColumn[]

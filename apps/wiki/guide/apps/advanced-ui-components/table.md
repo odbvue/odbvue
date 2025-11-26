@@ -42,7 +42,7 @@ Powerful data table component with integrated search, filtering, sorting, pagina
 
 | Event | Payload | Description |
 |-------|---------|-------------|
-| `fetch` | `data: OvTableData[], offset: number, limit: number, search?: string, filter?: string, sort?: string` | Emitted when data needs to be fetched (on mount, page change, search, filter, sort) |
+| `fetch` | `data: OvTableData[], offset: number, limit: number, search?: string, filter?: OvFilterValue, sort?: string` | Emitted when data needs to be fetched (on mount, page change, search, filter, sort) |
 | `action` | `name: string, data: OvTableData[], value?: OvTableData` | Emitted when row action, table action, or cell action is triggered |
 
 ### Exposed Methods
@@ -437,17 +437,23 @@ The `fetch` event provides all necessary parameters for server-side data handlin
 | `offset` | `number` | `0` for first page, `10` for second (with itemsPerPage: 10) |
 | `limit` | `number` | `11` (itemsPerPage + 1 to detect more pages) |
 | `search` | `string` | `"search term"` or `""` |
-| `filter` | `string` | `"status[active,blocked],phone[5551234]"` |
+| `filter` | `OvFilterValue` | `{ status: ['active', 'blocked'], phone: ['5551234'] }` |
 | `sort` | `string` | `"name,status-desc"` or `""` |
 
-### Filter String Format
+### Filter Object Format
 
-Multiple filters use comma separation with bracket notation:
+Filters are passed as an object where each key is a field name and the value is always an array of strings:
 
+```typescript
+type OvFilterValue = Record<string, string[]>
+
+// Examples:
+{ status: ['active'] }
+{ status: ['active', 'blocked'], phone: ['5551234'] }
+{ email: ['user@example.com'] }
 ```
-status[active],phone[555-1234]
-status[active,blocked]  // Multiple values for same field
-```
+
+**Note:** Filter values are always arrays, even when filtering by a single value. This provides consistent handling across the API.
 
 ### Sort String Format
 

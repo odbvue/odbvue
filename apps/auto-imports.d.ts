@@ -112,6 +112,6 @@ declare global {
   export type { Share, WindowFeatures, ShareOptions } from './src/components/VOvShare.vue'
   import('./src/components/VOvShare.vue')
   // @ts-ignore
-  export type { OvRule, OvAction, OvFormTextareaField, OvFormRatingField, OvFormSelectionField, OvFormFieldError, OvAlign, OvFormOptions, OvTableColumn, OvTableOptions, OvViewItem, OvViewOptions, OvFormData, OvTableData, OvViewData } from './src/components/index'
+  export type { OvRule, OvAction, OvFormTextareaField, OvFormRatingField, OvFormSelectionField, OvFormFieldError, OvAlign, OvFormOptions, OvTableColumn, OvFilterValue, OvTableOptions, OvViewItem, OvViewOptions, OvFormData, OvTableData, OvViewData } from './src/components/index'
   import('./src/components/index')
 }

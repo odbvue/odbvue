@@ -59,7 +59,7 @@ export function i18nDevPlugin(): Plugin {
         let hasChanges = false
 
         for (const item of items) {
-          if (!jsonData[item.key]) {
+          if (item.key && !jsonData[item.key]) {
             jsonData[item.key] = item.value
             hasChanges = true
           }
