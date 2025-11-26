@@ -87,7 +87,7 @@ export const useNavigationStore = defineStore(
         .filter((page) => page.role !== 'guest')
         .filter(
           (page) =>
-            (!app.auth.isAuthenticated && ['restricted', 'public'].includes(page.role)) ||
+            (!app.auth.isAuthenticated && ['restricted', 'public'].includes(page.role.toLowerCase())) ||
             app.auth.isAuthenticated,
         )
     })
