@@ -13,7 +13,12 @@
 </template>
 
 <script setup lang="ts">
-definePage({ meta: { role: 'admin' } })
+definePage({
+  meta: {
+    visibility: 'always',
+    access: 'when-authenticated',
+  },
+})
 
 const shareOptions = ref<ShareOptions>({
   url: 'https://www.google.com',

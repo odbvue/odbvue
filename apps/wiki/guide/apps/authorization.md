@@ -105,88 +105,100 @@ User data type with privileges in Application Main store.
 
 ## Pages & Page Meta's
 
-### Overview of page access `meta.role`
+### Visibility & Access Props
 
-| Role       | Description                                                                                 |
-| ---------- | ------------------------------------------------------------------------------------------- |
-| public     | Page is always visible and accessible without authentication                                |
-| guest      | Page is visible and accessible only for **un**-authenticated users (e.g. `/login`, `/signup`)                          |
-| restricted | Page is visible to users without authentication but accessible only for authenticated users. Un-authenticated users get message `unauthorized` |
-| **`x`**    | Page is visible and accessible only for authenticated users **with role `X`** (e.g. `/admin`)              |
+Meta properties control page visibility and access permissions:
 
-Page meta can be set either as
+#### Visibility
 
-```vue
-<route lang="json">
-{
-  "meta": {
-    "role": "public"
-  }
-}
-</route>
-```
+Determines whether a page link/item appears in navigation menus and UI:
 
-or (preferred)
+| Value | Description |
+|-------|-------------|
+| `always` | Page always appears in navigation, regardless of authentication state |
+| `when-authenticated` | Page only appears when user is logged in |
+| `when-unauthenticated` | Page only appears when user is not logged in |
+| `with-role` | Page only appears when user has one of the specified roles |
+| `never` | Page never appears in navigation (e.g., error pages, authentication pages) |
+
+#### Access
+
+Controls whether a user can actually access the page:
+
+| Value | Description |
+|-------|-------------|
+| `always` | Page is always accessible to anyone |
+| `when-authenticated` | Page requires user to be logged in |
+| `when-unauthenticated` | Page only accessible to users not logged in |
+| `with-role` | Page requires user to have one of the specified roles |
+| `never` | Page is never accessible |
+
+#### Page Meta Definition
+
+Page meta can be set using `definePage()` in `.vue` files:
 
 ```ts
 <script setup lang="ts">
-definePage({ meta: { role: 'guest' } })
-// ...
+definePage({
+  meta: {
+    title: 'Page Title',
+    description: 'Page description',
+    icon: '$mdiIcon',
+    color: '#HEXCOLOR',
+    visibility: 'always',
+    access: 'when-authenticated',
+    roles: ['admin', 'editor']  // required for 'with-role'
+  }
+})
 </script>
 ```
 
-or (for .md files) as
-
-```md{5}
----
-title: About BSB
-description: Learn more about our platform and its capabilities
-icon: $mdiInformation
-role: public
-color: primary
----
-
-# This is an MD file
-```
-
-### Apply meta to pages
-
-**public**
-
-- `@/pages/index.vue`
-- `@/pages/about.md`
-- `@/pages/[...path].vue`
-
-**guest**
-
-- `@/pages/login.vue`
-- `@/pages/signup.vue`
-- `@/pages/recover-password.vue`
-- `@/pages/reset-password/[token].vue`
-
-**restricted**
-
-- `@/pages/sandbox/**`
-- `@/pages/confirm-email/[id].vue`
-
-**Aadmin**
-
-- create a new page `@/pages/admin/index.vue`
+Or in `.vue` files using `<route>` block:
 
 ```vue
-<template>
-  <h1>Admin</h1>
-  <p>Nothing here yet</p>
-</template>
 <route lang="json">
 {
   "meta": {
     "title": "Admin",
-    "role": "admin"
+    "visibility": "with-role",
+    "access": "with-role",
+    "roles": ["admin"]
   }
 }
 </route>
 ```
+
+Or in `.md` files using frontmatter:
+
+```md
+---
+title: About
+description: Learn more about our platform
+icon: $mdiInformation
+color: '#FA8531'
+visibility: always
+access: always
+---
+
+# About
+
+Page content here...
+```
+
+### Apply meta to pages
+
+| Page | Path | Visibility | Access | Roles |
+|------|------|------------|--------|-------|
+| Welcome Home | `/` | `always` | `always` | - |
+| About | `/about` | `always` | `always` | - |
+| Login | `/login` | `never` | `when-unauthenticated` | - |
+| Sign Up | `/signup` | `never` | `when-unauthenticated` | - |
+| Recover Password | `/recover-password` | `never` | `when-unauthenticated` | - |
+| Reset Password | `/reset-password/[token]` | `never` | `always` | - |
+| Confirm Email | `/confirm-email/[id]` | `never` | `always` | - |
+| Sandbox | `/sandbox` | `always` | `when-authenticated` | - |
+| Admin | `/admin` | `with-role` | `with-role` | `admin` |
+| Not Found | `/[...path]` | `never` | `always` | - |
 
 ## Navigation guards
 

@@ -120,7 +120,13 @@
 </template>
 
 <script setup lang="ts">
-definePage({ meta: { role: 'restricted' } })
+definePage({
+  meta: {
+    visibility: 'always',
+    access: 'when-authenticated',
+  },
+})
+
 function cameraLoading(loading: boolean) {
   console.log('camera loading', loading)
 }

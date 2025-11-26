@@ -36,7 +36,13 @@
 </template>
 
 <script setup lang="ts">
-definePage({ meta: { role: 'restricted' } })
+definePage({
+  meta: {
+    visibility: 'always',
+    access: 'when-authenticated',
+  },
+})
+
 import VOvPad from '@/components/VOvPad.vue'
 
 const pad = ref<typeof VOvPad | null>(null)

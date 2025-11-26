@@ -1,9 +1,10 @@
 ---
-title: About Our Platform
+title: About
 description: Learn more about our platform and its capabilities
 icon: $mdiInformation
-role: public
 color: #FA8531
+visibility: always
+access: always
 ---
 
 # About

@@ -91,6 +91,12 @@
 </template>
 
 <script setup lang="ts">
+definePage({
+  meta: {
+    visibility: 'always',
+    access: 'when-authenticated',
+  },
+})
 import { type OvFormOptions, type OvFormData } from '@/components/'
 import { ref } from 'vue'
 

@@ -50,7 +50,12 @@
 </template>
 
 <script setup lang="ts">
-definePage({ meta: { role: 'admin' } })
+definePage({
+  meta: {
+    visibility: 'always',
+    access: 'when-authenticated',
+  },
+})
 
 const map = ref<VOvMapInstance | null>(null)
 

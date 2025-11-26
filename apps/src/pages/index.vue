@@ -27,7 +27,8 @@ definePage({
     description: 'Welcome to the home page',
     icon: '$mdiHome',
     color: '#ABCDEF',
-    role: 'public',
+    visibility: 'always',
+    access: 'always',
   },
 })
 import { useCardBackground } from '@/composables/ui'

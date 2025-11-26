@@ -9,7 +9,9 @@
     "description": "Administration page",
     "icon": "$mdiShieldAccount",
     "color": "#FFDDDD",
-    "role": "admin"
+    "visibility": "with-role",
+    "access": "with-role",
+    "roles": ["admin"]
   }
 }
 </route>

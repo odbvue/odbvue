@@ -11,7 +11,12 @@
 </template>
 
 <script setup lang="ts">
-definePage({ meta: { role: 'guest' } })
+definePage({
+  meta: {
+    visibility: 'never',
+    access: 'when-unauthenticated',
+  },
+})
 
 const app = useAppStore()
 const router = useRouter()

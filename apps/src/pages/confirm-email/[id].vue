@@ -10,7 +10,12 @@
 </template>
 
 <script setup lang="ts">
-definePage({ meta: { role: 'restricted' } })
+definePage({
+  meta: {
+    visibility: 'never',
+    access: 'always',
+  },
+})
 const authStore = useAuthStore()
 const router = useRouter()
 const route = useRoute()
