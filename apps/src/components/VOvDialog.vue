@@ -15,10 +15,12 @@
       :color="props.color"
     >
       <v-card-text>
-        <span v-if="props.content && !hasContentProps">{{ props.content }}</span>
-        <v-chip v-if="props.content && hasContentProps" v-bind="contentProps">{{
-          props.content
-        }}</v-chip>
+        <span class="text-pre-wrap text-break" v-if="props.content && !hasContentProps">
+          {{ props.content }}
+        </span>
+        <v-chip v-if="props.content && hasContentProps" v-bind="contentProps">
+          {{ props.content }}
+        </v-chip>
         <slot
           name="content"
           :onClose="
