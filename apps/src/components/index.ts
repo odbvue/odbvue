@@ -334,6 +334,10 @@ export const renderViewItem = (
   onEmit?: (event: string, ...args: unknown[]) => void,
 ) => {
   return () => {
+    if (typeof value === 'object' && value !== null) {
+      value = JSON.stringify(value, null, 2)
+    }
+
     const valueStr = String(value ?? '')
     const valueDsp = valueStr.slice(0, item?.maxLength ?? options?.maxLength ?? 32767)
     const isTrimmed = item?.maxLength === 0 || valueStr.length > valueDsp.length
