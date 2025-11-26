@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.212
+
+### Patch Changes
+
+- 1f9071e: admin audit inital
+
 ## 0.0.211
 
 ### Patch Changes
