@@ -220,12 +220,10 @@ if (import.meta.hot) {
               </v-menu>
             </v-list-item>
             <v-list-item
-              link
-              :prepend-icon="app.settings.themeIcon"
               @click="app.settings.toggleTheme()"
             >
               <v-list-item-title>
-                <v-icon :icon="app.settings.themeIcon"></v-icon>
+                <v-icon class="ml-10" :icon="app.settings.themeIcon"></v-icon>
               </v-list-item-title>
             </v-list-item>
           </v-list>
