@@ -235,18 +235,18 @@ BEGIN
     BEGIN
         WITH edition AS (
             SELECT
-                sys_context('USERENV', 'CURRENT_EDITION_NAME') AS name
+                upper(sys_context('USERENV', 'CURRENT_EDITION_NAME')) AS name
             FROM
                 dual
         )
         SELECT
             lower(substr(name,
                          1,
-                         instr(name, 'V_') - 2)),
+                         instr(name, '_V') - 1)),
             'v'
             || replace(
                 substr(name,
-                       instr(name, 'V_') + 2),
+                       instr(name, '_V') + 2),
                 '_',
                 '.'
             )
@@ -265,4 +265,4 @@ END pck_api_audit;
 /
 
 
--- sqlcl_snapshot {"hash":"f10257cc95fcc40d2b3f641f22aebfab4c14efc6","type":"PACKAGE_BODY","name":"PCK_API_AUDIT","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"5c2ec4cc502cd0bcf7a452507ecef62fa041da90","type":"PACKAGE_BODY","name":"PCK_API_AUDIT","schemaName":"ODBVUE","sxml":""}
