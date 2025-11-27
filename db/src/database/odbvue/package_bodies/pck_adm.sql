@@ -19,6 +19,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_adm AS
                                             a.id                                        AS "id",
                                             a.severity                                  AS "severity",
                                             a.message                                   AS "message",
+                                            a.module                                    AS "module",
                                             u.username                                  AS "username",
                                             a.attributes                                AS "{}attributes",
                                             to_char(a.created, 'YYYY-MM-DD HH24:MI:SS') AS "created"
@@ -58,6 +59,21 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_adm AS
                                 WHERE
                                     a.severity = j.sev
                             ) )
+            -- Module filter
+                            AND ( NOT JSON_EXISTS ( v_filter, '$.module' )
+                                      OR EXISTS (
+                                SELECT
+                                    1
+                                FROM
+                                        JSON_TABLE ( JSON_QUERY(v_filter, '$.module'), '$[*]'
+                                            COLUMNS (
+                                                modl VARCHAR2 ( 100 ) PATH '$'
+                                            )
+                                        )
+                                    j
+                                WHERE
+                                    a.module = j.modl
+                            ) )
                         ORDER BY
                             a.created DESC
                         OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY;
@@ -68,4 +84,4 @@ END pck_adm;
 /
 
 
--- sqlcl_snapshot {"hash":"96b09d9f914ad22df5281ba349957a016cba9a1e","type":"PACKAGE_BODY","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"f15c901cd96c7e99308c6e049e48f2ecaaff62f0","type":"PACKAGE_BODY","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}

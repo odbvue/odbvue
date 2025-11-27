@@ -3,7 +3,6 @@
   "severity": "Severity",
   "message": "Message",
   "attributes": "Attributes",
-  "Severity": "Severity",
-  "Username": "Username",
-  "Message": "Message"
+  "username": "Username",
+  "module": "Module"
 }
