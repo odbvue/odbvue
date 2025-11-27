@@ -92,6 +92,7 @@ declare global {
   const useServerSeoMeta: typeof import('@unhead/vue').useServerSeoMeta
   const useSettingsStore: typeof import('./src/stores/app/settings').useSettingsStore
   const useSlots: typeof import('vue').useSlots
+  const useTableFetch: typeof import('./src/components/index').useTableFetch
   const useTemplateRef: typeof import('vue').useTemplateRef
   const useTheme: typeof import('vuetify').useTheme
   const useUiStore: typeof import('./src/stores/app/ui').useUiStore
@@ -112,6 +113,6 @@ declare global {
   export type { Share, WindowFeatures, ShareOptions } from './src/components/VOvShare.vue'
   import('./src/components/VOvShare.vue')
   // @ts-ignore
-  export type { OvRule, OvAction, OvFormTextareaField, OvFormRatingField, OvFormSelectionField, OvFormFieldError, OvAlign, OvFormOptions, OvTableColumn, OvFilterValue, OvTableOptions, OvViewItem, OvViewOptions, OvFormData, OvTableData, OvViewData } from './src/components/index'
+  export type { OvRule, OvAction, OvFormTextareaField, OvFormRatingField, OvFormSelectionField, OvFormFieldError, OvAlign, OvFormOptions, OvTableColumn, OvFilterValue, OvTableOptions, OvViewItem, OvViewOptions, OvFormData, OvTableData, OvViewData, UseTableFetchOptions, UseTableFetchReturn } from './src/components/index'
   import('./src/components/index')
 }

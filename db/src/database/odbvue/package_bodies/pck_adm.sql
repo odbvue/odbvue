@@ -8,7 +8,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_adm AS
         p_offset PLS_INTEGER DEFAULT 0,
         r_audit  OUT SYS_REFCURSOR
     ) AS
-        v_filter VARCHAR2(2000 CHAR) := utl_url.unescape(p_filter);
+        v_filter VARCHAR2(2000 CHAR) := utl_url.unescape(coalesce(p_filter, '{}'));
     BEGIN
         IF pck_api_auth.role(NULL, 'ADMIN') IS NULL THEN
             pck_api_auth.http_401;
@@ -80,8 +80,51 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_adm AS
 
     END get_audit;
 
+    PROCEDURE get_users (
+        p_search VARCHAR2 DEFAULT NULL,
+        p_limit  PLS_INTEGER DEFAULT 10,
+        p_offset PLS_INTEGER DEFAULT 0,
+        r_users  OUT SYS_REFCURSOR
+    ) AS
+    BEGIN
+        IF pck_api_auth.role(NULL, 'ADMIN') IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+
+        OPEN r_users FOR SELECT
+                                            u.uuid                                    AS "uuid",
+                                            u.username                                AS "username",
+                                            u.fullname                                AS "fullname",
+                                            to_char(u.created, 'YYYY-MM-DD HH24:MI')  AS "created",
+                                            to_char(u.accessed, 'YYYY-MM-DD HH24:MI') AS "accessed",
+                                            u.status                                  AS "status",
+                                            CASE u.status
+                                                WHEN 'N' THEN
+                                                    'Unverified'
+                                                WHEN 'A' THEN
+                                                    'Verified'
+                                                WHEN 'D' THEN
+                                                    'Suspended'
+                                                ELSE
+                                                    'Unknown'
+                                            END                                       AS "status_text"
+                                        FROM
+                                            app_users u
+                        WHERE
+                                1 = 1
+            -- Search filter
+                            AND ( p_search IS NULL
+                                  OR u.username LIKE upper(p_search)
+                                                     || '%' )
+                        ORDER BY
+                            u.username ASC
+                        OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY;
+
+    END get_users;
+
 END pck_adm;
 /
 
 
--- sqlcl_snapshot {"hash":"f15c901cd96c7e99308c6e049e48f2ecaaff62f0","type":"PACKAGE_BODY","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"c4d5d3594a54828e4ec5517a15826618d8222f5a","type":"PACKAGE_BODY","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}

@@ -4,5 +4,7 @@
   "message": "Message",
   "attributes": "Attributes",
   "username": "Username",
-  "module": "Module"
+  "module": "Module",
+  "accessed": "Accessed",
+  "status_text": "Status_text"
 }

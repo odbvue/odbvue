@@ -6,6 +6,7 @@
 
 import {
 	mdiAccount,
+	mdiAccountGroup,
 	mdiAlert,
 	mdiAlertCircle,
 	mdiCalendar,
@@ -17,6 +18,7 @@ import {
 	mdiCheckCircle,
 	mdiChevronLeft,
 	mdiChevronRight,
+	mdiClipboardList,
 	mdiClockOutline,
 	mdiClose,
 	mdiCog,
@@ -93,6 +95,7 @@ import {
 
 export default {
   mdiAccount,
+  mdiAccountGroup,
   mdiAlert,
   mdiAlertCircle,
   mdiCalendar,
@@ -104,6 +107,7 @@ export default {
   mdiCheckCircle,
   mdiChevronLeft,
   mdiChevronRight,
+  mdiClipboardList,
   mdiClockOutline,
   mdiClose,
   mdiCog,
