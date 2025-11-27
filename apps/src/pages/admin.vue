@@ -2,7 +2,7 @@
   <v-container>
     <h1>Admin</h1>
     <h2>Audit</h2>
-    <v-ov-table :options :data :t @fetch="fetchAudit"></v-ov-table>
+    <v-ov-table :options :data :t :loading @fetch="fetchAudit"></v-ov-table>
   </v-container>
 </template>
 
@@ -22,6 +22,7 @@ definePage({
 const http = useHttp()
 const { t } = useI18n()
 
+const loading = ref(false)
 const data = ref<OvTableData[]>([])
 const options = ref<OvTableOptions>({
   key: 'audit',
@@ -34,6 +35,7 @@ const options = ref<OvTableOptions>({
         { rules: { type: 'contains', params: 'WARN' }, color: 'warning', icon: '$mdiAlert' },
       ],
     },
+    { name: 'module' },
     { name: 'username' },
     { name: 'message' },
     { name: 'attributes', maxLength: 0 },
@@ -43,19 +45,24 @@ const options = ref<OvTableOptions>({
       {
         type: 'select',
         name: 'severity',
-        label: 'Severity',
-        items: ['ERROR', 'WARN', 'INFO', 'DEBUG'],
+        label: 'severity',
+        items: ['FATAL', 'ERROR', 'WARN', 'INFO', 'DEBUG'],
         multiple: true,
       },
       {
         type: 'text',
         name: 'username',
-        label: 'Username',
+        label: 'username',
+      },
+      {
+        type: 'text',
+        name: 'module',
+        label: 'module',
       },
       {
         type: 'text',
         name: 'message',
-        label: 'Message',
+        label: 'message',
       },
     ],
     actions: [{ name: 'apply' }, { name: 'cancel' }],
@@ -70,6 +77,7 @@ type Audit = {
   id: string
   created: string
   severity: string
+  module: string
   message: string
   attributes: string
 }
@@ -86,7 +94,7 @@ const fetchAudit = async (
   filter: OvFilterValue,
   sort: string,
 ) => {
-  console.log(filter)
+  loading.value = true
   const { data: auditData } = await http.get<AuditResponse>('adm/audit/', {
     params: {
       offset,
@@ -97,5 +105,6 @@ const fetchAudit = async (
     },
   })
   data.value = auditData?.audit ?? []
+  loading.value = false
 }
 </script>

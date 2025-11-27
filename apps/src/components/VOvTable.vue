@@ -106,6 +106,34 @@
                   ></v-text-field>
                 </td>
               </tr>
+            </thead>
+            <thead v-if="mobile">
+              <tr v-if="mobile">
+                <td colspan="2" class="border-t-sm border-secondary h-0"></td>
+              </tr>
+              <tr>
+                <td class="text-center" :colspan="colspan - 1">
+                  <v-btn
+                    icon="$mdiChevronLeft"
+                    :disabled="!hasPrevPage"
+                    @click="fetch(currentPage - 1)"
+                  />
+                  <v-btn
+                    icon="$mdiChevronRight"
+                    :disabled="!hasNextPage"
+                    @click="fetch(currentPage + 1)"
+                  />
+                </td>
+                <td class="text-right w-0 text-no-wrap">
+                  <v-btn v-if="canRefresh" icon="$mdiRefresh" @click="fetch()" />
+                  <v-btn
+                    v-for="action in actions"
+                    :key="action.name"
+                    v-bind="action.props"
+                    @click="handleTableAction(action.name)"
+                  />
+                </td>
+              </tr>
               <tr v-if="mobile">
                 <td colspan="2" class="border-t-xl border-secondary h-0"></td>
               </tr>
