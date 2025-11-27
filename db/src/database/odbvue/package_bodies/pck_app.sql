@@ -213,19 +213,6 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
         v_verify_token   app_tokens.token%TYPE;
         v_email_id       app_emails.id%TYPE;
 
-        PROCEDURE errors (
-            p_name    VARCHAR2,
-            p_message VARCHAR2
-        ) AS
-        BEGIN
-            OPEN r_errors FOR SELECT
-                                  p_name    AS "name",
-                                  p_message AS "message"
-                              FROM
-                                  dual;
-
-        END errors;
-
         FUNCTION audit_attrs RETURN app_audit.attributes%TYPE IS
         BEGIN
             RETURN pck_api_audit.attributes('username', p_username, 'password', '********', 'fullname',
@@ -234,47 +221,39 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
         END audit_attrs;
 
     BEGIN
-        r_error := pck_api_validate.validate(p_username,
-                                             JSON_ARRAY(
-                                        JSON_OBJECT(
-                                            'type' VALUE 'email',
-                                            'message' VALUE 'username.must.be.valid.email.address'
-                                        )
-                                    ));
+        pck_api_validate.validate('username',
+                                  p_username,
+                                  pck_api_validate.rule('email', NULL, 'username.must.be.valid.email.address'),
+                                  r_error,
+                                  r_errors);
 
         IF r_error IS NOT NULL THEN
-            errors('username', r_error);
             pck_api_audit.warn('Signup', audit_attrs);
             r_error := NULL;
             RETURN;
         END IF;
 
-        r_error := pck_api_validate.validate(p_password,
-                                             JSON_ARRAY(
-                                        JSON_OBJECT(
-                                            'type' VALUE 'regexp',
-                                                    'params' VALUE pck_api_settings.read('APP_AUTH_PASSWORD_REQUIREMENTS'),
-                                                    'message' VALUE pck_api_settings.read('APP_AUTH_PASSWORD_MESSAGE')
-                                        )
-                                    ));
+        pck_api_validate.validate('password',
+                                  p_password,
+                                  pck_api_validate.rule('regexp',
+                                                        pck_api_settings.read('APP_AUTH_PASSWORD_REQUIREMENTS'),
+                                                        pck_api_settings.read('APP_AUTH_PASSWORD_MESSAGE')),
+                                  r_error,
+                                  r_errors);
 
         IF r_error IS NOT NULL THEN
-            errors('password', r_error);
             pck_api_audit.warn('Signup', audit_attrs);
             r_error := NULL;
             RETURN;
         END IF;
 
-        r_error := pck_api_validate.validate(p_fullname,
-                                             JSON_ARRAY(
-                                        JSON_OBJECT(
-                                            'type' VALUE 'required',
-                                            'message' VALUE 'full.name.is.required'
-                                        )
-                                    ));
+        pck_api_validate.validate('fullname',
+                                  p_fullname,
+                                  pck_api_validate.rule('required', NULL, 'full.name.is.required'),
+                                  r_error,
+                                  r_errors);
 
         IF r_error IS NOT NULL THEN
-            errors('fullname', r_error);
             pck_api_audit.warn('Signup', audit_attrs);
             r_error := NULL;
             RETURN;
@@ -316,8 +295,13 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
         EXCEPTION
             WHEN dup_val_on_index THEN
                 r_error := 'username.already.exists';
-                errors('username', r_error);
                 pck_api_audit.warn('Signup', audit_attrs);
+                OPEN r_errors FOR SELECT
+                                      'username' AS "name",
+                                      r_error    AS "message"
+                                  FROM
+                                      dual;
+
                 r_error := NULL;
                 RETURN;
         END;
@@ -469,32 +453,16 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
             utl_raw.cast_to_raw(trim(p_password) || c_salt),
             4
         );
-
-        PROCEDURE errors (
-            p_name    VARCHAR2,
-            p_message VARCHAR2
-        ) AS
-        BEGIN
-            OPEN r_errors FOR SELECT
-                                  p_name    AS "name",
-                                  p_message AS "message"
-                              FROM
-                                  dual;
-
-        END errors;
-
     BEGIN
-        r_error := pck_api_validate.validate(p_password,
-                                             JSON_ARRAY(
-                                        JSON_OBJECT(
-                                            'type' VALUE 'regexp',
-                                                    'params' VALUE pck_api_settings.read('APP_AUTH_PASSWORD_REQUIREMENTS'),
-                                                    'message' VALUE pck_api_settings.read('APP_AUTH_PASSWORD_MESSAGE')
-                                        )
-                                    ));
+        pck_api_validate.validate('password',
+                                  p_password,
+                                  pck_api_validate.rule('regexp',
+                                                        pck_api_settings.read('APP_AUTH_PASSWORD_REQUIREMENTS'),
+                                                        pck_api_settings.read('APP_AUTH_PASSWORD_MESSAGE')),
+                                  r_error,
+                                  r_errors);
 
         IF r_error IS NOT NULL THEN
-            errors('password', r_error);
             pck_api_audit.warn('Signup',
                                pck_api_audit.attributes('username', p_username, 'error', r_error));
 
@@ -596,4 +564,4 @@ END pck_app;
 /
 
 
--- sqlcl_snapshot {"hash":"4ae30eefb10be1f2082d59a8c457acf1f774b0a6","type":"PACKAGE_BODY","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"9a8d8ce5e1c9508d29d81a040f0849a925cc8df2","type":"PACKAGE_BODY","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}

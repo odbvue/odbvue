@@ -591,8 +591,65 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_validate AS
             RETURN 'Validation error: ' || sqlerrm;
     END;
 
+    FUNCTION rule (
+        p_type    IN VARCHAR2,
+        p_params  IN VARCHAR2 DEFAULT NULL,
+        p_message IN VARCHAR2
+    ) RETURN CLOB IS
+        v_rule json_object_t := NEW json_object_t();
+    BEGIN
+        v_rule.put('type', p_type);
+        IF p_params IS NOT NULL THEN
+            v_rule.put('params', p_params);
+        END IF;
+        v_rule.put('message', p_message);
+        RETURN v_rule.to_clob;
+    END;
+
+    PROCEDURE validate (
+        p_field  IN VARCHAR2,
+        p_value  IN VARCHAR2,
+        p_rules  IN CLOB,
+        r_error  OUT VARCHAR2,
+        r_errors OUT SYS_REFCURSOR
+    ) IS
+    BEGIN
+        FOR r IN (
+            SELECT
+                *
+            FROM
+                JSON_TABLE ( p_rules, '$[*]'
+                    COLUMNS (
+                        type VARCHAR2 ( 200 ) PATH '$.type',
+                        params CLOB PATH '$.params',
+                        message VARCHAR2 ( 4000 ) PATH '$.message'
+                    )
+                )
+        ) LOOP
+            r_error := validate(
+                p_value => p_value,
+                p_rules => rule(
+                           p_type    => r.type,
+                           p_params  => r.params,
+                           p_message => r.message
+                       )
+            );
+
+            IF r_error IS NOT NULL THEN
+                OPEN r_errors FOR SELECT
+                                      p_field AS "name",
+                                      r_error AS "message"
+                                  FROM
+                                      dual;
+
+                RETURN;
+            END IF;
+
+        END LOOP;
+    END;
+
 END pck_api_validate;
 /
 
 
--- sqlcl_snapshot {"hash":"d18abf4d291ac056d4b9ddb0b9fae1eeef8f13b7","type":"PACKAGE_BODY","name":"PCK_API_VALIDATE","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"325f71963e3f366187d03eb30e23e0554c566930","type":"PACKAGE_BODY","name":"PCK_API_VALIDATE","schemaName":"ODBVUE","sxml":""}
