@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1764245985979 stripComments:false  logicalFilePath:featchore\odbvue\package_bodies\pck_api_audit.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_bodies/pck_api_audit.sql:f10257cc95fcc40d2b3f641f22aebfab4c14efc6:5c2ec4cc502cd0bcf7a452507ecef62fa041da90:alter
+
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_audit AS
 
     FUNCTION attributes (
@@ -264,5 +268,3 @@ BEGIN
 END pck_api_audit;
 /
 
-
--- sqlcl_snapshot {"hash":"5c2ec4cc502cd0bcf7a452507ecef62fa041da90","type":"PACKAGE_BODY","name":"PCK_API_AUDIT","schemaName":"ODBVUE","sxml":""}

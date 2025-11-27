@@ -325,9 +325,8 @@ export const OvActionFormat = (
   return { ...actionFmt, ...fmt }
 }
 
-import { h } from 'vue'
+import { h, ref } from 'vue'
 import { VLabel, VIcon, VChip, VBtn } from 'vuetify/components'
-
 export const renderViewItem = (
   value: unknown,
   item?: OvViewItem,
@@ -420,5 +419,71 @@ export const renderViewItem = (
     })
 
     return h('span', {}, children)
+  }
+}
+
+import { useHttp } from '@/composables/http'
+import type { Ref } from 'vue'
+
+// Table Fetch Composable
+export interface UseTableFetchOptions<T> {
+  endpoint: string
+  responseKey: keyof T
+}
+
+export interface UseTableFetchReturn {
+  loading: Ref<boolean>
+  data: Ref<OvTableData[]>
+  fetch: (
+    fetchData: OvTableData[],
+    offset: number,
+    limit: number,
+    search: string,
+    filter: OvFilterValue,
+    sort: string,
+  ) => Promise<void>
+}
+
+export function useTableFetch<T extends Record<string, unknown>>(
+  options: UseTableFetchOptions<T>,
+): UseTableFetchReturn {
+  const http = useHttp()
+  const loading = ref(false)
+  const data = ref<OvTableData[]>([])
+
+  const fetch = async (
+    _fetchData: OvTableData[],
+    offset: number,
+    limit: number,
+    search: string,
+    filter: OvFilterValue,
+    sort: string,
+  ) => {
+    loading.value = true
+    try {
+      const { data: response } = await http.get<T>(options.endpoint, {
+        params: {
+          offset,
+          limit,
+          search,
+          filter:
+            Object.keys(filter).length > 0 ? encodeURIComponent(JSON.stringify(filter)) : undefined,
+          sort,
+        },
+      })
+
+      if (response) {
+        const items = response[options.responseKey]
+        data.value = Array.isArray(items) ? items : []
+      }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return {
+    loading,
+    data,
+    fetch,
   }
 }
