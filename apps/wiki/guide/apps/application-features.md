@@ -104,7 +104,9 @@ Add logo `./apps/public/logo.sv` and change default layout.
     </v-main>
     <v-footer app>
       <v-row>
-        <v-col> {{ version }} </v-col>
+        <v-col>          
+          <span class="text-caption">{{ app.version }}</span>
+        </v-col>
         <v-col class="text-right">
           <v-btn
             icon

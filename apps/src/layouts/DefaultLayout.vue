@@ -187,7 +187,7 @@
     <v-footer app>
       <v-row>
         <v-col>
-          {{ app.version }}
+          <span class="text-caption">{{ app.version }}</span>
           <v-btn
             v-if="needRefresh"
             variant="outlined"

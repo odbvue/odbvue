@@ -277,7 +277,9 @@ onMounted(async () => await useAppStore().init())
     <!-- // -->
     <v-footer app>
       <v-row>
-        <v-col> {{ app.version }} </v-col>
+        <v-col>           
+          <span class="text-caption">{{ app.version }}</span>
+        </v-col>
         <!-- // -->
       </v-row>
     </v-footer>
