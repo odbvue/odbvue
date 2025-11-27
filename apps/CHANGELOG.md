@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.217
+
+### Patch Changes
+
+- bb4e03b: ui table component
+
 ## 0.0.216
 
 ### Patch Changes
