@@ -392,7 +392,7 @@ if (import.meta.hot) {
       </v-list>
     </v-navigation-drawer>
     <!-- -->
-    <v-main class="ma-4">
+    <v-app-bar>
       <v-breadcrumbs :items="app.navigation.breadcrumbs">
         <template v-slot:title="{ item, index }">
           <v-breadcrumbs-item
@@ -404,6 +404,9 @@ if (import.meta.hot) {
           <v-breadcrumbs-item v-else>{{ item.title }}</v-breadcrumbs-item>
         </template>
       </v-breadcrumbs>
+    </v-app-bar>
+    <!-- -->
+    <v-main class="ma-4">
       <slot />
     </v-main>
     <!-- -->
@@ -784,8 +787,7 @@ if (import.meta.hot) {
         height="6"
       ></v-progress-linear>
     </v-app-bar>
-    <v-main class="ma-4" id="main" tabindex="-1">
-      <!-- ... -->
+    <v-app-bar>
       <v-alert
         type="info"
         :text="app.ui.info ? t(app.ui.info) : ''"
@@ -804,6 +806,8 @@ if (import.meta.hot) {
         v-show="app.ui.error.length > 0"
         class="mb-2"
       ></v-alert>
+    </v-app-bar>
+    <v-main class="ma-4" id="main" tabindex="-1">
       <!-- ... -->
       <v-snackbar v-model="app.ui.snackbar">
         {{ app.ui.snack }}
