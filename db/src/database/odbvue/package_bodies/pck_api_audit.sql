@@ -62,7 +62,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_audit AS
 
         BEGIN
             v_request_method := trim(owa_util.get_cgi_env('REQUEST_METHOD'));
-            v_request_uri := trim(owa_util.get_cgi_env('REQUEST_URI'));
+            v_request_uri := trim(owa_util.get_cgi_env('SCRIPT_NAME'));
             v_agent := trim(owa_util.get_cgi_env('HTTP_USER_AGENT'));
             v_ip := trim(owa_util.get_cgi_env('REMOTE_ADDR'));
         EXCEPTION
@@ -265,4 +265,4 @@ END pck_api_audit;
 /
 
 
--- sqlcl_snapshot {"hash":"b90c65efb0e742697eb42f3e3b0a95869551392a","type":"PACKAGE_BODY","name":"PCK_API_AUDIT","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"f10257cc95fcc40d2b3f641f22aebfab4c14efc6","type":"PACKAGE_BODY","name":"PCK_API_AUDIT","schemaName":"ODBVUE","sxml":""}
