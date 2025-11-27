@@ -43,7 +43,7 @@
     "defaultBranch" : "main"
   },
   "stage" : {
-    "excludeObjects" : [ "ALL.user" ],
+    "excludeObjects" : [ "ALL.user", "ADMIN.*" ],
     "generatedFormat" : "liquibase",
     "softObjectIsolation" : "change"
   }
