@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.214
+
+### Patch Changes
+
+- 63bf08b: db audit and validation
+
 ## 0.0.213
 
 ### Patch Changes
