@@ -43,8 +43,8 @@ const options = ref<OvTableOptions>({
     { name: 'fullname' },
     { name: 'created' },
     { name: 'accessed' },
-    { name: 'status_text', format: { text: 'status' } },
+    { name: 'status_text', title: 'status' },
   ],
-  maxLength: 30,
+  maxLength: 24,
 })
 </script>
