@@ -134,6 +134,19 @@ export default defineConfig(({ mode }) => {
               type: "image/png",
               purpose: "maskable"
             }
+          ],
+          screenshots: [
+            {
+              src: "screenshot-540x720.png",
+              sizes: "540x720",
+              type: "image/png"
+            },
+            {
+              src: "screenshot-1280x720.png",
+              sizes: "1280x720",
+              type: "image/png",
+              form_factor: "wide"
+            }
           ]
         },
       }),
