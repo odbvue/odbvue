@@ -3,7 +3,7 @@
     <v-container>
       <v-row>
         <v-col>
-          <v-table>
+          <v-table class="border-none">
             <thead>
               <tr v-if="!mobile">
                 <th v-for="column in columns" :key="column.name" :class="column.class">
@@ -106,12 +106,8 @@
                   ></v-text-field>
                 </td>
               </tr>
-            </thead>
-            <thead v-if="mobile">
+
               <tr v-if="mobile">
-                <td colspan="2" class="border-t-sm border-secondary h-0"></td>
-              </tr>
-              <tr>
                 <td class="text-center" :colspan="colspan - 1">
                   <v-btn
                     icon="$mdiChevronLeft"
@@ -134,8 +130,13 @@
                   />
                 </td>
               </tr>
+
               <tr v-if="mobile">
-                <td colspan="2" class="border-t-xl border-secondary h-0"></td>
+                <td colspan="2" class="border-none"></td>
+              </tr>
+
+              <tr v-if="!mobile">
+                <td :colspan="colspan" class="border-b-sm h-0"></td>
               </tr>
             </thead>
 
@@ -157,6 +158,7 @@
                 <td v-for="column in columns" :key="column.name" />
               </tr>
             </tbody>
+
             <tbody v-else v-for="item in page" :key="String(item[options.key])">
               <tr v-for="column in columns" :key="column.name">
                 <th class="w-0">{{ column.title }}</th>

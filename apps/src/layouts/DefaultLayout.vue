@@ -86,9 +86,7 @@
                 </v-list>
               </v-menu>
             </v-list-item>
-            <v-list-item
-              @click="app.settings.toggleTheme()"
-            >
+            <v-list-item @click="app.settings.toggleTheme()">
               <v-list-item-title>
                 <v-icon class="ml-10" :icon="app.settings.themeIcon"></v-icon>
               </v-list-item-title>
