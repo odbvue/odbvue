@@ -39,6 +39,15 @@
         >
           {{ t(String(actionProps(action).text || action)) }}
         </v-btn>
+
+        <v-btn
+          v-if="props.copyable"
+          :prepend-icon="copyFeedback ? '$mdiCheckCircle' : '$mdiContentCopy'"
+          color="secondary"
+          @click="handleCopyToClipboard(props.content || '')"
+        >
+          {{ t('copy.to.clipboard') }}
+        </v-btn>
         <v-btn v-if="props.closeable" color="secondary" @click="dialogOpen = false">
           {{ t('close') }}
         </v-btn>
@@ -75,6 +84,7 @@ const props = defineProps<{
   fullscreen?: boolean
   scrollable?: boolean
   closeable?: boolean
+  copyable?: boolean
 
   title?: string
   subtitle?: string
@@ -139,5 +149,14 @@ function handleAction(action: OvAction) {
     return
   }
   emit('action', action)
+}
+
+const copyFeedback = ref(false)
+const handleCopyToClipboard = (text: string) => {
+  navigator.clipboard.writeText(text)
+  copyFeedback.value = true
+  setTimeout(() => {
+    copyFeedback.value = false
+  }, 2000)
 }
 </script>
