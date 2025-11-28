@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.219
+
+### Patch Changes
+
+- de90760: audit users
+
 ## 0.0.218
 
 ### Patch Changes
