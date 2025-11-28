@@ -405,6 +405,13 @@ export const renderViewItem = (
       const actionObj = typeof action === 'string' ? { name: action } : action
       const actionVal = actionObj.key ? (data ?? {})[actionObj.key] : value
       const props = OvActionFormat(actionVal, actionObj, options?.actionFormat)
+
+      if ((props as Record<string, unknown>).to && actionObj.key) {
+        ;(props as Record<string, unknown>).to = (
+          (props as Record<string, unknown>).to as string
+        ).replace('{{value}}', (data ?? {})[actionObj.key] as string)
+      }
+
       const hidden = (props as Record<string, unknown>)['hidden'] === true
       if (!hidden) {
         children.push(
@@ -429,6 +436,7 @@ import type { Ref } from 'vue'
 export interface UseTableFetchOptions<T> {
   endpoint: string
   responseKey: keyof T
+  filter?: OvFilterValue
 }
 
 export interface UseTableFetchReturn {
@@ -461,13 +469,17 @@ export function useTableFetch<T extends Record<string, unknown>>(
   ) => {
     loading.value = true
     try {
+      console.log(options.filter, filter)
+      const filterValue = options.filter || filter
       const { data: response } = await http.get<T>(options.endpoint, {
         params: {
           offset,
           limit,
           search,
           filter:
-            Object.keys(filter).length > 0 ? encodeURIComponent(JSON.stringify(filter)) : undefined,
+            Object.keys(filterValue).length > 0
+              ? encodeURIComponent(JSON.stringify(filterValue))
+              : undefined,
           sort,
         },
       })

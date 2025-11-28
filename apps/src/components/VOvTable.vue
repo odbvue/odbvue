@@ -108,35 +108,35 @@
               </tr>
 
               <tr v-if="mobile">
-                <td class="text-center" :colspan="colspan - 1">
-                  <v-btn
-                    icon="$mdiChevronLeft"
-                    :disabled="!hasPrevPage"
-                    @click="fetch(currentPage - 1)"
-                  />
-                  <v-btn
-                    icon="$mdiChevronRight"
-                    :disabled="!hasNextPage"
-                    @click="fetch(currentPage + 1)"
-                  />
-                </td>
-                <td class="text-right w-0 text-no-wrap">
-                  <v-btn v-if="canRefresh" icon="$mdiRefresh" @click="fetch()" />
-                  <v-btn
-                    v-for="action in actions"
-                    :key="action.name"
-                    v-bind="action.props"
-                    @click="handleTableAction(action.name)"
-                  />
+                <td :colspan="colspan" class="border-none">
+                  <v-row no-gutters>
+                    <v-col cols="8" :class="!mobile ? 'text-center' : ''">
+                      <v-btn
+                        icon="$mdiChevronLeft"
+                        :disabled="!hasPrevPage"
+                        @click="fetch(currentPage - 1)"
+                      />
+                      <v-btn
+                        icon="$mdiChevronRight"
+                        :disabled="!hasNextPage"
+                        @click="fetch(currentPage + 1)"
+                      />
+                    </v-col>
+                    <v-col cols="4" class="text-right">
+                      <v-btn v-if="canRefresh" icon="$mdiRefresh" @click="fetch()" />
+                      <v-btn
+                        v-for="action in actions"
+                        :key="action.name"
+                        v-bind="action.props"
+                        @click="handleTableAction(action.name)"
+                      />
+                    </v-col>
+                  </v-row>
                 </td>
               </tr>
 
-              <tr v-if="mobile">
-                <td colspan="2" class="border-none"></td>
-              </tr>
-
-              <tr v-if="!mobile">
-                <td :colspan="colspan" class="border-b-sm h-0"></td>
+              <tr>
+                <td :colspan="colspan" :class="mobile ? 'border-none' : 'border-b-sm h-0'"></td>
               </tr>
             </thead>
 
@@ -157,6 +157,9 @@
               <tr v-for="n in emptyRowsCount" :key="n">
                 <td v-for="column in columns" :key="column.name" />
               </tr>
+              <tr>
+                <td :colspan="colspan" class="h-0"></td>
+              </tr>
             </tbody>
 
             <tbody v-else v-for="item in page" :key="String(item[options.key])">
@@ -175,32 +178,36 @@
                 </td>
               </tr>
               <tr>
-                <td colspan="2" class="border-t-xl border-secondary h-0"></td>
+                <td colspan="2" class="border-none"></td>
               </tr>
             </tbody>
 
             <tfoot>
               <tr>
-                <td class="text-center" :colspan="colspan - 1">
-                  <v-btn
-                    icon="$mdiChevronLeft"
-                    :disabled="!hasPrevPage"
-                    @click="fetch(currentPage - 1)"
-                  />
-                  <v-btn
-                    icon="$mdiChevronRight"
-                    :disabled="!hasNextPage"
-                    @click="fetch(currentPage + 1)"
-                  />
-                </td>
-                <td class="text-right w-0 text-no-wrap">
-                  <v-btn v-if="canRefresh" icon="$mdiRefresh" @click="fetch()" />
-                  <v-btn
-                    v-for="action in actions"
-                    :key="action.name"
-                    v-bind="action.props"
-                    @click="handleTableAction(action.name)"
-                  />
+                <td :colspan="colspan" class="border-none">
+                  <v-row no-gutters>
+                    <v-col cols="8" :class="!mobile ? 'text-center' : ''">
+                      <v-btn
+                        icon="$mdiChevronLeft"
+                        :disabled="!hasPrevPage"
+                        @click="fetch(currentPage - 1)"
+                      />
+                      <v-btn
+                        icon="$mdiChevronRight"
+                        :disabled="!hasNextPage"
+                        @click="fetch(currentPage + 1)"
+                      />
+                    </v-col>
+                    <v-col cols="4" class="text-right">
+                      <v-btn v-if="canRefresh" icon="$mdiRefresh" @click="fetch()" />
+                      <v-btn
+                        v-for="action in actions"
+                        :key="action.name"
+                        v-bind="action.props"
+                        @click="handleTableAction(action.name)"
+                      />
+                    </v-col>
+                  </v-row>
                 </td>
               </tr>
             </tfoot>
