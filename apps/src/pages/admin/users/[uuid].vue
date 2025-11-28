@@ -1,14 +1,11 @@
 <template>
   <v-container>
-    <label>{{ userData.username }}</label>
-    <br />
-    <br />
-    <v-tabs v-model="tab">
+    <v-tabs v-model="admin.tab">
       <v-tab value="details">{{ t('details') }}</v-tab>
       <v-tab value="audit">{{ t('audit') }}</v-tab>
     </v-tabs>
     <br />
-    <v-tabs-window v-model="tab">
+    <v-tabs-window v-model="admin.tab">
       <v-tabs-window-item value="details">
         <v-ov-view :data="userData" :options="userOptions"></v-ov-view>
       </v-tabs-window-item>
@@ -26,6 +23,8 @@
 </template>
 
 <script setup lang="ts">
+import { useAdminStore } from '../admin'
+
 definePage({
   meta: {
     title: 'Details',
@@ -46,7 +45,7 @@ const uuid =
       : route.params.uuid
     : ''
 
-const tab = ref('details')
+const admin = useAdminStore()
 
 // user
 
@@ -77,8 +76,8 @@ const userData = ref<{
   status_text: '',
 })
 
-const userOptions = ref({
-  key: 'uuid',
+const userOptions = ref<OvViewOptions>({
+  cols: 2,
   items: [
     { name: 'username', label: 'username' },
     { name: 'fullname', label: 'full.name' },
@@ -102,6 +101,7 @@ const userOptions = ref({
       ],
     },
   ],
+  maxLength: 24,
 })
 
 onMounted(async () => {
@@ -139,7 +139,6 @@ const {
 
 const auditOptions = ref<OvTableOptions>({
   key: 'id',
-  itemsPerPage: 5,
   columns: [
     { name: 'created' },
     {
@@ -155,5 +154,6 @@ const auditOptions = ref<OvTableOptions>({
     { name: 'message' },
     { name: 'attributes', maxLength: 0 },
   ],
+  maxLength: 24,
 })
 </script>

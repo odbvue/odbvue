@@ -469,7 +469,6 @@ export function useTableFetch<T extends Record<string, unknown>>(
   ) => {
     loading.value = true
     try {
-      console.log(options.filter, filter)
       const filterValue = options.filter || filter
       const { data: response } = await http.get<T>(options.endpoint, {
         params: {
