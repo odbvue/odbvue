@@ -392,14 +392,16 @@ if (import.meta.hot) {
     <!-- -->
     <v-app-bar>
       <v-breadcrumbs :items="app.navigation.breadcrumbs">
+        <template v-slot:divider>
+          <v-icon icon="$mdiChevronRight"></v-icon>
+        </template>
         <template v-slot:title="{ item, index }">
           <v-breadcrumbs-item
-            v-if="index !== app.navigation.breadcrumbs.length - 1"
             :to="item.href"
+            :disabled="index === app.navigation.breadcrumbs.length - 1"
           >
             {{ item.title }}
           </v-breadcrumbs-item>
-          <v-breadcrumbs-item v-else>{{ item.title }}</v-breadcrumbs-item>
         </template>
       </v-breadcrumbs>
     </v-app-bar>
