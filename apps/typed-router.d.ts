@@ -58,11 +58,18 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
-    '/admin/users': RouteRecordInfo<
-      '/admin/users',
+    '/admin/users/': RouteRecordInfo<
+      '/admin/users/',
       '/admin/users',
       Record<never, never>,
       Record<never, never>,
+      | never
+    >,
+    '/admin/users/[uuid]': RouteRecordInfo<
+      '/admin/users/[uuid]',
+      '/admin/users/:uuid',
+      { uuid: ParamValue<true> },
+      { uuid: ParamValue<false> },
       | never
     >,
     '/confirm-email/[id]': RouteRecordInfo<
@@ -220,9 +227,15 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
-    'src/pages/admin/users.vue': {
+    'src/pages/admin/users/index.vue': {
       routes:
-        | '/admin/users'
+        | '/admin/users/'
+      views:
+        | never
+    }
+    'src/pages/admin/users/[uuid].vue': {
+      routes:
+        | '/admin/users/[uuid]'
       views:
         | never
     }

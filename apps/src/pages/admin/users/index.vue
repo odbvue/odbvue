@@ -34,7 +34,7 @@ const {
 })
 
 const options = ref<OvTableOptions>({
-  key: 'users',
+  key: 'uuid',
   search: {
     placeholder: 'username',
   },
@@ -43,7 +43,34 @@ const options = ref<OvTableOptions>({
     { name: 'fullname' },
     { name: 'created' },
     { name: 'accessed' },
-    { name: 'status_text', title: 'status' },
+    {
+      name: 'status_text',
+      title: 'status',
+      format: [
+        {
+          rules: { type: 'contains', params: 'Unverified' },
+          color: 'warning',
+          icon: '$mdiAlertCircle',
+        },
+        { rules: { type: 'contains', params: 'Disabled' }, color: 'error', icon: '$mdiAlert' },
+        {
+          rules: { type: 'contains', params: 'Verified' },
+          color: 'success',
+          icon: '$mdiInformation',
+        },
+      ],
+    },
+    {
+      name: 'actions',
+      title: '',
+      actions: [
+        {
+          name: 'details',
+          key: 'uuid',
+          format: { icon: '$mdiMagnify', to: '/admin/users/{{value}}' },
+        },
+      ],
+    },
   ],
   maxLength: 24,
 })
