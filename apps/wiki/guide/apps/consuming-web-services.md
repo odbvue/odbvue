@@ -233,7 +233,13 @@ export const useAppStore = defineStore('app', () => {
     const { data } = await api<ContextResponse>('app/context/')
     const dbVersion = data?.version
     const isDev = import.meta.env.DEV ? '-dev' : ''
-    version.value = `v${packageVersion}-${dbVersion}${isDev}`
+    version.value =
+      dbVersion == packageVersion
+        ? `v${packageVersion}${isDev}`
+        : `v${packageVersion}-${dbVersion}${isDev}`
+    user.value = data?.user?.[0] ?? defaultUser
+    consents.value = data?.consents ?? []
+    config.value = data?.config ?? []
   }
 
   return {
