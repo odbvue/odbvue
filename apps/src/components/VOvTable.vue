@@ -107,34 +107,6 @@
                 </td>
               </tr>
 
-              <tr v-if="mobile">
-                <td :colspan="colspan" class="border-none">
-                  <v-row no-gutters>
-                    <v-col cols="8" :class="!mobile ? 'text-center' : ''">
-                      <v-btn
-                        icon="$mdiChevronLeft"
-                        :disabled="!hasPrevPage"
-                        @click="fetch(currentPage - 1)"
-                      />
-                      <v-btn
-                        icon="$mdiChevronRight"
-                        :disabled="!hasNextPage"
-                        @click="fetch(currentPage + 1)"
-                      />
-                    </v-col>
-                    <v-col cols="4" class="text-right">
-                      <v-btn v-if="canRefresh" icon="$mdiRefresh" @click="fetch()" />
-                      <v-btn
-                        v-for="action in actions"
-                        :key="action.name"
-                        v-bind="action.props"
-                        @click="handleTableAction(action.name)"
-                      />
-                    </v-col>
-                  </v-row>
-                </td>
-              </tr>
-
               <tr>
                 <td :colspan="colspan" :class="mobile ? 'border-none' : 'border-b-sm h-0'"></td>
               </tr>
@@ -324,13 +296,17 @@ watch(
 )
 const page = computed(() => localData.value.slice(0, itemsPerPage.value))
 const currentPage = ref(options.currentPage || 1)
-const itemsPerPage = ref(options.itemsPerPage || 10)
+const itemsPerPage = computed(() => options.itemsPerPage || (mobile.value ? 1 : 10))
 const hasNextPage = computed(() => localData.value.length > itemsPerPage.value)
 const hasPrevPage = computed(() => currentPage.value > 1)
 const canRefresh = computed(() => options.canRefresh ?? true)
 const emptyRowsCount = computed(() =>
   page.value.length < itemsPerPage.value ? itemsPerPage.value - page.value.length : 0,
 )
+
+watch(mobile, (newValue, oldValue) => {
+  fetch(1)
+})
 
 const columns = computed(() => {
   return options.columns.map((column) => {

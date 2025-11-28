@@ -58,16 +58,19 @@ import { renderViewItem, OvTextAlign, OvActionFormat } from '.'
 const { defaults } = useDefaults({
   name: 'VOvForm',
   defaults: {
+    VBtn: {
+      size: 'small',
+      variant: 'tonal',
+      class: 'ma-1',
+    },
     VContainer: {
       class: 'position-relative',
     },
     VOverlay: {
       class: 'rounded',
     },
-    VForm: {
-      VBtn: {
-        class: 'ma-1',
-      },
+    VChip: {
+      variant: 'text',
     },
   },
 })
