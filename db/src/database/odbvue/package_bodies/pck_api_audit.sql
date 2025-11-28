@@ -74,7 +74,6 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_audit AS
             v_attributes.put('request_method', v_request_method);
         END IF;
         IF v_request_uri IS NOT NULL THEN
-            v_attributes.put('request_uri', v_request_uri);
             DECLARE
                 v_module VARCHAR2(200 CHAR) := regexp_substr(v_request_uri, '[^/]+', 1, 3);
                 v_method VARCHAR2(200 CHAR) := regexp_substr(v_request_uri, '[^/]+', 1, 4);
@@ -89,7 +88,6 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_audit AS
                 WHEN OTHERS THEN
                     NULL;
             END;
-
         END IF;
 
         IF v_agent IS NOT NULL THEN
@@ -265,4 +263,4 @@ END pck_api_audit;
 /
 
 
--- sqlcl_snapshot {"hash":"5c2ec4cc502cd0bcf7a452507ecef62fa041da90","type":"PACKAGE_BODY","name":"PCK_API_AUDIT","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"c87a204de7b1e8a6d40f64c4673df4069da225d3","type":"PACKAGE_BODY","name":"PCK_API_AUDIT","schemaName":"ODBVUE","sxml":""}
