@@ -430,7 +430,6 @@ const pages = ref([ // [!code --]
 ::: details source
 ```vue
 <template>
-  <h1>Home</h1>
   <v-row>
     <v-col
       cols="12"
@@ -440,6 +439,7 @@ const pages = ref([ // [!code --]
     >
       <v-card
         min-height="8em"
+        hover
         :style="useCardBackground(page.color || '#ffffff').value"
         :prepend-icon="page.icon"
         :title="page.title"
