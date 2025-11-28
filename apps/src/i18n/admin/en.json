@@ -6,5 +6,8 @@
   "username": "Username",
   "module": "Module",
   "accessed": "Accessed",
-  "status_text": "Status_text"
+  "status_text": "Status_text",
+  "period.from": "Period from",
+  "period.to": "Period to",
+  "copy.to.clipboard": "Copy to clipboard"
 }

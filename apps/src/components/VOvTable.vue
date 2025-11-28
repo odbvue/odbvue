@@ -212,6 +212,7 @@
         v-model="dialog"
         closeable
         scrollable
+        copyable
         :title="t(dialogTitle)"
         :content="dialogContent"
       />
@@ -414,7 +415,10 @@ const filterChips = computed(() => {
         .map((value) => ({ ...baseChip, value }))
     }
 
-    return field.value !== undefined ? [{ ...baseChip, value: field.value }] : []
+    const displayValue =
+      field.type === 'datetime' ? String(field.value).replace('T', ' ') : field.value
+
+    return field.value !== undefined ? [{ ...baseChip, value: displayValue }] : []
   })
 })
 
