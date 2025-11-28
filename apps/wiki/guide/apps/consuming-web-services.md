@@ -234,7 +234,7 @@ export const useAppStore = defineStore('app', () => {
     const dbVersion = data?.version
     const isDev = import.meta.env.DEV ? '-dev' : ''
     version.value =
-      dbVersion == packageVersion
+        dbVersion == `v${packageVersion}`
         ? `v${packageVersion}${isDev}`
         : `v${packageVersion}-${dbVersion}${isDev}`
     user.value = data?.user?.[0] ?? defaultUser
