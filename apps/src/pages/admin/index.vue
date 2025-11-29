@@ -29,5 +29,6 @@ definePage({
 const widgets = ref([
   { name: 'Users', path: '/admin/users', icon: '$mdiAccountGroup', color: 'info' },
   { name: 'Audit Logs', path: '/admin/audit', icon: '$mdiClipboardList', color: 'info' },
+  { name: 'Emails', path: '/admin/emails', icon: '$mdiEmail', color: 'info' }
 ])
 </script>
