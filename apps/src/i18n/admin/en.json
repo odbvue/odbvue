@@ -11,5 +11,9 @@
   "period.to": "Period to",
   "copy.to.clipboard": "Copy to clipboard",
   "session.expired": "Session expired",
-  "audit": "Audit"
+  "audit": "Audit",
+  "to": "To",
+  "subject": "Subject",
+  "error": "Error",
+  "emails": "Emails"
 }

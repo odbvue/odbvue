@@ -3,6 +3,7 @@
     <v-tabs v-model="admin.tab">
       <v-tab value="details">{{ t('details') }}</v-tab>
       <v-tab value="audit">{{ t('audit') }}</v-tab>
+      <v-tab value="emails">{{ t('emails') }}</v-tab>
     </v-tabs>
     <br />
     <v-tabs-window v-model="admin.tab">
@@ -16,6 +17,15 @@
           :t
           :loading="auditLoading"
           @fetch="auditFetch"
+        />
+      </v-tabs-window-item>
+      <v-tabs-window-item value="emails">
+        <v-ov-table
+          :options="emailsOptions"
+          :data="emailsData"
+          :t
+          :loading="emailsLoading"
+          @fetch="emailsFetch"
         />
       </v-tabs-window-item>
     </v-tabs-window>
@@ -156,4 +166,39 @@ const auditOptions = ref<OvTableOptions>({
   ],
   maxLength: 24,
 })
+
+// emails
+type EmailsResponse = {
+  emails: Array<{
+    id: string
+    created: string
+    to: string
+    subject: string
+    status: string
+    error: string
+  }>
+}
+
+const {
+  loading: emailsLoading,
+  data: emailsData,
+  fetch: emailsFetch,
+} = useTableFetch<EmailsResponse>({
+  endpoint: 'adm/emails/',
+  responseKey: 'emails',
+  filter: { uuid: [uuid] },
+})
+
+const emailsOptions = ref<OvTableOptions>({
+  key: 'id',
+  columns: [
+    { name: 'created' },
+    { name: 'to' },
+    { name: 'subject' },
+    { name: 'status' },
+    { name: 'error', maxLength: 0 },
+  ],
+  maxLength: 24,
+})
+
 </script>
