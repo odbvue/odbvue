@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.221
+
+### Patch Changes
+
+- 6340b18: admin emails poc
+
 ## 0.0.220
 
 ### Patch Changes
