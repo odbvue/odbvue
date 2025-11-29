@@ -232,6 +232,9 @@ import {
   OvActionFormat,
 } from './index'
 
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
+
 const { defaults } = useDefaults({
   name: 'VOvForm',
   defaults: {
@@ -262,12 +265,10 @@ const { defaults } = useDefaults({
 const {
   options,
   data = [],
-  t = (text?: string) => text || '',
   loading = false,
 } = defineProps<{
   options: OvTableOptions
   data?: OvTableData[]
-  t?: (text?: string) => string
   loading?: boolean
 }>()
 
@@ -304,7 +305,7 @@ const emptyRowsCount = computed(() =>
   page.value.length < itemsPerPage.value ? itemsPerPage.value - page.value.length : 0,
 )
 
-watch(mobile, (newValue, oldValue) => {
+watch(mobile, () => {
   fetch(1)
 })
 

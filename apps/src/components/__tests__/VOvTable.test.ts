@@ -330,44 +330,6 @@ describe('VOvTable', () => {
     })
   })
 
-  describe('Props - Translation Function', () => {
-    it('accepts translation function prop', () => {
-      const mockT = (text?: string) => `translated_${text}`
-      const wrapper = mount(VOvTable, {
-        props: {
-          options: basicTableOptions,
-          data: basicTableData,
-          t: mockT,
-        },
-      })
-      expect(wrapper.props('t')).toBe(mockT)
-    })
-
-    it('defaults translation function if not provided', () => {
-      const wrapper = mount(VOvTable, {
-        props: {
-          options: basicTableOptions,
-          data: basicTableData,
-        },
-      })
-      const defaultT = wrapper.props('t')
-      expect(typeof defaultT).toBe('function')
-    })
-
-    it('uses translation function for column titles', async () => {
-      const mockT = (text?: string) => `translated_${text}`
-      const wrapper = mount(VOvTable, {
-        props: {
-          options: basicTableOptions,
-          data: basicTableData,
-          t: mockT,
-        },
-      })
-      await flushPromises()
-      expect(wrapper.vm).toBeDefined()
-    })
-  })
-
   describe('Props - Loading', () => {
     it('accepts loading prop as false', () => {
       const wrapper = mount(VOvTable, {

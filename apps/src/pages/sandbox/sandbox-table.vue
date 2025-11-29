@@ -1,5 +1,5 @@
 <template>
-  <v-ov-table :options :data :loading :t @fetch="fetch" @action="action" />
+  <v-ov-table :options :data :loading @fetch="fetch" @action="action" />
   <v-checkbox v-model="loading" label="Loading" class="ma-1" />
 </template>
 
@@ -10,8 +10,6 @@ definePage({
     access: 'when-authenticated',
   },
 })
-
-const { t } = useI18n()
 
 const loading = ref(false)
 const data = ref<OvTableData[]>([])
