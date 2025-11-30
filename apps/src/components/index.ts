@@ -39,6 +39,7 @@ export type OvFormat = {
   href?: string
   target?: string
   hidden?: boolean
+  html?: boolean
 }
 export type OvAction =
   | {
@@ -308,6 +309,7 @@ export const OvFormat = (value: unknown, format?: OvFormat | OvFormat[]) => {
       to: fmt.to,
       href: fmt.href,
       target: fmt.target,
+      html: fmt.html,
     }).filter(([, value]) => value !== undefined),
   )
 }
@@ -363,32 +365,36 @@ export const renderViewItem = (
       }
 
       if (item?.format) {
-        const slots: Record<string, () => unknown> = {
-          default: () => valueDsp,
-        }
+        if (chipProps.html && isTrimmed === false) {
+          children.push(h('div', { innerHTML: valueStr }))
+        } else {
+          const slots: Record<string, () => unknown> = {
+            default: () => valueDsp,
+          }
 
-        if (chipProps.href && typeof chipProps.href === 'string') {
-          chipProps.href = chipProps.href.replace('{{value}}', valueStr)
-        }
+          if (chipProps.href && typeof chipProps.href === 'string') {
+            chipProps.href = chipProps.href.replace('{{value}}', valueStr)
+          }
 
-        if (chipProps.to && typeof chipProps.to === 'string') {
-          chipProps.to = chipProps.to.replace('{{value}}', valueStr)
-        }
+          if (chipProps.to && typeof chipProps.to === 'string') {
+            chipProps.to = chipProps.to.replace('{{value}}', valueStr)
+          }
 
-        if (chipProps.icon) {
-          slots.prepend = () =>
-            h(VIcon, {
-              icon: chipProps.icon as string,
-              start: true,
-            })
-        }
+          if (chipProps.icon) {
+            slots.prepend = () =>
+              h(VIcon, {
+                icon: chipProps.icon as string,
+                start: true,
+              })
+          }
 
-        children.push(h(VChip, chipProps, slots))
+          children.push(h(VChip, chipProps, slots))
+        }
       } else if (valueDsp) {
         children.push(h('span', {}, valueDsp))
       }
 
-      if (isTrimmed) {
+      if (isTrimmed && valueStr) {
         children.push(
           h(VBtn, {
             icon: '$mdiDotsHorizontal',

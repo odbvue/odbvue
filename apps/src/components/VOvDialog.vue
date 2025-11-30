@@ -18,9 +18,10 @@
         <span class="text-pre-wrap text-break" v-if="props.content && !hasContentProps">
           {{ props.content }}
         </span>
-        <v-chip v-if="props.content && hasContentProps" v-bind="contentProps">
+        <v-chip v-if="props.content && hasContentProps && !contentProps.html" v-bind="contentProps">
           {{ props.content }}
         </v-chip>
+        <div v-html="props.content" v-if="props.content && hasContentProps && contentProps.html" />
         <slot
           name="content"
           :onClose="

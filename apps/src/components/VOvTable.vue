@@ -118,7 +118,10 @@
                   <v-ov-view
                     :data="item"
                     :options="{ items: [columnViewOptions.get(column.name)] }"
-                    @details="(name: string, value: string) => showDialog(name, value)"
+                    @details="
+                      (name: string, value: string) =>
+                        showDialog(name, value, columnViewOptions.get(column.name)?.format)
+                    "
                     @action="
                       (name: string, value: string) =>
                         handleRowAction(column.name, name, item[options.key])
@@ -141,7 +144,10 @@
                   <v-ov-view
                     :data="item"
                     :options="{ items: [columnViewOptions.get(column.name)] }"
-                    @details="(name: string, value: string) => showDialog(name, value)"
+                    @details="
+                      (name: string, value: string) =>
+                        showDialog(name, value, columnViewOptions.get(column.name)?.format)
+                    "
                     @action="
                       (name: string, value: string) =>
                         handleRowAction(column.name, name, item[options.key])
@@ -194,6 +200,7 @@
         copyable
         :title="t(dialogTitle)"
         :content="dialogContent"
+        :content-format="dialogContentFormat"
       />
 
       <v-dialog v-model="form" :width="mobile ? '100%' : '75%'">
@@ -229,6 +236,7 @@ import {
   type OvFormOptions,
   type OvFormData,
   type OvFilterValue,
+  type OvFormat,
   OvActionFormat,
 } from './index'
 
@@ -356,10 +364,12 @@ const actions = computed(() => {
 const dialog = ref(false)
 const dialogTitle = ref('')
 const dialogContent = ref('')
+const dialogContentFormat = ref<OvFormat | OvFormat[]>()
 
-function showDialog(title: string, content: string) {
+function showDialog(title: string, content: string, format?: OvFormat | OvFormat[]) {
   dialogTitle.value = title
   dialogContent.value = content
+  dialogContentFormat.value = format
   dialog.value = true
 }
 
