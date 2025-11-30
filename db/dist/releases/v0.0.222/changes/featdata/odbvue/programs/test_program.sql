@@ -7,7 +7,7 @@ BEGIN
         program_name        => '"ODBVUE"."TEST_PROGRAM"',
         program_type        => 'STORED_PROCEDURE',
         program_action      => 'pck_api_audit.info',
-        number_of_arguments => 1,
+        number_of_arguments => 0,
         enabled             => TRUE,
         comments            => NULL
     );
