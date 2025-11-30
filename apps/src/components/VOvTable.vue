@@ -311,10 +311,10 @@ watch(mobile, () => {
 
 const columns = computed(() => {
   return options.columns.map((column) => {
-    const { name, title } = column
+    const { name, label } = column
     return {
       name,
-      title: t(title || name),
+      title: t(label || name),
       align: column.align || options.align ? `text-${column.align || options.align}` : '',
       class: [
         column.align || options.align ? `text-${column.align || options.align}` : '',
@@ -648,7 +648,7 @@ defineExpose({
 })
 
 onMounted(async () => {
-  fetch()
+  await fetch()
 })
 </script>
 <style scoped>

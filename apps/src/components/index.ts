@@ -157,7 +157,7 @@ export type OvFormOptions = {
 
 export type OvTableColumn = {
   name: string
-  title?: string
+  label?: string
   format?: OvFormat | OvFormat[]
   actions?: OvAction[]
   actionFormat?: OvFormat | OvFormat[]
@@ -429,14 +429,16 @@ export const renderViewItem = (
   }
 }
 
+// Table Fetch Composable
+
 import { useHttp } from '@/composables/http'
 import type { Ref } from 'vue'
 
-// Table Fetch Composable
 export interface UseTableFetchOptions<T> {
   endpoint: string
   responseKey: keyof T
   filter?: OvFilterValue
+  search?: string
 }
 
 export interface UseTableFetchReturn {
@@ -469,16 +471,14 @@ export function useTableFetch<T extends Record<string, unknown>>(
   ) => {
     loading.value = true
     try {
-      const filterValue = options.filter || filter
+      const searchValue = options.search || search
+      const filterValue = { ...filter, ...options.filter }
       const { data: response } = await http.get<T>(options.endpoint, {
         params: {
           offset,
           limit,
-          search,
-          filter:
-            Object.keys(filterValue).length > 0
-              ? encodeURIComponent(JSON.stringify(filterValue))
-              : undefined,
+          search: searchValue ? encodeURIComponent(searchValue) : '',
+          filter: encodeURIComponent(JSON.stringify(filterValue)),
           sort,
         },
       })
