@@ -39,6 +39,7 @@ export type OvFormat = {
   href?: string
   target?: string
   hidden?: boolean
+  html?: boolean
 }
 export type OvAction =
   | {
@@ -157,7 +158,7 @@ export type OvFormOptions = {
 
 export type OvTableColumn = {
   name: string
-  title?: string
+  label?: string
   format?: OvFormat | OvFormat[]
   actions?: OvAction[]
   actionFormat?: OvFormat | OvFormat[]
@@ -191,6 +192,7 @@ export type OvTableOptions = {
   canRefresh?: boolean
   maxLength?: number
   align?: OvAlign
+  alwaysMobile?: boolean
 }
 
 export type OvViewItem = {
@@ -308,6 +310,7 @@ export const OvFormat = (value: unknown, format?: OvFormat | OvFormat[]) => {
       to: fmt.to,
       href: fmt.href,
       target: fmt.target,
+      html: fmt.html,
     }).filter(([, value]) => value !== undefined),
   )
 }
@@ -362,7 +365,9 @@ export const renderViewItem = (
         children.push(h('br'))
       }
 
-      if (item?.format) {
+      if (chipProps.html && isTrimmed === false) {
+        children.push(h('div', { innerHTML: valueStr }))
+      } else {
         const slots: Record<string, () => unknown> = {
           default: () => valueDsp,
         }
@@ -384,15 +389,14 @@ export const renderViewItem = (
         }
 
         children.push(h(VChip, chipProps, slots))
-      } else if (valueDsp) {
-        children.push(h('span', {}, valueDsp))
       }
 
-      if (isTrimmed) {
+      if (isTrimmed && valueStr) {
         children.push(
           h(VBtn, {
             icon: '$mdiDotsHorizontal',
             variant: 'text',
+            size: 'x-small',
             onClick: () => {
               onEmit?.('details', item?.label ?? item?.name ?? '', valueStr)
             },
@@ -429,14 +433,16 @@ export const renderViewItem = (
   }
 }
 
+// Table Fetch Composable
+
 import { useHttp } from '@/composables/http'
 import type { Ref } from 'vue'
 
-// Table Fetch Composable
 export interface UseTableFetchOptions<T> {
   endpoint: string
   responseKey: keyof T
   filter?: OvFilterValue
+  search?: string
 }
 
 export interface UseTableFetchReturn {
@@ -469,16 +475,14 @@ export function useTableFetch<T extends Record<string, unknown>>(
   ) => {
     loading.value = true
     try {
-      const filterValue = options.filter || filter
+      const searchValue = options.search || search
+      const filterValue = { ...filter, ...options.filter }
       const { data: response } = await http.get<T>(options.endpoint, {
         params: {
           offset,
           limit,
-          search,
-          filter:
-            Object.keys(filterValue).length > 0
-              ? encodeURIComponent(JSON.stringify(filterValue))
-              : undefined,
+          search: searchValue ? encodeURIComponent(searchValue) : '',
+          filter: encodeURIComponent(JSON.stringify(filterValue)),
           sort,
         },
       })

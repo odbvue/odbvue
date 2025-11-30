@@ -34,9 +34,9 @@ describe('VOvTable', () => {
   const basicTableOptions: OvTableOptions = {
     key: 'id',
     columns: [
-      { name: 'id', title: 'ID' },
-      { name: 'name', title: 'Name' },
-      { name: 'email', title: 'Email' },
+      { name: 'id', label: 'ID' },
+      { name: 'name', label: 'Name' },
+      { name: 'email', label: 'Email' },
     ],
   }
 
@@ -216,11 +216,11 @@ describe('VOvTable', () => {
       const optionsWithActions: OvTableOptions = {
         ...basicTableOptions,
         columns: [
-          { name: 'id', title: 'ID' },
-          { name: 'name', title: 'Name' },
+          { name: 'id', label: 'ID' },
+          { name: 'name', label: 'Name' },
           {
             name: 'actions',
-            title: 'Actions',
+            label: 'Actions',
             actions: ['edit', 'delete'],
           },
         ],
@@ -330,44 +330,6 @@ describe('VOvTable', () => {
     })
   })
 
-  describe('Props - Translation Function', () => {
-    it('accepts translation function prop', () => {
-      const mockT = (text?: string) => `translated_${text}`
-      const wrapper = mount(VOvTable, {
-        props: {
-          options: basicTableOptions,
-          data: basicTableData,
-          t: mockT,
-        },
-      })
-      expect(wrapper.props('t')).toBe(mockT)
-    })
-
-    it('defaults translation function if not provided', () => {
-      const wrapper = mount(VOvTable, {
-        props: {
-          options: basicTableOptions,
-          data: basicTableData,
-        },
-      })
-      const defaultT = wrapper.props('t')
-      expect(typeof defaultT).toBe('function')
-    })
-
-    it('uses translation function for column titles', async () => {
-      const mockT = (text?: string) => `translated_${text}`
-      const wrapper = mount(VOvTable, {
-        props: {
-          options: basicTableOptions,
-          data: basicTableData,
-          t: mockT,
-        },
-      })
-      await flushPromises()
-      expect(wrapper.vm).toBeDefined()
-    })
-  })
-
   describe('Props - Loading', () => {
     it('accepts loading prop as false', () => {
       const wrapper = mount(VOvTable, {
@@ -429,9 +391,9 @@ describe('VOvTable', () => {
       const optionsWithAlign: OvTableOptions = {
         ...basicTableOptions,
         columns: [
-          { name: 'id', title: 'ID', align: 'center' },
-          { name: 'name', title: 'Name', align: 'left' },
-          { name: 'email', title: 'Email', align: 'right' },
+          { name: 'id', label: 'ID', align: 'center' },
+          { name: 'name', label: 'Name', align: 'left' },
+          { name: 'email', label: 'Email', align: 'right' },
         ],
       }
       const wrapper = mount(VOvTable, {
@@ -448,11 +410,11 @@ describe('VOvTable', () => {
       const optionsWithFormat: OvTableOptions = {
         ...basicTableOptions,
         columns: [
-          { name: 'id', title: 'ID' },
-          { name: 'name', title: 'Name' },
+          { name: 'id', label: 'ID' },
+          { name: 'name', label: 'Name' },
           {
             name: 'email',
-            title: 'Email',
+            label: 'Email',
             format: { icon: '$mdiEmail', color: 'primary' },
           },
         ],
@@ -471,9 +433,9 @@ describe('VOvTable', () => {
       const optionsWithMaxLength: OvTableOptions = {
         ...basicTableOptions,
         columns: [
-          { name: 'id', title: 'ID' },
-          { name: 'name', title: 'Name', maxLength: 5 },
-          { name: 'email', title: 'Email' },
+          { name: 'id', label: 'ID' },
+          { name: 'name', label: 'Name', maxLength: 5 },
+          { name: 'email', label: 'Email' },
         ],
       }
       const wrapper = mount(VOvTable, {
@@ -527,11 +489,11 @@ describe('VOvTable', () => {
       const optionsWithColumnActions: OvTableOptions = {
         ...basicTableOptions,
         columns: [
-          { name: 'id', title: 'ID' },
-          { name: 'name', title: 'Name' },
+          { name: 'id', label: 'ID' },
+          { name: 'name', label: 'Name' },
           {
             name: 'actions',
-            title: 'Actions',
+            label: 'Actions',
             actions: ['edit', 'delete'],
           },
         ],
@@ -825,10 +787,10 @@ describe('VOvTable', () => {
       const optionsWithForm: OvTableOptions = {
         ...basicTableOptions,
         columns: [
-          { name: 'id', title: 'ID' },
+          { name: 'id', label: 'ID' },
           {
             name: 'name',
-            title: 'Name',
+            label: 'Name',
             actions: [
               {
                 name: 'edit',
@@ -1151,12 +1113,12 @@ describe('VOvTable', () => {
       const fullFeaturedOptions: OvTableOptions = {
         key: 'id',
         columns: [
-          { name: 'id', title: 'ID', align: 'center' },
-          { name: 'name', title: 'Name' },
-          { name: 'email', title: 'Email', format: { icon: '$mdiEmail' } },
+          { name: 'id', label: 'ID', align: 'center' },
+          { name: 'name', label: 'Name' },
+          { name: 'email', label: 'Email', format: { icon: '$mdiEmail' } },
           {
             name: 'actions',
-            title: 'Actions',
+            label: 'Actions',
             actions: ['edit', 'delete'],
           },
         ],
@@ -1188,16 +1150,16 @@ describe('VOvTable', () => {
       const multiFormatOptions: OvTableOptions = {
         key: 'id',
         columns: [
-          { name: 'id', title: 'ID' },
+          { name: 'id', label: 'ID' },
           {
             name: 'status',
-            title: 'Status',
+            label: 'Status',
             format: [
               { color: 'green', text: 'Active', rules: { type: 'equals', params: 'active' } },
               { color: 'red', text: 'Inactive', rules: { type: 'equals', params: 'inactive' } },
             ],
           },
-          { name: 'email', title: 'Email' },
+          { name: 'email', label: 'Email' },
         ],
       }
       const wrapper = mount(VOvTable, {
@@ -1278,10 +1240,10 @@ describe('VOvTable', () => {
       const newOptions: OvTableOptions = {
         key: 'id',
         columns: [
-          { name: 'id', title: 'ID' },
-          { name: 'name', title: 'Name' },
-          { name: 'email', title: 'Email' },
-          { name: 'phone', title: 'Phone' },
+          { name: 'id', label: 'ID' },
+          { name: 'name', label: 'Name' },
+          { name: 'email', label: 'Email' },
+          { name: 'phone', label: 'Phone' },
         ],
       }
       await wrapper.setProps({ options: newOptions })

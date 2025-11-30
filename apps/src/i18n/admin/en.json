@@ -15,5 +15,16 @@
   "to": "To",
   "subject": "Subject",
   "error": "Error",
-  "emails": "Emails"
+  "emails": "Emails",
+  "full.name": "Full name",
+  "content": "Content",
+  "schedule": "Schedule",
+  "started": "Started",
+  "duration": "Duration",
+  "comments": "Comments",
+  "enabled": "Enabled",
+  "output": "Output",
+  "job.name": "Job name",
+  "admin.job.action.success": "Admin job action success",
+  "admin.job.action.failed": "Admin job action failed"
 }

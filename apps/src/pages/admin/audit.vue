@@ -1,5 +1,5 @@
 <template>
-  <v-ov-table :options :data :t :loading @fetch="fetchAudit"></v-ov-table>
+  <v-ov-table :options :data :loading @fetch="fetchAudit"></v-ov-table>
 </template>
 
 <script setup lang="ts">
@@ -11,24 +11,11 @@ definePage({
   },
 })
 
-const { t } = useI18n()
-
-type AuditResponse = {
-  audit: Array<{
-    id: string
-    created: string
-    severity: string
-    module: string
-    message: string
-    attributes: string
-  }>
-}
-
 const {
   loading,
   data,
   fetch: fetchAudit,
-} = useTableFetch<AuditResponse>({
+} = useTableFetch({
   endpoint: 'adm/audit/',
   responseKey: 'audit',
 })

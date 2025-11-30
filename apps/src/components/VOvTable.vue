@@ -3,9 +3,9 @@
     <v-container>
       <v-row>
         <v-col>
-          <v-table class="border-none">
+          <v-table>
             <thead>
-              <tr v-if="!mobile">
+              <tr v-if="!mobile && !options.alwaysMobile">
                 <th v-for="column in columns" :key="column.name" :class="column.class">
                   {{ column.title }}
                 </th>
@@ -112,16 +112,25 @@
               </tr>
             </thead>
 
-            <tbody v-if="!mobile">
+            <tbody v-if="!mobile && !options.alwaysMobile">
               <tr v-for="item in page" :key="String(item[options.key])">
                 <td v-for="column in columns" :key="column.name" :class="column.class">
-                  <v-ov-view
-                    :data="item"
-                    :options="{ items: [columnViewOptions.get(column.name)] }"
-                    @details="(name: string, value: string) => showDialog(name, value)"
-                    @action="
-                      (name: string, value: string) =>
-                        handleRowAction(column.name, name, item[options.key])
+                  <component
+                    :is="
+                      renderViewItem(
+                        item[column.name],
+                        columnViewOptions.get(column.name),
+                        item,
+                        {
+                          maxLength: options.maxLength,
+                          actionFormat: options.actionFormat,
+                        } as OvViewOptions,
+                        (eventName: string, ...args: unknown[]) => {
+                          eventName === 'details'
+                            ? showDialog(args[0] as string, args[1] as string)
+                            : handleRowAction(column.name, args[0] as string, item[options.key])
+                        },
+                      )
                     "
                   />
                 </td>
@@ -136,15 +145,23 @@
 
             <tbody v-else v-for="item in page" :key="String(item[options.key])">
               <tr v-for="column in columns" :key="column.name">
-                <th class="w-0">{{ column.title }}</th>
-                <td :class="column.class">
-                  <v-ov-view
-                    :data="item"
-                    :options="{ items: [columnViewOptions.get(column.name)] }"
-                    @details="(name: string, value: string) => showDialog(name, value)"
-                    @action="
-                      (name: string, value: string) =>
-                        handleRowAction(column.name, name, item[options.key])
+                <td :colspan="colspan" :class="column.class">
+                  <component
+                    :is="
+                      renderViewItem(
+                        item[column.name],
+                        columnViewOptions.get(column.name),
+                        item,
+                        {
+                          maxLength: options.maxLength,
+                          actionFormat: options.actionFormat,
+                        } as OvViewOptions,
+                        (eventName: string, ...args: unknown[]) => {
+                          eventName === 'details'
+                            ? showDialog(args[0] as string, args[1] as string)
+                            : handleRowAction(column.name, args[0] as string, item[options.key])
+                        },
+                      )
                     "
                   />
                 </td>
@@ -158,13 +175,15 @@
               <tr>
                 <td :colspan="colspan" class="border-none">
                   <v-row no-gutters>
-                    <v-col cols="8" :class="!mobile ? 'text-center' : ''">
+                    <v-col cols="8">
                       <v-btn
+                        v-if="hasPrevPage || hasNextPage"
                         icon="$mdiChevronLeft"
                         :disabled="!hasPrevPage"
                         @click="fetch(currentPage - 1)"
                       />
                       <v-btn
+                        v-if="hasPrevPage || hasNextPage"
                         icon="$mdiChevronRight"
                         :disabled="!hasNextPage"
                         @click="fetch(currentPage + 1)"
@@ -194,13 +213,14 @@
         copyable
         :title="t(dialogTitle)"
         :content="dialogContent"
+        :content-format="dialogContentFormat"
       />
 
       <v-dialog v-model="form" :width="mobile ? '100%' : '75%'">
         <v-card>
           <v-card-title>{{ formTitle }}</v-card-title>
           <v-card-text>
-            <v-Ov-form
+            <v-ov-form
               :options="formOptions"
               :data="formData"
               :t
@@ -229,8 +249,14 @@ import {
   type OvFormOptions,
   type OvFormData,
   type OvFilterValue,
+  type OvFormat,
+  type OvViewOptions,
   OvActionFormat,
+  renderViewItem,
 } from './index'
+
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 
 const { defaults } = useDefaults({
   name: 'VOvForm',
@@ -243,9 +269,11 @@ const { defaults } = useDefaults({
     },
     VTable: {
       hover: true,
-      class: 'border rounded',
       VTextField: {
         density: 'compact',
+      },
+      VLabel: {
+        class: 'pb-1 mt-2 text-body-2',
       },
       VChip: {
         variant: 'text',
@@ -262,12 +290,10 @@ const { defaults } = useDefaults({
 const {
   options,
   data = [],
-  t = (text?: string) => text || '',
   loading = false,
 } = defineProps<{
   options: OvTableOptions
   data?: OvTableData[]
-  t?: (text?: string) => string
   loading?: boolean
 }>()
 
@@ -304,16 +330,16 @@ const emptyRowsCount = computed(() =>
   page.value.length < itemsPerPage.value ? itemsPerPage.value - page.value.length : 0,
 )
 
-watch(mobile, (newValue, oldValue) => {
+watch(mobile, () => {
   fetch(1)
 })
 
 const columns = computed(() => {
   return options.columns.map((column) => {
-    const { name, title } = column
+    const { name, label } = column
     return {
       name,
-      title: t(title || name),
+      title: t(label || name),
       align: column.align || options.align ? `text-${column.align || options.align}` : '',
       class: [
         column.align || options.align ? `text-${column.align || options.align}` : '',
@@ -330,6 +356,7 @@ const columnViewOptions = computed(() => {
       column.name,
       {
         name: column.name,
+        label: mobile.value || options.alwaysMobile ? t(column.label || column.name) : undefined,
         format: column.format,
         actions: column.actions,
         actionFormat: column.actionFormat,
@@ -355,10 +382,12 @@ const actions = computed(() => {
 const dialog = ref(false)
 const dialogTitle = ref('')
 const dialogContent = ref('')
+const dialogContentFormat = ref<OvFormat | OvFormat[]>()
 
-function showDialog(title: string, content: string) {
+function showDialog(title: string, content: string, format?: OvFormat | OvFormat[]) {
   dialogTitle.value = title
   dialogContent.value = content
+  dialogContentFormat.value = format
   dialog.value = true
 }
 
@@ -647,7 +676,7 @@ defineExpose({
 })
 
 onMounted(async () => {
-  fetch()
+  await fetch()
 })
 </script>
 <style scoped>

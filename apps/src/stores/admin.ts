@@ -4,6 +4,7 @@ export const useAdminStore = defineStore(
   'admin',
   () => {
     const tab = ref('details')
+
     return {
       tab,
     }

@@ -61,6 +61,7 @@ declare global {
   const toValue: typeof import('vue').toValue
   const triggerRef: typeof import('vue').triggerRef
   const unref: typeof import('vue').unref
+  const useAdminStore: typeof import('./src/stores/admin').useAdminStore
   const useAppStore: typeof import('./src/stores/index').useAppStore
   const useAttrs: typeof import('vue').useAttrs
   const useAuditStore: typeof import('./src/stores/app/audit').useAuditStore

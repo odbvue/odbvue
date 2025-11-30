@@ -29,6 +29,7 @@ definePage({
 const widgets = ref([
   { name: 'Users', path: '/admin/users', icon: '$mdiAccountGroup', color: 'info' },
   { name: 'Audit Logs', path: '/admin/audit', icon: '$mdiClipboardList', color: 'info' },
-  { name: 'Emails', path: '/admin/emails', icon: '$mdiEmail', color: 'info' }
+  { name: 'Emails', path: '/admin/emails', icon: '$mdiEmail', color: 'info' },
+  { name: 'Job Scheduler', path: '/admin/jobs', icon: '$mdiCalendarClock', color: 'info' },
 ])
 </script>
