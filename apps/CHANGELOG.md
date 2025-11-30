@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.222
+
+### Patch Changes
+
+- aa5f70e: admin jobs
+
 ## 0.0.221
 
 ### Patch Changes
