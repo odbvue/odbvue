@@ -8,22 +8,25 @@
     <br />
     <v-tabs-window v-model="admin.tab">
       <v-tabs-window-item value="details">
-        <v-ov-view :data="userData" :options="userOptions"></v-ov-view>
+        <v-ov-table
+          :data="detailsData"
+          :options="detailsOptions"
+          :loading="detailsLoading"
+          @fetch="detailsFetch"
+        />
       </v-tabs-window-item>
       <v-tabs-window-item value="audit">
         <v-ov-table
-          :options="auditOptions"
           :data="auditData"
-          :t
+          :options="auditOptions"
           :loading="auditLoading"
           @fetch="auditFetch"
         />
       </v-tabs-window-item>
       <v-tabs-window-item value="emails">
         <v-ov-table
-          :options="emailsOptions"
           :data="emailsData"
-          :t
+          :options="emailsOptions"
           :loading="emailsLoading"
           @fetch="emailsFetch"
         />
@@ -33,8 +36,6 @@
 </template>
 
 <script setup lang="ts">
-import { useAdminStore } from '../admin'
-
 definePage({
   meta: {
     title: 'Details',
@@ -44,8 +45,9 @@ definePage({
   },
 })
 
-const http = useHttp()
 const { t } = useI18n()
+
+const admin = useAdminStore()
 
 const route = useRoute()
 const uuid =
@@ -55,40 +57,21 @@ const uuid =
       : route.params.uuid
     : ''
 
-const admin = useAdminStore()
+// details
 
-// user
-
-type UserResponse = {
-  users: Array<{
-    id: string
-    username: string
-    fullname: string
-    created: string
-    accessed: string
-    status_text: string
-  }>
-}
-
-const userData = ref<{
-  id: string
-  username: string
-  fullname: string
-  created: string
-  accessed: string
-  status_text: string
-}>({
-  id: '',
-  username: '',
-  fullname: '',
-  created: '',
-  accessed: '',
-  status_text: '',
+const {
+  data: detailsData,
+  loading: detailsLoading,
+  fetch: detailsFetch,
+} = useTableFetch({
+  endpoint: 'adm/users/',
+  responseKey: 'users',
+  search: uuid,
 })
 
-const userOptions = ref<OvViewOptions>({
-  cols: 2,
-  items: [
+const detailsOptions = <OvTableOptions>{
+  key: 'uuid',
+  columns: [
     { name: 'username', label: 'username' },
     { name: 'fullname', label: 'full.name' },
     { name: 'created', label: 'created' },
@@ -112,36 +95,17 @@ const userOptions = ref<OvViewOptions>({
     },
   ],
   maxLength: 24,
-})
-
-onMounted(async () => {
-  const { data } = await http.get<UserResponse>('adm/users/', {
-    params: { offset: 0, limit: 1, search: uuid },
-  })
-
-  if (data?.users[0]) {
-    userData.value = data.users[0]
-  }
-})
+  canRefresh: false,
+  alwaysMobile: true,
+}
 
 // audit
 
-type AuditResponse = {
-  audit: Array<{
-    id: string
-    created: string
-    severity: string
-    module: string
-    message: string
-    attributes: string
-  }>
-}
-
 const {
-  loading: auditLoading,
   data: auditData,
+  loading: auditLoading,
   fetch: auditFetch,
-} = useTableFetch<AuditResponse>({
+} = useTableFetch({
   endpoint: 'adm/audit/',
   responseKey: 'audit',
   filter: { uuid: [uuid] },
@@ -164,26 +128,46 @@ const auditOptions = ref<OvTableOptions>({
     { name: 'message' },
     { name: 'attributes', maxLength: 0 },
   ],
+  filter: {
+    fields: [
+      {
+        type: 'select',
+        name: 'severity',
+        label: 'severity',
+        items: ['FATAL', 'ERROR', 'WARN', 'INFO', 'DEBUG'],
+        multiple: true,
+      },
+      {
+        type: 'text',
+        name: 'module',
+        label: 'module',
+      },
+      {
+        type: 'datetime',
+        name: 'period_from',
+        label: 'period.from',
+      },
+      {
+        type: 'datetime',
+        name: 'period_to',
+        label: 'period.to',
+      },
+    ],
+    actions: [{ name: 'apply' }, { name: 'cancel', format: { variant: 'outlined' } }],
+    actionSubmit: 'apply',
+    actionCancel: 'cancel',
+    cols: 2,
+  },
   maxLength: 24,
 })
 
 // emails
-type EmailsResponse = {
-  emails: Array<{
-    id: string
-    created: string
-    to: string
-    subject: string
-    status: string
-    error: string
-  }>
-}
 
 const {
   loading: emailsLoading,
   data: emailsData,
   fetch: emailsFetch,
-} = useTableFetch<EmailsResponse>({
+} = useTableFetch({
   endpoint: 'adm/emails/',
   responseKey: 'emails',
   filter: { uuid: [uuid] },
@@ -195,10 +179,17 @@ const emailsOptions = ref<OvTableOptions>({
     { name: 'created' },
     { name: 'to' },
     { name: 'subject' },
-    { name: 'status' },
+    { name: 'content', maxLength: 0, format: { html: true } },
+    {
+      name: 'status',
+      format: [
+        { rules: { type: 'contains', params: 'ERROR' }, color: 'error', icon: '$mdiAlertCircle' },
+        { rules: { type: 'contains', params: 'SENT' }, color: 'success', icon: '$mdiCheck' },
+        { rules: { type: 'contains', params: 'PENDING' }, color: 'info', icon: '$mdiInformation' },
+      ],
+    },
     { name: 'error', maxLength: 0 },
   ],
-  maxLength: 24,
+  maxLength: 30,
 })
-
 </script>

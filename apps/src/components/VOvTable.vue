@@ -3,9 +3,9 @@
     <v-container>
       <v-row>
         <v-col>
-          <v-table class="border-none">
+          <v-table>
             <thead>
-              <tr v-if="!mobile">
+              <tr v-if="!mobile && !options.alwaysMobile">
                 <th v-for="column in columns" :key="column.name" :class="column.class">
                   {{ column.title }}
                 </th>
@@ -112,19 +112,25 @@
               </tr>
             </thead>
 
-            <tbody v-if="!mobile">
+            <tbody v-if="!mobile && !options.alwaysMobile">
               <tr v-for="item in page" :key="String(item[options.key])">
                 <td v-for="column in columns" :key="column.name" :class="column.class">
-                  <v-ov-view
-                    :data="item"
-                    :options="{ items: [columnViewOptions.get(column.name)] }"
-                    @details="
-                      (name: string, value: string) =>
-                        showDialog(name, value, columnViewOptions.get(column.name)?.format)
-                    "
-                    @action="
-                      (name: string, value: string) =>
-                        handleRowAction(column.name, name, item[options.key])
+                  <component
+                    :is="
+                      renderViewItem(
+                        item[column.name],
+                        columnViewOptions.get(column.name),
+                        item,
+                        {
+                          maxLength: options.maxLength,
+                          actionFormat: options.actionFormat,
+                        } as OvViewOptions,
+                        (eventName: string, ...args: unknown[]) => {
+                          eventName === 'details'
+                            ? showDialog(args[0] as string, args[1] as string)
+                            : handleRowAction(column.name, args[0] as string, item[options.key])
+                        },
+                      )
                     "
                   />
                 </td>
@@ -139,18 +145,23 @@
 
             <tbody v-else v-for="item in page" :key="String(item[options.key])">
               <tr v-for="column in columns" :key="column.name">
-                <th class="w-0">{{ column.title }}</th>
-                <td :class="column.class">
-                  <v-ov-view
-                    :data="item"
-                    :options="{ items: [columnViewOptions.get(column.name)] }"
-                    @details="
-                      (name: string, value: string) =>
-                        showDialog(name, value, columnViewOptions.get(column.name)?.format)
-                    "
-                    @action="
-                      (name: string, value: string) =>
-                        handleRowAction(column.name, name, item[options.key])
+                <td :colspan="colspan" :class="column.class">
+                  <component
+                    :is="
+                      renderViewItem(
+                        item[column.name],
+                        columnViewOptions.get(column.name),
+                        item,
+                        {
+                          maxLength: options.maxLength,
+                          actionFormat: options.actionFormat,
+                        } as OvViewOptions,
+                        (eventName: string, ...args: unknown[]) => {
+                          eventName === 'details'
+                            ? showDialog(args[0] as string, args[1] as string)
+                            : handleRowAction(column.name, args[0] as string, item[options.key])
+                        },
+                      )
                     "
                   />
                 </td>
@@ -164,13 +175,15 @@
               <tr>
                 <td :colspan="colspan" class="border-none">
                   <v-row no-gutters>
-                    <v-col cols="8" :class="!mobile ? 'text-center' : ''">
+                    <v-col cols="8">
                       <v-btn
+                        v-if="hasPrevPage || hasNextPage"
                         icon="$mdiChevronLeft"
                         :disabled="!hasPrevPage"
                         @click="fetch(currentPage - 1)"
                       />
                       <v-btn
+                        v-if="hasPrevPage || hasNextPage"
                         icon="$mdiChevronRight"
                         :disabled="!hasNextPage"
                         @click="fetch(currentPage + 1)"
@@ -207,7 +220,7 @@
         <v-card>
           <v-card-title>{{ formTitle }}</v-card-title>
           <v-card-text>
-            <v-Ov-form
+            <v-ov-form
               :options="formOptions"
               :data="formData"
               :t
@@ -237,7 +250,9 @@ import {
   type OvFormData,
   type OvFilterValue,
   type OvFormat,
+  type OvViewOptions,
   OvActionFormat,
+  renderViewItem,
 } from './index'
 
 import { useI18n } from 'vue-i18n'
@@ -254,9 +269,11 @@ const { defaults } = useDefaults({
     },
     VTable: {
       hover: true,
-      class: 'border rounded',
       VTextField: {
         density: 'compact',
+      },
+      VLabel: {
+        class: 'pb-1 mt-2 text-body-2',
       },
       VChip: {
         variant: 'text',
@@ -339,6 +356,7 @@ const columnViewOptions = computed(() => {
       column.name,
       {
         name: column.name,
+        label: mobile.value || options.alwaysMobile ? t(column.label || column.name) : undefined,
         format: column.format,
         actions: column.actions,
         actionFormat: column.actionFormat,

@@ -1,5 +1,5 @@
 <template>
-  <v-ov-table :options :data :t :loading @fetch="fetchUsers"></v-ov-table>
+  <v-ov-table :options="options" :data="data" :loading="loading" @fetch="fetch"></v-ov-table>
 </template>
 
 <script setup lang="ts">
@@ -11,29 +11,16 @@ definePage({
   },
 })
 
-const { t } = useI18n()
-
-type UserResponse = {
-  users: Array<{
-    id: string
-    username: string
-    fullname: string
-    created: string
-    accessed: string
-    status_text: string
-  }>
-}
-
 const {
-  loading,
-  data,
-  fetch: fetchUsers,
-} = useTableFetch<UserResponse>({
+  loading: loading,
+  data: data,
+  fetch: fetch,
+} = useTableFetch({
   endpoint: 'adm/users/',
   responseKey: 'users',
 })
 
-const options = ref<OvTableOptions>({
+const options = <OvTableOptions>{
   key: 'uuid',
   search: {
     placeholder: 'username',
@@ -73,5 +60,5 @@ const options = ref<OvTableOptions>({
     },
   ],
   maxLength: 24,
-})
+}
 </script>

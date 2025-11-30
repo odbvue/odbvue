@@ -192,6 +192,7 @@ export type OvTableOptions = {
   canRefresh?: boolean
   maxLength?: number
   align?: OvAlign
+  alwaysMobile?: boolean
 }
 
 export type OvViewItem = {
@@ -364,34 +365,30 @@ export const renderViewItem = (
         children.push(h('br'))
       }
 
-      if (item?.format) {
-        if (chipProps.html && isTrimmed === false) {
-          children.push(h('div', { innerHTML: valueStr }))
-        } else {
-          const slots: Record<string, () => unknown> = {
-            default: () => valueDsp,
-          }
-
-          if (chipProps.href && typeof chipProps.href === 'string') {
-            chipProps.href = chipProps.href.replace('{{value}}', valueStr)
-          }
-
-          if (chipProps.to && typeof chipProps.to === 'string') {
-            chipProps.to = chipProps.to.replace('{{value}}', valueStr)
-          }
-
-          if (chipProps.icon) {
-            slots.prepend = () =>
-              h(VIcon, {
-                icon: chipProps.icon as string,
-                start: true,
-              })
-          }
-
-          children.push(h(VChip, chipProps, slots))
+      if (chipProps.html && isTrimmed === false) {
+        children.push(h('div', { innerHTML: valueStr }))
+      } else {
+        const slots: Record<string, () => unknown> = {
+          default: () => valueDsp,
         }
-      } else if (valueDsp) {
-        children.push(h('span', {}, valueDsp))
+
+        if (chipProps.href && typeof chipProps.href === 'string') {
+          chipProps.href = chipProps.href.replace('{{value}}', valueStr)
+        }
+
+        if (chipProps.to && typeof chipProps.to === 'string') {
+          chipProps.to = chipProps.to.replace('{{value}}', valueStr)
+        }
+
+        if (chipProps.icon) {
+          slots.prepend = () =>
+            h(VIcon, {
+              icon: chipProps.icon as string,
+              start: true,
+            })
+        }
+
+        children.push(h(VChip, chipProps, slots))
       }
 
       if (isTrimmed && valueStr) {
@@ -399,6 +396,7 @@ export const renderViewItem = (
           h(VBtn, {
             icon: '$mdiDotsHorizontal',
             variant: 'text',
+            size: 'x-small',
             onClick: () => {
               onEmit?.('details', item?.label ?? item?.name ?? '', valueStr)
             },

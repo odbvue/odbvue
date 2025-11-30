@@ -1,20 +1,7 @@
 <template>
   <v-defaults-provider :defaults>
-    <span v-if="options.items?.length === 1 && options.items?.[0]">
-      <component
-        :is="
-          renderViewItem(
-            data[options.items[0].name],
-            options.items[0],
-            data,
-            options,
-            emit as (event: string, ...args: unknown[]) => void,
-          )
-        "
-      />
-    </span>
-    <v-container v-else fluid>
-      <v-row>
+    <v-container>
+      <v-row no-gutters>
         <v-col
           v-for="item in options.items"
           :key="item.name"
@@ -62,6 +49,9 @@ const { defaults } = useDefaults({
       size: 'small',
       variant: 'tonal',
       class: 'ma-1',
+    },
+    VLabel: {
+      class: 'pb-1 mt-2',
     },
     VContainer: {
       class: 'position-relative',

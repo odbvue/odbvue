@@ -131,6 +131,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_adm AS
         p_offset PLS_INTEGER DEFAULT 0,
         r_users  OUT SYS_REFCURSOR
     ) AS
+        v_search VARCHAR2(2000 CHAR) := utl_url.unescape(coalesce(p_search, ''));
     BEGIN
         IF pck_api_auth.role(NULL, 'ADMIN') IS NULL THEN
             pck_api_auth.http_401;
@@ -159,12 +160,12 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_adm AS
                         WHERE
                                 1 = 1
             -- Search by username
-                            AND ( p_search IS NULL
-                                  OR u.username LIKE upper(p_search)
+                            AND ( v_search IS NULL
+                                  OR u.username LIKE upper(v_search)
                                                      || '%' )
             -- Search by UUID
-                            OR ( p_search IS NULL
-                                 OR u.uuid = p_search )
+                            OR ( v_search IS NULL
+                                 OR u.uuid = v_search )
                         ORDER BY
                             u.username ASC
                         OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY;
@@ -189,15 +190,26 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_adm AS
                                               to_char(e.created, 'YYYY-MM-DD HH24:MI') AS "created",
                                               (
                                                   SELECT
-                                                      JSON_ARRAYAGG(addr_addr)
+                                                      LISTAGG(addr_addr, ', ') WITHIN GROUP(
+                                                      ORDER BY
+                                                          addr_addr
+                                                      )
                                                   FROM
                                                       app_emails_addr a
                                                   WHERE
                                                           a.id_email = e.id
                                                       AND a.addr_type = 'To'
-                                              )                                        AS "{}to",
+                                              )                                        AS "to",
                                               e.subject                                AS "subject",
-                                              e.status                                 AS "status",
+                                              e.content                                AS "content",
+                                              CASE e.status
+                                                  WHEN 'E' THEN
+                                                      'ERROR'
+                                                  WHEN 'S' THEN
+                                                      'SENT'
+                                                  ELSE
+                                                      'PENDING'
+                                              END                                      AS "status",
                                               e.error                                  AS "error"
                                           FROM
                                               app_emails e
@@ -258,4 +270,4 @@ END pck_adm;
 /
 
 
--- sqlcl_snapshot {"hash":"235c40a6791ea22fc5bf6e555a5ae4cb23fd92fb","type":"PACKAGE_BODY","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"7484900fce4296cd8c05af5c8db73ffbccdab4af","type":"PACKAGE_BODY","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}

@@ -15,5 +15,10 @@
   "to": "To",
   "subject": "Subject",
   "error": "Error",
-  "emails": "Emails"
+  "emails": "Emails",
+  "full.name": "Full name",
+  "content": "Content",
+  "Attributes": "Attributes",
+  "Content": "Content",
+  "Username": "Username"
 }
