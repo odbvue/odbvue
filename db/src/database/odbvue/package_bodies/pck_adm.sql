@@ -176,7 +176,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_adm AS
         p_filter VARCHAR2 DEFAULT NULL,
         p_limit  PLS_INTEGER DEFAULT 10,
         p_offset PLS_INTEGER DEFAULT 0,
-        r_emails OUT SYS_REFCURSOR -- ref cursor for email records [{id, created, to_address, subject, status, message_id}]
+        r_emails OUT SYS_REFCURSOR
     ) AS
         v_filter VARCHAR2(2000 CHAR) := utl_url.unescape(coalesce(p_filter, '{}'));
     BEGIN
@@ -266,8 +266,160 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_adm AS
 
     END get_emails;
 
+    PROCEDURE get_jobs (
+        p_search VARCHAR2 DEFAULT NULL,
+        p_limit  PLS_INTEGER DEFAULT 10,
+        p_offset PLS_INTEGER DEFAULT 0,
+        r_jobs   OUT SYS_REFCURSOR
+    ) AS
+        v_search VARCHAR2(2000 CHAR) := utl_url.unescape(coalesce(p_search, ''));
+    BEGIN
+        IF pck_api_auth.role(NULL, 'ADMIN') IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+
+        OPEN r_jobs FOR SELECT
+                                          j.job_name                                        AS "name",
+                                          (
+                                              SELECT
+                                                  LISTAGG(s.repeat_interval, ', ')
+                                              FROM
+                                                  user_scheduler_schedules s
+                                              WHERE
+                                                  s.schedule_name = j.schedule_name
+                                          )                                                 AS "schedule",
+                                          to_char(last_start_date, 'YYYY-MM-DD HH24:MI:SS') AS "started",
+                                          to_char(last_run_duration)                        AS "duration",
+                                          j.comments                                        AS "comments",
+                                          j.enabled                                         AS "enabled"
+                                      FROM
+                                          user_scheduler_jobs j
+                       WHERE
+                               1 = 1
+            -- Job name filter
+                           AND ( v_search IS NULL
+                                 OR j.job_name LIKE upper(v_search)
+                                                    || '%' )
+                       ORDER BY
+                           j.job_name DESC
+                       OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY;
+
+    END get_jobs;
+
+    PROCEDURE get_jobs_history (
+        p_filter VARCHAR2 DEFAULT NULL,
+        p_offset NUMBER DEFAULT 0,
+        p_limit  NUMBER DEFAULT 10,
+        r_items  OUT SYS_REFCURSOR
+    ) AS
+        v_filter VARCHAR2(2000 CHAR) := utl_url.unescape(coalesce(p_filter, '{}'));
+    BEGIN
+        IF pck_api_auth.role(NULL, 'ADMIN') IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+
+        OPEN r_items FOR SELECT
+                                            job_name                                            AS "name",
+                                            to_char(actual_start_date, 'YYYY-MM-DD HH24:MI:SS') AS "started",
+                                            to_char(run_duration)                               AS "duration",
+                                            status                                              AS "status",
+                                            TRIM(output
+                                                 || ' ' || errors)                                   AS "output"
+                                        FROM
+                                            user_scheduler_job_run_details d
+                        WHERE
+                                1 = 1
+        -- Job name filter
+                            AND ( NOT JSON_EXISTS ( v_filter, '$.name' )
+                                      OR EXISTS (
+                                SELECT
+                                    1
+                                FROM
+                                        JSON_TABLE ( JSON_QUERY(v_filter, '$.name'), '$[*]'
+                                            COLUMNS (
+                                                name VARCHAR2 ( 100 ) PATH '$'
+                                            )
+                                        )
+                                    j
+                                WHERE
+                                    d.job_name = j.name
+                            ) )
+                        ORDER BY
+                            actual_start_date DESC
+                        OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY;
+
+    END;
+
+    PROCEDURE post_job_enable (
+        p_name VARCHAR2
+    ) AS
+        v_uuid app_users.uuid%TYPE := pck_api_auth.uuid(NULL);
+    BEGIN
+        IF pck_api_auth.role(NULL, 'ADMIN') IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+
+        pck_api_jobs.enable(upper(trim(replace(p_name, '_JOB', ''))));
+
+        pck_api_audit.info('Job Enable',
+                           pck_api_audit.attributes('name', p_name, 'uuid', v_uuid));
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            pck_api_audit.error('Job Enable',
+                                pck_api_audit.attributes('name', p_name, 'uuid', v_uuid, 'error',
+                                                         sqlerrm));
+    END;
+
+    PROCEDURE post_job_disable (
+        p_name VARCHAR2
+    ) AS
+        v_uuid app_users.uuid%TYPE := pck_api_auth.uuid(NULL);
+    BEGIN
+        IF pck_api_auth.role(NULL, 'ADMIN') IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+
+        pck_api_jobs.disable(upper(trim(replace(p_name, '_JOB', ''))));
+
+        pck_api_audit.info('Job Disable',
+                           pck_api_audit.attributes('name', p_name, 'uuid', v_uuid));
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            pck_api_audit.error('Job Disable',
+                                pck_api_audit.attributes('name', p_name, 'uuid', v_uuid, 'error',
+                                                         sqlerrm));
+    END;
+
+    PROCEDURE post_job_run (
+        p_name VARCHAR2
+    ) AS
+        v_uuid app_users.uuid%TYPE := pck_api_auth.uuid(NULL);
+    BEGIN
+        IF pck_api_auth.role(NULL, 'ADMIN') IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+
+        pck_api_jobs.run(upper(trim(replace(p_name, '_JOB', ''))));
+
+        pck_api_audit.info('Job Run',
+                           pck_api_audit.attributes('name', p_name, 'uuid', v_uuid));
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            pck_api_audit.error('Job Run',
+                                pck_api_audit.attributes('name', p_name, 'uuid', v_uuid, 'error',
+                                                         sqlerrm));
+    END;
+
 END pck_adm;
 /
 
 
--- sqlcl_snapshot {"hash":"7484900fce4296cd8c05af5c8db73ffbccdab4af","type":"PACKAGE_BODY","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"d458f55a64fad8f3415fe36b9c7d36983eb8cb2d","type":"PACKAGE_BODY","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}

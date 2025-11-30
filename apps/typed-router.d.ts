@@ -65,6 +65,20 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/admin/jobs/': RouteRecordInfo<
+      '/admin/jobs/',
+      '/admin/jobs',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/admin/jobs/[name]': RouteRecordInfo<
+      '/admin/jobs/[name]',
+      '/admin/jobs/:name',
+      { name: ParamValue<true> },
+      { name: ParamValue<false> },
+      | never
+    >,
     '/admin/users/': RouteRecordInfo<
       '/admin/users/',
       '/admin/users',
@@ -237,6 +251,18 @@ declare module 'vue-router/auto-routes' {
     'src/pages/admin/emails.vue': {
       routes:
         | '/admin/emails'
+      views:
+        | never
+    }
+    'src/pages/admin/jobs/index.vue': {
+      routes:
+        | '/admin/jobs/'
+      views:
+        | never
+    }
+    'src/pages/admin/jobs/[name].vue': {
+      routes:
+        | '/admin/jobs/[name]'
       views:
         | never
     }
