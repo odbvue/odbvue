@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.224
+
+### Patch Changes
+
+- cb4a248: admin settings
+
 ## 0.0.223
 
 ### Patch Changes
