@@ -313,6 +313,8 @@ export const useNavigationStore = defineStore('navigation', () => {
     return page ? page.title : ''
   })
 
+  const breadcrumb = ref('')
+
   const breadcrumbs = computed(() => {
     const paths = ['', ...route.path.split('/').filter(Boolean)].map((_, i, arr) => {
       const path = arr.slice(1, i + 1).join('/')
@@ -330,6 +332,13 @@ export const useNavigationStore = defineStore('navigation', () => {
           icon: page.icon,
         }
       })
+    if (breadcrumb.value)
+      crumbs.push({
+        title: breadcrumb.value,
+        disabled: true,
+        href: '',
+        icon: '',
+      })
     return crumbs
   })
 
@@ -340,6 +349,7 @@ export const useNavigationStore = defineStore('navigation', () => {
   return {
     pages,
     title,
+    breadcrumb,
     breadcrumbs,
   }
 })

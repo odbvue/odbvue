@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1764593433807 stripComments:false  logicalFilePath:featadmin\odbvue\package_bodies\pck_api_jobs.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_bodies/pck_api_jobs.sql:f4d6a769b7b322cc6a1f45f191aeb0cc4817f44c:39f69f981c1a2b0924173b0b481de3a301c96991:alter
+
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_jobs AS
 
     PROCEDURE add (
@@ -135,5 +139,3 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_jobs AS
 END;
 /
 
-
--- sqlcl_snapshot {"hash":"39f69f981c1a2b0924173b0b481de3a301c96991","type":"PACKAGE_BODY","name":"PCK_API_JOBS","schemaName":"ODBVUE","sxml":""}

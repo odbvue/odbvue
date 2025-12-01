@@ -44,7 +44,7 @@ const options = ref<OvTableOptions>({
   },
   columns: [
     { name: 'name' },
-    { name: 'schedule' },
+    { name: 'schedule', maxLength: 0 },
     { name: 'started' },
     { name: 'duration' },
     { name: 'comments' },

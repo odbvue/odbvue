@@ -21,7 +21,14 @@
         <v-chip v-if="props.content && hasContentProps && !contentProps.html" v-bind="contentProps">
           {{ props.content }}
         </v-chip>
-        <div v-html="props.content" v-if="props.content && hasContentProps && contentProps.html" />
+        <div v-if="props.content && hasContentProps && contentProps.html">
+          <div class="border-s-lg pa-4" v-html="cleanedHtml" />
+          <v-banner color="warning" icon="$mdiAlert" class="mt-2" density="compact"
+            ><v-banner-text>
+              {{ t('html.content.is.sanitized.due.to.security.reasons') }}
+            </v-banner-text>
+          </v-banner>
+        </div>
         <slot
           name="content"
           :onClose="
@@ -160,4 +167,19 @@ const handleCopyToClipboard = (text: string) => {
     copyFeedback.value = false
   }, 2000)
 }
+
+const cleanedHtml = computed(() => {
+  const raw = props.content || ''
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(raw, 'text/html')
+  doc.querySelectorAll('head style, head link[rel="stylesheet"]').forEach((el) => el.remove())
+  doc.querySelectorAll('a').forEach((a) => {
+    const span = doc.createElement('span')
+    if (a.className) span.className = a.className
+    if (a.title) span.title = a.title
+    span.innerHTML = a.innerHTML
+    a.replaceWith(span)
+  })
+  return doc.body ? doc.body.innerHTML : raw
+})
 </script>

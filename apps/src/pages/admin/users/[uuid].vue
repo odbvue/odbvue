@@ -69,6 +69,16 @@ const {
   search: uuid,
 })
 
+watch(detailsData, (newVal) => {
+  if (newVal && newVal.length > 0) {
+    useNavigationStore().breadcrumb = newVal[0]?.username as string
+  }
+})
+
+onUnmounted(() => {
+  useNavigationStore().breadcrumb = ''
+})
+
 const detailsOptions = <OvTableOptions>{
   key: 'uuid',
   columns: [

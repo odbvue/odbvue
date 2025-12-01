@@ -127,7 +127,11 @@
                         } as OvViewOptions,
                         (eventName: string, ...args: unknown[]) => {
                           eventName === 'details'
-                            ? showDialog(args[0] as string, args[1] as string)
+                            ? showDialog(
+                                args[0] as string,
+                                args[1] as string,
+                                columnViewOptions.get(column.name)?.format as OvFormat | OvFormat[],
+                              )
                             : handleRowAction(column.name, args[0] as string, item[options.key])
                         },
                       )
@@ -158,7 +162,11 @@
                         } as OvViewOptions,
                         (eventName: string, ...args: unknown[]) => {
                           eventName === 'details'
-                            ? showDialog(args[0] as string, args[1] as string)
+                            ? showDialog(
+                                args[0] as string,
+                                args[1] as string,
+                                columnViewOptions.get(column.name)?.format as OvFormat | OvFormat[],
+                              )
                             : handleRowAction(column.name, args[0] as string, item[options.key])
                         },
                       )
@@ -277,6 +285,7 @@ const { defaults } = useDefaults({
       },
       VChip: {
         variant: 'text',
+        class: 'text-wrap',
       },
       VBtn: {
         size: 'small',
