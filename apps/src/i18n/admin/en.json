@@ -26,5 +26,7 @@
   "output": "Output",
   "job.name": "Job name",
   "admin.job.action.success": "Admin job action success",
-  "admin.job.action.failed": "Admin job action failed"
+  "admin.job.action.failed": "Admin job action failed",
+  "Content": "Content",
+  "html.content.is.sanitized.due.to.security.reasons": "Html content is sanitized due to security reasons"
 }
