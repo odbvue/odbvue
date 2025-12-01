@@ -8,6 +8,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_jobs AS
         p_description VARCHAR2
     ) AS
         v_cnt PLS_INTEGER;
+        i     PLS_INTEGER;
     BEGIN
         remove(p_name);
         SELECT
@@ -31,21 +32,30 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_jobs AS
             enabled             => FALSE
         );
 
-        FOR i IN 1..v_cnt LOOP
+        i := 1;
+        FOR a IN (
+            SELECT
+                *
+            FROM
+                JSON_TABLE ( p_arguments, '$[*]'
+                    COLUMNS (
+                        type VARCHAR2 PATH '$.type',
+                        name VARCHAR2 PATH '$.name',
+                        value VARCHAR2 PATH '$.value'
+                    )
+                )
+        ) LOOP
             dbms_scheduler.define_program_argument(
                 program_name      => upper(p_name)
                                 || '_PROGRAM',
                 argument_position => i,
-                argument_name     => json_value(p_arguments, '$['
-                                                         ||(i - 1)
-                                                         || '].name'),
-                argument_type     => json_value(p_arguments, '$['
-                                                         ||(i - 1)
-                                                         || '].type'),
-                default_value     => json_value(p_arguments, '$['
-                                                         ||(i - 1)
-                                                         || '].value')
+                argument_name     => a.name,
+                argument_type     => a.type,
+                default_value     => a.value,
+                out_argument      => FALSE
             );
+
+            i := i + 1;
         END LOOP;
 
         dbms_scheduler.enable(upper(p_name) || '_PROGRAM');
@@ -126,4 +136,4 @@ END;
 /
 
 
--- sqlcl_snapshot {"hash":"f4d6a769b7b322cc6a1f45f191aeb0cc4817f44c","type":"PACKAGE_BODY","name":"PCK_API_JOBS","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"39f69f981c1a2b0924173b0b481de3a301c96991","type":"PACKAGE_BODY","name":"PCK_API_JOBS","schemaName":"ODBVUE","sxml":""}
