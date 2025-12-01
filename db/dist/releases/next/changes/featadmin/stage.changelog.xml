@@ -3,5 +3,6 @@
                    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+<include file="odbvue/package_bodies/pck_api_jobs.sql" relativeToChangelogFile="true"/>
 <include file="_custom/010_fix_test_job.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
 </databaseChangeLog>
