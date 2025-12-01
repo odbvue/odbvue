@@ -40,6 +40,16 @@ const {
   filter: { name: [name] },
 })
 
+watch(historyData, (newVal) => {
+  if (newVal && newVal.length > 0) {
+    useNavigationStore().breadcrumb = newVal[0]?.name as string
+  }
+})
+
+onUnmounted(() => {
+  useNavigationStore().breadcrumb = ''
+})
+
 const historyOptions = ref<OvTableOptions>({
   key: 'name',
   columns: [
