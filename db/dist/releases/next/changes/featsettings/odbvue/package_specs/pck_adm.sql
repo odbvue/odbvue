@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1764615774206 stripComments:false  logicalFilePath:featsettings\odbvue\package_specs\pck_adm.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_specs/pck_adm.sql:457e64db89715a95f56f8c466b7a3a960bcd57df:8a0f6976820f36249ddf9a8d71dc9b389e5f7edf:alter
+
 CREATE OR REPLACE PACKAGE odbvue.pck_adm AS -- Administration package
 
     PROCEDURE get_audit ( -- Get audit logs with filtering and pagination
@@ -63,5 +67,3 @@ CREATE OR REPLACE PACKAGE odbvue.pck_adm AS -- Administration package
 END pck_adm;
 /
 
-
--- sqlcl_snapshot {"hash":"8a0f6976820f36249ddf9a8d71dc9b389e5f7edf","type":"PACKAGE_SPEC","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}

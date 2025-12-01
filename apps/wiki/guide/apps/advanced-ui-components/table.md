@@ -480,3 +480,48 @@ name,-status           // name asc, then status desc
 - Loading overlay prevents interaction during data fetch operations
 - The `fetch` method can be called manually via template ref to refresh data
 
+## Composables
+
+### useTableFetch
+
+Encapsulates server-side data fetching for tables with search, filtering, and sorting.
+
+```typescript
+const { loading, data, fetch: fetchSettings } = useTableFetch({
+  endpoint: 'adm/settings/',
+  responseKey: 'settings'
+})
+```
+
+**Options:**
+- `endpoint` (string, required): API endpoint for fetching data
+- `responseKey` (string, required): Key in response containing data array
+- `filter` (OvFilterValue, optional): Pre-applied filters
+- `search` (string, optional): Pre-applied search term
+
+**Returns:** `{ loading, data, fetch }`
+
+### useFormAction
+
+Handles form-based actions with automatic error handling and loading state.
+
+```typescript
+const { action: actionSettings } = useFormAction({
+  endpoint: 'adm/setting/'
+})
+```
+
+**Options:**
+- `endpoint` (string, required): API endpoint for the action
+
+**Returns:** `{ loading, action }`
+
+The action function accepts: `(name, item, value?, callback?)` where callback receives errors if present.
+
+**Multiple Actions:**
+
+```typescript
+const { action: actionSettings } = useFormAction({ endpoint: 'adm/setting/' })
+const { action: actionUsers } = useFormAction({ endpoint: 'adm/user/' })
+```
+

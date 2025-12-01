@@ -259,6 +259,7 @@ import {
   type OvFilterValue,
   type OvFormat,
   type OvViewOptions,
+  type OvFormFieldError,
   OvActionFormat,
   renderViewItem,
 } from './index'
@@ -279,6 +280,9 @@ const { defaults } = useDefaults({
       hover: true,
       VTextField: {
         density: 'compact',
+        VLabel: {
+          class: 'pb-0 mt-0 text-body-2',
+        },
       },
       VLabel: {
         class: 'pb-1 mt-2 text-body-2',
@@ -307,7 +311,13 @@ const {
 }>()
 
 const emits = defineEmits<{
-  (event: 'action', name: string, data: unknown, value?: unknown): void
+  (
+    event: 'action',
+    name: string,
+    data: unknown,
+    value?: unknown,
+    callback?: (errors?: OvFormFieldError[]) => void,
+  ): void
   (
     event: 'fetch',
     data: OvTableData[],
@@ -619,9 +629,20 @@ async function handleFormSubmit(actionData: OvFormData) {
     return
   }
 
-  await emits('action', formActionName.value, localData.value, actionData)
-  localData.value[formRowIndex.value] = actionData
-  form.value = false
+  const onActionComplete = (formErrors?: OvFormFieldError[]) => {
+    if (formErrors && formErrors.length > 0) {
+      formOptions.value = {
+        ...(formOptions.value || {}),
+        errors: formErrors,
+      }
+      return
+    }
+
+    localData.value[formRowIndex.value] = actionData
+    form.value = false
+  }
+
+  emits('action', formActionName.value, localData.value, actionData, onActionComplete)
 }
 
 async function handleRowAction(columnName: string, actionName: string, keyValue?: unknown) {

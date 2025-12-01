@@ -502,3 +502,51 @@ export function useTableFetch<T extends Record<string, unknown>>(
     fetch,
   }
 }
+
+// Table Form Action Composable
+
+export interface UseFormActionOptions {
+  endpoint: string
+}
+
+export interface UseFormActionReturn {
+  loading: Ref<boolean>
+  action: (
+    name: string,
+    item: OvFormData,
+    value?: OvFormData,
+    callback?: (errors?: OvFormFieldError[]) => void,
+  ) => Promise<void>
+}
+
+export function useFormAction(options: UseFormActionOptions): UseFormActionReturn {
+  const http = useHttp()
+  const loading = ref(false)
+
+  const action = async (
+    _name: string,
+    _item: OvFormData,
+    value?: OvFormData,
+    callback?: (errors?: OvFormFieldError[]) => void,
+  ) => {
+    loading.value = true
+    try {
+      const res: { data?: { errors?: OvFormFieldError[] } | null } = await http.post(
+        options.endpoint,
+        value,
+      )
+      if (res?.data && res.data.errors) {
+        callback?.(res.data.errors)
+      } else {
+        callback?.()
+      }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return {
+    loading,
+    action,
+  }
+}
