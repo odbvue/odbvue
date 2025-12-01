@@ -47,8 +47,21 @@ CREATE OR REPLACE PACKAGE odbvue.pck_adm AS -- Administration package
         p_name VARCHAR2 -- job name
     );
 
+    PROCEDURE get_settings ( -- Get application settings
+        p_search   VARCHAR2 DEFAULT NULL, -- search term (job name)
+        p_limit    PLS_INTEGER DEFAULT 10, -- number of records to return
+        p_offset   PLS_INTEGER DEFAULT 0, -- offset for pagination
+        r_settings OUT SYS_REFCURSOR -- ref cursor for settings records [{key, name, value, secret, options}]
+    );
+
+    PROCEDURE post_setting ( -- Update application settings
+        p_id     VARCHAR2, -- setting key
+        p_value  VARCHAR2, -- new value
+        r_errors OUT SYS_REFCURSOR -- ref cursor for validation errors [{name, message}]
+    );
+
 END pck_adm;
 /
 
 
--- sqlcl_snapshot {"hash":"457e64db89715a95f56f8c466b7a3a960bcd57df","type":"PACKAGE_SPEC","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"8a0f6976820f36249ddf9a8d71dc9b389e5f7edf","type":"PACKAGE_SPEC","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}

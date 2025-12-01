@@ -31,5 +31,6 @@ const widgets = ref([
   { name: 'Audit Logs', path: '/admin/audit', icon: '$mdiClipboardList', color: 'info' },
   { name: 'Emails', path: '/admin/emails', icon: '$mdiEmail', color: 'info' },
   { name: 'Job Scheduler', path: '/admin/jobs', icon: '$mdiCalendarClock', color: 'info' },
+  { name: 'Settings', path: '/admin/settings', icon: '$mdiCog', color: 'info' },
 ])
 </script>

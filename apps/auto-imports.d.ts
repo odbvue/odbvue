@@ -73,6 +73,7 @@ declare global {
   const useDate: typeof import('vuetify').useDate
   const useDefaults: typeof import('vuetify').useDefaults
   const useDisplay: typeof import('vuetify').useDisplay
+  const useFormAction: typeof import('./src/components/index').useFormAction
   const useGoTo: typeof import('vuetify').useGoTo
   const useHead: typeof import('@unhead/vue').useHead
   const useHeadSafe: typeof import('@unhead/vue').useHeadSafe
@@ -91,6 +92,7 @@ declare global {
   const useServerHead: typeof import('@unhead/vue').useServerHead
   const useServerHeadSafe: typeof import('@unhead/vue').useServerHeadSafe
   const useServerSeoMeta: typeof import('@unhead/vue').useServerSeoMeta
+  const useSettingsAction: typeof import('./src/components/index').useSettingsAction
   const useSettingsStore: typeof import('./src/stores/app/settings').useSettingsStore
   const useSlots: typeof import('vue').useSlots
   const useTableFetch: typeof import('./src/components/index').useTableFetch
@@ -114,6 +116,6 @@ declare global {
   export type { Share, WindowFeatures, ShareOptions } from './src/components/VOvShare.vue'
   import('./src/components/VOvShare.vue')
   // @ts-ignore
-  export type { OvRule, OvAction, OvFormTextareaField, OvFormRatingField, OvFormSelectionField, OvFormFieldError, OvAlign, OvFormOptions, OvTableColumn, OvFilterValue, OvTableOptions, OvViewItem, OvViewOptions, OvFormData, OvTableData, OvViewData, UseTableFetchOptions, UseTableFetchReturn } from './src/components/index'
+  export type { OvRule, OvAction, OvFormTextareaField, OvFormRatingField, OvFormSelectionField, OvFormFieldError, OvAlign, OvFormOptions, OvTableColumn, OvFilterValue, OvTableOptions, OvViewItem, OvViewOptions, OvFormData, OvTableData, OvViewData, UseTableFetchOptions, UseTableFetchReturn, UseFormActionOptions, UseFormActionReturn } from './src/components/index'
   import('./src/components/index')
 }

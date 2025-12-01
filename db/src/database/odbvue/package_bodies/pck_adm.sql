@@ -418,8 +418,94 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_adm AS
                                                          sqlerrm));
     END;
 
+    PROCEDURE get_settings (
+        p_search   VARCHAR2 DEFAULT NULL,
+        p_limit    PLS_INTEGER DEFAULT 10,
+        p_offset   PLS_INTEGER DEFAULT 0,
+        r_settings OUT SYS_REFCURSOR
+    ) AS
+        v_search VARCHAR2(2000 CHAR) := utl_url.unescape(coalesce(p_search, ''));
+    BEGIN
+        IF pck_api_auth.role(NULL, 'ADMIN') IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+
+        OPEN r_settings FOR SELECT
+                                                  s.id      AS "id",
+                                                  s.name    AS "name",
+                                                  CASE
+                                                      WHEN s.secret = 'Y' THEN
+                                                          ''
+                                                      ELSE
+                                                          s.value
+                                                  END       AS "value",
+                                                  s.secret  AS "secret",
+                                                  s.options AS "{}options"
+                                              FROM
+                                                  app_settings s
+                           WHERE
+                                   1 = 1
+            -- Search by name or key
+                               AND ( p_search IS NULL
+                                     OR upper(s.name) LIKE '%'
+                                     || upper(v_search)
+                                     || '%'
+                                        OR s.id LIKE '%'
+                                                     || upper(v_search)
+                                                     || '%' )
+                           ORDER BY
+                               s.id ASC
+                           OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY;
+
+    END get_settings;
+
+    PROCEDURE post_setting (
+        p_id     VARCHAR2,
+        p_value  VARCHAR2,
+        r_errors OUT SYS_REFCURSOR
+    ) AS
+        v_uuid app_users.uuid%TYPE := pck_api_auth.uuid(NULL);
+    BEGIN
+        IF pck_api_auth.role(NULL, 'ADMIN') IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+
+        IF TRIM(p_value) IS NULL THEN
+            OPEN r_errors FOR SELECT
+                                  'value'    AS "name",
+                                  'required' AS "message"
+                              FROM
+                                  dual;
+
+            RETURN;
+        END IF;
+
+        UPDATE app_settings
+        SET
+            value =
+                CASE
+                    WHEN secret = 'Y' THEN
+                        pck_api_settings.enc(p_value)
+                    ELSE
+                        p_value
+                END
+        WHERE
+            id = p_id;
+
+        COMMIT;
+        pck_api_audit.info('Settings',
+                           pck_api_audit.attributes('id', p_id, 'uuid', v_uuid));
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            pck_api_audit.error('Settings',
+                                pck_api_audit.attributes('id', p_id, 'uuid', v_uuid));
+    END post_setting;
+
 END pck_adm;
 /
 
 
--- sqlcl_snapshot {"hash":"d458f55a64fad8f3415fe36b9c7d36983eb8cb2d","type":"PACKAGE_BODY","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"013e437a93172c3f5bcf584dbfdd8234ce0e7835","type":"PACKAGE_BODY","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}

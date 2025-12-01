@@ -27,6 +27,9 @@
   "job.name": "Job name",
   "admin.job.action.success": "Admin job action success",
   "admin.job.action.failed": "Admin job action failed",
-  "Content": "Content",
-  "html.content.is.sanitized.due.to.security.reasons": "Html content is sanitized due to security reasons"
+  "html.content.is.sanitized.due.to.security.reasons": "Html content is sanitized due to security reasons",
+  "id": "Id",
+  "value": "Value",
+  "search.by.id.or.name": "Search by id or name",
+  "save": "Save"
 }
