@@ -277,6 +277,7 @@ const { defaults } = useDefaults({
       },
       VChip: {
         variant: 'text',
+        class: 'text-wrap',
       },
       VBtn: {
         size: 'small',
