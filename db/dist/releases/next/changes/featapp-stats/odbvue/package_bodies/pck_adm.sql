@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1764677784663 stripComments:false  logicalFilePath:featapp-stats\odbvue\package_bodies\pck_adm.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_bodies/pck_adm.sql:013e437a93172c3f5bcf584dbfdd8234ce0e7835:17a6f8686b3f928923f14371054ec235b0be1318:alter
+
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_adm AS
 
     -- PUBLIC
@@ -1443,5 +1447,3 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_adm AS
 END pck_adm;
 /
 
-
--- sqlcl_snapshot {"hash":"17a6f8686b3f928923f14371054ec235b0be1318","type":"PACKAGE_BODY","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}
