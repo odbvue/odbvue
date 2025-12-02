@@ -189,7 +189,7 @@ Page content here...
 
 | Page | Path | Visibility | Access | Roles |
 |------|------|------------|--------|-------|
-| Welcome Home | `/` | `always` | `always` | - |
+| Home | `/` | `always` | `always` | - |
 | About | `/about` | `always` | `always` | - |
 | Login | `/login` | `never` | `when-unauthenticated` | - |
 | Sign Up | `/signup` | `never` | `when-unauthenticated` | - |

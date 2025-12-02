@@ -23,7 +23,7 @@
 <script setup lang="ts">
 definePage({
   meta: {
-    title: 'Welcome Home',
+    title: 'Home',
     description: 'Welcome to the home page',
     icon: '$mdiHome',
     color: '#ABCDEF',
