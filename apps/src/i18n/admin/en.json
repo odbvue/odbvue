@@ -31,5 +31,11 @@
   "id": "Id",
   "value": "Value",
   "search.by.id.or.name": "Search by id or name",
-  "save": "Save"
+  "save": "Save",
+  "stats": "Stats",
+  "failed.email.deliveries.in.last.24.hours": "Failed email deliveries in last 24 hours",
+  "warnings.in.last.24.hours": "Warnings in last 24 hours",
+  "errors.in.last.24.hours": "Errors in last 24 hours",
+  "active.users": "Active users",
+  "file.storage.total.size": "File storage total size"
 }

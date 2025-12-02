@@ -60,8 +60,20 @@ CREATE OR REPLACE PACKAGE odbvue.pck_adm AS -- Administration package
         r_errors OUT SYS_REFCURSOR -- ref cursor for validation errors [{name, message}]
     );
 
+    PROCEDURE job_stats; -- Scheduled job to aggregate application statistics
+
+    PROCEDURE get_stats ( -- Get application statistics 
+        r_stats OUT SYS_REFCURSOR -- ref cursor for statistics records [{period_type, period_label, metric_name, metric_value}]
+    );
+
+    PROCEDURE job_alerts; -- Scheduled job to check for alerts
+
+    PROCEDURE get_alerts ( -- Get application alerts
+        r_alerts OUT SYS_REFCURSOR -- ref cursor for alert records [{alert_type, message, created}]
+    );
+
 END pck_adm;
 /
 
 
--- sqlcl_snapshot {"hash":"8a0f6976820f36249ddf9a8d71dc9b389e5f7edf","type":"PACKAGE_SPEC","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"34dfad627ba4c52f1f6bf2a7bbe28c8a03e7a1f2","type":"PACKAGE_SPEC","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}

@@ -504,8 +504,944 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_adm AS
                                 pck_api_audit.attributes('id', p_id, 'uuid', v_uuid));
     END post_setting;
 
+    PROCEDURE job_stats AS
+        v_last_run TIMESTAMP;
+    BEGIN
+        SELECT
+            MAX(period_start)
+        INTO v_last_run
+        FROM
+            app_stats;
+
+        IF v_last_run IS NULL THEN
+            v_last_run := systimestamp - INTERVAL '11' YEAR;
+        END IF;
+
+    -- Audit Records
+
+        MERGE INTO app_stats tgt
+        USING (
+            WITH hours ( hour_start ) AS (
+                SELECT
+                    trunc(systimestamp, 'HH24')
+                FROM
+                    dual
+                UNION ALL
+                SELECT
+                    hour_start - INTERVAL '1' HOUR
+                FROM
+                    hours
+                WHERE
+                    hour_start - INTERVAL '1' HOUR >= v_last_run
+            ), periods AS (
+                SELECT
+                    'H'                                                  AS period_type,
+                    to_char(hour_start, 'YYYY-MM-DD HH24')
+                    || ':00'                                             AS period_label,
+                    hour_start                                           AS period_start,
+                    hour_start + INTERVAL '1' HOUR - INTERVAL '1' SECOND AS period_end
+                FROM
+                    hours
+            )
+            SELECT
+                p.period_type,
+                p.period_label,
+                p.period_start,
+                p.period_end,
+                'Events'    AS metric_name,
+                COUNT(a.id) AS metric_value
+            FROM
+                periods   p
+                LEFT JOIN app_audit a ON a.created BETWEEN p.period_start AND p.period_end
+            GROUP BY
+                p.period_type,
+                p.period_label,
+                p.period_start,
+                p.period_end
+        ) src ON ( tgt.period_type = src.period_type
+                   AND tgt.period_label = src.period_label
+                   AND tgt.metric_name = src.metric_name )
+        WHEN MATCHED THEN UPDATE
+        SET tgt.metric_value = src.metric_value
+        WHEN NOT MATCHED THEN
+        INSERT (
+            period_type,
+            period_label,
+            period_start,
+            period_end,
+            metric_name,
+            metric_value )
+        VALUES
+            ( src.period_type,
+              src.period_label,
+              src.period_start,
+              src.period_end,
+              src.metric_name,
+              src.metric_value );
+
+        COMMIT;
+
+    -- Audit Records - ERRORS
+        MERGE INTO app_stats tgt
+        USING (
+            WITH hours ( hour_start ) AS (
+                SELECT
+                    trunc(systimestamp, 'HH24')
+                FROM
+                    dual
+                UNION ALL
+                SELECT
+                    hour_start - INTERVAL '1' HOUR
+                FROM
+                    hours
+                WHERE
+                    hour_start - INTERVAL '1' HOUR >= v_last_run
+            ), periods AS (
+                SELECT
+                    'H'                                                  AS period_type,
+                    to_char(hour_start, 'YYYY-MM-DD HH24')
+                    || ':00'                                             AS period_label,
+                    hour_start                                           AS period_start,
+                    hour_start + INTERVAL '1' HOUR - INTERVAL '1' SECOND AS period_end
+                FROM
+                    hours
+            )
+            SELECT
+                p.period_type,
+                p.period_label,
+                p.period_start,
+                p.period_end,
+                'Errors'    AS metric_name,
+                COUNT(a.id) AS metric_value
+            FROM
+                periods   p
+                LEFT JOIN app_audit a ON a.created BETWEEN p.period_start AND p.period_end
+                                         AND a.severity = 'ERROR'
+            GROUP BY
+                p.period_type,
+                p.period_label,
+                p.period_start,
+                p.period_end
+        ) src ON ( tgt.period_type = src.period_type
+                   AND tgt.period_label = src.period_label
+                   AND tgt.metric_name = src.metric_name )
+        WHEN MATCHED THEN UPDATE
+        SET tgt.metric_value = src.metric_value
+        WHEN NOT MATCHED THEN
+        INSERT (
+            period_type,
+            period_label,
+            period_start,
+            period_end,
+            metric_name,
+            metric_value )
+        VALUES
+            ( src.period_type,
+              src.period_label,
+              src.period_start,
+              src.period_end,
+              src.metric_name,
+              src.metric_value );
+
+        COMMIT;
+
+    -- Users
+        MERGE INTO app_stats tgt
+        USING (
+            WITH hours ( hour_start ) AS (
+                SELECT
+                    trunc(systimestamp, 'HH24')
+                FROM
+                    dual
+                UNION ALL
+                SELECT
+                    hour_start - INTERVAL '1' HOUR
+                FROM
+                    hours
+                WHERE
+                    hour_start - INTERVAL '1' HOUR >= v_last_run
+            ), periods AS (
+                SELECT
+                    'H'                                                  AS period_type,
+                    to_char(hour_start, 'YYYY-MM-DD HH24')
+                    || ':00'                                             AS period_label,
+                    hour_start                                           AS period_start,
+                    hour_start + INTERVAL '1' HOUR - INTERVAL '1' SECOND AS period_end
+                FROM
+                    hours
+            )
+            SELECT
+                p.period_type,
+                p.period_label,
+                p.period_start,
+                p.period_end,
+                'Users'       AS metric_name,
+                COUNT(u.uuid) AS metric_value
+            FROM
+                periods   p
+                LEFT JOIN app_users u ON u.created BETWEEN p.period_start AND p.period_end
+            GROUP BY
+                p.period_type,
+                p.period_label,
+                p.period_start,
+                p.period_end
+        ) src ON ( tgt.period_type = src.period_type
+                   AND tgt.period_label = src.period_label
+                   AND tgt.metric_name = src.metric_name )
+        WHEN MATCHED THEN UPDATE
+        SET tgt.metric_value = src.metric_value
+        WHEN NOT MATCHED THEN
+        INSERT (
+            period_type,
+            period_label,
+            period_start,
+            period_end,
+            metric_name,
+            metric_value )
+        VALUES
+            ( src.period_type,
+              src.period_label,
+              src.period_start,
+              src.period_end,
+              src.metric_name,
+              src.metric_value );
+
+        COMMIT;
+
+    -- Emails
+        MERGE INTO app_stats tgt
+        USING (
+            WITH hours ( hour_start ) AS (
+                SELECT
+                    trunc(systimestamp, 'HH24')
+                FROM
+                    dual
+                UNION ALL
+                SELECT
+                    hour_start - INTERVAL '1' HOUR
+                FROM
+                    hours
+                WHERE
+                    hour_start - INTERVAL '1' HOUR >= v_last_run
+            ), periods AS (
+                SELECT
+                    'H'                                                  AS period_type,
+                    to_char(hour_start, 'YYYY-MM-DD HH24')
+                    || ':00'                                             AS period_label,
+                    hour_start                                           AS period_start,
+                    hour_start + INTERVAL '1' HOUR - INTERVAL '1' SECOND AS period_end
+                FROM
+                    hours
+            )
+            SELECT
+                p.period_type,
+                p.period_label,
+                p.period_start,
+                p.period_end,
+                'Emails'    AS metric_name,
+                COUNT(e.id) AS metric_value
+            FROM
+                periods    p
+                LEFT JOIN app_emails e ON e.created BETWEEN p.period_start AND p.period_end
+            GROUP BY
+                p.period_type,
+                p.period_label,
+                p.period_start,
+                p.period_end
+        ) src ON ( tgt.period_type = src.period_type
+                   AND tgt.period_label = src.period_label
+                   AND tgt.metric_name = src.metric_name )
+        WHEN MATCHED THEN UPDATE
+        SET tgt.metric_value = src.metric_value
+        WHEN NOT MATCHED THEN
+        INSERT (
+            period_type,
+            period_label,
+            period_start,
+            period_end,
+            metric_name,
+            metric_value )
+        VALUES
+            ( src.period_type,
+              src.period_label,
+              src.period_start,
+              src.period_end,
+              src.metric_name,
+              src.metric_value );
+
+        COMMIT;
+
+    -- Failed emails
+        MERGE INTO app_stats tgt
+        USING (
+            WITH hours ( hour_start ) AS (
+                SELECT
+                    trunc(systimestamp, 'HH24')
+                FROM
+                    dual
+                UNION ALL
+                SELECT
+                    hour_start - INTERVAL '1' HOUR
+                FROM
+                    hours
+                WHERE
+                    hour_start - INTERVAL '1' HOUR >= v_last_run
+            ), periods AS (
+                SELECT
+                    'H'                                                  AS period_type,
+                    to_char(hour_start, 'YYYY-MM-DD HH24')
+                    || ':00'                                             AS period_label,
+                    hour_start                                           AS period_start,
+                    hour_start + INTERVAL '1' HOUR - INTERVAL '1' SECOND AS period_end
+                FROM
+                    hours
+            )
+            SELECT
+                p.period_type,
+                p.period_label,
+                p.period_start,
+                p.period_end,
+                'Failed Emails' AS metric_name,
+                COUNT(e.id)     AS metric_value
+            FROM
+                periods    p
+                LEFT JOIN app_emails e ON e.created BETWEEN p.period_start AND p.period_end
+                                          AND e.status = 'E'
+            GROUP BY
+                p.period_type,
+                p.period_label,
+                p.period_start,
+                p.period_end
+        ) src ON ( tgt.period_type = src.period_type
+                   AND tgt.period_label = src.period_label
+                   AND tgt.metric_name = src.metric_name )
+        WHEN MATCHED THEN UPDATE
+        SET tgt.metric_value = src.metric_value
+        WHEN NOT MATCHED THEN
+        INSERT (
+            period_type,
+            period_label,
+            period_start,
+            period_end,
+            metric_name,
+            metric_value )
+        VALUES
+            ( src.period_type,
+              src.period_label,
+              src.period_start,
+              src.period_end,
+              src.metric_name,
+              src.metric_value );
+
+        COMMIT;
+
+    -- Storage
+        MERGE INTO app_stats tgt
+        USING (
+            WITH hours ( hour_start ) AS (
+                SELECT
+                    trunc(systimestamp, 'HH24')
+                FROM
+                    dual
+                UNION ALL
+                SELECT
+                    hour_start - INTERVAL '1' HOUR
+                FROM
+                    hours
+                WHERE
+                    hour_start - INTERVAL '1' HOUR >= v_last_run
+            ), periods AS (
+                SELECT
+                    'H'                                                  AS period_type,
+                    to_char(hour_start, 'YYYY-MM-DD HH24')
+                    || ':00'                                             AS period_label,
+                    hour_start                                           AS period_start,
+                    hour_start + INTERVAL '1' HOUR - INTERVAL '1' SECOND AS period_end
+                FROM
+                    hours
+            )
+            SELECT
+                p.period_type,
+                p.period_label,
+                p.period_start,
+                p.period_end,
+                'Storage'   AS metric_name,
+                COUNT(s.id) AS metric_value
+            FROM
+                periods     p
+                LEFT JOIN app_storage s ON s.created BETWEEN p.period_start AND p.period_end
+            GROUP BY
+                p.period_type,
+                p.period_label,
+                p.period_start,
+                p.period_end
+        ) src ON ( tgt.period_type = src.period_type
+                   AND tgt.period_label = src.period_label
+                   AND tgt.metric_name = src.metric_name )
+        WHEN MATCHED THEN UPDATE
+        SET tgt.metric_value = src.metric_value
+        WHEN NOT MATCHED THEN
+        INSERT (
+            period_type,
+            period_label,
+            period_start,
+            period_end,
+            metric_name,
+            metric_value )
+        VALUES
+            ( src.period_type,
+              src.period_label,
+              src.period_start,
+              src.period_end,
+              src.metric_name,
+              src.metric_value );
+
+        COMMIT;
+
+    -- Jobs
+        MERGE INTO app_stats tgt
+        USING (
+            WITH hours ( hour_start ) AS (
+                SELECT
+                    trunc(systimestamp, 'HH24')
+                FROM
+                    dual
+                UNION ALL
+                SELECT
+                    hour_start - INTERVAL '1' HOUR
+                FROM
+                    hours
+                WHERE
+                    hour_start - INTERVAL '1' HOUR >= v_last_run
+            ), periods AS (
+                SELECT
+                    'H'                                                  AS period_type,
+                    to_char(hour_start, 'YYYY-MM-DD HH24')
+                    || ':00'                                             AS period_label,
+                    hour_start                                           AS period_start,
+                    hour_start + INTERVAL '1' HOUR - INTERVAL '1' SECOND AS period_end
+                FROM
+                    hours
+            )
+            SELECT
+                p.period_type,
+                p.period_label,
+                p.period_start,
+                p.period_end,
+                'Jobs'            AS metric_name,
+                COUNT(j.job_name) AS metric_value
+            FROM
+                periods                        p
+                LEFT JOIN user_scheduler_job_run_details j ON j.actual_start_date BETWEEN p.period_start AND p.period_end
+            GROUP BY
+                p.period_type,
+                p.period_label,
+                p.period_start,
+                p.period_end
+        ) src ON ( tgt.period_type = src.period_type
+                   AND tgt.period_label = src.period_label
+                   AND tgt.metric_name = src.metric_name )
+        WHEN MATCHED THEN UPDATE
+        SET tgt.metric_value = src.metric_value
+        WHEN NOT MATCHED THEN
+        INSERT (
+            period_type,
+            period_label,
+            period_start,
+            period_end,
+            metric_name,
+            metric_value )
+        VALUES
+            ( src.period_type,
+              src.period_label,
+              src.period_start,
+              src.period_end,
+              src.metric_name,
+              src.metric_value );
+
+        COMMIT;
+
+    -- Consolidate By Days
+        MERGE INTO app_stats tgt
+        USING (
+            SELECT
+                'D'                                                            AS period_type,
+                trunc(s.period_start)                                          AS period_start,
+                trunc(s.period_start) + INTERVAL '1' DAY - INTERVAL '1' SECOND AS period_end,
+                to_char(
+                    trunc(s.period_start),
+                    'YYYY-MM-DD'
+                )                                                              AS period_label,
+                s.metric_name,
+                SUM(s.metric_value)                                            AS metric_value
+            FROM
+                app_stats s
+            WHERE
+                s.period_type = 'H'
+            GROUP BY
+                trunc(s.period_start),
+                s.metric_name
+        ) src ON ( tgt.period_type = src.period_type
+                   AND tgt.period_label = src.period_label
+                   AND tgt.metric_name = src.metric_name )
+        WHEN MATCHED THEN UPDATE
+        SET tgt.metric_value = src.metric_value
+        WHEN NOT MATCHED THEN
+        INSERT (
+            period_type,
+            period_label,
+            period_start,
+            period_end,
+            metric_name,
+            metric_value )
+        VALUES
+            ( src.period_type,
+              src.period_label,
+              src.period_start,
+              src.period_end,
+              src.metric_name,
+              src.metric_value );
+
+        COMMIT; 
+
+    -- Consolidate By Weeks
+        MERGE INTO app_stats tgt
+        USING (
+            SELECT
+                'W'                 AS period_type,
+                MIN(s.period_start) AS period_start,
+                MAX(s.period_start) AS period_end,
+                to_char(
+                    trunc(s.period_start, 'IW'),
+                    'YYYY-"W"IW'
+                )                   AS period_label,
+                s.metric_name,
+                SUM(s.metric_value) AS metric_value
+            FROM
+                app_stats s
+            WHERE
+                s.period_type = 'D'
+            GROUP BY
+                to_char(
+                    trunc(s.period_start, 'IW'),
+                    'YYYY-"W"IW'
+                ),
+                s.metric_name
+        ) src ON ( tgt.period_type = src.period_type
+                   AND tgt.period_label = src.period_label
+                   AND tgt.metric_name = src.metric_name )
+        WHEN MATCHED THEN UPDATE
+        SET tgt.metric_value = src.metric_value
+        WHEN NOT MATCHED THEN
+        INSERT (
+            period_type,
+            period_label,
+            period_start,
+            period_end,
+            metric_name,
+            metric_value )
+        VALUES
+            ( src.period_type,
+              src.period_label,
+              src.period_start,
+              src.period_end,
+              src.metric_name,
+              src.metric_value );
+
+        COMMIT;
+
+    -- Consolidate By Months
+        MERGE INTO app_stats tgt
+        USING (
+            SELECT
+                'M'                                                               AS period_type,
+                trunc(s.period_start, 'MM')                                       AS period_start,
+                last_day(s.period_start) + INTERVAL '1' DAY - INTERVAL '1' SECOND AS period_end,
+                to_char(s.period_start, 'YYYY-MM')                                AS period_label,
+                s.metric_name,
+                SUM(s.metric_value)                                               AS metric_value
+            FROM
+                app_stats s
+            WHERE
+                s.period_type = 'D'
+            GROUP BY
+                to_char(s.period_start, 'YYYY-MM'),
+                last_day(s.period_start) + INTERVAL '1' DAY - INTERVAL '1' SECOND,
+                trunc(s.period_start, 'MM'),
+                s.metric_name
+        ) src ON ( tgt.period_type = src.period_type
+                   AND tgt.period_label = src.period_label
+                   AND tgt.metric_name = src.metric_name )
+        WHEN MATCHED THEN UPDATE
+        SET tgt.metric_value = src.metric_value
+        WHEN NOT MATCHED THEN
+        INSERT (
+            period_type,
+            period_label,
+            period_start,
+            period_end,
+            metric_name,
+            metric_value )
+        VALUES
+            ( src.period_type,
+              src.period_label,
+              src.period_start,
+              src.period_end,
+              src.metric_name,
+              src.metric_value );
+
+        COMMIT;
+
+    -- Consolidate By Quarters
+        MERGE INTO app_stats tgt
+        USING (
+            SELECT
+                'Q'                                  AS period_type,
+                trunc(s.period_start, 'Q')           AS period_start,
+                add_months(
+                    trunc(s.period_start, 'Q'),
+                    3
+                ) - INTERVAL '1' SECOND              AS period_end,
+                to_char(s.period_start, 'YYYY-"Q"Q') AS period_label,
+                s.metric_name,
+                SUM(s.metric_value)                  AS metric_value
+            FROM
+                app_stats s
+            WHERE
+                s.period_type = 'D'
+            GROUP BY
+                to_char(s.period_start, 'YYYY-"Q"Q'),
+                add_months(
+                    trunc(s.period_start, 'Q'),
+                    3
+                ) - INTERVAL '1' SECOND,
+                trunc(s.period_start, 'Q'),
+                s.metric_name
+        ) src ON ( tgt.period_type = src.period_type
+                   AND tgt.period_label = src.period_label
+                   AND tgt.metric_name = src.metric_name )
+        WHEN MATCHED THEN UPDATE
+        SET tgt.metric_value = src.metric_value
+        WHEN NOT MATCHED THEN
+        INSERT (
+            period_type,
+            period_label,
+            period_start,
+            period_end,
+            metric_name,
+            metric_value )
+        VALUES
+            ( src.period_type,
+              src.period_label,
+              src.period_start,
+              src.period_end,
+              src.metric_name,
+              src.metric_value );
+
+        COMMIT;
+
+    -- Consolidate By Years
+        MERGE INTO app_stats tgt
+        USING (
+            SELECT
+                'Y'                             AS period_type,
+                trunc(s.period_start, 'YYYY')   AS period_start,
+                add_months(
+                    trunc(s.period_start, 'YYYY'),
+                    12
+                ) - INTERVAL '1' SECOND         AS period_end,
+                to_char(s.period_start, 'YYYY') AS period_label,
+                s.metric_name,
+                SUM(s.metric_value)             AS metric_value
+            FROM
+                app_stats s
+            WHERE
+                s.period_type = 'D'
+            GROUP BY
+                to_char(s.period_start, 'YYYY'),
+                add_months(
+                    trunc(s.period_start, 'YYYY'),
+                    12
+                ) - INTERVAL '1' SECOND,
+                trunc(s.period_start, 'YYYY'),
+                s.metric_name
+        ) src ON ( tgt.period_type = src.period_type
+                   AND tgt.period_label = src.period_label
+                   AND tgt.metric_name = src.metric_name )
+        WHEN MATCHED THEN UPDATE
+        SET tgt.metric_value = src.metric_value
+        WHEN NOT MATCHED THEN
+        INSERT (
+            period_type,
+            period_label,
+            period_start,
+            period_end,
+            metric_name,
+            metric_value )
+        VALUES
+            ( src.period_type,
+              src.period_label,
+              src.period_start,
+              src.period_end,
+              src.metric_name,
+              src.metric_value );
+
+        COMMIT;
+        dbms_output.put_line('Updated App Stats from ' || to_char(v_last_run, 'YYYY-MM-DD HH24:MI:SS.FF'));
+    END job_stats;
+
+    PROCEDURE get_stats (
+        r_stats OUT SYS_REFCURSOR
+    ) AS
+    BEGIN
+        IF pck_api_auth.role(NULL, 'ADMIN') IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+
+        OPEN r_stats FOR SELECT
+                                            period_type  AS "period_type",
+                                            period_label AS "period_label",
+                                            metric_name  AS "metric_name",
+                                            metric_value AS "metric_value"
+                                        FROM
+                                            (
+                                                SELECT
+                                                    period_type,
+                                                    period_label,
+                                                    metric_name,
+                                                    metric_value,
+                                                    ROW_NUMBER()
+                                                    OVER(PARTITION BY period_type, metric_name
+                                                         ORDER BY
+                                                             period_label DESC
+                                                    ) AS rn
+                                                FROM
+                                                    app_stats
+                                            )
+                        WHERE
+                            rn <= 10
+                        ORDER BY
+                            period_type,
+                            metric_name,
+                            period_label;
+
+    END get_stats;
+
+    PROCEDURE job_alerts AS
+    BEGIN
+
+        -- Total file storage size alert
+
+        MERGE INTO app_alerts a
+        USING (
+            SELECT
+                'file.storage.total.size' AS alert_text,
+                CASE
+                    WHEN SUM(file_size) < 1024               THEN
+                        round(
+                            sum(file_size),
+                            2
+                        )
+                        || ' B'
+                    WHEN SUM(file_size) < 1024 * 1024        THEN
+                        round(sum(file_size) / 1024,
+                              2)
+                        || ' KB'
+                    WHEN SUM(file_size) < 1024 * 1024 * 1024 THEN
+                        round(sum(file_size) / 1024 / 1024,
+                              2)
+                        || ' MB'
+                    ELSE
+                        round(sum(file_size) / 1024 / 1024 / 1024,
+                              2)
+                        || ' GB'
+                END                       AS alert_value,
+                'info'                    AS alert_type
+            FROM
+                app_storage
+        ) src ON ( a.alert_text = src.alert_text )
+        WHEN MATCHED THEN UPDATE
+        SET a.alert_value = src.alert_value,
+            a.alert_type = src.alert_type,
+            a.created = systimestamp
+        WHEN NOT MATCHED THEN
+        INSERT (
+            alert_text,
+            alert_value,
+            alert_type,
+            created )
+        VALUES
+            ( src.alert_text,
+              src.alert_value,
+              src.alert_type,
+              systimestamp );
+
+        COMMIT;
+
+        -- Active users alert
+        MERGE INTO app_alerts a
+        USING (
+            SELECT
+                'active.users'       AS alert_text,
+                COUNT(DISTINCT uuid) AS alert_value,
+                'info'               AS alert_type
+            FROM
+                app_tokens
+            WHERE
+                    type_id = 'REFRESH'
+                AND expiration >= systimestamp
+        ) src ON ( a.alert_text = src.alert_text )
+        WHEN MATCHED THEN UPDATE
+        SET a.alert_value = src.alert_value,
+            a.alert_type = src.alert_type,
+            a.created = systimestamp
+        WHEN NOT MATCHED THEN
+        INSERT (
+            alert_text,
+            alert_value,
+            alert_type,
+            created )
+        VALUES
+            ( src.alert_text,
+              src.alert_value,
+              src.alert_type,
+              systimestamp );
+
+        COMMIT;
+
+        -- Errors in last 24 hours alert
+        MERGE INTO app_alerts a
+        USING (
+            SELECT
+                'errors.in.last.24.hours' AS alert_text,
+                COUNT(id)                 AS alert_value,
+                CASE
+                    WHEN COUNT(id) > 0 THEN
+                        'error'
+                    ELSE
+                        'success'
+                END                       AS alert_type
+            FROM
+                app_audit
+            WHERE
+                    severity = 'ERROR'
+                AND created >= systimestamp - INTERVAL '24' HOUR
+        ) src ON ( a.alert_text = src.alert_text )
+        WHEN MATCHED THEN UPDATE
+        SET a.alert_value = src.alert_value,
+            a.alert_type = src.alert_type,
+            a.created = systimestamp
+        WHEN NOT MATCHED THEN
+        INSERT (
+            alert_text,
+            alert_value,
+            alert_type,
+            created )
+        VALUES
+            ( src.alert_text,
+              src.alert_value,
+              src.alert_type,
+              systimestamp );
+
+        COMMIT;
+
+        -- Warnings in last 24 hours alert
+        MERGE INTO app_alerts a
+        USING (
+            SELECT
+                'warnings.in.last.24.hours' AS alert_text,
+                COUNT(id)                   AS alert_value,
+                CASE
+                    WHEN COUNT(id) > 0 THEN
+                        'warning'
+                    ELSE
+                        'success'
+                END                         AS alert_type
+            FROM
+                app_audit
+            WHERE
+                    severity = 'WARN'
+                AND created >= systimestamp - INTERVAL '24' HOUR
+        ) src ON ( a.alert_text = src.alert_text )
+        WHEN MATCHED THEN UPDATE
+        SET a.alert_value = src.alert_value,
+            a.alert_type = src.alert_type,
+            a.created = systimestamp
+        WHEN NOT MATCHED THEN
+        INSERT (
+            alert_text,
+            alert_value,
+            alert_type,
+            created )
+        VALUES
+            ( src.alert_text,
+              src.alert_value,
+              src.alert_type,
+              systimestamp );
+
+        COMMIT;
+
+        -- Failed email deliveries in last 24 hours alert
+        MERGE INTO app_alerts a
+        USING (
+            SELECT
+                'failed.email.deliveries.in.last.24.hours' AS alert_text,
+                COUNT(id)                                  AS alert_value,
+                CASE
+                    WHEN COUNT(id) > 0 THEN
+                        'warning'
+                    ELSE
+                        'success'
+                END                                        AS alert_type
+            FROM
+                app_emails
+            WHERE
+                    status = 'E'
+                AND created >= systimestamp - INTERVAL '24' HOUR
+        ) src ON ( a.alert_text = src.alert_text )
+        WHEN MATCHED THEN UPDATE
+        SET a.alert_value = src.alert_value,
+            a.alert_type = src.alert_type,
+            a.created = systimestamp
+        WHEN NOT MATCHED THEN
+        INSERT (
+            alert_text,
+            alert_value,
+            alert_type,
+            created )
+        VALUES
+            ( src.alert_text,
+              src.alert_value,
+              src.alert_type,
+              systimestamp );
+
+        COMMIT;
+    END job_alerts;
+
+    PROCEDURE get_alerts (
+        r_alerts OUT SYS_REFCURSOR
+    ) AS
+    BEGIN
+        IF pck_api_auth.role(NULL, 'ADMIN') IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+
+        OPEN r_alerts FOR SELECT
+                                              alert_text                                AS "text",
+                                              alert_value                               AS "value",
+                                              alert_type                                AS "type",
+                                              to_char(created, 'YYYY-MM-DD HH24:MI:SS') AS "created"
+                                          FROM
+                                              app_alerts
+                         ORDER BY
+                             created DESC;
+
+    END get_alerts;
+
 END pck_adm;
 /
 
 
--- sqlcl_snapshot {"hash":"013e437a93172c3f5bcf584dbfdd8234ce0e7835","type":"PACKAGE_BODY","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"17a6f8686b3f928923f14371054ec235b0be1318","type":"PACKAGE_BODY","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}
