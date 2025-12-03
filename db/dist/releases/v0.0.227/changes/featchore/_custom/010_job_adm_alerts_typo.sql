@@ -4,6 +4,7 @@
 
 begin 
     pck_api_jobs.remove('ADN_ALERTS');
-    pck_api_jobs.add('adm_alerts','pck_adm.job_alerts',NULL,'FREQ=MINUTELY; INTERVAL=15','Refresh Admin Dashboard Alerts');
+    pck_api_jobs.remove('ADM_ALERTS');
+    --pck_api_jobs.add('adm_alerts','pck_adm.job_alerts',NULL,'FREQ=MINUTELY; INTERVAL=15','Refresh Admin Dashboard Alerts');
 end;    
 /
