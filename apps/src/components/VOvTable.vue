@@ -316,7 +316,7 @@ const emits = defineEmits<{
     name: string,
     data: unknown,
     value?: unknown,
-    callback?: (errors?: OvFormFieldError[]) => void,
+    callback?: (errors?: OvFormFieldError[], shouldRefetch?: boolean) => void,
   ): void
   (
     event: 'fetch',
@@ -629,7 +629,7 @@ async function handleFormSubmit(actionData: OvFormData) {
     return
   }
 
-  const onActionComplete = (formErrors?: OvFormFieldError[]) => {
+  const onActionComplete = (formErrors?: OvFormFieldError[], shouldRefetch?: boolean) => {
     if (formErrors && formErrors.length > 0) {
       formOptions.value = {
         ...(formOptions.value || {}),
@@ -638,7 +638,11 @@ async function handleFormSubmit(actionData: OvFormData) {
       return
     }
 
-    localData.value[formRowIndex.value] = actionData
+    if (shouldRefetch) {
+      fetch()
+    } else {
+      localData.value[formRowIndex.value] = actionData
+    }
     form.value = false
   }
 
