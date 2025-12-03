@@ -142,7 +142,6 @@ const fetchAlerts = async () => {
 //
 
 onMounted(async () => {
-  await fetchStats()
-  await fetchAlerts()
+  await Promise.all([fetchStats(), fetchAlerts()])
 })
 </script>
