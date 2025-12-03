@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.226
+
+### Patch Changes
+
+- 58c32d7: admin user permissions
+
 ## 0.0.225
 
 ### Patch Changes
