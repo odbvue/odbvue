@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.228
+
+### Patch Changes
+
+- ac9d3d7: rest api (alpha)
+
 ## 0.0.227
 
 ### Patch Changes
