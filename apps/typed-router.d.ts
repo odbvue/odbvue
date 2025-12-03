@@ -128,6 +128,13 @@ declare module 'vue-router/auto-routes' {
       { token: ParamValue<false> },
       | never
     >,
+    '/rest': RouteRecordInfo<
+      '/rest',
+      '/rest',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/sandbox/': RouteRecordInfo<
       '/sandbox/',
       '/sandbox',
@@ -312,6 +319,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/reset-password/[token].vue': {
       routes:
         | '/reset-password/[token]'
+      views:
+        | never
+    }
+    'src/pages/rest.vue': {
+      routes:
+        | '/rest'
       views:
         | never
     }
