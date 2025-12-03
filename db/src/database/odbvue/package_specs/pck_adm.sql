@@ -14,6 +14,30 @@ CREATE OR REPLACE PACKAGE odbvue.pck_adm AS -- Administration package
         r_users  OUT SYS_REFCURSOR -- ref cursor for user records [{id, username, email, roles, created, last_login, status}]
     );
 
+    PROCEDURE get_roles ( -- Get list of roles
+        p_search VARCHAR2 DEFAULT NULL, -- search term (username)
+        p_limit  PLS_INTEGER DEFAULT 10, -- number of records to return
+        p_offset PLS_INTEGER DEFAULT 0, -- offset for pagination
+        r_roles  OUT SYS_REFCURSOR -- ref cursor for role records [{role, description}]
+    );
+
+    PROCEDURE get_permissions ( -- Get list of user permissions with filtering and pagination
+        p_filter      VARCHAR2 DEFAULT NULL, -- user UUID
+        p_search      VARCHAR2 DEFAULT NULL, -- search term (username)
+        p_limit       PLS_INTEGER DEFAULT 10, -- number of records to return
+        p_offset      PLS_INTEGER DEFAULT 0, -- offset for pagination
+        r_permissions OUT SYS_REFCURSOR -- ref cursor for user permission records [{uuid, role, permissions, from, to}]
+    );
+
+    PROCEDURE post_permission ( -- Set user permission
+        p_uuid       VARCHAR2, -- user UUID
+        p_role       VARCHAR2, -- role name
+        p_permission VARCHAR2, -- permission value
+        p_from       VARCHAR2, -- permission start time
+        p_to         VARCHAR2, -- permission end time
+        r_errors     OUT SYS_REFCURSOR -- ref cursor for validation errors [{name, message}]
+    );
+
     PROCEDURE get_emails ( -- Get email logs with filtering and pagination
         p_filter VARCHAR2 DEFAULT NULL, -- filters (as UrlEncoded JSON)
         p_limit  PLS_INTEGER DEFAULT 10, -- number of records to return
@@ -76,4 +100,4 @@ END pck_adm;
 /
 
 
--- sqlcl_snapshot {"hash":"34dfad627ba4c52f1f6bf2a7bbe28c8a03e7a1f2","type":"PACKAGE_SPEC","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"7866c617e38a6ced5fcb0ec9549fb5b5fce936a2","type":"PACKAGE_SPEC","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}

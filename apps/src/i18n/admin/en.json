@@ -37,5 +37,14 @@
   "warnings.in.last.24.hours": "Warnings in last 24 hours",
   "errors.in.last.24.hours": "Errors in last 24 hours",
   "active.users": "Active users",
-  "file.storage.total.size": "File storage total size"
+  "file.storage.total.size": "File storage total size",
+  "permissions": "Permissions",
+  "role": "Role",
+  "permission": "Permission",
+  "from": "From",
+  "add": "Add",
+  "role.is.required": "Role is required",
+  "permission.already.exists": "Permission already exists",
+  "from.invalid.format": "From invalid format",
+  "to.invalid.format": "To invalid format"
 }

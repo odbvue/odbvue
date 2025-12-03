@@ -35,6 +35,75 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_audit AS
         RETURN v_json.to_clob();
     END attributes;
 
+    PROCEDURE errors ( -- Helper to populate error messages
+        r_errors IN OUT SYS_REFCURSOR, -- Ref Cursor
+        key1     IN VARCHAR2, -- Key 1
+        value1   IN VARCHAR2, -- Value 1
+        key2     IN VARCHAR2 DEFAULT NULL, -- Key 2
+        value2   IN VARCHAR2 DEFAULT NULL, -- Value 2
+        key3     IN VARCHAR2 DEFAULT NULL, -- Key 3
+        value3   IN VARCHAR2 DEFAULT NULL, -- Value 3
+        key4     IN VARCHAR2 DEFAULT NULL, -- Key 4
+        value4   IN VARCHAR2 DEFAULT NULL, -- Value 4
+        key5     IN VARCHAR2 DEFAULT NULL, -- Key 5
+        value5   IN VARCHAR2 DEFAULT NULL, -- Value 5
+        key6     IN VARCHAR2 DEFAULT NULL, -- Key 6
+        value6   IN VARCHAR2 DEFAULT NULL -- Value 6
+    ) AS
+    BEGIN
+        OPEN r_errors FOR SELECT
+                                                                                                                                          key1   AS
+                                                                                                                                          "name"
+                                                                                                                                          ,
+                                                                                                                                          value1 AS
+                                                                                                                                          "message"
+                                                                                                                                      FROM
+                                                                                                                                          dual
+                                                                                                                    WHERE
+                                                                                                                        key1 IS NOT NULL
+                                                                                                  UNION ALL
+                                                                                                  SELECT
+                                                                                                      key2   AS "name",
+                                                                                                      value2 AS "message"
+                                                                                                  FROM
+                                                                                                      dual
+                                                                                                  WHERE
+                                                                                                      key2 IS NOT NULL
+                                                                                UNION ALL
+                                                                                SELECT
+                                                                                    key3   AS "name",
+                                                                                    value3 AS "message"
+                                                                                FROM
+                                                                                    dual
+                                                                                WHERE
+                                                                                    key3 IS NOT NULL
+                                                              UNION ALL
+                                                              SELECT
+                                                                  key4   AS "name",
+                                                                  value4 AS "message"
+                                                              FROM
+                                                                  dual
+                                                              WHERE
+                                                                  key4 IS NOT NULL
+                                            UNION ALL
+                                            SELECT
+                                                key5   AS "name",
+                                                value5 AS "message"
+                                            FROM
+                                                dual
+                                            WHERE
+                                                key5 IS NOT NULL
+                          UNION ALL
+                          SELECT
+                              key6   AS "name",
+                              value6 AS "message"
+                          FROM
+                              dual
+                          WHERE
+                              key6 IS NOT NULL;
+
+    END errors;
+
     PROCEDURE log (
         p_severity   IN VARCHAR2,
         p_message    IN app_audit.message%TYPE,
@@ -263,4 +332,4 @@ END pck_api_audit;
 /
 
 
--- sqlcl_snapshot {"hash":"c87a204de7b1e8a6d40f64c4673df4069da225d3","type":"PACKAGE_BODY","name":"PCK_API_AUDIT","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"e197f5b24648e27657cc4b0dbb559f4f4aa0f437","type":"PACKAGE_BODY","name":"PCK_API_AUDIT","schemaName":"ODBVUE","sxml":""}

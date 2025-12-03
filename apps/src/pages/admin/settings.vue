@@ -30,7 +30,9 @@ const {
 })
 
 const { action: actionSettings } = useFormAction({
-  endpoint: 'adm/setting/',
+  endpoints: {
+    edit: 'adm/setting/',
+  },
 })
 
 const options = ref<OvTableOptions>({

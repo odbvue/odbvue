@@ -1,3 +1,3 @@
 # Features
 
-//todo
+- [Administration](admin.md) - System management

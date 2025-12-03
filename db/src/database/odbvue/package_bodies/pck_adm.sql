@@ -172,6 +172,245 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_adm AS
 
     END get_users;
 
+    PROCEDURE get_roles (
+        p_search VARCHAR2 DEFAULT NULL,
+        p_limit  PLS_INTEGER DEFAULT 10,
+        p_offset PLS_INTEGER DEFAULT 0,
+        r_roles  OUT SYS_REFCURSOR
+    ) AS
+        v_search VARCHAR2(2000 CHAR) := utl_url.unescape(coalesce(p_search, ''));
+    BEGIN
+        IF pck_api_auth.role(NULL, 'ADMIN') IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+
+        OPEN r_roles FOR SELECT
+                                            r.role        AS "role",
+                                            r.description AS "description"
+                                        FROM
+                                            app_roles r
+                        WHERE
+                                1 = 1
+            -- Search by role or description
+                            AND ( p_search IS NULL
+                                  OR upper(r.role) LIKE '%'
+                                                        || upper(v_search)
+                                                        || '%' )
+                        ORDER BY
+                            r.role ASC
+                        OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY;
+
+    END get_roles;
+
+    PROCEDURE get_permissions (
+        p_filter      VARCHAR2 DEFAULT NULL,
+        p_search      VARCHAR2 DEFAULT NULL,
+        p_limit       PLS_INTEGER DEFAULT 10,
+        p_offset      PLS_INTEGER DEFAULT 0,
+        r_permissions OUT SYS_REFCURSOR
+    ) AS
+
+        v_filter VARCHAR2(2000 CHAR) := utl_url.unescape(coalesce(p_filter, '{}'));
+        v_search VARCHAR2(2000 CHAR) := utl_url.unescape(coalesce(p_search, ''));
+    BEGIN
+        IF pck_api_auth.role(NULL, 'ADMIN') IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+
+        OPEN r_permissions FOR SELECT
+                                                        p.id                                           AS "id",
+                                                        u.uuid                                         AS "uuid",
+                                                        r.role                                         AS "role",
+                                                        p.permission                                   AS "permission",
+                                                        CASE
+                                                            WHEN systimestamp BETWEEN p.valid_from AND p.valid_to THEN
+                                                                'Y'
+                                                            ELSE
+                                                                'N'
+                                                        END                                            AS "active",
+                                                        to_char(p.valid_from, 'YYYY-MM-DD HH24:MI:SS') AS "from",
+                                                        to_char(p.valid_to, 'YYYY-MM-DD HH24:MI:SS')   AS "to"
+                                                    FROM
+                                                             app_permissions p
+                                                        JOIN app_users u ON u.id = p.id_user
+                                                        JOIN app_roles r ON r.id = p.id_role
+                              WHERE
+                                      1 = 1
+            -- UUID filter
+                                  AND ( NOT JSON_EXISTS ( v_filter, '$.uuid' )
+                                            OR EXISTS (
+                                      SELECT
+                                          1
+                                      FROM
+                                              JSON_TABLE ( JSON_QUERY(v_filter, '$.uuid'), '$[*]'
+                                                  COLUMNS (
+                                                      uuid VARCHAR2 ( 100 ) PATH '$'
+                                                  )
+                                              )
+                                          j
+                                      WHERE
+                                          u.uuid = j.uuid
+                                  ) )
+            -- Search by permission or description
+                                  AND ( v_search IS NULL
+                                        OR upper(p.permission) LIKE '%'
+                                        || upper(v_search)
+                                        || '%'
+                                           OR upper(r.role) LIKE '%'
+                                                                 || upper(v_search)
+                                                                 || '%' )
+                              ORDER BY
+                                  r.role,
+                                  p.permission ASC
+                              OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY;
+
+    END get_permissions;
+
+    PROCEDURE post_permission (
+        p_uuid       VARCHAR2,
+        p_role       VARCHAR2,
+        p_permission VARCHAR2,
+        p_from       VARCHAR2,
+        p_to         VARCHAR2,
+        r_errors     OUT SYS_REFCURSOR
+    ) AS
+
+        v_id          app_permissions.id%TYPE;
+        v_id_role     app_roles.id%TYPE;
+        v_id_user     app_users.id%TYPE;
+        v_from        TIMESTAMP;
+        v_to          TIMESTAMP;
+        v_audit_attrs CLOB := pck_api_audit.attributes('grantee', p_uuid, 'role', p_role, 'permission',
+                                                       p_permission, 'from', p_from, 'to', p_to,
+                                                       'uuid', pck_api_auth.uuid);
+    BEGIN
+        IF pck_api_auth.role(NULL, 'ADMIN') IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+
+        BEGIN
+            SELECT
+                p.id
+            INTO v_id
+            FROM
+                app_permissions p
+            WHERE
+                p.id_user IN (
+                    SELECT
+                        u.id
+                    FROM
+                        app_users u
+                    WHERE
+                        u.uuid = p_uuid
+                )
+                AND p.id_role IN (
+                    SELECT
+                        r.id
+                    FROM
+                        app_roles r
+                    WHERE
+                        r.role = upper(p_role)
+                );
+
+        EXCEPTION
+            WHEN no_data_found THEN
+                v_id := NULL;
+        END;
+
+        IF ( v_id IS NULL ) THEN
+            BEGIN
+                SELECT
+                    r.id
+                INTO v_id_role
+                FROM
+                    app_roles r
+                WHERE
+                    r.role = upper(p_role);
+
+            EXCEPTION
+                WHEN no_data_found THEN
+                    pck_api_audit.errors(r_errors, 'role', 'role.is.required');
+                    RETURN;
+            END;
+
+            BEGIN
+                SELECT
+                    u.id
+                INTO v_id_user
+                FROM
+                    app_users u
+                WHERE
+                    u.uuid = p_uuid;
+
+            EXCEPTION
+                WHEN no_data_found THEN
+                    pck_api_audit.errors(r_errors, 'role', 'user.is.required');
+                    RETURN;
+            END;
+
+        END IF;
+
+        IF TRIM(p_permission) IS NULL THEN
+            pck_api_audit.errors(r_errors, 'role', 'permission.is.required');
+            RETURN;
+        END IF;
+
+        BEGIN
+            v_from := TO_TIMESTAMP ( replace(p_from, 'T'), 'YYYY-MM-DD HH24:MI:SS' );
+        EXCEPTION
+            WHEN OTHERS THEN
+                pck_api_audit.errors(r_errors, 'from', 'from.invalid.format');
+                RETURN;
+        END;
+
+        BEGIN
+            v_to := TO_TIMESTAMP ( replace(p_to, 'T'), 'YYYY-MM-DD HH24:MI:SS' );
+        EXCEPTION
+            WHEN OTHERS THEN
+                pck_api_audit.errors(r_errors, 'to', 'to.invalid.format');
+                RETURN;
+        END;
+
+        MERGE INTO app_permissions tgt
+        USING (
+            SELECT
+                v_id         AS id,
+                v_id_user    AS id_user,
+                v_id_role    AS id_role,
+                p_permission AS permission,
+                v_from       AS valid_from,
+                v_to         AS valid_to
+            FROM
+                dual
+        ) src ON ( tgt.id = src.id )
+        WHEN NOT MATCHED THEN
+        INSERT (
+            id_user,
+            id_role,
+            permission,
+            valid_from,
+            valid_to )
+        VALUES
+            ( src.id_user,
+              src.id_role,
+              src.permission,
+              src.valid_from,
+              src.valid_to )
+        WHEN MATCHED THEN UPDATE
+        SET tgt.permission = src.permission,
+            tgt.valid_from = src.valid_from,
+            tgt.valid_to = src.valid_to;
+
+        COMMIT;
+        pck_api_audit.info('Permission', v_audit_attrs);
+    EXCEPTION
+        WHEN OTHERS THEN
+            pck_api_audit.error('Permission', v_audit_attrs);
+    END post_permission;
+
     PROCEDURE get_emails (
         p_filter VARCHAR2 DEFAULT NULL,
         p_limit  PLS_INTEGER DEFAULT 10,
@@ -1444,4 +1683,4 @@ END pck_adm;
 /
 
 
--- sqlcl_snapshot {"hash":"17a6f8686b3f928923f14371054ec235b0be1318","type":"PACKAGE_BODY","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"b9e59719bef7f88665fd65d82eb19db692f1adb4","type":"PACKAGE_BODY","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}
