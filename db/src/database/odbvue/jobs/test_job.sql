@@ -21,9 +21,8 @@ BEGIN
         value     => 3
     );
 
-    dbms_scheduler.enable('"ODBVUE"."TEST_JOB"');
 END;
 /
 
 
--- sqlcl_snapshot {"hash":"7ff145b8106bd5dc301abbae7ffb46b2aa780358","type":"JOB","name":"TEST_JOB","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"1a9879cc1a1a8e609d9a5955932cfa5996ac367e","type":"JOB","name":"TEST_JOB","schemaName":"ODBVUE","sxml":""}
