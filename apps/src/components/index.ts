@@ -506,7 +506,10 @@ export function useTableFetch<T extends Record<string, unknown>>(
 // Table Form Action Composable
 
 export interface UseFormActionOptions {
-  endpoint: string
+  endpoint?: string
+  endpoints?: Record<string, string>
+  transformPayload?: (actionName: string, payload: OvFormData) => OvFormData
+  refetchOn?: string[]
 }
 
 export interface UseFormActionReturn {
@@ -515,7 +518,7 @@ export interface UseFormActionReturn {
     name: string,
     item: OvFormData,
     value?: OvFormData,
-    callback?: (errors?: OvFormFieldError[]) => void,
+    callback?: (errors?: OvFormFieldError[], shouldRefetch?: boolean) => void,
   ) => Promise<void>
 }
 
@@ -523,22 +526,42 @@ export function useFormAction(options: UseFormActionOptions): UseFormActionRetur
   const http = useHttp()
   const loading = ref(false)
 
+  const getEndpoint = (actionName: string): string => {
+    if (options.endpoints?.[actionName]) {
+      return options.endpoints[actionName]
+    }
+    if (options.endpoint) {
+      return options.endpoint
+    }
+    throw new Error(`No endpoint configured for action: ${actionName}`)
+  }
+
+  const shouldRefetch = (actionName: string): boolean => {
+    if (!options.refetchOn) return false
+    return options.refetchOn.includes(actionName)
+  }
+
   const action = async (
-    _name: string,
+    name: string,
     _item: OvFormData,
     value?: OvFormData,
-    callback?: (errors?: OvFormFieldError[]) => void,
+    callback?: (errors?: OvFormFieldError[], shouldRefetch?: boolean) => void,
   ) => {
     loading.value = true
     try {
+      let payload = value
+      if (options.transformPayload && payload) {
+        payload = options.transformPayload(name, payload)
+      }
+      const endpoint = getEndpoint(name)
       const res: { data?: { errors?: OvFormFieldError[] } | null } = await http.post(
-        options.endpoint,
-        value,
+        endpoint,
+        payload,
       )
       if (res?.data && res.data.errors) {
-        callback?.(res.data.errors)
+        callback?.(res.data.errors, false)
       } else {
-        callback?.()
+        callback?.(undefined, shouldRefetch(name))
       }
     } finally {
       loading.value = false
