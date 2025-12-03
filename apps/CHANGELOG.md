@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.227
+
+### Patch Changes
+
+- 5600737: fixed admin jobs
+
 ## 0.0.226
 
 ### Patch Changes
