@@ -1656,6 +1656,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_adm AS
               systimestamp );
 
         COMMIT;
+        dbms_output.put_line('Updated App Alerts');
     END job_alerts;
 
     PROCEDURE get_alerts (
@@ -1683,4 +1684,4 @@ END pck_adm;
 /
 
 
--- sqlcl_snapshot {"hash":"b9e59719bef7f88665fd65d82eb19db692f1adb4","type":"PACKAGE_BODY","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"d811876d7be2545462dafd43d333b8204efa7908","type":"PACKAGE_BODY","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}

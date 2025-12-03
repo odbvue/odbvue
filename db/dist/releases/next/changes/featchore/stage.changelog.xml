@@ -3,6 +3,5 @@
                    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
-<!--CHANGES-->
-<include file="changes/featchore/stage.changelog.xml" relativeToChangelogFile="true"/>
+<include file="_custom/010_job_adm_alerts_typo.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
 </databaseChangeLog>

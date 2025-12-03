@@ -3,6 +3,8 @@
 </template>
 
 <script lang="ts" setup>
+import type { OvTableData } from '@/components'
+
 definePage({
   meta: {
     title: 'Job Scheduler',
@@ -20,12 +22,10 @@ const http = useHttp()
 
 const jobs = ref<{ fetch: () => void } | null>(null)
 
-const action = async (actionName: string, actionData: OvTableData[]) => {
+const action = async (actionName: string, actionData: OvTableData[], value: OvTableData) => {
   if (['enable', 'disable', 'run'].indexOf(actionName) === -1) return
-  if (!actionData[0]) return
-  const name = actionData[0].name
-  if (!name) return
-  const { status } = await http.post(`adm/job-${actionName}/`, { name })
+  if (!value.name) return
+  const { status } = await http.post(`adm/job-${actionName}/`, { name: value.name })
   if (status === 200) app.ui.setSuccess('admin.job.action.success')
   else app.ui.setError('admin.job.action.failed')
   jobs.value?.fetch()
