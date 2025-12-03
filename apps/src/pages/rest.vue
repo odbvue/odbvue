@@ -650,21 +650,6 @@ async function loadModuleManifest(module: ApiModule) {
     module.manifest = data
     module.endpoints = parseEndpoints(data as OpenApiManifest)
     module.error = false
-
-    // Set default values for common parameters
-    for (const endpoint of module.endpoints) {
-      if (endpoint.parameters) {
-        for (const param of endpoint.parameters) {
-          const key = `${module.name}-${endpoint.method}-${endpoint.path}-${param.name}`
-          // Set defaults for limit and offset
-          if (param.name === 'limit' && !paramValues.value[key]) {
-            paramValues.value[key] = '10'
-          } else if (param.name === 'offset' && !paramValues.value[key]) {
-            paramValues.value[key] = '0'
-          }
-        }
-      }
-    }
   } catch (err) {
     module.error = true
     console.error(`Failed to load manifest for ${module.name}:`, err)
