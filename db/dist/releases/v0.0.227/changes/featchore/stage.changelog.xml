@@ -3,7 +3,6 @@
                    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
-<include file="_custom/010_job_adm_alerts_typo.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
 <include file="odbvue/package_bodies/pck_adm.sql" relativeToChangelogFile="true"/>
 <include file="odbvue/programs/adm_alerts_program.sql" relativeToChangelogFile="true"/>
 <include file="odbvue/schedules/adm_alerts_schedule.sql" relativeToChangelogFile="true"/>
