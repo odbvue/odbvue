@@ -197,7 +197,11 @@ export default defineConfig({
       '/features': [
         {
           text: 'Features',
-          items: [{ text: 'Overview', link: '/features' }],
+          items: [
+            { text: 'Overview', link: '/features' },
+            { text: 'Application', link: '/features/app' },
+            { text: 'Administration', link: '/features/adm' },
+          ],
         },
       ],
     },
