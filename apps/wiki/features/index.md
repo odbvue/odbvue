@@ -1,3 +1,4 @@
 # Features
 
-- [Administration](admin.md) - System management
+- [Application](app.md) - Core features
+- [Administration](adm.md) - System management

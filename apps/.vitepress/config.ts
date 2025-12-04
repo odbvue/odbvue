@@ -26,7 +26,9 @@ export default defineConfig({
 
     nav: [
       { text: 'Home', link: '/' },
-      { text: 'Introduction', link: '/introduction' },
+      { text: 'OdbVue', link: 'https://odbvue.com' },
+      { text: 'Apps', link: 'https://apps.odbvue.com' },
+      { text: 'Introduction', link: '/introduction/vision' },
       { text: 'Guide', link: '/guide' },
       { text: 'Features', link: '/features' },
     ],
@@ -35,7 +37,11 @@ export default defineConfig({
       '/introduction': [
         {
           text: 'Introduction',
-          items: [{ text: 'What is OdbVue?', link: '/introduction' }],
+          items: [
+            { text: 'Why OdbVue?', link: '/introduction/vision' },
+            { text: 'Skills and habits', link: '/introduction/skills-and-habits' },
+            { text: 'Architecture and design', link: '/introduction/architecture-and-design' },
+          ],
         },
       ],
       '/guide': [
@@ -191,7 +197,11 @@ export default defineConfig({
       '/features': [
         {
           text: 'Features',
-          items: [{ text: 'Overview', link: '/features' }],
+          items: [
+            { text: 'Overview', link: '/features' },
+            { text: 'Application', link: '/features/app' },
+            { text: 'Administration', link: '/features/adm' },
+          ],
         },
       ],
     },

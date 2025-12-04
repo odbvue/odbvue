@@ -10,17 +10,20 @@ hero:
   actions:
     - theme: alt
       text: Introduction
-      link: /introduction
+      link: /introduction/vision
     - theme: brand
       text: Guide
       link: /guide
 
 features:
-  - title: Feature A
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
-  - title: Feature B
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
-  - title: Feature C
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
+  - title: Why?
+    link: /introduction/vision
+    details: Create a vision, Understand the problem, Start doing
+  - title: who?
+    link: /introduction/skills-and-habits
+    details: Acknowledge skills, Develop Habits, Keep growing
+  - title: How?
+    link: /introduction/architecture-and-design
+    details: Do the design right, Choose architecture, Keep high standards
 ---
 
