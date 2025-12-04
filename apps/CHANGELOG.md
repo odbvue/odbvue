@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.229
+
+### Patch Changes
+
+- 8a13d94: rest api page (swagger ui style), sandbox accessibility and cli documentation
+
 ## 0.0.228
 
 ### Patch Changes
