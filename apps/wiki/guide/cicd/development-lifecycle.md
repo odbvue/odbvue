@@ -46,6 +46,20 @@ A **tag** marks specific commits as release points (e.g., `v1.0.0`) in Git histo
 8. **Release**
    Tag a new version, commit release notes, and push to origin for deployment or distribution.
 
+## CLI
+
+The **`ov` CLI** is a command-line tool that automates and streamlines the development workflow for the OdbVue project. It provides commands for managing feature branches, committing changes, exporting database objects, staging changesets, and publishing releases.
+
+> [!IMPORTANT]
+> Before using the `ov` CLI, you must build and register it globally:
+> ```bash
+> cd cli
+> pnpm install
+> pnpm build
+> pnpm link -g
+> ```
+> After linking, the `ov` command will be available globally in your terminal.
+
 ## Initial setup (once)
 
 ### Step 1. Init git repo (if not done yet)
@@ -109,97 +123,87 @@ cd ..
 
 ### Step 1. Create a feature branch
 
-#### `./scripts/create-feature.sh [feature-name]`
+#### `ov new-feature [feature-name]` or `ov nf [feature-name]`
 
 ```bash
-# Check for unmerged changes
-git status --porcelain
-# If clean, proceed:
-git checkout main
-git pull origin main
-git checkout -b feat/[feature-name]
+ov nf my-feature
 ```
 
+This command:
+- Checks for unmerged changes and exits if any exist
+- Checks out and pulls the latest `main` branch
+- Creates and checks out a new branch `feat/my-feature`
+
 > [!IMPORTANT]
-> The script will exit if you have uncommitted changes. Commit or stash any changes before running the script.
+> Commit or stash any changes before running this command.
 
 ### Step 2. Implement application changes
 
-Work on feature in the feature branch. Commit regularly.
+Work on the feature in the feature branch. Commit regularly using the commit-all command:
+
+#### `ov commit-all` or `ov ca`
 
 ```bash
-git add .
-git commit -m "feat(scope): description of change"
+ov ca
 ```
+
+You'll be prompted to:
+- Provide a scope (e.g., `apps`, `db`, `chore`, `cicd`)
+- Provide a commit message
+
+Result: Creates a commit with message format `(${scope}): ${message}`
 
 ### Step 2a. Implement database DDL changes (if needed)
 
-DDL - Data Definition Language - create and alter database object like table structure, packages
+DDL - Data Definition Language - create and alter database objects like table structure, packages
 
 Do development directly in development database. When done:
 
-#### `./scripts/db-export.sh [commit-message] [connection-string]`
+#### `ov db-export [-c, --connection <connection>]` or `ov de`
 
-```bash 
-cd db
-sql [connection-string]
-project export
-!git add .
-!git commit -m "feat(db): [commit-message]"
-exit
-cd ..
+```bash
+ov de -c user/password@dbhost
 ```
+
+This command exports database objects using SQLcl project export. The `ODBVUE_DB_CONN` environment variable can be used instead of providing `-c` option.
+
+> [!NOTE]
+> Verify the exported database objects are correct before proceeding.
 
 ### Step 2b. Implement database DML changes (if needed)
 
 DML - Data Manipulation Language - insert and update data scripts  
 
-Create SQL script file placeholder manually for the next changeset:
+Create SQL script file placeholder for the next changeset:
 
-#### `./scripts/db-add-custom.sh [path-to-file]`
+#### `ov db-add-custom [path-to-file]` or `ov da`
 
 ```bash
-cd db
-sql /nolog
-project stage add-custom -file-name [path-to-file]
-exit
-cd ..
+ov da db/src/database/001_insert_data.sql
 ```
+
+This stages custom database files using SQLcl project staging.
 
 > [!NOTE]
-> Scripts will be executed in alphabetic order name `001_*`, `002_*` and so on
+> Scripts will be executed in alphabetic order: `001_*`, `002_*` and so on
 
-### Step 3. Create Pull Request
+### Step 3. Prepare Pull Request
 
-When feature is ready:
+When feature is ready, stage database changes and create a changeset:
 
-#### `./scripts/submit-pr.sh [connection-string]`
-
-```bash
-cd db
-sql [connection-string]
-project stage 
-exit
-cd ..
-
-# Stage database changes first
-git add db/
-
-cd apps
-pnpm changeset
-```
-
-You'll be prompted to:
-
-- Choose the version bump type: patch, minor, or major
-- Write a concise summary of the changes
+#### `ov submit-pr [-c, --connection <connection>]` or `ov sp`
 
 ```bash
-git add .
-git commit -m "changeset: [changeset-summary]"
-git push -u origin feat/feat/[feature-name]
-cd..
+ov sp -c user/password@dbhost
 ```
+
+This command:
+- Stages database changes using SQLcl project stage
+- Prompts for confirmation
+- Stages all database changes with `git add db/`
+- Prompts to create a changeset (choose version bump: patch, minor, or major)
+- Commits all changes with changeset summary
+- Pushes to origin with upstream tracking
 
 ### Step 4. Merge Pull Request
 
@@ -207,45 +211,41 @@ Then on GitHub:
 
 - Open a PR against `main`
 - Request reviews
-- Address feedback and push updates
+- Address feedback and push updates (use `ov ca` to commit changes)
 - Merge into `main`
 
 ### Step 5. Close the feature
 
-#### `./scripts/close-feature.sh`
+#### `ov close-feature` or `ov cf`
 
 ```bash
-# [current-branch] git rev-parse --abbrev-ref HEAD
-git checkout main
-git pull origin main
-git merge --squash [current-branch]
-git push
-git branch -d [current-branch]
-git push origin --delete [current-branch]
+ov cf
 ```
+
+This command:
+- Checks out and pulls the latest `main` branch
+- Squash merges the current feature branch into `main`
+- Pushes to origin
+- Deletes the local and remote feature branch
 
 ## Release
 
 Create and publish release
 
-#### `./scripts/release.sh [version] [message]`
+#### `ov create-release` or `ov cr`
 
 ```bash
-git checkout main
-git pull origin main
-
-# bump json packages version to [version] (remove v prefix)
-
-cd db
-sql /nolog
-project release -version [version]
-exit
-cd ..
-
-git add .
-git commit -m "release: [version] [message]"
-
-git tag -a [version] -m "Release [version] [message]"
-git push origin [version]
-git push
+ov cr -m "Release notes message"
 ```
+
+This command:
+- Checks out and pulls the latest `main` branch
+- Reads version from `apps/package.json`
+- Creates database release using SQLcl project release (if db directory exists)
+- Stages all changes with `git add .`
+- Commits with message format `release: [version] [additional-message]`
+- Creates annotated git tag with format `v[version]`
+- Pushes tag and commits to origin for deployment or distribution
+
+> [!NOTE]
+> The `-m, --message` option is optional and adds additional context to the release commit and tag.
