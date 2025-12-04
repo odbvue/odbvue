@@ -61,7 +61,6 @@ declare global {
   const toValue: typeof import('vue').toValue
   const triggerRef: typeof import('vue').triggerRef
   const unref: typeof import('vue').unref
-  const useAdminStore: typeof import('./src/stores/admin').useAdminStore
   const useAppStore: typeof import('./src/stores/index').useAppStore
   const useAttrs: typeof import('vue').useAttrs
   const useAuditStore: typeof import('./src/stores/app/audit').useAuditStore
@@ -92,7 +91,6 @@ declare global {
   const useServerHead: typeof import('@unhead/vue').useServerHead
   const useServerHeadSafe: typeof import('@unhead/vue').useServerHeadSafe
   const useServerSeoMeta: typeof import('@unhead/vue').useServerSeoMeta
-  const useSettingsAction: typeof import('./src/components/index').useSettingsAction
   const useSettingsStore: typeof import('./src/stores/app/settings').useSettingsStore
   const useSlots: typeof import('vue').useSlots
   const useTableFetch: typeof import('./src/components/index').useTableFetch

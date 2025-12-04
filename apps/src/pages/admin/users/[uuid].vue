@@ -57,6 +57,28 @@ definePage({
 
 const { t } = useI18n()
 
+import { defineStore, acceptHMRUpdate } from 'pinia'
+const useAdminStore = defineStore(
+  'admin',
+  () => {
+    const tab = ref('details')
+
+    return {
+      tab,
+    }
+  },
+  {
+    storage: {
+      adapter: 'localStorage',
+      include: ['tab'],
+    },
+  } as Record<string, unknown>,
+)
+
+if (import.meta.hot) {
+  import.meta.hot.accept(acceptHMRUpdate(useAdminStore, import.meta.hot))
+}
+
 const admin = useAdminStore()
 
 const route = useRoute()
