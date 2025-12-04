@@ -23,6 +23,12 @@
           <v-list-item-title>{{ page.title }}</v-list-item-title>
         </v-list-item>
       </v-list>
+      <v-divider />
+      <v-list>
+        <v-list-item link prepend-icon="$mdiSchool" href="https://wiki.odbvue.com" target="_blank">
+          <v-list-item-title>Wiki</v-list-item-title>
+        </v-list-item>
+      </v-list>
       <v-divider v-if="app.auth.isAuthenticated" />
       <v-list v-if="app.auth.isAuthenticated">
         <v-list-item>
