@@ -93,8 +93,9 @@
 <script setup lang="ts">
 definePage({
   meta: {
-    visibility: 'always',
-    access: 'when-authenticated',
+    visibility: 'with-role',
+    access: 'with-role',
+    roles: ['developer'],
   },
 })
 import { type OvFormOptions, type OvFormData } from '@/components/'
