@@ -188,28 +188,7 @@ program
         process.exit(1);
       }
 
-      logger.warn('Please verify if DB objects are correctly exported');
-
-      const commitResponse = await prompt('Would you like to commit changes? (Y/N): ');
-
-      if (commitResponse.toLowerCase() !== 'y') {
-        logger.info('Export completed without committing changes.');
-        return;
-      }
-
-      const commitMessage = await prompt('Enter commit message: ');
-
-      if (!commitMessage.trim()) {
-        logger.error('Commit message cannot be empty.');
-        process.exit(1);
-      }
-
-      logger.info('Committing changes...');
-
-      execSync('git add .', { cwd: dbDir, stdio: 'inherit' });
-      execSync(`git commit -m "feat(db): ${commitMessage}"`, { cwd: dbDir, stdio: 'inherit' });
-
-      logger.success('Database export completed and changes committed.');
+      logger.success('Database export completed');
     } catch (error) {
       logger.error(`Failed to export database: ${error}`);
       process.exit(1);
@@ -748,6 +727,41 @@ program
           proc.kill();
         }
       });
+      process.exit(1);
+    }
+  });
+
+// Commit All command
+program
+  .command('commit-all')
+  .alias('ca')
+  .description('Add and commit all changes with scope and message')
+  .action(async () => {
+    try {
+      const scope = await prompt('Enter scope (e.g., apps, db, i13e, cicd, wiki, chore): ');
+
+      if (!scope.trim()) {
+        logger.error('Scope cannot be empty.');
+        process.exit(1);
+      }
+
+      const message = await prompt('Enter commit message: ');
+
+      if (!message.trim()) {
+        logger.error('Commit message cannot be empty.');
+        process.exit(1);
+      }
+
+      logger.info('Committing all changes...');
+      execSync('git add .', { cwd: rootDir, stdio: 'inherit' });
+      execSync(`git commit -m "(${scope.trim()}): ${message.trim()}"`, {
+        cwd: rootDir,
+        stdio: 'inherit',
+      });
+
+      logger.success(`Changes committed with message: "(${scope.trim()}): ${message.trim()}"`);
+    } catch (error) {
+      logger.error(`Failed to commit changes: ${error}`);
       process.exit(1);
     }
   });
