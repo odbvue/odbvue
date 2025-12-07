@@ -19,7 +19,6 @@ export const useTravailStore = defineStore(
       assignee: string
       created: string
       modified: string
-
     }
 
     const tasks = ref<Task[]>([])

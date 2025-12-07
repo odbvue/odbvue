@@ -23,7 +23,7 @@ const routeParamValue = (name: string) => {
   const route = useRoute()
   const param = (route.params as Record<string, unknown>)[name]
   return Array.isArray(param) ? param[0] : param || ''
-} 
+}
 const routeQueryValue = (name: string) => {
   const route = useRoute()
   const query = route.query[name]
