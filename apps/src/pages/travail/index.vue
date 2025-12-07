@@ -13,12 +13,22 @@
     <v-row>
       <v-col v-for="task in travail.tasks" :key="task.key" cols="12" md="4" sm="6">
         <v-card>
-          <v-card-subtitle>{{ task.key }}</v-card-subtitle>
-          <v-card-title>{{ task.title }}</v-card-title>
+          <v-card-title><v-badge bordered :content="task.key" :offset-x="-8">{{ task.title }}</v-badge></v-card-title>
           <v-card-text>{{ task.description }}</v-card-text>
-          <v-card-text
-            ><v-label>{{ t('assignee') }}:</v-label> {{ task.assignee }}</v-card-text
-          >
+          <v-card-text>
+            <v-row>
+              <v-col v-if="task.parent_key" cols="12" sm="6">
+                <v-label>{{ t('parent') }}:</v-label> {{ task.parent_key }}
+              </v-col>
+              <v-col  cols="12" sm="6">
+                <v-label>{{ t('assignee') }}:</v-label> {{ task.assignee }}
+              </v-col>
+            </v-row>
+          </v-card-text>
+          <v-card-actions>
+            <v-btn :to="`/travail/new-task?parent-key=${task.key}`" text>{{ t('create.child.task') }}</v-btn>
+            <v-btn :to="`/travail/${task.key}`" text>{{ t('view.details') }}</v-btn>
+          </v-card-actions>
         </v-card>
       </v-col>
     </v-row>

@@ -738,6 +738,33 @@ program
   .description('Add and commit all changes with scope and message')
   .action(async () => {
     try {
+      const appsDir = path.resolve(rootDir, 'apps');
+
+      // Run format
+      logger.info('Running pnpm format...');
+      execSync('pnpm format', { cwd: appsDir, stdio: 'inherit' });
+      logger.success('Format completed.');
+
+      // Run lint
+      logger.info('Running pnpm lint...');
+      try {
+        execSync('pnpm lint', { cwd: appsDir, stdio: 'inherit' });
+        logger.success('Lint completed.');
+      } catch {
+        logger.error('Lint failed. Please fix lint errors before committing.');
+        process.exit(1);
+      }
+
+      // Run type-check
+      logger.info('Running pnpm type-check...');
+      try {
+        execSync('pnpm type-check', { cwd: appsDir, stdio: 'inherit' });
+        logger.success('Type-check completed.');
+      } catch {
+        logger.error('Type-check failed. Please fix type errors before committing.');
+        process.exit(1);
+      }
+
       const scope = await prompt('Enter scope (e.g., apps, db, i13e, cicd, wiki, chore): ');
 
       if (!scope.trim()) {

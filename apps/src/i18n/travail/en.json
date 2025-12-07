@@ -1,4 +1,9 @@
 {
   "assignee": "Assignee",
-  "new.task": "New task"
+  "new.task": "New task",
+  "view.details": "View details",
+  "create.child.task": "Create child task",
+  "parent": "Parent",
+  "priority": "Priority",
+  "due.date": "Due date"
 }

@@ -9,6 +9,7 @@ export const useTravailStore = defineStore(
 
     type Task = {
       key: string
+      parent_key?: string
       title: string
       description: string
       due: string
@@ -18,6 +19,7 @@ export const useTravailStore = defineStore(
       assignee: string
       created: string
       modified: string
+
     }
 
     const tasks = ref<Task[]>([])
@@ -34,6 +36,13 @@ export const useTravailStore = defineStore(
       tasks.value = data?.tasks || []
     }
 
+    const getTask = async (key: string) => {
+      const { data } = await http.get<{ tasks: Task[] }>('tra/tasks/', {
+        params: { filter: undefined, search: key, offset: 0, limit: 1 },
+      })
+      return data?.tasks[0]
+    }
+
     const createTask = async (task: OvFormData) => {
       await http.post<{ task: Task }>('tra/task/', task)
       await getTasks()
@@ -43,6 +52,7 @@ export const useTravailStore = defineStore(
       viewMode,
       tasks,
       getTasks,
+      getTask,
       createTask,
     }
   },
