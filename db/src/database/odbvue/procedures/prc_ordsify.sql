@@ -300,15 +300,16 @@ BEGIN
                     v_params := v_params
                                 || lower(a.argument_name)
                                 || ' => :'
-                                || v_argument
+                                || replace(v_argument, '_', '-')
                                 || ',';
 
                     IF a.defaulted = 'N' THEN
                         IF a.in_out = 'IN' THEN
                             v_pattern := v_pattern
                                          || ':'
-                                         || v_argument
+                                         || replace(v_argument, '_', '-')
                                          || '/';
+
                         END IF;
                     END IF;
 
@@ -424,7 +425,7 @@ BEGIN
                             p_pattern            => v_pattern,
                             p_method             => v_method,
                             p_name               => v_argument,
-                            p_bind_variable_name => v_argument,
+                            p_bind_variable_name => replace(v_argument, '_', '-'),
                             p_source_type        =>
                                            CASE a.in_out
                                                WHEN 'OUT' THEN
@@ -456,4 +457,4 @@ END;
 /
 
 
--- sqlcl_snapshot {"hash":"3b8fce91b9c7ae71314a469485d07a20acec4eff","type":"PROCEDURE","name":"PRC_ORDSIFY","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"99022cecc183b13d9af3bbec62bebb0862e1fb46","type":"PROCEDURE","name":"PRC_ORDSIFY","schemaName":"ODBVUE","sxml":""}
