@@ -1,13 +1,13 @@
 # Form
 
-Flexible form component with built-in validation, customizable fields, and action handling. Supports text, email, password, textarea, number, select, checkbox, switch, rating, file, and date/time inputs.
+Flexible form component with built-in validation, customizable fields, and action handling. Supports text, email, password, textarea, markdown, number, select, checkbox, switch, rating, file, and date/time inputs.
 
 ## Overview
 
-`VOvForm` provides a comprehensive form solution with configurable fields, validation rules, custom actions, and error handling. It supports 13+ field types with Vuetify integration, automatic layout management, and responsive grid columns. The component handles form submission, validation, and custom actions with TypeScript support throughout.
+`VOvForm` provides a comprehensive form solution with configurable fields, validation rules, custom actions, and error handling. It supports 14+ field types with Vuetify integration, automatic layout management, and responsive grid columns. The component handles form submission, validation, and custom actions with TypeScript support throughout.
 
 **Features:**
-- 13+ field types (text, email, password, textarea, number, select, checkbox, switch, rating, file, date, time, datetime)
+- 14+ field types (text, email, password, textarea, markdown, number, select, checkbox, switch, rating, file, date, time, datetime)
 - Built-in validation with 20+ rule types
 - Customizable actions with formatters
 - Responsive grid layout with configurable columns
@@ -183,6 +183,30 @@ Multi-line text input with optional auto-grow:
 - `autoGrow` (boolean) - Auto-expand as user types
 - `noResize` (boolean) - Disable manual resizing
 
+#### Markdown Field
+Rich text editor with markdown output using TipTap:
+
+```typescript
+{
+  type: 'markdown',
+  name: 'content',
+  label: 'Content',
+  hint: 'Use the toolbar to format your text',
+  toolbar: ['bold', 'italic', 'heading1', 'heading2', 'bulletList', 'orderedList'],
+  minHeight: '150px',
+  maxHeight: '300px'
+}
+```
+
+**Markdown-specific properties:**
+- `toolbar` (string[]) - Toolbar buttons to display. Available options: `bold`, `italic`, `underline`, `strike`, `bulletList`, `orderedList`, `heading1`, `heading2`, `heading3`. Default: `['bold', 'italic', 'heading1', 'heading2', 'bulletList', 'orderedList']`
+- `toolbarClass` (string) - CSS class for toolbar container
+- `editorClass` (string) - CSS class for editor content area
+- `minHeight` (string) - Minimum height of the editor (e.g., `'150px'`)
+- `maxHeight` (string) - Maximum height before scrolling (e.g., `'300px'`)
+
+The markdown field stores content as markdown format, making it ideal for rich text that needs to be rendered or stored as markdown.
+
 #### Switch Field
 Toggle switch input:
 
@@ -233,16 +257,25 @@ Dropdown select with single or multiple selection:
   type: 'select',
   name: 'country',
   label: 'Select Country',
-  items: ['USA', 'Canada', 'Mexico'],
+  items: [
+    { title: 'USA', value: 'us' },
+    { title: 'Canada', value: 'ca' },
+    { title: 'Mexico', value: 'mx' }
+  ],
   multiple: false,
   chips: false
 }
 ```
 
 **Selection-specific properties:**
-- `items` (string[]) - Array of selectable items
+- `items` (`OvFormSelectItem[]`) - Array of selectable items with `{ title: string, value: unknown }` structure
 - `multiple` (boolean) - Allow multiple selections
 - `chips` (boolean) - Display selected items as chips
+- `itemTitle` (string) - Property name for display text (default: `'title'`)
+- `itemValue` (string) - Property name for the value (default: `'value'`)
+- `fetchItems` (`(search: string) => Promise<OvFormSelectItem[]>`) - Async function to fetch items dynamically
+- `debounce` (number) - Debounce delay in milliseconds for async search (default: 300)
+- `minSearchLength` (number) - Minimum characters required before triggering search (default: 0)
 
 #### Combobox Field
 Autocomplete-enabled select with custom input:
@@ -252,7 +285,11 @@ Autocomplete-enabled select with custom input:
   type: 'combobox',
   name: 'tags',
   label: 'Tags',
-  items: ['React', 'Vue', 'Angular'],
+  items: [
+    { title: 'React', value: 'react' },
+    { title: 'Vue', value: 'vue' },
+    { title: 'Angular', value: 'angular' }
+  ],
   multiple: true,
   chips: true
 }
@@ -266,10 +303,43 @@ Autocomplete with filtering:
   type: 'autocomplete',
   name: 'city',
   label: 'Select City',
-  items: ['New York', 'Los Angeles', 'Chicago'],
+  items: [
+    { title: 'New York', value: 'ny' },
+    { title: 'Los Angeles', value: 'la' },
+    { title: 'Chicago', value: 'chi' }
+  ],
   multiple: false
 }
 ```
+
+#### Autocomplete with Async Data
+Autocomplete with dynamic API-driven items:
+
+```typescript
+{
+  type: 'autocomplete',
+  name: 'assignee',
+  label: 'Assignee',
+  clearable: true,
+  fetchItems: async (search: string) => {
+    const response = await http.get('/api/users', { params: { search } })
+    return response.data.map(user => ({
+      title: user.fullname,
+      value: user.uuid
+    }))
+  },
+  itemValue: 'value',
+  itemTitle: 'title',
+  debounce: 300,
+  minSearchLength: 1
+}
+```
+
+The `fetchItems` function is called with the search string whenever the user types (after debounce delay). The component automatically:
+- Debounces API calls to avoid excessive requests
+- Shows a loading indicator while fetching
+- Preserves selected items so they display correctly even when search results change
+- Supports custom `itemValue` and `itemTitle` property mappings
 
 #### File Field
 File input field:

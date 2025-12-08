@@ -56,6 +56,7 @@ type OvFormFieldBase = {
     | 'email'
     | 'password'
     | 'textarea'
+    | 'markdown'
     | 'number'
     | 'switch'
     | 'rating'
@@ -106,6 +107,15 @@ export type OvFormTextareaField = OvFormFieldBase & {
   autoGrow?: boolean
 }
 
+export type OvFormMarkdownField = OvFormFieldBase & {
+  type: 'markdown'
+  toolbar?: string[]
+  toolbarClass?: string
+  editorClass?: string
+  minHeight?: string
+  maxHeight?: string
+}
+
 export type OvFormRatingField = OvFormFieldBase & {
   type: 'rating'
   length?: number
@@ -113,9 +123,19 @@ export type OvFormRatingField = OvFormFieldBase & {
   itemLabels?: string[]
 }
 
+export type OvFormSelectItem = {
+  title: string
+  value: unknown
+}
+
 export type OvFormSelectionField = OvFormFieldBase & {
   type: 'select' | 'combobox' | 'autocomplete'
-  items?: string[]
+  items?: (string | OvFormSelectItem)[]
+  fetchItems?: (search: string) => Promise<OvFormSelectItem[]>
+  debounce?: number
+  minSearchLength?: number
+  itemValue?: string
+  itemTitle?: string
   chips?: boolean
   multiple?: boolean
 }
@@ -127,6 +147,7 @@ type OvFormFileField = OvFormFieldBase & {
 type OvFormField =
   | OvFormFieldBase
   | OvFormTextareaField
+  | OvFormMarkdownField
   | OvFormRatingField
   | OvFormSelectionField
   | OvFormFileField

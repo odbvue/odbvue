@@ -219,6 +219,20 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/travail/': RouteRecordInfo<
+      '/travail/',
+      '/travail',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/travail/[num]': RouteRecordInfo<
+      '/travail/[num]',
+      '/travail/:num',
+      { num: ParamValue<true> },
+      { num: ParamValue<false> },
+      | never
+    >,
   }
 
   /**
@@ -397,6 +411,18 @@ declare module 'vue-router/auto-routes' {
     'src/pages/signup.vue': {
       routes:
         | '/signup'
+      views:
+        | never
+    }
+    'src/pages/travail/index.vue': {
+      routes:
+        | '/travail/'
+      views:
+        | never
+    }
+    'src/pages/travail/[num].vue': {
+      routes:
+        | '/travail/[num]'
       views:
         | never
     }

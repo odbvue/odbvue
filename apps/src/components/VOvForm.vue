@@ -16,21 +16,54 @@
             :key="field.name"
             :cols="12 / (mobile ? 1 : options.cols || 1)"
           >
-            <component
-              :is="field.component"
-              :id="field.name"
-              v-model="values[field.name]"
-              v-bind="field.props"
-              :rules="field.rules()"
-              :error-messages="field.errors()"
-              @keyup.enter="handleFieldEnter(field.name)"
-            >
-              <template #label>
-                <slot :name="`field-${field.name}`" :value="values[field.name]" :field="field">
-                  {{ field.props.label }}
-                </slot>
-              </template>
-            </component>
+            <!-- Markdown field with custom wrapper -->
+            <template v-if="field.type === 'markdown'">
+              <div class="v-ov-form-markdown-field">
+                <label v-if="field.props.label" class="v-label mb-1 d-block">
+                  <slot :name="`field-${field.name}`" :value="values[field.name]" :field="field">
+                    {{ field.props.label }}
+                  </slot>
+                </label>
+                <v-sheet
+                  :id="field.name"
+                  rounded
+                  border
+                  class="pa-2"
+                  :style="field.props.style as string"
+                >
+                  <component
+                    :is="field.component"
+                    v-model="values[field.name]"
+                    :toolbar="field.props.toolbar"
+                    :toolbar-class="field.props.toolbarClass"
+                    :editor-class="field.props.editorClass"
+                    :output-format="field.props.outputFormat"
+                    :max-height="field.props.maxHeight"
+                  />
+                </v-sheet>
+                <div v-if="field.props.hint" class="v-messages mt-1">
+                  <div class="v-messages__message">{{ field.props.hint }}</div>
+                </div>
+              </div>
+            </template>
+            <!-- Standard form fields -->
+            <template v-else>
+              <component
+                :is="field.component"
+                :id="field.name"
+                v-model="values[field.name]"
+                v-bind="field.props"
+                :rules="field.rules()"
+                :error-messages="field.errors()"
+                @keyup.enter="handleFieldEnter(field.name)"
+              >
+                <template #label>
+                  <slot :name="`field-${field.name}`" :value="values[field.name]" :field="field">
+                    {{ field.props.label }}
+                  </slot>
+                </template>
+              </component>
+            </template>
           </v-col>
         </v-row>
         <v-row v-if="actions.length > 0">
@@ -74,9 +107,12 @@ import {
   OvRuleValidate,
   type OvFormFieldError,
   type OvFormTextareaField,
+  type OvFormMarkdownField,
   type OvFormRatingField,
   type OvFormSelectionField,
+  type OvFormSelectItem,
 } from './index'
+import VOvEditor from './VOvEditor.vue'
 
 const { defaults } = useDefaults({
   name: 'VOvForm',
@@ -131,6 +167,74 @@ const { mobile } = useDisplay()
 const form = ref()
 const showPwd = ref(false)
 
+// State for async autocomplete fields
+const asyncItems = ref<Record<string, OvFormSelectItem[]>>({})
+const asyncSelectedItems = ref<Record<string, OvFormSelectItem[]>>({})
+const asyncLoading = ref<Record<string, boolean>>({})
+const debounceTimers = ref<Record<string, ReturnType<typeof setTimeout>>>({})
+
+const getAsyncFieldItems = (fieldName: string): OvFormSelectItem[] => {
+  const searchItems = asyncItems.value[fieldName] || []
+  const selectedItems = asyncSelectedItems.value[fieldName] || []
+  // Merge selected items with search results, avoiding duplicates
+  const allItems = [...selectedItems]
+  for (const item of searchItems) {
+    if (!allItems.some((s) => s.value === item.value)) {
+      allItems.push(item)
+    }
+  }
+  return allItems
+}
+
+const handleAutocompleteSelect = (
+  fieldName: string,
+  field: OvFormSelectionField,
+  value: unknown,
+) => {
+  if (!field.fetchItems) return
+  const itemValue = field.itemValue || 'value'
+  const allItems = getAsyncFieldItems(fieldName)
+  const selectedItem = allItems.find(
+    (item) => (item as Record<string, unknown>)[itemValue] === value,
+  )
+  if (selectedItem) {
+    asyncSelectedItems.value[fieldName] = [selectedItem]
+  } else if (value === null || value === undefined) {
+    asyncSelectedItems.value[fieldName] = []
+  }
+}
+
+const handleAutocompleteSearch = (
+  fieldName: string,
+  field: OvFormSelectionField,
+  search: string | null,
+) => {
+  if (!field.fetchItems) return
+
+  const searchValue = search ?? ''
+  const minLength = field.minSearchLength ?? 0
+  if (searchValue.length < minLength) {
+    asyncItems.value[fieldName] = []
+    return
+  }
+
+  // Clear existing timer
+  if (debounceTimers.value[fieldName]) {
+    clearTimeout(debounceTimers.value[fieldName])
+  }
+
+  const delay = field.debounce ?? 300
+  debounceTimers.value[fieldName] = setTimeout(async () => {
+    asyncLoading.value[fieldName] = true
+    try {
+      const items = await field.fetchItems!(searchValue)
+      asyncItems.value[fieldName] = items
+    } finally {
+      asyncLoading.value[fieldName] = false
+    }
+  }, delay)
+}
+
 const fields = computed(() => {
   const componentMap = {
     select: VSelect,
@@ -141,6 +245,7 @@ const fields = computed(() => {
     checkbox: VCheckbox,
     rating: VRating,
     textarea: VTextarea,
+    markdown: VOvEditor,
     text: VTextField,
     number: VTextField,
     email: VTextField,
@@ -213,6 +318,23 @@ const fields = computed(() => {
         noResize: textareaField.noResize,
         autoGrow: textareaField.autoGrow,
       }
+    } else if (field.type === 'markdown') {
+      const markdownField = field as OvFormMarkdownField
+      specificProps = {
+        toolbar: markdownField.toolbar || [
+          'bold',
+          'italic',
+          'heading1',
+          'heading2',
+          'bulletList',
+          'orderedList',
+        ],
+        toolbarClass: markdownField.toolbarClass || '',
+        editorClass: markdownField.editorClass || '',
+        outputFormat: 'markdown',
+        maxHeight: markdownField.maxHeight,
+        style: markdownField.minHeight ? `min-height: ${markdownField.minHeight}` : undefined,
+      }
     } else if (field.type === 'rating') {
       const ratingField = field as OvFormRatingField
       specificProps = {
@@ -222,17 +344,31 @@ const fields = computed(() => {
       }
     } else if (['select', 'combobox', 'autocomplete'].includes(field.type)) {
       const selectionField = field as OvFormSelectionField
+      const hasFetchItems = !!selectionField.fetchItems
+      const fieldItems = hasFetchItems ? getAsyncFieldItems(field.name) : selectionField.items || []
+
+      // Only set itemTitle/itemValue when explicitly configured or using fetchItems
+      const hasObjectItems = hasFetchItems || selectionField.itemTitle || selectionField.itemValue
+
       specificProps = {
-        items: selectionField.items || [],
+        items: fieldItems,
         chips: selectionField.chips || false,
         multiple: selectionField.multiple || false,
-        itemTitle: 'title',
-        itemValue: 'value',
+        itemTitle: hasObjectItems ? selectionField.itemTitle || 'title' : undefined,
+        itemValue: hasObjectItems ? selectionField.itemValue || 'value' : undefined,
+        loading: hasFetchItems ? asyncLoading.value[field.name] || false : undefined,
+        'onUpdate:search': hasFetchItems
+          ? (search: string) => handleAutocompleteSearch(field.name, selectionField, search)
+          : undefined,
+        'onUpdate:modelValue': hasFetchItems
+          ? (value: unknown) => handleAutocompleteSelect(field.name, selectionField, value)
+          : undefined,
       }
     }
 
     return {
       component: componentMap[field.type as keyof typeof componentMap] || VTextField,
+      type: field.type,
       name: field.name,
       props: { ...baseProps, ...specificProps },
       errors: (): string[] => {
