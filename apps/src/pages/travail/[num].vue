@@ -1,6 +1,15 @@
 <template>
   <v-container>
-    {{ key }}
+    <v-ov-view
+      v-if="num != 'new-task'"
+      :data="{ num }"
+      :options="{ items: [{ name: 'num', label: 'key' }] }"
+    />
+    <v-ov-view
+      v-if="parentNum"
+      :data="{ num: parentNum }"
+      :options="{ items: [{ name: 'num', label: 'parent.key' }] }"
+    />
 
     <v-ov-form :data="taskData" :options="taskOptions" @submit="createTask" />
   </v-container>
@@ -30,27 +39,22 @@ const routeQueryValue = (name: string) => {
   return Array.isArray(query) ? query[0] : query || ''
 }
 
-const key = ref(routeParamValue('key'))
-const parentKey = ref(routeQueryValue('parent-key'))
+const num = ref(routeParamValue('num'))
+const parentNum = ref(routeQueryValue('parent-num'))
 
 import { useTravailStore } from './travail.ts'
 const travail = useTravailStore()
 const router = useRouter()
-const app = useAppStore()
 
 onMounted(async () => {
-  if (key.value) {
-    app.ui.startLoading()
-    const task = await travail.getTask(key.value)
-    app.ui.stopLoading()
+  if (num.value) {
+    const task = await travail.getTask(num.value)
     taskData.value = task || {}
   }
 })
 
 const createTask = async (task: OvFormData) => {
-  app.ui.startLoading()
   await travail.createTask(task)
-  app.ui.stopLoading()
   router.push('/travail')
 }
 
@@ -59,15 +63,15 @@ const taskOptions = ref<OvFormOptions>({
   fields: [
     {
       type: 'text',
-      name: 'parent-key',
+      name: 'parent-num',
+      value: parentNum.value || '',
       hidden: true,
-      value: taskData.value['parent-key'] || parentKey.value || '',
     },
     {
       type: 'text',
-      name: 'key',
-      label: 'key',
-      hidden: key.value !== 'new-task' || parentKey.value !== '',
+      name: 'num',
+      value: num.value || '',
+      hidden: true,
     },
     {
       type: 'text',
@@ -75,9 +79,36 @@ const taskOptions = ref<OvFormOptions>({
       label: 'title',
     },
     {
-      type: 'textarea',
+      type: 'markdown',
       name: 'description',
       label: 'description',
+      minHeight: '200px',
+      maxHeight: '200px',
+    },
+    {
+      type: 'select',
+      name: 'priority',
+      label: 'priority',
+      items: travail.plan?.priorities?.map((p) => ({
+        value: p.id,
+        title: p.name,
+      })),
+    },
+    {
+      type: 'date',
+      name: 'due',
+      label: 'due',
+    },
+    {
+      type: 'autocomplete',
+      name: 'assignee',
+      label: 'assignee',
+      clearable: true,
+      fetchItems: (search: string) => travail.getAssignees(search),
+      itemValue: 'value',
+      itemTitle: 'title',
+      debounce: 300,
+      minSearchLength: 1,
     },
   ],
   actions: [{ name: 'submit' }],

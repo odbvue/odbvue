@@ -1,40 +1,52 @@
 <template>
   <v-container fluid>
     <v-row>
-      <v-col cols="12" class="d-flex justify-end">
-        <v-btn
-          color="primary"
-          prepend-icon="$mdiPlus"
-          :text="t('new.task')"
-          to="/travail/new-task"
-        />
+      <v-col cols="12" sm="8">
+        <v-badge bordered offset-x="-8" :content="travail.key"
+          ><h1>{{ travail.plan?.title }}</h1></v-badge
+        >
+        <v-btn icon="$mdiPencil" class="ml-8" variant="text" density="comfortable" />
       </v-col>
     </v-row>
     <v-row>
-      <v-col v-for="task in travail.tasks" :key="task.key" cols="12" md="4" sm="6">
-        <v-card>
+      <v-col v-for="task in travail.tasks" :key="task.num" cols="12" md="4" sm="6">
+        <v-card class="h-100 d-flex flex-column">
           <v-card-title
-            ><v-badge bordered :content="task.key" :offset-x="-8">{{
+            ><v-badge bordered :content="task.num" :offset-x="-8">{{
               task.title
             }}</v-badge></v-card-title
           >
-          <v-card-text>{{ task.description }}</v-card-text>
-          <v-card-text>
-            <v-row>
-              <v-col v-if="task.parent_key" cols="12" sm="6">
-                <v-label>{{ t('parent') }}:</v-label> {{ task.parent_key }}
-              </v-col>
-              <v-col cols="12" sm="6">
-                <v-label>{{ t('assignee') }}:</v-label> {{ task.assignee }}
-              </v-col>
-            </v-row>
+          <v-card-text class="flex-grow-1">
+            <v-chip
+              v-for="detail in travail.taskDetails(task.num)"
+              :key="detail.label"
+              :color="detail.color"
+              class="ma-1"
+              density="compact"
+              rounded
+            >
+              <strong>{{ detail.value }}</strong
+              >&nbsp;({{ t(detail.label) }})
+            </v-chip>
           </v-card-text>
           <v-card-actions>
-            <v-btn :to="`/travail/new-task?parent-key=${task.key}`" text>{{
-              t('create.child.task')
-            }}</v-btn>
-            <v-btn :to="`/travail/${task.key}`" text>{{ t('view.details') }}</v-btn>
+            <v-btn prepend-icon="$mdiPlus" :to="`/travail/new-task?parent-num=${task.num}`" text>
+              {{ t('task') }}
+            </v-btn>
+            <v-btn prepend-icon="$mdiPencil" :to="`/travail/${task.num}`" text>
+              {{ t('open') }}
+            </v-btn>
           </v-card-actions>
+        </v-card>
+      </v-col>
+      <v-col>
+        <v-card
+          class="d-flex align-center justify-center"
+          height="100%"
+          min-height="150px"
+          :to="`/travail/new-task?parent-num=`"
+        >
+          <v-icon size="48px">$mdiPlus</v-icon>
         </v-card>
       </v-col>
     </v-row>
@@ -55,12 +67,9 @@ definePage({
 
 import { useTravailStore } from './travail.ts'
 const travail = useTravailStore()
-const app = useAppStore()
 const { t } = useI18n()
 
 onMounted(async () => {
-  app.ui.startLoading()
-  await travail.getTasks()
-  app.ui.stopLoading()
+  await travail.init()
 })
 </script>

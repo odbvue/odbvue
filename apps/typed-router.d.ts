@@ -226,11 +226,11 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
-    '/travail/[key]': RouteRecordInfo<
-      '/travail/[key]',
-      '/travail/:key',
-      { key: ParamValue<true> },
-      { key: ParamValue<false> },
+    '/travail/[num]': RouteRecordInfo<
+      '/travail/[num]',
+      '/travail/:num',
+      { num: ParamValue<true> },
+      { num: ParamValue<false> },
       | never
     >,
   }
@@ -420,9 +420,9 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
-    'src/pages/travail/[key].vue': {
+    'src/pages/travail/[num].vue': {
       routes:
-        | '/travail/[key]'
+        | '/travail/[num]'
       views:
         | never
     }
