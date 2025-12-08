@@ -113,9 +113,19 @@ export type OvFormRatingField = OvFormFieldBase & {
   itemLabels?: string[]
 }
 
+export type OvFormSelectItem = {
+  title: string
+  value: unknown
+}
+
 export type OvFormSelectionField = OvFormFieldBase & {
   type: 'select' | 'combobox' | 'autocomplete'
-  items?: string[]
+  items?: (string | OvFormSelectItem)[]
+  fetchItems?: (search: string) => Promise<OvFormSelectItem[]>
+  debounce?: number
+  minSearchLength?: number
+  itemValue?: string
+  itemTitle?: string
   chips?: boolean
   multiple?: boolean
 }
