@@ -1,13 +1,13 @@
 # Form
 
-Flexible form component with built-in validation, customizable fields, and action handling. Supports text, email, password, textarea, number, select, checkbox, switch, rating, file, and date/time inputs.
+Flexible form component with built-in validation, customizable fields, and action handling. Supports text, email, password, textarea, markdown, number, select, checkbox, switch, rating, file, and date/time inputs.
 
 ## Overview
 
-`VOvForm` provides a comprehensive form solution with configurable fields, validation rules, custom actions, and error handling. It supports 13+ field types with Vuetify integration, automatic layout management, and responsive grid columns. The component handles form submission, validation, and custom actions with TypeScript support throughout.
+`VOvForm` provides a comprehensive form solution with configurable fields, validation rules, custom actions, and error handling. It supports 14+ field types with Vuetify integration, automatic layout management, and responsive grid columns. The component handles form submission, validation, and custom actions with TypeScript support throughout.
 
 **Features:**
-- 13+ field types (text, email, password, textarea, number, select, checkbox, switch, rating, file, date, time, datetime)
+- 14+ field types (text, email, password, textarea, markdown, number, select, checkbox, switch, rating, file, date, time, datetime)
 - Built-in validation with 20+ rule types
 - Customizable actions with formatters
 - Responsive grid layout with configurable columns
@@ -182,6 +182,30 @@ Multi-line text input with optional auto-grow:
 - `rows` (number) - Initial row count
 - `autoGrow` (boolean) - Auto-expand as user types
 - `noResize` (boolean) - Disable manual resizing
+
+#### Markdown Field
+Rich text editor with markdown output using TipTap:
+
+```typescript
+{
+  type: 'markdown',
+  name: 'content',
+  label: 'Content',
+  hint: 'Use the toolbar to format your text',
+  toolbar: ['bold', 'italic', 'heading1', 'heading2', 'bulletList', 'orderedList'],
+  minHeight: '150px',
+  maxHeight: '300px'
+}
+```
+
+**Markdown-specific properties:**
+- `toolbar` (string[]) - Toolbar buttons to display. Available options: `bold`, `italic`, `underline`, `strike`, `bulletList`, `orderedList`, `heading1`, `heading2`, `heading3`. Default: `['bold', 'italic', 'heading1', 'heading2', 'bulletList', 'orderedList']`
+- `toolbarClass` (string) - CSS class for toolbar container
+- `editorClass` (string) - CSS class for editor content area
+- `minHeight` (string) - Minimum height of the editor (e.g., `'150px'`)
+- `maxHeight` (string) - Maximum height before scrolling (e.g., `'300px'`)
+
+The markdown field stores content as markdown format, making it ideal for rich text that needs to be rendered or stored as markdown.
 
 #### Switch Field
 Toggle switch input:

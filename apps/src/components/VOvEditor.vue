@@ -9,19 +9,26 @@
       :icon="btn.icon"
     />
   </div>
-  <editor-content :editor="editor" :class="props.editorClass" class="editor-content" />
+  <editor-content
+    :editor="editor"
+    :class="props.editorClass"
+    class="editor-content"
+    :style="editorContentStyle"
+  />
 </template>
 
 <script setup lang="ts">
 import { useEditor, EditorContent, Editor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
-import { computed, onBeforeUnmount } from 'vue'
+import { computed, onBeforeUnmount, watch } from 'vue'
 import TurndownService from 'turndown'
+import MarkdownIt from 'markdown-it'
 import pretty from 'pretty'
 
 const model = defineModel({ type: String, default: '' })
 
 const turndown = new TurndownService()
+const markdownIt = new MarkdownIt()
 
 const props = defineProps({
   toolbar: {
@@ -36,9 +43,46 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  outputFormat: {
+    type: String as () => 'html' | 'markdown',
+    default: 'html',
+  },
+  maxHeight: {
+    type: String,
+    default: undefined,
+  },
 })
 
 const emits = defineEmits(['updated'])
+
+// Convert markdown to HTML for editor display
+const mdToHtml = (md: string): string => {
+  if (!md) return ''
+  return markdownIt.render(md)
+}
+
+// Convert HTML to markdown for output
+const htmlToMd = (html: string): string => {
+  if (!html) return ''
+  return turndown.turndown(html)
+}
+
+// Get initial content based on input format
+const getInitialContent = (): string => {
+  if (props.outputFormat === 'markdown') {
+    return mdToHtml(model.value)
+  }
+  return model.value
+}
+
+// Computed style for editor content area
+const editorContentStyle = computed(() => {
+  if (!props.maxHeight) return undefined
+  return {
+    maxHeight: props.maxHeight,
+    overflowY: 'auto' as const,
+  }
+})
 
 interface ToolbarButton {
   id: string
@@ -105,13 +149,36 @@ const buttonConfig: Record<string, ToolbarButton> = {
 }
 
 const editor = useEditor({
-  content: model.value,
+  content: getInitialContent(),
   extensions: [StarterKit],
   onUpdate: ({ editor }) => {
-    model.value = editor.getHTML()
-    emits('updated', model.value)
+    const html = editor.getHTML()
+    const output = props.outputFormat === 'markdown' ? htmlToMd(html) : html
+    model.value = output
+    emits('updated', output)
   },
 })
+
+// Watch for external model changes and update editor content
+let isInternalUpdate = false
+watch(
+  () => model.value,
+  (newValue) => {
+    if (isInternalUpdate) {
+      isInternalUpdate = false
+      return
+    }
+    if (!editor.value?.commands) return
+
+    const currentContent =
+      props.outputFormat === 'markdown' ? htmlToMd(editor.value.getHTML()) : editor.value.getHTML()
+
+    if (newValue !== currentContent) {
+      const htmlContent = props.outputFormat === 'markdown' ? mdToHtml(newValue) : newValue
+      editor.value.commands.setContent(htmlContent, { emitUpdate: false })
+    }
+  },
+)
 
 const toolbarButtons = computed(() =>
   props.toolbar.map((id) => buttonConfig[id]).filter((btn): btn is ToolbarButton => Boolean(btn)),
@@ -148,6 +215,11 @@ defineExpose({
 <style scoped>
 :deep(.ProseMirror) {
   padding: 1px;
+  outline: none;
+}
+
+:deep(.ProseMirror:focus) {
+  outline: none;
 }
 
 :deep(.ProseMirror) ul,
