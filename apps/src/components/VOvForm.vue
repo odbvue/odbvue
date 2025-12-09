@@ -53,6 +53,7 @@
                 :id="field.name"
                 v-model="values[field.name]"
                 v-bind="field.props"
+                :autocomplete ="field.props.autocomplete || 'off'"
                 :rules="field.rules()"
                 :error-messages="field.errors()"
                 @keyup.enter="handleFieldEnter(field.name)"
