@@ -69,7 +69,7 @@
 import { computed, ref } from 'vue'
 import { useDisplay } from 'vuetify'
 import { useI18n } from 'vue-i18n'
-import { OvFieldFormat, OvActionFormat, type OvAction } from '.'
+import { OvFieldFormat, OvActionFormat, type OvAction, type OvFormat } from '.'
 
 const { name, thresholds } = useDisplay()
 const previousBreakpointWidth = computed<string>(() => {

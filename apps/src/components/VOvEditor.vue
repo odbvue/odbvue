@@ -1,36 +1,122 @@
 <template>
-  <div class="editor-toolbar" :class="props.toolbarClass">
-    <v-btn
-      v-for="btn in toolbarButtons"
-      :key="btn.id"
-      :variant="isActive(btn) ? 'outlined' : 'text'"
-      density="comfortable"
-      @click="handleClick(btn)"
-      :icon="btn.icon"
-    />
+  <div
+    class="v-input v-input--horizontal v-input--density-default v-ov-editor"
+    :class="{ 'v-input--disabled': props.disabled }"
+  >
+    <div class="v-input__control">
+      <div
+        class="v-field v-field--variant-outlined v-ov-editor-wrapper"
+        :class="{ 'v-field--disabled': props.disabled, 'v-field--focused': isFocused }"
+      >
+        <div class="v-field__overlay"></div>
+        <div class="v-field__field">
+          <div class="v-ov-editor-content" :class="{ 'pt-2': props.label }">
+            <div
+              v-if="!props.readonly && toolbarButtons.length > 0"
+              class="editor-toolbar"
+              :class="props.toolbarClass"
+            >
+              <v-btn
+                v-for="btn in toolbarButtons"
+                :key="btn.id"
+                :variant="isActive(btn) ? 'outlined' : 'text'"
+                density="comfortable"
+                :disabled="props.disabled"
+                @click="handleClick(btn)"
+                :icon="btn.icon"
+              />
+            </div>
+            <editor-content
+              :editor="editor"
+              :class="props.editorClass"
+              class="editor-content"
+              :style="editorContentStyle"
+              @focus="isFocused = true"
+              @blur="isFocused = false"
+            />
+          </div>
+        </div>
+        <div class="v-field__outline">
+          <div class="v-field__outline__start"></div>
+          <div v-if="props.label" class="v-field__outline__notch">
+            <label class="v-label v-field-label v-field-label--floating" aria-hidden="true">
+              {{ props.label }}
+            </label>
+          </div>
+          <div class="v-field__outline__end"></div>
+        </div>
+      </div>
+    </div>
+    <div v-if="props.hint && !props.hideDetails" class="v-input__details">
+      <div class="v-messages">
+        <div class="v-messages__message">{{ props.hint }}</div>
+      </div>
+    </div>
   </div>
-  <editor-content
-    :editor="editor"
-    :class="props.editorClass"
-    class="editor-content"
-    :style="editorContentStyle"
-  />
 </template>
 
 <script setup lang="ts">
 import { useEditor, EditorContent, Editor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
-import { computed, onBeforeUnmount, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import TurndownService from 'turndown'
 import MarkdownIt from 'markdown-it'
 import pretty from 'pretty'
+import type { ValidationRule } from 'vuetify/lib/composables/validation.mjs'
+
+defineOptions({
+  inheritAttrs: false,
+})
 
 const model = defineModel({ type: String, default: '' })
+const isFocused = ref(false)
 
 const turndown = new TurndownService()
 const markdownIt = new MarkdownIt()
 
 const props = defineProps({
+  // Vuetify input field props
+  id: {
+    type: String,
+    default: undefined,
+  },
+  label: {
+    type: String,
+    default: undefined,
+  },
+  hint: {
+    type: String,
+    default: undefined,
+  },
+  persistentHint: {
+    type: Boolean,
+    default: true,
+  },
+  rules: {
+    type: Array as () => ValidationRule[],
+    default: () => [],
+  },
+  errorMessages: {
+    type: [String, Array] as unknown as () => string | string[],
+    default: () => [],
+  },
+  disabled: {
+    type: Boolean,
+    default: false,
+  },
+  readonly: {
+    type: Boolean,
+    default: false,
+  },
+  density: {
+    type: String as () => 'default' | 'comfortable' | 'compact',
+    default: 'default',
+  },
+  hideDetails: {
+    type: [Boolean, String] as unknown as () => boolean | 'auto',
+    default: false,
+  },
+  // Editor-specific props
   toolbar: {
     type: Array<string>,
     default: () => [],
@@ -51,9 +137,13 @@ const props = defineProps({
     type: String,
     default: undefined,
   },
+  class: {
+    type: String,
+    default: '',
+  },
 })
 
-const emits = defineEmits(['updated'])
+const emits = defineEmits(['updated', 'keyup'])
 
 // Convert markdown to HTML for editor display
 const mdToHtml = (md: string): string => {
@@ -214,7 +304,7 @@ defineExpose({
 
 <style scoped>
 :deep(.ProseMirror) {
-  padding: 1px;
+  padding: 16px;
   outline: none;
 }
 
