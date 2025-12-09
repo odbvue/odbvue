@@ -14,5 +14,13 @@
   "open": "Open",
   "task": "Task",
   "Parent Task": "Parent Task",
-  "parent.task": "Parent task"
+  "parent.task": "Parent task",
+  "effort.(d)": "Effort (d)",
+  "estimated.effort": "Estimated effort",
+  "To Do": "To Do",
+  "In Progress": "In Progress",
+  "Done": "Done",
+  "board-view": "Board-view",
+  "calendar-view": "Calendar-view",
+  "today": "Today"
 }

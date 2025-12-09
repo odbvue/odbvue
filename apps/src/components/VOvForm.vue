@@ -16,54 +16,23 @@
             :key="field.name"
             :cols="12 / (mobile ? 1 : options.cols || 1)"
           >
-            <!-- Markdown field with custom wrapper -->
-            <template v-if="field.type === 'markdown'">
-              <div class="v-ov-form-markdown-field">
-                <label v-if="field.props.label" class="v-label mb-1 d-block">
-                  <slot :name="`field-${field.name}`" :value="values[field.name]" :field="field">
-                    {{ field.props.label }}
-                  </slot>
-                </label>
-                <v-sheet
-                  :id="field.name"
-                  rounded
-                  border
-                  class="pa-2"
-                  :style="field.props.style as string"
-                >
-                  <component
-                    :is="field.component"
-                    v-model="values[field.name]"
-                    :toolbar="field.props.toolbar"
-                    :toolbar-class="field.props.toolbarClass"
-                    :editor-class="field.props.editorClass"
-                    :output-format="field.props.outputFormat"
-                    :max-height="field.props.maxHeight"
-                  />
-                </v-sheet>
-                <div v-if="field.props.hint" class="v-messages mt-1">
-                  <div class="v-messages__message">{{ field.props.hint }}</div>
-                </div>
-              </div>
-            </template>
             <!-- Standard form fields -->
-            <template v-else>
-              <component
-                :is="field.component"
-                :id="field.name"
-                v-model="values[field.name]"
-                v-bind="field.props"
-                :rules="field.rules()"
-                :error-messages="field.errors()"
-                @keyup.enter="handleFieldEnter(field.name)"
-              >
-                <template #label>
-                  <slot :name="`field-${field.name}`" :value="values[field.name]" :field="field">
-                    {{ field.props.label }}
-                  </slot>
-                </template>
-              </component>
-            </template>
+            <component
+              :is="field.component"
+              :id="field.name"
+              v-model="values[field.name]"
+              v-bind="field.props"
+              :autocomplete="field.props.autocomplete || 'off'"
+              :rules="field.rules()"
+              :error-messages="field.errors()"
+              @keyup.enter="handleFieldEnter(field.name)"
+            >
+              <template #label>
+                <slot :name="`field-${field.name}`" :value="values[field.name]" :field="field">
+                  {{ field.props.label }}
+                </slot>
+              </template>
+            </component>
           </v-col>
         </v-row>
         <v-row v-if="actions.length > 0">

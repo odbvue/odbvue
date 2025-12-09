@@ -46,5 +46,7 @@
   "role.is.required": "Role is required",
   "permission.already.exists": "Permission already exists",
   "from.invalid.format": "From invalid format",
-  "to.invalid.format": "To invalid format"
+  "to.invalid.format": "To invalid format",
+  "Message": "Message",
+  "Attributes": "Attributes"
 }

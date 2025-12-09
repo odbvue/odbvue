@@ -1,55 +1,79 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
+import type { OvFormFieldError } from '@/components/index.ts'
+
+export type PostTaskResponse = {
+  error?: string
+  errors?: OvFormFieldError[]
+}
 
 export const useTravailStore = defineStore(
   'travail',
   () => {
     const http = useHttp()
-
     const { startLoading, stopLoading } = useUiStore()
 
-    type Plan = {
+    type Board = {
       key: string
       title: string
       description: string
-      due_warning_days: number
-      statuses: {
-        id: string
-        name: string
-        color: string
-        done: boolean
-      }[]
-      priorities?: {
-        id: string
-        name: string
-        color: string
-      }[]
+      settings: {
+        due_warn_before_days: number
+        statuses: Array<{
+          value: string
+          title: string
+          attrs: {
+            format: {
+              color: string
+            }
+          }
+        }>
+        priorities: Array<{
+          value: string
+          title: string
+          attrs: {
+            format: {
+              color: string
+            }
+          }
+        }>
+        units?: string
+      }
     }
 
     type Task = {
       num: string
       key: string
-      parent_num?: string
       title: string
-      description: string
-      due: string
-      due_color?: string
-      status?: {
-        id: string
-        name: string
-        color: string
-        done: boolean
+      description?: string
+
+      due?: string
+      due_details: {
+        format: {
+          color: string
+        }
       }
-      priority?: {
-        id: string
-        name: string
-        color: string
+      reminder?: string
+      started?: string
+      completed?: string
+
+      status: string
+      priority?: string
+
+      estimated?: number
+      remaining?: number
+      invested?: number
+
+      assignee?: {
+        value: string
+        title: string
       }
-      author_uuid: string
+
       author: string
-      assignee_uuid: string
-      assignee: string
       created: string
-      modified: string
+      editor?: string
+      modified?: string
+
+      parent_num?: string
     }
 
     type TaskDetails = {
@@ -58,31 +82,39 @@ export const useTravailStore = defineStore(
       color?: string
     }
 
+    const viewModes = ['board', 'calendar'] as const
+    const viewMode = ref('board')
+
+    const boards = ref<Board[]>([])
+    const board = ref<Board | null>(null)
     const key = ref('TRA')
-    const plans = ref<Plan[]>([])
-    const plan = ref<Plan | null>(null)
+
+    const statuses = computed(() => board.value?.settings.statuses || [])
+    const priorities = computed(() => board.value?.settings.priorities || [])
+
     const tasks = ref<Task[]>([])
-    const task = ref<Task | null>(null)
 
     const init = async () => {
       startLoading()
-      await getPlans('', `{"key": ["${key.value}"]}`)
-      plan.value = plans.value[0] ?? null
-      key.value = plan.value ? plan.value.key : 'TRA'
+      await getBoards('', `{"key": ["${key.value}"]}`)
+      board.value = boards.value[0] ?? null
+      if (!board.value) {
+        key.value = 'TRA'
+      }
       await getTasks('', `{"key": ["${key.value}"]}`)
       stopLoading()
     }
 
-    const getPlans = async (
+    const getBoards = async (
       search?: string,
       filter?: string,
       offset: number = 0,
       limit: number = 10,
     ) => {
-      const { data } = await http.get<{ plans: Plan[] }>('tra/plans/', {
+      const { data } = await http.get<{ boards: Board[] }>('tra/boards/', {
         params: { filter, search, offset, limit },
       })
-      plans.value = data?.plans || []
+      boards.value = data?.boards || []
     }
 
     const getTasks = async (
@@ -97,74 +129,77 @@ export const useTravailStore = defineStore(
       tasks.value = data?.tasks || []
     }
 
+    const postTask = async (task: OvFormData) => {
+      return await http.post<PostTaskResponse>('tra/task/', {
+        data: encodeURIComponent(JSON.stringify(task)),
+      })
+    }
+
     const taskDetails = computed(() => (num: string): TaskDetails[] => {
       const task = tasks.value.find((t) => t.num === num) || null
       const result: TaskDetails[] = []
       if (!task) return result
       if (task.parent_num) result.push({ value: task.parent_num, label: 'parent.task' })
-      if (task.due) result.push({ value: task.due, label: 'due.date', color: task.due_color })
-      if (task.assignee) result.push({ value: task.assignee, label: 'assignee' })
-      if (task.status)
+
+      if (task.due) {
         result.push({
-          value: task.status.name,
-          label: 'status',
-          color: task.status.color,
+          value: task.due,
+          label: 'due.date',
+          color: task.due_details.format.color,
         })
+      }
       if (task.priority)
         result.push({
-          value: task.priority.name,
+          value: priorities.value.find((p) => p.value === task.priority)?.title || task.priority,
           label: 'priority',
-          color: task.priority.color,
+          color: priorities.value.find((p) => p.value === task.priority)?.attrs.format.color || '',
+        })
+      if (task.estimated && task.estimated > 0) {
+        const units = board.value?.settings.units || 'units'
+        result.push({
+          value: `${task.estimated} ${units}`,
+          label: 'estimated.effort',
+        })
+      }
+      if (task.assignee?.value)
+        result.push({
+          value: task.assignee.title,
+          label: 'assignee',
         })
       return result
     })
 
-    const getTask = async (num: string) => {
-      const { data } = await http.get<{ tasks: Task[] }>('tra/tasks/', {
-        params: { filter: `{"num": ["${num}"]}`, search: '', offset: 0, limit: 1 },
-      })
-      return data?.tasks[0]
-    }
-
-    const createTask = async (task: OvFormData) => {
-      await http.post<{ task: Task }>('tra/task/', task)
-      await getTasks()
-    }
-
-    type Assignee = {
-      uuid: string
-      fullname: string
-    }
-
     const getAssignees = async (search: string = '') => {
-      const { data } = await http.get<{ assignees: Assignee[] }>('tra/assignees/', {
-        params: { search, offset: 0, limit: 20 },
-      })
-      return (data?.assignees || []).map((a) => ({
-        title: a.fullname,
-        value: a.uuid,
-      }))
+      const { data } = await http.get<{ assignees: { value: string; title: string }[] }>(
+        'tra/assignees/',
+        {
+          params: { search, offset: 0, limit: 20 },
+        },
+      )
+      return data?.assignees
     }
 
     return {
+      viewModes,
+      viewMode,
       key,
-      plans,
-      plan,
-      tasks,
-      task,
+      boards,
+      board,
+      getBoards,
+      statuses,
+      priorities,
+      postTask,
       taskDetails,
-      init,
-      getPlans,
-      getTasks,
-      getTask,
-      createTask,
       getAssignees,
+      init,
+      getTasks,
+      tasks,
     }
   },
   {
     storage: {
       adapter: 'localStorage',
-      include: ['key'],
+      include: ['key', 'viewMode'],
     },
   } as Record<string, unknown>,
 )

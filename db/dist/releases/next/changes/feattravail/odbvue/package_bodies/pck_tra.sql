@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1765288871207 stripComments:false  logicalFilePath:feattravail\odbvue\package_bodies\pck_tra.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_bodies/pck_tra.sql:4fd0224b8422e121de789704c9e25bac1c5b67b7:0fac4d2f0d8950683e656c7c4ef45c1e1df9539b:alter
+
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
 
     FUNCTION ts (
@@ -348,5 +352,3 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
 END pck_tra;
 /
 
-
--- sqlcl_snapshot {"hash":"0fac4d2f0d8950683e656c7c4ef45c1e1df9539b","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}

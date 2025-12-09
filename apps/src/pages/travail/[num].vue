@@ -11,7 +11,7 @@
       :options="{ items: [{ name: 'num', label: 'parent.key' }] }"
     />
 
-    <v-ov-form :data="taskData" :options="taskOptions" @submit="createTask" />
+    <v-ov-form :data="taskData" :options="taskOptions" @submit="saveTask" />
   </v-container>
 </template>
 
@@ -27,7 +27,7 @@ definePage({
   },
 })
 
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 const routeParamValue = (name: string) => {
   const route = useRoute()
   const param = (route.params as Record<string, unknown>)[name]
@@ -41,29 +41,38 @@ const routeQueryValue = (name: string) => {
 
 const num = ref(routeParamValue('num'))
 const parentNum = ref(routeQueryValue('parent-num'))
+const status = ref(routeQueryValue('status'))
 
 import { useTravailStore } from './travail.ts'
+import type { OvFormFieldError } from '@/components/index.ts'
 const travail = useTravailStore()
-const router = useRouter()
 
 onMounted(async () => {
-  if (num.value) {
-    const task = await travail.getTask(num.value)
+  if (num.value && num.value !== 'new-task') {
+    const task = await travail.tasks.find((t) => t.num === num.value)
     taskData.value = task || {}
   }
 })
 
-const createTask = async (task: OvFormData) => {
-  await travail.createTask(task)
+const errors = ref<OvFormFieldError[]>([])
+
+const router = useRouter()
+const saveTask = async (task: OvFormData) => {
+  const { data } = await travail.postTask(task)
+  if (data?.errors) {
+    errors.value = data.errors
+    return
+  }
   router.push('/travail')
 }
 
 const taskData = ref<OvFormData>({})
-const taskOptions = ref<OvFormOptions>({
+const taskOptions = computed<OvFormOptions>(() => ({
+  cols: 2,
   fields: [
     {
       type: 'text',
-      name: 'parent-num',
+      name: 'parent',
       value: parentNum.value || '',
       hidden: true,
     },
@@ -71,6 +80,12 @@ const taskOptions = ref<OvFormOptions>({
       type: 'text',
       name: 'num',
       value: num.value || '',
+      hidden: true,
+    },
+    {
+      type: 'text',
+      name: 'key',
+      value: travail.key,
       hidden: true,
     },
     {
@@ -86,18 +101,30 @@ const taskOptions = ref<OvFormOptions>({
       maxHeight: '200px',
     },
     {
-      type: 'select',
-      name: 'priority',
-      label: 'priority',
-      items: travail.plan?.priorities?.map((p) => ({
-        value: p.id,
-        title: p.name,
-      })),
-    },
-    {
       type: 'date',
       name: 'due',
       label: 'due',
+      clearable: true,
+    },
+    {
+      type: 'select',
+      name: 'priority',
+      label: 'priority',
+      items: travail.priorities,
+      clearable: true,
+    },
+    {
+      type: 'select',
+      name: 'status',
+      label: 'status',
+      items: travail.statuses,
+      value: status.value || '',
+    },
+    {
+      type: 'number',
+      name: 'estimated',
+      label: `effort`,
+      clearable: true,
     },
     {
       type: 'autocomplete',
@@ -105,13 +132,10 @@ const taskOptions = ref<OvFormOptions>({
       label: 'assignee',
       clearable: true,
       fetchItems: (search: string) => travail.getAssignees(search),
-      itemValue: 'value',
-      itemTitle: 'title',
-      debounce: 300,
-      minSearchLength: 1,
     },
   ],
-  actions: [{ name: 'submit' }],
-  actionSubmit: 'submit',
-})
+  errors: errors.value,
+  actions: [{ name: 'save' }],
+  actionSubmit: 'save',
+}))
 </script>

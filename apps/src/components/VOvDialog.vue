@@ -69,7 +69,7 @@
 import { computed, ref } from 'vue'
 import { useDisplay } from 'vuetify'
 import { useI18n } from 'vue-i18n'
-import { OvFormat, OvActionFormat, type OvAction } from '.'
+import { OvFieldFormat, OvActionFormat, type OvAction, type OvFormat } from '.'
 
 const { name, thresholds } = useDisplay()
 const previousBreakpointWidth = computed<string>(() => {
@@ -127,7 +127,7 @@ const emit = defineEmits<{
 }>()
 
 const contentProps = computed(() => {
-  return OvFormat(props.content, props.contentFormat)
+  return OvFieldFormat(props.content, props.contentFormat)
 })
 
 const hasContentProps = computed(() => {
