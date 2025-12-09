@@ -8,6 +8,7 @@ export {}
 declare global {
   const EffectScope: typeof import('vue').EffectScope
   const OvActionFormat: typeof import('./src/components/index').OvActionFormat
+  const OvFieldFormat: typeof import('./src/components/index').OvFieldFormat
   const OvFormat: typeof import('./src/components/index').OvFormat
   const OvRuleValidate: typeof import('./src/components/index').OvRuleValidate
   const OvTextAlign: typeof import('./src/components/index').OvTextAlign
@@ -114,6 +115,6 @@ declare global {
   export type { Share, WindowFeatures, ShareOptions } from './src/components/VOvShare.vue'
   import('./src/components/VOvShare.vue')
   // @ts-ignore
-  export type { OvRule, OvAction, OvFormTextareaField, OvFormMarkdownField, OvFormRatingField, OvFormSelectItem, OvFormSelectionField, OvFormFieldError, OvAlign, OvFormOptions, OvTableColumn, OvFilterValue, OvTableOptions, OvViewItem, OvViewOptions, OvFormData, OvTableData, OvViewData, UseTableFetchOptions, UseTableFetchReturn, UseFormActionOptions, UseFormActionReturn } from './src/components/index'
+  export type { OvRule, OvFormat, OvAction, OvFormTextareaField, OvFormMarkdownField, OvFormRatingField, OvFormSelectItem, OvFormSelectionField, OvFormFieldError, OvAlign, OvFormOptions, OvTableColumn, OvFilterValue, OvTableOptions, OvViewItem, OvViewOptions, OvFormData, OvTableData, OvViewData, UseTableFetchOptions, UseTableFetchReturn, UseFormActionOptions, UseFormActionReturn } from './src/components/index'
   import('./src/components/index')
 }
