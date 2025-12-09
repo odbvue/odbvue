@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.232
+
+### Patch Changes
+
+- 4e05184: travail app
+
 ## 0.0.231
 
 ### Patch Changes
