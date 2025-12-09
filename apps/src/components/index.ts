@@ -315,7 +315,7 @@ function formatValidate(value: unknown, format?: OvFormat | OvFormat[]): OvForma
 export const OvTextAlign = (align: 'left' | 'center' | 'right' | undefined) =>
   align ?? `text-${align}`
 
-export const OvFormat = (value: unknown, format?: OvFormat | OvFormat[]) => {
+export const OvFieldFormat = (value: unknown, format?: OvFormat | OvFormat[]) => {
   const fmt = formatValidate(value, format)
   return Object.fromEntries(
     Object.entries({
@@ -342,8 +342,8 @@ export const OvActionFormat = (
   actionFormat?: OvFormat | OvFormat[],
 ) => {
   if (typeof action === 'string') return { name: action, text: action }
-  const fmt = OvFormat(value, action.format)
-  const actionFmt = OvFormat(value, actionFormat)
+  const fmt = OvFieldFormat(value, action.format)
+  const actionFmt = OvFieldFormat(value, actionFormat)
   fmt.text = fmt.icon ? undefined : fmt.text || action.name
   fmt.name = action.name
   return { ...actionFmt, ...fmt }
@@ -366,7 +366,7 @@ export const renderViewItem = (
     const valueStr = String(value ?? '')
     const valueDsp = valueStr.slice(0, item?.maxLength ?? options?.maxLength ?? 32767)
     const isTrimmed = item?.maxLength === 0 || valueStr.length > valueDsp.length
-    const chipProps = OvFormat(valueStr, item?.format)
+    const chipProps = OvFieldFormat(valueStr, item?.format)
 
     const children: (ReturnType<typeof h> | string)[] = []
 
