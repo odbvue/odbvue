@@ -3,7 +3,6 @@
                    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
-<include file="_custom/010_travail_initial_data.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
 <include file="odbvue/package_specs/pck_tra.sql" relativeToChangelogFile="true"/>
 <include file="odbvue/tables/tra_boards.sql" relativeToChangelogFile="true"/>
 <include file="odbvue/tables/tra_links.sql" relativeToChangelogFile="true"/>
@@ -24,4 +23,5 @@
 <include file="odbvue/indexes/idx_tra_tasks_status.sql" relativeToChangelogFile="true"/>
 <include file="odbvue/ref_constraints/cfk_tra_links_child.sql" relativeToChangelogFile="true"/>
 <include file="odbvue/ref_constraints/cfk_tra_links_parent.sql" relativeToChangelogFile="true"/>
+<include file="_custom/010_travail_initial_data.sql" relativeToChangelogFile="true"/> <!-- action="custom" -->
 </databaseChangeLog>
