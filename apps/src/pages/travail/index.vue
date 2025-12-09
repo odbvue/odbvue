@@ -60,10 +60,7 @@
                   v-for="status in travail.statuses"
                   :key="status.value"
                   :color="status.attrs.format.color"
-                  @click="
-                    travail.postTask({ ...task, ...{ status: status.value } })
-                    travail.init()
-                  "
+                  @click="travail.postTaskStatus(task.num, status.value)"
                 >
                   {{ t(status.title) }}
                 </v-btn>

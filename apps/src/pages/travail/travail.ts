@@ -135,6 +135,12 @@ export const useTravailStore = defineStore(
       })
     }
 
+    const postTaskStatus = async (num: string, status: string) => {
+      startLoading()
+      await postTask({ ...tasks.value.find((t) => t.num === num), ...{ status: status } })
+      await init()
+    }
+
     const taskDetails = computed(() => (num: string): TaskDetails[] => {
       const task = tasks.value.find((t) => t.num === num) || null
       const result: TaskDetails[] = []
@@ -189,6 +195,7 @@ export const useTravailStore = defineStore(
       statuses,
       priorities,
       postTask,
+      postTaskStatus,
       taskDetails,
       getAssignees,
       init,
