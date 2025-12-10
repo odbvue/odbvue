@@ -18,6 +18,7 @@ declare global {
   const defineAsyncComponent: typeof import('vue').defineAsyncComponent
   const defineComponent: typeof import('vue').defineComponent
   const effectScope: typeof import('vue').effectScope
+  const fileToBase64: typeof import('./src/components/index').fileToBase64
   const getCurrentInstance: typeof import('vue').getCurrentInstance
   const getCurrentScope: typeof import('vue').getCurrentScope
   const getCurrentWatcher: typeof import('vue').getCurrentWatcher
@@ -47,6 +48,7 @@ declare global {
   const onUnmounted: typeof import('vue').onUnmounted
   const onUpdated: typeof import('vue').onUpdated
   const onWatcherCleanup: typeof import('vue').onWatcherCleanup
+  const processFormDataWithFiles: typeof import('./src/components/index').processFormDataWithFiles
   const provide: typeof import('vue').provide
   const reactive: typeof import('vue').reactive
   const readonly: typeof import('vue').readonly
@@ -115,6 +117,6 @@ declare global {
   export type { Share, WindowFeatures, ShareOptions } from './src/components/VOvShare.vue'
   import('./src/components/VOvShare.vue')
   // @ts-ignore
-  export type { OvRule, OvFormat, OvAction, OvFormTextareaField, OvFormMarkdownField, OvFormRatingField, OvFormSelectItem, OvFormSelectionField, OvFormFieldError, OvAlign, OvFormOptions, OvTableColumn, OvFilterValue, OvTableOptions, OvViewItem, OvViewOptions, OvFormData, OvTableData, OvViewData, UseTableFetchOptions, UseTableFetchReturn, UseFormActionOptions, UseFormActionReturn } from './src/components/index'
+  export type { OvRule, OvFormat, OvAction, OvFormTextareaField, OvFormMarkdownField, OvFormRatingField, OvFormSelectItem, OvFormSelectionField, OvFormFileField, OvFormFileData, OvFormFieldError, OvAlign, OvFormOptions, OvTableColumn, OvFilterValue, OvTableOptions, OvViewItem, OvViewOptions, OvFormData, OvTableData, OvViewData, UseTableFetchOptions, UseTableFetchReturn, UseFormActionOptions, UseFormActionReturn } from './src/components/index'
   import('./src/components/index')
 }

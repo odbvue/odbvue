@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1765374633407 stripComments:false  logicalFilePath:feattravail\odbvue\package_bodies\pck_api_openai.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_bodies/pck_api_openai.sql:46c88b1c98609a12bfe02cfd6975a6173aef62bb:a72dff1d677f728ade8ec7b71ad9d07644b5c72b:alter
+
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_openai AS 
   -- PRIVATE
   
@@ -394,5 +398,3 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_openai AS
 END;
 /
 
-
--- sqlcl_snapshot {"hash":"a72dff1d677f728ade8ec7b71ad9d07644b5c72b","type":"PACKAGE_BODY","name":"PCK_API_OPENAI","schemaName":"ODBVUE","sxml":""}
