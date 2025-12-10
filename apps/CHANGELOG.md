@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.233
+
+### Patch Changes
+
+- 7f6e468: travail notes
+
 ## 0.0.232
 
 ### Patch Changes
