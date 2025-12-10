@@ -1,29 +1,22 @@
 -- Travail
 
 CREATE OR REPLACE PROCEDURE prc_drop_table_if_exists(table_name IN VARCHAR2) AS
-    table_count NUMBER; 
 BEGIN
-    SELECT COUNT(*) INTO table_count 
-    FROM user_tables 
-    WHERE table_name = UPPER(table_name);
-    
-    IF table_count > 0 THEN
+    BEGIN
         EXECUTE IMMEDIATE 'DROP TABLE ' || table_name;
-    END IF;
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            NULL;
+    END;
 END;
 /    
 
 begin
-    -- prc_drop_table_if_exists('tra_items');
-    -- prc_drop_table_if_exists('tra_notes');
-
+    prc_drop_table_if_exists('tra_notes');
     prc_drop_table_if_exists('tra_links');
     prc_drop_table_if_exists('tra_tasks');
     prc_drop_table_if_exists('tra_boards');
-
-    prc_drop_table_if_exists('tra_priorities');
-    prc_drop_table_if_exists('tra_statuses');
-    prc_drop_table_if_exists('tra_labels');
 end;
 /
 
@@ -113,31 +106,25 @@ CREATE TABLE tra_links (
 );
 /
 
-
-
-/*
 CREATE TABLE tra_notes (
     id NUMBER(19) GENERATED ALWAYS AS IDENTITY  (START WITH 1 INCREMENT BY 1) PRIMARY KEY,
     task_id NUMBER(19) NOT NULL,
-    author CHAR(32 CHAR),
+    storage_id CHAR(32 CHAR),
     content CLOB,
-    created TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL
+    assistant CLOB,
+    author CHAR(32 CHAR),
+    created TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
+    editor CHAR(32 CHAR),
+    modified TIMESTAMP,
+    CONSTRAINT cfk_tra_notes_storage FOREIGN KEY (storage_id) REFERENCES app_storage(id),
+    CONSTRAINT cfk_tra_notes_task FOREIGN KEY (task_id) REFERENCES tra_tasks(id)
 );
-/
 
-CREATE TABLE tra_items (
-    task_id NUMBER(19) NOT NULL,
-    key VARCHAR2(100 CHAR) NOT NULL,
-    type VARCHAR2(50 CHAR) NOT NULL,
-    value CLOB
-);
-*/
+CREATE INDEX idx_tra_notes_task_id ON tra_notes(task_id);
+CREATE INDEX idx_tra_notes_storage_id ON tra_notes(storage_id);
+CREATE INDEX idx_tra_notes_created ON tra_notes(created);
 /
-
--- exec PRC_ORDSIFY;
---/
 
 drop procedure prc_drop_table_if_exists;
 /
-
 

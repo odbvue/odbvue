@@ -80,6 +80,7 @@ import {
   type OvFormRatingField,
   type OvFormSelectionField,
   type OvFormSelectItem,
+  type OvFormFileField,
 } from './index'
 import VOvEditor from './VOvEditor.vue'
 
@@ -332,6 +333,12 @@ const fields = computed(() => {
         'onUpdate:modelValue': hasFetchItems
           ? (value: unknown) => handleAutocompleteSelect(field.name, selectionField, value)
           : undefined,
+      }
+    } else if (field.type === 'file') {
+      const fileField = field as OvFormFileField
+      specificProps = {
+        multiple: fileField.multiple || false,
+        accept: fileField.accept,
       }
     }
 

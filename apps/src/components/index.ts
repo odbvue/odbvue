@@ -140,8 +140,57 @@ export type OvFormSelectionField = OvFormFieldBase & {
   multiple?: boolean
 }
 
-type OvFormFileField = OvFormFieldBase & {
+export type OvFormFileField = OvFormFieldBase & {
   type: 'file'
+  multiple?: boolean
+  accept?: string
+}
+
+export type OvFormFileData = {
+  name: string
+  type: string
+  size: number
+  content: string // base64 encoded
+}
+
+/**
+ * Converts a File object to a serializable format with base64 content
+ */
+export async function fileToBase64(file: File): Promise<OvFormFileData> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(',')[1] || ''
+      resolve({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        content: base64,
+      })
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+/**
+ * Processes form data and converts any File objects to base64 format
+ */
+export async function processFormDataWithFiles(formData: OvFormData): Promise<OvFormData> {
+  const result: OvFormData = {}
+
+  for (const [key, value] of Object.entries(formData)) {
+    if (value instanceof File) {
+      result[key] = await fileToBase64(value)
+    } else if (value instanceof FileList || (Array.isArray(value) && value[0] instanceof File)) {
+      const files = Array.from(value as FileList | File[])
+      result[key] = await Promise.all(files.map(fileToBase64))
+    } else {
+      result[key] = value
+    }
+  }
+
+  return result
 }
 
 type OvFormField =

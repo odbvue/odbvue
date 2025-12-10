@@ -303,31 +303,29 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_openai AS
       "model": "'
                      || p_model
                      || '",
-      "messages": [
-      {
+      "input": [
+        {
           "role": "user",
           "content": [
-          {
-              "type": "text",
+            {
+              "type": "input_text",
               "text": "'
                      || j(p_prompt)
                      || '"
-          },
-          {
-              "type": "image_url",
-              "image_url": {
-              "url": "data:image/png;base64,'
-                     || p_image
+            },
+            {
+              "type": "input_image",
+              "image_url": "data:image/png;base64,'
+                     || j(p_image)
                      || '"
-              }
-          }
+            }
           ]
-      }
+        }
       ],
-      "max_tokens": 600
+      "max_output_tokens": 5000
     }';
 
-        pck_api_http.request(v_req, 'POST', 'https://api.openai.com/v1/chat/completions');
+        pck_api_http.request(v_req, 'POST', 'https://api.openai.com/v1/responses');
         pck_api_http.request_auth_token(v_req, p_api_key);
         pck_api_http.request_content_type(v_req, 'application/json');
         pck_api_http.request_charset(v_req, 'UTF-8');
@@ -337,7 +335,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_openai AS
         IF r_error IS NOT NULL THEN
             RETURN;
         END IF;
-        r_message := v_response;
+        r_message := JSON_VALUE(v_response, '$.output[1].content[0].text' RETURNING CLOB);
     END;
 
     PROCEDURE image (
@@ -397,4 +395,4 @@ END;
 /
 
 
--- sqlcl_snapshot {"hash":"46c88b1c98609a12bfe02cfd6975a6173aef62bb","type":"PACKAGE_BODY","name":"PCK_API_OPENAI","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"a72dff1d677f728ade8ec7b71ad9d07644b5c72b","type":"PACKAGE_BODY","name":"PCK_API_OPENAI","schemaName":"ODBVUE","sxml":""}

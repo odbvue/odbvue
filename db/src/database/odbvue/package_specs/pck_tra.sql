@@ -29,8 +29,27 @@ CREATE OR REPLACE PACKAGE odbvue.pck_tra AS
         r_assignees OUT SYS_REFCURSOR -- Resulting assignee list
     );
 
+    PROCEDURE get_notes ( -- Method to get list of notes for a task
+        p_filter IN VARCHAR2 DEFAULT NULL, -- Filter in URL encoded JSON format
+        p_search IN VARCHAR2 DEFAULT NULL, -- Search string
+        p_offset IN PLS_INTEGER DEFAULT 0, -- Offset for pagination
+        p_limit  IN PLS_INTEGER DEFAULT 10, -- Limit for pagination
+        r_notes  OUT SYS_REFCURSOR -- Resulting note list
+    );
+
+    PROCEDURE post_note ( -- Method to create or update a note
+        p_data   CLOB, -- Note data in JSON format
+        r_error  OUT VARCHAR2, -- Error message if any
+        r_errors OUT SYS_REFCURSOR -- Resulting errors if any
+    );
+
+    PROCEDURE get_download (
+        p_id IN VARCHAR2 -- Storage identifier of the file
+    );
+
+    PROCEDURE job_assistant; -- Procedure to run assistant jobs for tasks
 END pck_tra;
 /
 
 
--- sqlcl_snapshot {"hash":"474a660b4195d4d9de595da038a316330db25e0c","type":"PACKAGE_SPEC","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"e0ae749f29b257072c571ac769d8391dd05021bf","type":"PACKAGE_SPEC","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}

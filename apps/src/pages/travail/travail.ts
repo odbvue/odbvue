@@ -1,5 +1,5 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
-import type { OvFormFieldError } from '@/components/index.ts'
+import { processFormDataWithFiles, type OvFormFieldError } from '@/components/index.ts'
 
 export type PostTaskResponse = {
   error?: string
@@ -185,6 +185,72 @@ export const useTravailStore = defineStore(
       return data?.assignees
     }
 
+    type Note = {
+      id: number
+      num: string
+      storage_id: string
+      content: string
+      file_id: string
+      file_name: string
+      file_size: number
+      assistant: string
+      author: string
+      author_fullname: string
+      created: string
+      editor: string
+      editor_fullname: string
+      modified: string
+    }
+
+    const notes = ref<Note[]>([])
+    const notesPage = ref(1)
+    const notesPerPage = 10
+    const notesHasNext = ref(false)
+
+    const getNotes = async (
+      search?: string,
+      filter?: string,
+      offset: number = 0,
+      limit: number = notesPerPage + 1,
+    ) => {
+      const { data } = await http.get<{ notes: Note[] }>('tra/notes/', {
+        params: { filter, search, offset, limit },
+      })
+      const allNotes = data?.notes || []
+      notesHasNext.value = allNotes.length > notesPerPage
+      notes.value = allNotes.slice(0, notesPerPage)
+    }
+
+    const fetchNotesPage = async (num: string, page: number) => {
+      notesPage.value = page
+      const offset = (page - 1) * notesPerPage
+      await getNotes('', `{"num": ["${num}"]}`, offset, notesPerPage + 1)
+    }
+
+    const postNote = async (note: OvFormData) => {
+      const processedNote = await processFormDataWithFiles(note)
+      await http.post<PostTaskResponse>('tra/note/', {
+        data: JSON.stringify(processedNote),
+      })
+      notesPage.value = 1
+      await getNotes('', `{"num": ["${note.num}"]}`)
+    }
+
+    const downloadFile = async (fileId: string, fileName: string) => {
+      const response = await http.get(`tra/download/${fileId}`)
+      if (response.status === 200 && response.data) {
+        const blob = new Blob([response.data as ArrayBuffer], { type: 'application/octet-stream' })
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.setAttribute('download', fileName) // Let server suggest filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+      }
+    }
+
     return {
       viewModes,
       viewMode,
@@ -201,6 +267,14 @@ export const useTravailStore = defineStore(
       init,
       getTasks,
       tasks,
+      getNotes,
+      notes,
+      notesPage,
+      notesPerPage,
+      notesHasNext,
+      fetchNotesPage,
+      postNote,
+      downloadFile,
     }
   },
   {
