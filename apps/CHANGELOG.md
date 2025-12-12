@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.234
+
+### Patch Changes
+
+- e16eb7a: travail boards management
+
 ## 0.0.233
 
 ### Patch Changes
