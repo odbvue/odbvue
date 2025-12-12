@@ -188,9 +188,28 @@ export const useTravailStore = defineStore(
       tasks.value = data?.tasks || []
     }
 
+    const isRecord = (value: unknown): value is Record<string, unknown> =>
+      typeof value === 'object' && value !== null
+
+    const normalizeTaskForPost = (task: OvFormData): OvFormData => {
+      const normalized: OvFormData = { ...task }
+
+      if ('assignee' in normalized) {
+        const assignee = normalized.assignee
+        if (typeof assignee === 'string' || assignee === null || assignee === undefined) {
+          // already normalized
+        } else if (isRecord(assignee) && typeof assignee.value === 'string') {
+          normalized.assignee = assignee.value
+        }
+      }
+
+      return normalized
+    }
+
     const postTask = async (task: OvFormData) => {
+      const normalizedTask = normalizeTaskForPost(task)
       return await http.post<PostTaskResponse>('tra/task/', {
-        data: encodeURIComponent(JSON.stringify(task)),
+        data: encodeURIComponent(JSON.stringify(normalizedTask)),
       })
     }
 

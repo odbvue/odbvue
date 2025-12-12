@@ -201,6 +201,7 @@ export default defineConfig({
             { text: 'Overview', link: '/features' },
             { text: 'Application', link: '/features/app' },
             { text: 'Administration', link: '/features/adm' },
+            { text: 'Travail', link: '/features/travail' },
           ],
         },
       ],
