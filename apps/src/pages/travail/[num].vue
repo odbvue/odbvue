@@ -1,19 +1,14 @@
 <template>
   <v-container>
     <v-row>
-      <v-col cols="12" sm="6">
+      <v-col cols="12">
         <h2>Details</h2>
-        <v-ov-view
-          v-if="num != 'new-task'"
-          :data="{ num }"
-          :options="{ items: [{ name: 'num', label: 'key' }] }"
+        <v-ov-form
+          :data="taskData"
+          :options="taskOptions"
+          @submit="saveTask"
+          @cancel="cancelTask"
         />
-        <v-ov-view
-          v-if="parentNum"
-          :data="{ num: parentNum }"
-          :options="{ items: [{ name: 'num', label: 'parent.key' }] }"
-        />
-        <v-ov-form :data="taskData" :options="taskOptions" @submit="saveTask" />
       </v-col>
 
       <v-col cols="12" sm="6" v-if="num != 'new-task'">
@@ -35,7 +30,7 @@
               @click="travail.downloadFile(note.file_id, note.file_name)"
               prepend-icon="$mdiDownload"
             >
-              {{ note.file_name }}
+              {{ formatFileName(note.file_name) }}
             </v-btn>
             <v-sheet v-if="note.assistant" class="text-body-2 font-italic ma-2 mt-4">
               <v-icon left>$mdiRobot</v-icon>
@@ -100,21 +95,15 @@ definePage({
   },
 })
 
-import { useRoute } from 'vue-router'
-const routeParamValue = (name: string) => {
-  const route = useRoute()
-  const param = (route.params as Record<string, unknown>)[name]
-  return Array.isArray(param) ? param[0] : param || ''
-}
-const routeQueryValue = (name: string) => {
-  const route = useRoute()
-  const query = route.query[name]
-  return Array.isArray(query) ? query[0] : query || ''
-}
+import { useRouteParams } from '@/stores/app/navigation'
+import { truncateMiddle } from './_utils/text'
 
-const num = ref(routeParamValue('num'))
-const parentNum = ref(routeQueryValue('parent-num'))
-const status = ref(routeQueryValue('status'))
+const { param, query } = useRouteParams()
+const num = param('num')
+const parentNum = query('parent-num')
+const status = query('status')
+
+const formatFileName = (fileName: string): string => truncateMiddle(fileName, 6, 7)
 
 import { useTravailStore } from './travail.ts'
 import type { OvFormFieldError } from '@/components/index.ts'
@@ -122,7 +111,7 @@ const travail = useTravailStore()
 
 onMounted(async () => {
   if (num.value && num.value !== 'new-task') {
-    const task = await travail.tasks.find((t) => t.num === num.value)
+    const task = travail.tasks.find((t) => t.num === num.value)
     taskData.value = task || {}
     await travail.fetchNotesPage(num.value, 1)
   }
@@ -150,15 +139,28 @@ const saveTask = async (task: OvFormData) => {
   }
   router.push('/travail')
 }
+const cancelTask = () => {
+  router.push('/travail')
+}
 
 const taskData = ref<OvFormData>({})
 const taskOptions = computed<OvFormOptions>(() => ({
+  cols: 3,
   fields: [
     {
       type: 'text',
+      name: 'num',
+      label: 'key',
+      value: num.value == 'new-task' ? '' : num.value || '',
+      disabled: true,
+    },
+    {
+      type: 'text',
       name: 'parent',
+      label: 'parent',
       value: parentNum.value || '',
-      hidden: true,
+      disabled: true,
+      hidden: parentNum.value ? false : true,
     },
     {
       type: 'text',
@@ -176,13 +178,6 @@ const taskOptions = computed<OvFormOptions>(() => ({
       type: 'text',
       name: 'title',
       label: 'title',
-    },
-    {
-      type: 'markdown',
-      name: 'description',
-      label: 'description',
-      minHeight: '200px',
-      maxHeight: '200px',
     },
     {
       type: 'date',
@@ -219,8 +214,9 @@ const taskOptions = computed<OvFormOptions>(() => ({
     },
   ],
   errors: errors.value,
-  actions: [{ name: 'save' }],
+  actions: [{ name: 'save' }, { name: 'cancel', format: { variant: 'outlined' } }],
   actionSubmit: 'save',
+  actionCancel: 'cancel',
 }))
 
 import MarkdownIt from 'markdown-it'

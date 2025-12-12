@@ -22,5 +22,11 @@
   "Done": "Done",
   "board-view": "Board-view",
   "calendar-view": "Calendar-view",
-  "today": "Today"
+  "today": "Today",
+  "key": "Key",
+  "title": "Title",
+  "description": "Description",
+  "settingsText": "SettingsText",
+  "settings": "Settings",
+  "invalid.json": "Invalid json"
 }

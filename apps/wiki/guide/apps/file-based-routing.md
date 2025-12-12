@@ -197,12 +197,21 @@ async function extractMetaFromMarkdown(absolutePath: string): Promise<Record<str
 export default defineConfig({
   plugins: [
     Markdown({}),
-    VueRouter({ extensions: ['.vue', '.md'], async extendRoute(route) {
+    VueRouter({
+      routesFolder: [
+        {
+          src: 'src/pages',
+          exclude: ['**/_components/**'], //to have local components
+        },
+      ],
+      extensions: ['.vue', '.md'],
+      async extendRoute(route) {
       if (route.component?.endsWith('.md')) {
         const meta = await extractMetaFromMarkdown(route.component)
         if (meta)  route.meta = { ...route.meta, ...meta }
       }
-    } }),
+    },
+    }),
     vue({
       include: [/\.vue$/, /\.md$/]
     }),

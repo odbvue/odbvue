@@ -233,6 +233,13 @@ declare module 'vue-router/auto-routes' {
       { num: ParamValue<false> },
       | never
     >,
+    '/travail/boards': RouteRecordInfo<
+      '/travail/boards',
+      '/travail/boards',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
   }
 
   /**
@@ -423,6 +430,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/travail/[num].vue': {
       routes:
         | '/travail/[num]'
+      views:
+        | never
+    }
+    'src/pages/travail/boards.vue': {
+      routes:
+        | '/travail/boards'
       views:
         | never
     }
