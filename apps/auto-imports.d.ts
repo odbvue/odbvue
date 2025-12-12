@@ -13,6 +13,9 @@ declare global {
   const OvRuleValidate: typeof import('./src/components/index').OvRuleValidate
   const OvTextAlign: typeof import('./src/components/index').OvTextAlign
   const computed: typeof import('vue').computed
+  const computedRouteParam: typeof import('./src/stores/app/navigation').computedRouteParam
+  const computedRouteParams: typeof import('./src/stores/app/navigation').computedRouteParams
+  const computedRouteQuery: typeof import('./src/stores/app/navigation').computedRouteQuery
   const createApp: typeof import('vue').createApp
   const customRef: typeof import('vue').customRef
   const defineAsyncComponent: typeof import('vue').defineAsyncComponent
@@ -88,6 +91,7 @@ declare global {
   const useModel: typeof import('vue').useModel
   const useNavigationStore: typeof import('./src/stores/app/navigation').useNavigationStore
   const useRoute: typeof import('vue-router').useRoute
+  const useRouteParams: typeof import('./src/stores/app/navigation').useRouteParams
   const useRouter: typeof import('vue-router').useRouter
   const useRtl: typeof import('vuetify').useRtl
   const useSeoMeta: typeof import('@unhead/vue').useSeoMeta

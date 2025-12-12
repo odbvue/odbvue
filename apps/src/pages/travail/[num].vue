@@ -100,21 +100,12 @@ definePage({
   },
 })
 
-import { useRoute } from 'vue-router'
-const routeParamValue = (name: string) => {
-  const route = useRoute()
-  const param = (route.params as Record<string, unknown>)[name]
-  return Array.isArray(param) ? param[0] : param || ''
-}
-const routeQueryValue = (name: string) => {
-  const route = useRoute()
-  const query = route.query[name]
-  return Array.isArray(query) ? query[0] : query || ''
-}
+import { useRouteParams } from '@/stores/app/navigation'
 
-const num = ref(routeParamValue('num'))
-const parentNum = ref(routeQueryValue('parent-num'))
-const status = ref(routeQueryValue('status'))
+const { param, query } = useRouteParams()
+const num = param('num')
+const parentNum = query('parent-num')
+const status = query('status')
 
 import { useTravailStore } from './travail.ts'
 import type { OvFormFieldError } from '@/components/index.ts'
@@ -122,7 +113,7 @@ const travail = useTravailStore()
 
 onMounted(async () => {
   if (num.value && num.value !== 'new-task') {
-    const task = await travail.tasks.find((t) => t.num === num.value)
+    const task = travail.tasks.find((t) => t.num === num.value)
     taskData.value = task || {}
     await travail.fetchNotesPage(num.value, 1)
   }
