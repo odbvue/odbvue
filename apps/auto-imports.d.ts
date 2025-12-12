@@ -82,6 +82,7 @@ declare global {
   const useGoTo: typeof import('vuetify').useGoTo
   const useHead: typeof import('@unhead/vue').useHead
   const useHeadSafe: typeof import('@unhead/vue').useHeadSafe
+  const useHtml5DragDrop: typeof import('./src/composables/dnd').useHtml5DragDrop
   const useHttp: typeof import('./src/composables/http').useHttp
   const useI18n: typeof import('vue-i18n').useI18n
   const useId: typeof import('vue').useId
@@ -114,6 +115,9 @@ declare global {
   // @ts-ignore
   export type { Component, Slot, Slots, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, ShallowRef, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
   import('vue')
+  // @ts-ignore
+  export type { DragDropOptions } from './src/composables/dnd'
+  import('./src/composables/dnd')
   // @ts-ignore
   export type { TOvMapMarker, VOvMapInstance } from './src/components/VOvMap.vue'
   import('./src/components/VOvMap.vue')

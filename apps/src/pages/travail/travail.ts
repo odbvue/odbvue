@@ -6,6 +6,11 @@ export type PostTaskResponse = {
   errors?: OvFormFieldError[]
 }
 
+export type PostRankResponse = {
+  error?: string
+  errors?: OvFormFieldError[]
+}
+
 export type PostBoardResponse = {
   error?: string
   errors?: OvFormFieldError[]
@@ -78,6 +83,8 @@ export const useTravailStore = defineStore(
       editor?: string
       modified?: string
 
+      rank_value?: number
+
       parent_num?: string
     }
 
@@ -87,12 +94,48 @@ export const useTravailStore = defineStore(
       color?: string
     }
 
+    type BoardFilter = {
+      name: string
+      value: string
+    }
+
     const viewModes = ['board', 'calendar'] as const
     const viewMode = ref('board')
 
     const boards = ref<Board[]>([])
     const board = ref<Board | null>(null)
     const key = ref('TRA')
+
+    const boardFilters = ref<Record<string, BoardFilter[]>>({})
+
+    const activeBoardFilters = computed<BoardFilter[]>(() => boardFilters.value[key.value] ?? [])
+
+    const setActiveBoardFilters = (filters: BoardFilter[]) => {
+      boardFilters.value = {
+        ...boardFilters.value,
+        [key.value]: filters,
+      }
+    }
+
+    const toggleActiveBoardFilter = (filter: BoardFilter) => {
+      const existing = activeBoardFilters.value
+      const idx = existing.findIndex((f) => f.name === filter.name && f.value === filter.value)
+      if (idx >= 0) {
+        setActiveBoardFilters(existing.filter((_, i) => i !== idx))
+        return
+      }
+      setActiveBoardFilters([...existing, filter])
+    }
+
+    const removeActiveBoardFilter = (name: string, value: string) => {
+      setActiveBoardFilters(
+        activeBoardFilters.value.filter((f) => !(f.name === name && f.value === value)),
+      )
+    }
+
+    const clearActiveBoardFilters = () => {
+      setActiveBoardFilters([])
+    }
 
     const statuses = computed(() => board.value?.settings.statuses || [])
     const priorities = computed(() => board.value?.settings.priorities || [])
@@ -155,6 +198,36 @@ export const useTravailStore = defineStore(
       startLoading()
       await postTask({ ...tasks.value.find((t) => t.num === num), ...{ status: status } })
       await init()
+    }
+
+    const postTaskRank = async (num: string, before: string | null, after: string | null) => {
+      return await http.post<PostRankResponse>('tra/rank/', {
+        num,
+        before,
+        after,
+      })
+    }
+
+    const postTaskMove = async (
+      num: string,
+      toStatus: string,
+      before: string | null,
+      after: string | null,
+    ) => {
+      startLoading()
+      try {
+        const existing = tasks.value.find((t) => t.num === num)
+        if (!existing) return
+
+        if (existing.status !== toStatus) {
+          await postTask({ ...existing, status: toStatus })
+        }
+
+        await postTaskRank(num, before, after)
+        await init()
+      } finally {
+        stopLoading()
+      }
     }
 
     const taskDetails = computed(() => (num: string): TaskDetails[] => {
@@ -280,11 +353,19 @@ export const useTravailStore = defineStore(
       setActiveBoard,
       postTask,
       postTaskStatus,
+      postTaskRank,
+      postTaskMove,
       taskDetails,
       getAssignees,
       init,
       getTasks,
       tasks,
+      boardFilters,
+      activeBoardFilters,
+      setActiveBoardFilters,
+      toggleActiveBoardFilter,
+      removeActiveBoardFilter,
+      clearActiveBoardFilters,
       getNotes,
       notes,
       notesPage,
@@ -298,7 +379,7 @@ export const useTravailStore = defineStore(
   {
     storage: {
       adapter: 'localStorage',
-      include: ['key', 'viewMode'],
+      include: ['key', 'viewMode', 'boardFilters'],
     },
   } as Record<string, unknown>,
 )
