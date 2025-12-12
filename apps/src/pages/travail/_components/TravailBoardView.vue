@@ -1,5 +1,23 @@
 <template>
   <v-row>
+    <v-col cols="12">
+      <v-chip
+        v-for="chip in filterChips"
+        :key="`${chip.name}-${chip.value}`"
+        :prepend-icon="chip.icon"
+        class="ma-1"
+        color="primary"
+        closable
+        rounded
+        start
+        @click:close="removeFilter(chip.name, chip.value)"
+      >
+        <strong>{{ chip.value }}</strong
+        >&nbsp;({{ t(chip.label) }})
+      </v-chip>
+    </v-col>
+  </v-row>
+  <v-row>
     <v-col
       cols="12"
       sm="4"
@@ -69,9 +87,12 @@
               v-for="detail in travail.taskDetails(task.num)"
               :key="detail.label"
               :color="detail.color"
+              :prepend-icon="isFilterActive(detail) ? '$mdiFilterCheck' : '$mdiFilterPlus'"
+              link
               class="ma-1"
               density="compact"
               rounded
+              @click="toggleFilter(detail)"
             >
               <strong>{{ detail.value }}</strong
               >&nbsp;({{ t(detail.label) }})
@@ -160,11 +181,62 @@ const { t } = useI18n()
 
 type Task = (typeof travail.tasks)[number]
 
+type TaskDetail = {
+  value: string
+  label: string
+  color?: string
+}
+
+type BoardFilter = {
+  name: string
+  value: string
+}
+
+type FilterChip = {
+  name: string
+  label: string
+  value: string
+  icon: string
+}
+
+const filterChips = computed<FilterChip[]>(() =>
+  travail.activeBoardFilters.map(
+    (f): FilterChip => ({
+      name: f.name,
+      label: f.name,
+      value: f.value,
+      icon: '$mdiFilter',
+    }),
+  ),
+)
+
+const isFilterActive = (detail: TaskDetail): boolean =>
+  travail.activeBoardFilters.some((f) => f.name === detail.label && f.value === detail.value)
+
+const toggleFilter = (detail: TaskDetail) => {
+  const filter: BoardFilter = { name: detail.label, value: detail.value }
+  travail.toggleActiveBoardFilter(filter)
+}
+
+const removeFilter = (name: string, value: string) => {
+  travail.removeActiveBoardFilter(name, value)
+}
+
 const INF_RANK = Number.POSITIVE_INFINITY
+
+const filteredTasks = computed<Task[]>(() => {
+  const filters = travail.activeBoardFilters
+  if (!filters.length) return travail.tasks
+
+  return travail.tasks.filter((task) => {
+    const details = travail.taskDetails(task.num)
+    return filters.every((f) => details.some((d) => d.label === f.name && d.value === f.value))
+  })
+})
 
 const tasksByStatus = computed<Record<string, Task[]>>(() => {
   const grouped: Record<string, Task[]> = {}
-  for (const task of travail.tasks) {
+  for (const task of filteredTasks.value) {
     const status = task.status
     ;(grouped[status] ||= []).push(task)
   }
