@@ -7,6 +7,12 @@ CREATE OR REPLACE PACKAGE odbvue.pck_tra AS
         r_boards OUT SYS_REFCURSOR -- Resulting plan list
     );
 
+    PROCEDURE post_board ( -- Method to create or update a board
+        p_data   CLOB, -- Board data in JSON format
+        r_error  OUT VARCHAR2, -- Error message if any
+        r_errors OUT SYS_REFCURSOR -- Resulting errors if any
+    );
+
     PROCEDURE get_tasks ( -- Method to get list of tasks
         p_filter IN VARCHAR2 DEFAULT NULL, -- Filter in URL encoded JSON format 
         p_search IN VARCHAR2 DEFAULT NULL, -- Search string
@@ -52,4 +58,4 @@ END pck_tra;
 /
 
 
--- sqlcl_snapshot {"hash":"e0ae749f29b257072c571ac769d8391dd05021bf","type":"PACKAGE_SPEC","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"6cd7d9c37620c5bf400a5c15de60fb1af6014d22","type":"PACKAGE_SPEC","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}

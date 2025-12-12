@@ -76,9 +76,76 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
                                   WHERE
                                       b.key = j.value
                               ) )
+                -- Search by title or key
+                              AND ( v_search IS NULL
+                                    OR upper(b.title) LIKE '%'
+                                    || upper(v_search)
+                                    || '%'
+                                       OR upper(b.key) LIKE '%'
+                                                            || upper(v_search)
+                                                            || '%' )
+                          ORDER BY
+                              b.created DESC
                           OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY;
 
     END get_boards;
+
+    PROCEDURE post_board (
+        p_data   CLOB,
+        r_error  OUT VARCHAR2,
+        r_errors OUT SYS_REFCURSOR
+    ) AS
+
+        v_uuid        CHAR(32 CHAR) := pck_api_auth.uuid;
+        v_data        CLOB := utl_url.unescape(coalesce(p_data, '{}'));
+        v_key         tra_boards.key%TYPE := upper(trim(JSON_VALUE(v_data, '$.key')));
+        v_title       tra_boards.title%TYPE := JSON_VALUE(v_data, '$.title');
+        v_description tra_boards.description%TYPE := JSON_VALUE(v_data, '$.description');
+        v_settings    tra_boards.settings%TYPE := JSON_QUERY(v_data, '$.settings' RETURNING CLOB);
+    BEGIN
+        IF v_uuid IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+        IF v_title IS NULL THEN
+            pck_api_audit.errors(r_errors, 'title', 'required');
+            RETURN;
+        END IF;
+
+        UPDATE tra_boards
+        SET
+            title = v_title,
+            description = v_description,
+            settings = v_settings,
+            editor = v_uuid,
+            modified = systimestamp
+        WHERE
+            key = v_key;
+
+        IF SQL%rowcount = 0 THEN
+            INSERT INTO tra_boards (
+                key,
+                title,
+                description,
+                settings,
+                author
+            ) VALUES ( v_key,
+                       v_title,
+                       v_description,
+                       v_settings,
+                       v_uuid );
+
+        END IF;
+
+        COMMIT;
+    EXCEPTION
+        WHEN OTHERS THEN
+            ROLLBACK;
+            pck_api_audit.error('Travail',
+                                pck_api_audit.attributes('data', v_data, 'uuid', v_uuid));
+
+            r_error := 'something.went.wrong';
+    END post_board;
 
     PROCEDURE get_tasks (
         p_filter IN VARCHAR2 DEFAULT NULL,
@@ -553,4 +620,4 @@ END pck_tra;
 /
 
 
--- sqlcl_snapshot {"hash":"e8340b83119b0cab84ace1bd3f9cb46dfee52752","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"cb98eff20f4f79058d27eb4fa084bc33f80e362d","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}

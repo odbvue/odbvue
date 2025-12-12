@@ -6,6 +6,11 @@ export type PostTaskResponse = {
   errors?: OvFormFieldError[]
 }
 
+export type PostBoardResponse = {
+  error?: string
+  errors?: OvFormFieldError[]
+}
+
 export const useTravailStore = defineStore(
   'travail',
   () => {
@@ -115,6 +120,17 @@ export const useTravailStore = defineStore(
         params: { filter, search, offset, limit },
       })
       boards.value = data?.boards || []
+    }
+
+    const postBoard = async (board: OvFormData) => {
+      return await http.post<PostBoardResponse>('tra/board/', {
+        data: encodeURIComponent(JSON.stringify(board)),
+      })
+    }
+
+    const setActiveBoard = async (boardKey: string) => {
+      key.value = boardKey
+      await init()
     }
 
     const getTasks = async (
@@ -260,6 +276,8 @@ export const useTravailStore = defineStore(
       getBoards,
       statuses,
       priorities,
+      postBoard,
+      setActiveBoard,
       postTask,
       postTaskStatus,
       taskDetails,

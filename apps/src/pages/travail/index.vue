@@ -5,7 +5,13 @@
         <v-badge bordered offset-x="-8" :content="travail.key"
           ><h1>{{ travail.board?.title }}</h1></v-badge
         >
-        <v-btn icon="$mdiPencil" class="ml-8" variant="text" density="comfortable" />
+        <v-btn
+          icon="$mdiPencil"
+          class="ml-8"
+          variant="text"
+          density="comfortable"
+          to="/travail/boards"
+        />
       </v-col>
       <v-col cols="12" sm="4" class="d-flex align-end justify-end">
         <v-btn-toggle v-model="travail.viewMode" mandatory>
