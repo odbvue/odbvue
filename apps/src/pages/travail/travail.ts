@@ -288,3 +288,5 @@ export const useTravailStore = defineStore(
 if (import.meta.hot) {
   import.meta.hot.accept(acceptHMRUpdate(useTravailStore, import.meta.hot))
 }
+
+export type TravailStore = ReturnType<typeof useTravailStore>

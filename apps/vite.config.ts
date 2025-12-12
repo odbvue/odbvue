@@ -66,12 +66,21 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       Markdown({}),
-      VueRouter({ extensions: ['.vue', '.md'], async extendRoute(route) {
+      VueRouter({
+        routesFolder: [
+          {
+            src: 'src/pages',
+            exclude: ['**/_components/**'],
+          },
+        ],
+        extensions: ['.vue', '.md'],
+        async extendRoute(route) {
         if (route.component?.endsWith('.md')) {
           const meta = await extractMetaFromMarkdown(route.component)
           if (meta)  route.meta = { ...route.meta, ...meta }
         }
-      } }),
+      },
+      }),
       vue({
         include: [/\.vue$/, /\.md$/]
       }),
