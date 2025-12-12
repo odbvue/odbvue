@@ -35,7 +35,7 @@
               @click="travail.downloadFile(note.file_id, note.file_name)"
               prepend-icon="$mdiDownload"
             >
-              {{ note.file_name }}
+              {{ formatFileName(note.file_name) }}
             </v-btn>
             <v-sheet v-if="note.assistant" class="text-body-2 font-italic ma-2 mt-4">
               <v-icon left>$mdiRobot</v-icon>
@@ -101,11 +101,14 @@ definePage({
 })
 
 import { useRouteParams } from '@/stores/app/navigation'
+import { truncateMiddle } from './_utils/text'
 
 const { param, query } = useRouteParams()
 const num = param('num')
 const parentNum = query('parent-num')
 const status = query('status')
+
+const formatFileName = (fileName: string): string => truncateMiddle(fileName, 6, 7)
 
 import { useTravailStore } from './travail.ts'
 import type { OvFormFieldError } from '@/components/index.ts'
