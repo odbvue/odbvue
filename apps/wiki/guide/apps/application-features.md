@@ -918,3 +918,13 @@ Create Page Not Found page
   { meta: { layout: 'fullscreen' } }
 </route>
 ```
+
+## Drag & Drop (composable)
+
+For simple Kanban-style interactions (move cards between columns) you can use a small HTML5 drag-and-drop composable. It centralizes drag state, drop-target highlighting helpers, and provides default inline styles that follow the Vuetify theme.
+
+#### `@/composables/dnd.ts`
+
+::: details source
+<<<../../../src/composables/dnd.ts
+:::

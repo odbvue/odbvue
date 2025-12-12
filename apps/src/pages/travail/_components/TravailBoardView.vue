@@ -1,9 +1,32 @@
 <template>
   <v-row>
-    <v-col cols="12" sm="4" v-for="status in travail.statuses" :key="status.value">
+    <v-col
+      cols="12"
+      sm="4"
+      v-for="status in travail.statuses"
+      :key="status.value"
+      class="ov-dnd-column"
+      :class="{ 'ov-dnd-column--active': activeDropKey === status.value }"
+      :style="activeDropKey === status.value ? dndDropColumnActiveStyle : undefined"
+      @dragenter.prevent="enterDropTarget(status.value)"
+      @dragleave="leaveDropTarget(status.value)"
+      @dragover.prevent
+      @drop="onDrop(status.value, $event)"
+    >
       <h2>{{ t(status.title) }}</h2>
 
-      <v-card v-for="task in tasksByStatus[status.value]" :key="task.num" class="mt-4 mb-2">
+      <v-card
+        v-for="task in tasksByStatus[status.value]"
+        :key="task.num"
+        class="mt-4 mb-2 ov-dnd-card"
+        :class="{ 'ov-dnd-card--dragging': draggingNum === task.num }"
+        :style="
+          draggingNum === task.num ? [dndCardBaseStyle, dndCardDraggingStyle] : dndCardBaseStyle
+        "
+        draggable="true"
+        @dragstart="onDragStart(task, $event)"
+        @dragend="endDrag"
+      >
         <v-card-title>
           <v-badge bordered :content="task.num" :offset-x="-8">{{ task.title }}</v-badge>
         </v-card-title>
@@ -60,6 +83,7 @@
 
 <script setup lang="ts">
 import type { TravailStore } from '../travail'
+import { useHtml5DragDrop } from '@/composables/dnd'
 
 const props = defineProps<{ travail: TravailStore }>()
 const travail = props.travail
@@ -93,4 +117,51 @@ const statusTitleByValue = computed<Record<string, string>>(() => {
   for (const status of travail.statuses) map[status.value] = t(status.title)
   return map
 })
+
+type DragPayload = {
+  num: string
+}
+
+const isDragPayload = (value: unknown): value is DragPayload => {
+  if (!value || typeof value !== 'object') return false
+  if (!('num' in value)) return false
+  return typeof (value as Record<string, unknown>).num === 'string'
+}
+
+const {
+  draggingPayload,
+  activeDropKey,
+  dndCardBaseStyle,
+  dndCardDraggingStyle,
+  dndDropColumnActiveStyle,
+  startDrag,
+  endDrag,
+  extractPayload,
+  enterDropTarget,
+  leaveDropTarget,
+} = useHtml5DragDrop<DragPayload, string>({
+  mime: 'application/x-odbvue-travail-task',
+  toText: (p) => p.num,
+  fromText: (text) => (text ? { num: text } : null),
+  fromJson: (value) => (isDragPayload(value) ? value : null),
+})
+
+const draggingNum = computed(() => draggingPayload.value?.num ?? null)
+
+const onDragStart = (task: Task, event: DragEvent) => {
+  startDrag({ num: task.num }, event)
+}
+
+const onDrop = async (toStatus: string, event: DragEvent) => {
+  event.preventDefault()
+  const payload = extractPayload(event)
+  if (!payload) return
+
+  const task = travail.tasks.find((t) => t.num === payload.num)
+  if (!task) return
+  if (task.status === toStatus) return
+
+  await travail.postTaskStatus(task.num, toStatus)
+  endDrag()
+}
 </script>
