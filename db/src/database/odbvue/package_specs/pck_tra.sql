@@ -54,8 +54,15 @@ CREATE OR REPLACE PACKAGE odbvue.pck_tra AS
     );
 
     PROCEDURE job_assistant; -- Procedure to run assistant jobs for tasks
+
+    PROCEDURE post_rank (
+        p_num    IN VARCHAR2,
+        p_before IN VARCHAR2,
+        p_after  IN VARCHAR2
+    );
+
 END pck_tra;
 /
 
 
--- sqlcl_snapshot {"hash":"6cd7d9c37620c5bf400a5c15de60fb1af6014d22","type":"PACKAGE_SPEC","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"fe51f1f211c5c7f8fef23aaec1b85d574fef9e95","type":"PACKAGE_SPEC","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}

@@ -6,6 +6,11 @@ export type PostTaskResponse = {
   errors?: OvFormFieldError[]
 }
 
+export type PostRankResponse = {
+  error?: string
+  errors?: OvFormFieldError[]
+}
+
 export type PostBoardResponse = {
   error?: string
   errors?: OvFormFieldError[]
@@ -77,6 +82,8 @@ export const useTravailStore = defineStore(
       created: string
       editor?: string
       modified?: string
+
+      rank_value?: number
 
       parent_num?: string
     }
@@ -155,6 +162,36 @@ export const useTravailStore = defineStore(
       startLoading()
       await postTask({ ...tasks.value.find((t) => t.num === num), ...{ status: status } })
       await init()
+    }
+
+    const postTaskRank = async (num: string, before: string | null, after: string | null) => {
+      return await http.post<PostRankResponse>('tra/rank/', {
+        num,
+        before,
+        after,
+      })
+    }
+
+    const postTaskMove = async (
+      num: string,
+      toStatus: string,
+      before: string | null,
+      after: string | null,
+    ) => {
+      startLoading()
+      try {
+        const existing = tasks.value.find((t) => t.num === num)
+        if (!existing) return
+
+        if (existing.status !== toStatus) {
+          await postTask({ ...existing, status: toStatus })
+        }
+
+        await postTaskRank(num, before, after)
+        await init()
+      } finally {
+        stopLoading()
+      }
     }
 
     const taskDetails = computed(() => (num: string): TaskDetails[] => {
@@ -280,6 +317,8 @@ export const useTravailStore = defineStore(
       setActiveBoard,
       postTask,
       postTaskStatus,
+      postTaskRank,
+      postTaskMove,
       taskDetails,
       getAssignees,
       init,

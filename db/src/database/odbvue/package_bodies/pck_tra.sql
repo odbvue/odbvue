@@ -204,10 +204,12 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
                                               to_char(t.created, 'YYYY-MM-DD HH24:MI:SS')  AS "created",
                                               t.editor                                     AS "editor",
                                               to_char(t.modified, 'YYYY-MM-DD HH24:MI:SS') AS "modified",
-                                              pt.num                                       AS "parent_num"
+                                              pt.num                                       AS "parent_num",
+                                              r.rank_value                                 AS "rank_value"
                                           FROM
                                                    tra_tasks t
                                               JOIN tra_boards b ON t.key = b.key
+                                              LEFT JOIN tra_ranks  r ON r.task_id = t.id
                                               LEFT JOIN app_users  u ON t.assignee = u.uuid
                                               LEFT JOIN tra_links  l ON t.id = l.child_id
                                               LEFT JOIN tra_tasks  pt ON l.parent_id = pt.id
@@ -244,6 +246,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
                                      t.num = j.value
                              ) )
                          ORDER BY
+                             nvl(r.rank_value, 999999999999999999) ASC,
                              t.created DESC
                          OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY;
 
@@ -616,8 +619,214 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
         wpg_docload.download_file(v_file);
     END;
 
+    PROCEDURE post_rank (
+        p_num    IN VARCHAR2,
+        p_before IN VARCHAR2,
+        p_after  IN VARCHAR2
+    ) AS
+
+        v_uuid        CHAR(32 CHAR) := pck_api_auth.uuid;
+        v_num         tra_tasks.num%TYPE := upper(trim(p_num));
+        v_before_num  tra_tasks.num%TYPE := upper(trim(p_before));
+        v_after_num   tra_tasks.num%TYPE := upper(trim(p_after));
+        v_task_id     tra_tasks.id%TYPE;
+        v_key         tra_tasks.key%TYPE;
+        v_status      tra_tasks.status%TYPE;
+        v_before_rank tra_ranks.rank_value%TYPE;
+        v_after_rank  tra_ranks.rank_value%TYPE;
+        v_new_rank    tra_ranks.rank_value%TYPE;
+        c_start       CONSTANT PLS_INTEGER := 1000;
+        c_step        CONSTANT PLS_INTEGER := 1000;
+        c_gap         CONSTANT PLS_INTEGER := 500;
+    BEGIN
+        IF v_uuid IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+        BEGIN
+            SELECT
+                t.id,
+                t.key,
+                t.status
+            INTO
+                v_task_id,
+                v_key,
+                v_status
+            FROM
+                tra_tasks t
+            WHERE
+                t.num = v_num;
+
+        EXCEPTION
+            WHEN no_data_found THEN
+                pck_api_auth.http(400, 'task.not.found');
+                RETURN;
+        END;
+
+        -- Normalize ranks in this column (board key + status) to ensure spacing and that every task has a rank.
+        MERGE INTO tra_ranks tr
+        USING (
+            SELECT
+                t.id               AS task_id,
+                ( c_start + ( ROW_NUMBER()
+                              OVER(
+                    ORDER BY
+                        nvl(r.rank_value, 999999999999999999) ASC,
+                        t.created ASC
+                              ) - 1 ) * c_step ) AS new_rank
+            FROM
+                tra_tasks t
+                LEFT JOIN tra_ranks r ON r.task_id = t.id
+            WHERE
+                    t.key = v_key
+                AND t.status = v_status
+        ) src ON ( tr.task_id = src.task_id )
+        WHEN MATCHED THEN UPDATE
+        SET tr.rank_value = src.new_rank
+        WHEN NOT MATCHED THEN
+        INSERT (
+            task_id,
+            rank_value )
+        VALUES
+            ( src.task_id,
+              src.new_rank );
+
+        IF v_before_num IS NOT NULL THEN
+            BEGIN
+                SELECT
+                    r.rank_value
+                INTO v_before_rank
+                FROM
+                         tra_tasks t
+                    JOIN tra_ranks r ON r.task_id = t.id
+                WHERE
+                        t.num = v_before_num
+                    AND t.key = v_key
+                    AND t.status = v_status;
+
+            EXCEPTION
+                WHEN no_data_found THEN
+                    v_before_rank := NULL;
+            END;
+        END IF;
+
+        IF v_after_num IS NOT NULL THEN
+            BEGIN
+                SELECT
+                    r.rank_value
+                INTO v_after_rank
+                FROM
+                         tra_tasks t
+                    JOIN tra_ranks r ON r.task_id = t.id
+                WHERE
+                        t.num = v_after_num
+                    AND t.key = v_key
+                    AND t.status = v_status;
+
+            EXCEPTION
+                WHEN no_data_found THEN
+                    v_after_rank := NULL;
+            END;
+        END IF;
+
+        IF
+            v_before_rank IS NULL
+            AND v_after_rank IS NULL
+        THEN
+            v_new_rank := c_start;
+        ELSIF v_before_rank IS NULL THEN
+            v_new_rank := v_after_rank - c_gap;
+        ELSIF v_after_rank IS NULL THEN
+            v_new_rank := v_before_rank + c_gap;
+        ELSE
+            v_new_rank := floor((v_before_rank + v_after_rank) / 2);
+            IF v_new_rank = v_before_rank
+            OR v_new_rank = v_after_rank THEN
+                -- No space left between neighbors; re-normalize with a larger step.
+                MERGE INTO tra_ranks tr2
+                USING (
+                    SELECT
+                        t.id                          AS task_id,
+                        ( c_start + ( ROW_NUMBER()
+                                      OVER(
+                            ORDER BY
+                                nvl(r.rank_value, 999999999999999999) ASC,
+                                t.created ASC
+                                      ) - 1 ) * ( c_step * 1000 ) ) AS new_rank
+                    FROM
+                        tra_tasks t
+                        LEFT JOIN tra_ranks r ON r.task_id = t.id
+                    WHERE
+                            t.key = v_key
+                        AND t.status = v_status
+                ) src2 ON ( tr2.task_id = src2.task_id )
+                WHEN MATCHED THEN UPDATE
+                SET tr2.rank_value = src2.new_rank
+                WHEN NOT MATCHED THEN
+                INSERT (
+                    task_id,
+                    rank_value )
+                VALUES
+                    ( src2.task_id,
+                      src2.new_rank );
+
+                SELECT
+                    r.rank_value
+                INTO v_before_rank
+                FROM
+                         tra_tasks t
+                    JOIN tra_ranks r ON r.task_id = t.id
+                WHERE
+                        t.num = v_before_num
+                    AND t.key = v_key
+                    AND t.status = v_status;
+
+                SELECT
+                    r.rank_value
+                INTO v_after_rank
+                FROM
+                         tra_tasks t
+                    JOIN tra_ranks r ON r.task_id = t.id
+                WHERE
+                        t.num = v_after_num
+                    AND t.key = v_key
+                    AND t.status = v_status;
+
+                v_new_rank := floor((v_before_rank + v_after_rank) / 2);
+            END IF;
+
+        END IF;
+
+        MERGE INTO tra_ranks tr3
+        USING (
+            SELECT
+                v_task_id  AS task_id,
+                v_new_rank AS rank_value
+            FROM
+                dual
+        ) src3 ON ( tr3.task_id = src3.task_id )
+        WHEN MATCHED THEN UPDATE
+        SET tr3.rank_value = src3.rank_value
+        WHEN NOT MATCHED THEN
+        INSERT (
+            task_id,
+            rank_value )
+        VALUES
+            ( src3.task_id,
+              src3.rank_value );
+
+        COMMIT;
+    EXCEPTION
+        WHEN OTHERS THEN
+            ROLLBACK;
+            pck_api_audit.error('Travail',
+                                pck_api_audit.attributes('num', v_num, 'uuid', v_uuid));
+
+            pck_api_auth.http(400, 'something.went.wrong');
+    END post_rank;
+
 END pck_tra;
 /
 
 
--- sqlcl_snapshot {"hash":"cb98eff20f4f79058d27eb4fa084bc33f80e362d","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"4f81b6a34f6e548d19a6fb5f3b5c51d510bb179f","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}

@@ -15,6 +15,7 @@ END;
 begin
     prc_drop_table_if_exists('tra_notes');
     prc_drop_table_if_exists('tra_links');
+    prc_drop_table_if_exists('tra_ranks');
     prc_drop_table_if_exists('tra_tasks');
     prc_drop_table_if_exists('tra_boards');
 end;
@@ -96,6 +97,16 @@ CREATE INDEX idx_tra_tasks_completed ON tra_tasks(completed);
 CREATE INDEX idx_tra_tasks_author ON tra_tasks(author);
 CREATE INDEX idx_tra_tasks_created ON tra_tasks(created);
 / 
+
+CREATE TABLE tra_ranks(
+    task_id NUMBER(19) PRIMARY KEY,
+    rank_value NUMBER(19) NOT NULL,
+    CONSTRAINT cfk_tra_ranks_task FOREIGN KEY (task_id) REFERENCES tra_tasks(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_tra_ranks_rank_value ON tra_ranks(rank_value);
+/
+
 
 CREATE TABLE tra_links (
     parent_id NUMBER(19) NOT NULL,
