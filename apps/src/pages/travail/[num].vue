@@ -1,19 +1,14 @@
 <template>
   <v-container>
     <v-row>
-      <v-col cols="12" sm="6">
+      <v-col cols="12">
         <h2>Details</h2>
-        <v-ov-view
-          v-if="num != 'new-task'"
-          :data="{ num }"
-          :options="{ items: [{ name: 'num', label: 'key' }] }"
+        <v-ov-form
+          :data="taskData"
+          :options="taskOptions"
+          @submit="saveTask"
+          @cancel="cancelTask"
         />
-        <v-ov-view
-          v-if="parentNum"
-          :data="{ num: parentNum }"
-          :options="{ items: [{ name: 'num', label: 'parent.key' }] }"
-        />
-        <v-ov-form :data="taskData" :options="taskOptions" @submit="saveTask" />
       </v-col>
 
       <v-col cols="12" sm="6" v-if="num != 'new-task'">
@@ -144,15 +139,28 @@ const saveTask = async (task: OvFormData) => {
   }
   router.push('/travail')
 }
+const cancelTask = () => {
+  router.push('/travail')
+}
 
 const taskData = ref<OvFormData>({})
 const taskOptions = computed<OvFormOptions>(() => ({
+  cols: 3,
   fields: [
     {
       type: 'text',
+      name: 'num',
+      label: 'key',
+      value: num.value == 'new-task' ? '' : num.value || '',
+      disabled: true,
+    },
+    {
+      type: 'text',
       name: 'parent',
+      label: 'parent',
       value: parentNum.value || '',
-      hidden: true,
+      disabled: true,
+      hidden: parentNum.value ? false : true,
     },
     {
       type: 'text',
@@ -170,13 +178,6 @@ const taskOptions = computed<OvFormOptions>(() => ({
       type: 'text',
       name: 'title',
       label: 'title',
-    },
-    {
-      type: 'markdown',
-      name: 'description',
-      label: 'description',
-      minHeight: '200px',
-      maxHeight: '200px',
     },
     {
       type: 'date',
@@ -213,8 +214,9 @@ const taskOptions = computed<OvFormOptions>(() => ({
     },
   ],
   errors: errors.value,
-  actions: [{ name: 'save' }],
+  actions: [{ name: 'save' }, { name: 'cancel', format: { variant: 'outlined' } }],
   actionSubmit: 'save',
+  actionCancel: 'cancel',
 }))
 
 import MarkdownIt from 'markdown-it'
