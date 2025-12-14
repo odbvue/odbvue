@@ -1,23 +1,49 @@
 # OdbVue
 
-*Work in progress..*
+OdbVue is a template + reference implementation for building and deploying business-class apps with **Oracle AI Database** and **Vue 3**.
 
-**OdbVue** is a template and a guide for crafting and deploying business class applications using **Oracle AI Data Base** - the Next-Gen AI-Native Database for All Your Data - and **VueJS** - an Approachable, Performant and Versatile Framework for Building Web User Interfaces.
+- Demo: https://apps.odbvue.com
+- Documentation: https://wiki.odbvue.com
 
-## Getting started
+## Quick start (local DB + apps)
 
-//todo
+Prerequisites:
 
-## Contents
+- Node.js: `^20.19.0` or `>=22.12.0`
+- pnpm: `10.x`
+- Podman (for local Oracle ADB Free container)
+- Oracle SQLcl (`sql` on PATH)
 
-- **main** - template for a static landing page.
+From the repo root:
 
-- **apps** - source of business class applications.
+```sh
+# 1) build + link the ov CLI
+cd cli
+pnpm install
+pnpm build
+pnpm link -g
 
-- **wiki** - complete documentation and implementation guides.
+# 2) start local DB, generate local config, download wallet
+cd ..
+ov local-setup
 
-- **i13e** - infrastructure - guide on how to deploy locally and to Cloud environments.
+# 3) install/upgrade schema + objects
+ov db-install-local
+
+# 4) start app + wiki dev servers
+ov dev
+```
+
+Open the URLs shown in the terminal (typically `http://localhost:5173` for the app and `http://localhost:5174` for the wiki).
+
+## Repo layout
+
+- `apps/` – main Vue 3 + Vite app (also contains the VitePress docs tooling)
+- `db/` – database artifacts (SQL/PLSQL) and deployment helpers
+- `i13e/` – infrastructure examples for local + cloud deployments
+- `cli/` – `ov` helper CLI
+- `main/` – static landing page template
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](/LICENSE) file for details
+MIT — see [LICENSE](/LICENSE).

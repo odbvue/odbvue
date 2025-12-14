@@ -4,9 +4,17 @@ import { Command } from 'commander';
 import { execSync, spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { readFileSync, writeFileSync, unlinkSync, existsSync } from 'fs';
+import {
+  copyFileSync,
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from 'fs';
 import chalk from 'chalk';
-import { platform } from 'os';
+import { homedir, platform, tmpdir } from 'os';
 import { createInterface } from 'readline';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -56,6 +64,145 @@ const logger = {
   warn: (msg: string) => console.warn(chalk.yellow(`⚠ ${msg}`)),
 };
 
+const tryExec = (command: string, cwd?: string): boolean => {
+  try {
+    execSync(command, {
+      cwd,
+      stdio: 'ignore',
+    });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const getPodmanCommand = (): string | null => {
+  const isWindows = platform() === 'win32';
+  if (isWindows) {
+    if (tryExec('podman.exe --version')) {
+      return 'podman.exe';
+    }
+  }
+
+  if (tryExec('podman --version')) {
+    return 'podman';
+  }
+
+  return null;
+};
+
+const ensureFileFromExample = (targetPath: string, examplePath: string) => {
+  if (existsSync(targetPath)) {
+    return;
+  }
+
+  if (!existsSync(examplePath)) {
+    throw new Error(`Missing example file: ${examplePath}`);
+  }
+
+  mkdirSync(path.dirname(targetPath), { recursive: true });
+  copyFileSync(examplePath, targetPath);
+};
+
+const normalizePathForSqlcl = (p: string): string => {
+  // SQLcl generally tolerates forward slashes on Windows.
+  return p.replace(/\\/g, '/');
+};
+
+const pickQQuoteDelimiter = (value: string): string => {
+  const candidates = ['~', '^', '!', '#', '%', '|', '+', '='];
+  const delimiter = candidates.find((c) => !value.includes(c));
+  if (!delimiter) {
+    throw new Error('Unable to pick a safe q-quote delimiter for config JSON.');
+  }
+  return delimiter;
+};
+
+type TnsAlias = {
+  name: string;
+};
+
+const parseTnsnamesAliases = (tnsNamesContent: string): TnsAlias[] => {
+  const aliases: TnsAlias[] = [];
+  const lines = tnsNamesContent.split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+    const match = trimmed.match(/^([A-Za-z0-9_\-\.]+)\s*=/);
+    if (match) {
+      aliases.push({ name: match[1] });
+    }
+  }
+  return aliases;
+};
+
+const detectPreferredTnsAlias = (tnsNamesContent: string): string | null => {
+  const aliases = parseTnsnamesAliases(tnsNamesContent);
+  if (aliases.length === 0) {
+    return null;
+  }
+
+  const tp = aliases.find((a) => a.name.toLowerCase().endsWith('_tp'));
+  return (tp ?? aliases[0]).name;
+};
+
+const expandZipToDirectory = (zipPath: string, destinationDir: string) => {
+  mkdirSync(destinationDir, { recursive: true });
+  const isWindows = platform() === 'win32';
+  if (isWindows) {
+    const zip = zipPath.replace(/"/g, '""');
+    const dest = destinationDir.replace(/"/g, '""');
+    execSync(
+      `powershell.exe -NoProfile -Command "Expand-Archive -Force -Path \"${zip}\" -DestinationPath \"${dest}\""`,
+      { stdio: 'inherit' },
+    );
+    return;
+  }
+
+  execSync(`unzip -o -q "${zipPath}" -d "${destinationDir}"`, { stdio: 'inherit' });
+};
+
+const downloadWalletZipFromContainer = async (
+  podmanCmd: string,
+  containerName: string,
+  outputZipPath: string,
+): Promise<void> => {
+  mkdirSync(path.dirname(outputZipPath), { recursive: true });
+
+  const zipCommand = [
+    "set -euo pipefail",
+    'cd /u01/app/oracle/wallets/tls_wallet',
+    'shopt -s dotglob',
+    'zip -r -X -q - *',
+  ].join(' && ');
+
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(podmanCmd, ['exec', containerName, 'bash', '-lc', zipCommand], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    const output = createWriteStream(outputZipPath);
+    child.stdout?.pipe(output);
+
+    let stderr = '';
+    child.stderr?.on('data', (data: Buffer) => {
+      stderr += data.toString();
+    });
+
+    child.on('error', (error) => reject(error));
+    child.on('exit', (code) => {
+      output.close();
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(stderr || `podman exec exited with code ${code}`));
+      }
+    });
+  });
+};
+
 // Prompt utility for user input
 const prompt = (question: string): Promise<string> => {
   return new Promise((resolve) => {
@@ -76,6 +223,315 @@ program
   .name('ov')
   .description('OdbVue CLI - Project management utilities')
   .version(version, '-v, --version');
+
+// Local DB command group
+const localDbCmd = program.command('local-db').description('Local database (ADB Free) helpers using Podman');
+
+localDbCmd
+  .command('up')
+  .description('Build and start the local database container (podman compose up -d --build)')
+  .option('-d, --dir <dir>', 'Local DB folder (defaults to i13e/local/db)')
+  .action((options: { dir?: string }) => {
+    const podmanCmd = getPodmanCommand();
+    if (!podmanCmd) {
+      logger.error('Podman not found. Please install Podman and ensure it is on PATH.');
+      process.exit(1);
+    }
+
+    const localDbDir = options.dir
+      ? path.resolve(rootDir, options.dir)
+      : path.resolve(rootDir, 'i13e/local/db');
+    if (!existsSync(localDbDir)) {
+      logger.error(`Local DB folder not found: ${localDbDir}`);
+      process.exit(1);
+    }
+
+    logger.info('Starting local DB (podman compose up)...');
+    execSync(`${podmanCmd} compose up -d --build`, { cwd: localDbDir, stdio: 'inherit' });
+    logger.success('Local DB started');
+  });
+
+localDbCmd
+  .command('down')
+  .description('Stop and remove the local database container (podman compose down)')
+  .option('-d, --dir <dir>', 'Local DB folder (defaults to i13e/local/db)')
+  .action((options: { dir?: string }) => {
+    const podmanCmd = getPodmanCommand();
+    if (!podmanCmd) {
+      logger.error('Podman not found. Please install Podman and ensure it is on PATH.');
+      process.exit(1);
+    }
+
+    const localDbDir = options.dir
+      ? path.resolve(rootDir, options.dir)
+      : path.resolve(rootDir, 'i13e/local/db');
+    if (!existsSync(localDbDir)) {
+      logger.error(`Local DB folder not found: ${localDbDir}`);
+      process.exit(1);
+    }
+
+    logger.info('Stopping local DB (podman compose down)...');
+    execSync(`${podmanCmd} compose down`, { cwd: localDbDir, stdio: 'inherit' });
+    logger.success('Local DB stopped');
+  });
+
+localDbCmd
+  .command('logs')
+  .description('Show recent logs from the local database container')
+  .option('-n, --name <name>', 'Container name', 'odbvue-db-dev')
+  .option('-t, --tail <lines>', 'Tail lines', '80')
+  .action((options: { name: string; tail: string }) => {
+    const podmanCmd = getPodmanCommand();
+    if (!podmanCmd) {
+      logger.error('Podman not found. Please install Podman and ensure it is on PATH.');
+      process.exit(1);
+    }
+
+    execSync(`${podmanCmd} logs --tail ${options.tail} ${options.name}`, { stdio: 'inherit' });
+  });
+
+localDbCmd
+  .command('wallet')
+  .description('Download the TLS wallet from the local DB container to a zip file')
+  .option('-n, --name <name>', 'Container name', 'odbvue-db-dev')
+  .option('-o, --out <path>', 'Output zip path (defaults to ~/.wallets/odbvue/local.zip)')
+  .action(async (options: { name: string; out?: string }) => {
+    const podmanCmd = getPodmanCommand();
+    if (!podmanCmd) {
+      logger.error('Podman not found. Please install Podman and ensure it is on PATH.');
+      process.exit(1);
+    }
+
+    const defaultOut = path.resolve(homedir(), '.wallets/odbvue/local.zip');
+    const outPath = options.out ? path.resolve(rootDir, options.out) : defaultOut;
+
+    logger.info(`Downloading wallet to: ${outPath}`);
+    try {
+      await downloadWalletZipFromContainer(podmanCmd, options.name, outPath);
+      logger.success('Wallet downloaded');
+    } catch (error) {
+      logger.error(`Failed to download wallet: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Guided local setup
+program
+  .command('local-setup')
+  .description('Guided local setup: start local DB, create config files, and prepare app/wiki for local dev')
+  .option('-n, --name <name>', 'Local DB container name', 'odbvue-db-dev')
+  .action(async (options: { name: string }) => {
+    const podmanCmd = getPodmanCommand();
+    if (!podmanCmd) {
+      logger.error('Podman not found. Install Podman first (or run manual setup from i13e/local/db).');
+      process.exit(1);
+    }
+
+    const hasSqlcl = tryExec('sql -v');
+    if (!hasSqlcl) {
+      logger.warn('SQLcl (sql) not found on PATH. You can still start DB, but installs/exports will not work.');
+    }
+
+    const appsDir = path.resolve(rootDir, 'apps');
+    const dbDir = path.resolve(rootDir, 'db');
+    const localDbDir = path.resolve(rootDir, 'i13e/local/db');
+    const cliEnvPath = path.resolve(rootDir, 'cli/.env');
+
+    if (!existsSync(localDbDir)) {
+      logger.error(`Local DB folder not found: ${localDbDir}`);
+      process.exit(1);
+    }
+
+    logger.info('Configuring local DB passwords...');
+    const defaultPassword = 'MySecurePass123!';
+    const adminPasswordInput = await prompt(`ADMIN_PASSWORD [${defaultPassword}]: `);
+    const walletPasswordInput = await prompt(`WALLET_PASSWORD [${defaultPassword}]: `);
+    const adminPassword = adminPasswordInput.trim() ? adminPasswordInput.trim() : defaultPassword;
+    const walletPassword = walletPasswordInput.trim() ? walletPasswordInput.trim() : defaultPassword;
+
+    const localDbEnvPath = path.resolve(localDbDir, '.env');
+    const localDbEnvExamplePath = path.resolve(localDbDir, '.env.example');
+    if (!existsSync(localDbEnvPath)) {
+      ensureFileFromExample(localDbEnvPath, localDbEnvExamplePath);
+    }
+    writeFileSync(
+      localDbEnvPath,
+      `ADMIN_PASSWORD="${adminPassword}"\nWALLET_PASSWORD="${walletPassword}"\n`,
+      'utf-8',
+    );
+    logger.success('Local DB .env written');
+
+    logger.info('Starting local DB container...');
+    execSync(`${podmanCmd} compose up -d --build`, { cwd: localDbDir, stdio: 'inherit' });
+    logger.success('Local DB started');
+
+    const walletZipPath = path.resolve(homedir(), '.wallets/odbvue/local.zip');
+    logger.info('Downloading wallet from container...');
+    await downloadWalletZipFromContainer(podmanCmd, options.name, walletZipPath);
+    logger.success(`Wallet saved: ${walletZipPath}`);
+
+    const walletExtractDir = path.resolve(tmpdir(), `odbvue-wallet-${Date.now()}`);
+    logger.info('Detecting TNS alias from wallet...');
+    expandZipToDirectory(walletZipPath, walletExtractDir);
+    const tnsNamesPath = path.resolve(walletExtractDir, 'tnsnames.ora');
+    if (!existsSync(tnsNamesPath)) {
+      logger.error('Could not find tnsnames.ora in extracted wallet.');
+      process.exit(1);
+    }
+
+    const tnsNames = readFileSync(tnsNamesPath, 'utf-8');
+    const detectedAlias = detectPreferredTnsAlias(tnsNames);
+    if (!detectedAlias) {
+      logger.error('Could not detect a TNS alias from tnsnames.ora.');
+      process.exit(1);
+    }
+    logger.success(`Using TNS alias: ${detectedAlias}`);
+
+    const sqlclWallet = normalizePathForSqlcl(walletZipPath);
+    const odbvueConn = `-cloudconfig ${sqlclWallet} admin/${adminPassword}@${detectedAlias}`;
+    writeFileSync(cliEnvPath, `ODBVUE_DB_CONN="${odbvueConn}"\n`, 'utf-8');
+    logger.success('Wrote cli/.env (ODBVUE_DB_CONN)');
+
+    // Create db/.config.json from example if missing
+    const dbConfigPath = path.resolve(dbDir, '.config.json');
+    const dbConfigExamplePath = path.resolve(dbDir, '.config.json.example');
+    if (!existsSync(dbConfigPath)) {
+      ensureFileFromExample(dbConfigPath, dbConfigExamplePath);
+      try {
+        const configRaw = readFileSync(dbConfigPath, 'utf-8');
+        const config = JSON.parse(configRaw) as {
+          schema?: { username?: string; password?: string };
+          app?: { password?: string; host?: string };
+          smtp?: { password?: string };
+          jwt?: { secret?: string };
+        };
+
+        if (config.schema) {
+          config.schema.password = adminPassword;
+          config.schema.username = config.schema.username ?? 'odbvue';
+        }
+        if (config.app) {
+          config.app.password = adminPassword;
+          config.app.host = 'localhost:5173';
+        }
+        if (config.smtp) {
+          config.smtp.password = adminPassword;
+        }
+        if (config.jwt) {
+          config.jwt.secret = adminPassword;
+        }
+
+        writeFileSync(dbConfigPath, `${JSON.stringify(config, null, 2)}\n`, 'utf-8');
+        logger.success('Wrote db/.config.json');
+      } catch {
+        logger.warn('db/.config.json created but could not be auto-filled.');
+      }
+    } else {
+      logger.info('db/.config.json already exists; leaving it unchanged.');
+    }
+
+    // Create apps/.env.local
+    const appsEnvLocalPath = path.resolve(appsDir, '.env.local');
+    if (!existsSync(appsEnvLocalPath)) {
+      writeFileSync(
+        appsEnvLocalPath,
+        `VITE_API_URI=https://localhost:8443/ords/odbvue/\n`,
+        'utf-8',
+      );
+      logger.success('Wrote apps/.env.local');
+    }
+
+    logger.success('Local setup completed');
+    console.log('');
+    logger.info('Next steps:');
+    console.log(chalk.gray('  1) Install DB schema + objects: ') + chalk.cyan('ov db-install-local'));
+    console.log(chalk.gray('  2) Start app + wiki dev servers: ') + chalk.cyan('ov dev'));
+  });
+
+// Install database objects into the local DB
+program
+  .command('db-install-local')
+  .alias('dil')
+  .description('Install/upgrade schema + objects into the local DB using db/dist and db/.config.json')
+  .option('-c, --connection <connection>', 'Database connection (uses ODBVUE_DB_CONN if not provided)')
+  .option('-v, --version <version>', 'Version tag (defaults to apps/package.json version)')
+  .action((options: { connection?: string; version?: string }) => {
+    const connection = options.connection || process.env.ODBVUE_DB_CONN;
+    if (!connection) {
+      logger.error('Database connection not provided and ODBVUE_DB_CONN not set (try: ov local-setup).');
+      process.exit(1);
+    }
+
+    const dbDir = path.resolve(rootDir, 'db');
+    const dbDistDir = path.resolve(dbDir, 'dist');
+    const dbConfigPath = path.resolve(dbDir, '.config.json');
+    if (!existsSync(dbConfigPath)) {
+      logger.error('Missing db/.config.json. Create it from db/.config.json.example (or run ov local-setup).');
+      process.exit(1);
+    }
+
+    const configJson = JSON.parse(readFileSync(dbConfigPath, 'utf-8')) as unknown;
+    const configCompact = JSON.stringify(configJson);
+    const delimiter = pickQQuoteDelimiter(configCompact);
+
+    const appsPackagePath = path.resolve(rootDir, 'apps/package.json');
+    const appsPackage = JSON.parse(readFileSync(appsPackagePath, 'utf-8')) as { version: string };
+    const versionTag = options.version ? options.version : `v${appsPackage.version}`;
+    const schemaName = 'odbvue';
+    const edition = `${schemaName}_${versionTag.replace(/[.\-]/g, '_')}`.toUpperCase();
+
+    logger.info(`Installing to schema '${schemaName}', edition '${edition}', version '${versionTag}'...`);
+
+    const sqlScript = [
+      `connect ${connection}`,
+      'set define off',
+      'set verify off',
+      'set feedback off',
+      'set serveroutput on',
+      'set sqlblanklines on',
+      'variable config CLOB',
+      'variable schema VARCHAR2(200)',
+      'variable edition VARCHAR2(200)',
+      `begin :config := q'${delimiter}${configCompact}${delimiter}'; :schema := '${schemaName}'; :edition := '${edition}'; end;`,
+      '/',
+      'set define on',
+      `define EDITION = '${edition}'`,
+      '@000_install.sql',
+      "lb update -log -changelog-file releases/main.changelog.xml -search-path '.'",
+      '@999_install.sql',
+      `prompt Installed ${versionTag} (${edition})`,
+      'exit',
+      '',
+    ].join('\n');
+
+    const tempScriptPath = path.resolve(dbDistDir, '.sql_install_local_temp');
+    writeFileSync(tempScriptPath, sqlScript, 'utf-8');
+
+    try {
+      const isWindows = platform() === 'win32';
+      const shell = isWindows ? 'powershell.exe' : '/bin/bash';
+      const piping = isWindows
+        ? `type "${tempScriptPath}" | sql /nolog`
+        : `cat "${tempScriptPath}" | sql /nolog`;
+
+      execSync(piping, {
+        cwd: dbDistDir,
+        stdio: 'inherit',
+        shell,
+      });
+
+      logger.success('Database install completed');
+    } catch (error) {
+      logger.error(`Database install failed: ${error}`);
+      process.exit(1);
+    } finally {
+      try {
+        unlinkSync(tempScriptPath);
+      } catch {
+        // ignore
+      }
+    }
+  });
 
 // New Feature command
 program

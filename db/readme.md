@@ -1,47 +1,70 @@
-# Example Template
+# Database (SQL/PLSQL)
 
-The introduction summarizes the purpose and function of the project, and should be concise (a brief paragraph or two). This introduction may be the same as the first paragraph on the project page.
+This folder contains the SQLcl project export (DDL), install scripts, and release changelogs used by the OdbVue API.
 
-For a full description of the module, visit the
-[project page](https://www.oracle.com).
+## Local database quick start (recommended)
 
-Submit bug reports and feature suggestions, or track changes in the
-[issue queue](https://www.oracle.com).
+OdbVue includes a ready-to-run local Oracle **ADB Free** container under `i13e/local/db`.
 
+Prerequisites:
 
-## Table of contents (optional)
+- Podman (or a compatible container runtime) with Compose support
+- Oracle SQLcl (`sql` on PATH)
 
-- Requirements
-- Installation
-- Configuration
-- Troubleshooting
-- FAQ
-- Maintainers
+Notes:
 
+- The local DB image is pulled from Oracle Container Registry (`container-registry.oracle.com`). The first run may require you to log in and accept the image terms.
+- On Windows, Podman typically runs via WSL; ensure Podman Desktop/WSL integration is working.
 
-## Requirements (required)
+From the repo root:
 
-This project requires the following:
+```sh
+# guided setup: writes local passwords, starts DB, downloads wallet,
+# creates cli/.env (ODBVUE_DB_CONN), db/.config.json (if missing), and apps/.env.local
+ov local-setup
 
-- [Hard Work](https://www.noMorePlay.com)
+# install schema + objects into the local DB
+ov db-install-local
+```
 
+After that, start the UI:
 
-## Installation (required, unless a separate INSTALL.md is provided)
+```sh
+ov dev
+```
 
-Install as you would normally install.
+## Config files
 
-## Configuration (optional)
+- `db/.config.json` (ignored by git): application + schema bootstrap config consumed by the install scripts.
+	- Create it from `db/.config.json.example`.
+	- Keep secrets here only for local dev; never commit it.
 
-## Troubleshooting (optional)
+- `cli/.env` (ignored by git): local developer connection string used by `ov` commands.
+	- Contains `ODBVUE_DB_CONN` (often using SQLcl `-cloudconfig <wallet.zip>`).
 
-## FAQ (optional)
+## Manual local DB (without ov)
 
-**Q: How do I write a README?**
+If you prefer manual control:
 
-**A:** Follow this template. It's fun and easy!
+```sh
+cd i13e/local/db
+cp .env.example .env
+./build.sh
+```
 
-## Maintainers (optional)
+Then download the wallet:
 
+```sh
+./download-wallet.sh odbvue-db-dev ~/.wallets/odbvue/local.zip
+```
 
-## For more information about SQLcl Projects:
-Reach out to the SQLcl Project Extension documentation by visiting the [Database Application CI/CD Doc Link](https://docs.oracle.com/en/database/oracle/sql-developer-command-line/24.3/sqcug/database-application-ci-cd.html).
+Finally set `ODBVUE_DB_CONN` (example):
+
+```dotenv
+ODBVUE_DB_CONN="-cloudconfig ~/.wallets/odbvue/local.zip admin/<ADMIN_PASSWORD>@<TNS_ALIAS>"
+```
+
+## Notes
+
+- The install entrypoint is `db/dist/install.sql` (used indirectly); the `ov db-install-local` command runs `db/dist/000_install.sql` + Liquibase changelog + `db/dist/999_install.sql`.
+- For SQLcl project docs, see the SQLcl user guide (Database Application CI/CD).
