@@ -6,6 +6,7 @@
 
 import {
 	mdiAccount,
+	mdiAccountBoxMultiple,
 	mdiAccountGroup,
 	mdiAlert,
 	mdiAlertCircle,
@@ -106,6 +107,7 @@ import {
 
 export default {
   mdiAccount,
+  mdiAccountBoxMultiple,
   mdiAccountGroup,
   mdiAlert,
   mdiAlertCircle,
