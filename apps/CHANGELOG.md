@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.239
+
+### Patch Changes
+
+- 6572c6b: landing page alpha 2
+
 ## 0.0.238
 
 ### Patch Changes
