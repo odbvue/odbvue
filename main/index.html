@@ -176,6 +176,7 @@
                 gap: 14px;
                 flex-wrap: wrap;
                 justify-content: flex-end;
+                position: relative;
             }
 
             .nav a {
@@ -193,6 +194,55 @@
             .nav a:focus {
                 outline: 2px solid rgba(0, 98, 158, 0.35);
                 outline-offset: 2px;
+            }
+
+            .nav__mobile {
+                display: none;
+                position: relative;
+            }
+
+            .nav__mobile > summary {
+                list-style: none;
+            }
+
+            .nav__mobile > summary::-webkit-details-marker {
+                display: none;
+            }
+
+            .nav__mobile-trigger {
+                padding: 11px 12px;
+            }
+
+            .nav__mobile-icon {
+                width: 18px;
+                height: 18px;
+                display: block;
+            }
+
+            .nav__mobile-panel {
+                position: absolute;
+                right: 0;
+                top: calc(100% + 10px);
+                min-width: 190px;
+                padding: 6px;
+                border-radius: 16px;
+                background: var(--surface);
+                border: 1px solid rgba(26, 28, 30, var(--border-opacity));
+            }
+
+            .nav__mobile-panel a {
+                display: block;
+            }
+
+            @media (max-width: 720px) {
+                .nav > a,
+                .nav .cta {
+                    display: none;
+                }
+
+                .nav__mobile {
+                    display: inline-flex;
+                }
             }
 
             .cta {
@@ -249,6 +299,10 @@
                 border-color: color-mix(in srgb, var(--primary) 26%, transparent);
                 backdrop-filter: blur(10px);
                 box-shadow: 0 8px 18px rgba(26, 28, 30, 0.12);
+            }
+
+            .continue[hidden] {
+                display: none !important;
             }
 
             .continue:hover:not(:disabled) {
@@ -404,10 +458,31 @@
                 color: var(--primary);
             }
 
-            .hero__tile p {
+            .hero__tile-caption {
+                margin: 0 0 1.02rem;
+                font-size: 1.02rem;
+                font-weight: 800;
+                line-height: 1.25;
+                min-height: calc(2 * 1.02em);
+                color: rgba(26, 28, 30, var(--high-emphasis-opacity));
+            }
+
+            .hero__tile-content {
+                display: flex;
+                flex-direction: column;
+                gap: 0;
+                min-width: 0;
+            }
+
+            .hero__tile-list {
                 margin: 0;
-                font-size: 1.12rem;
+                padding-left: 20px;
                 color: rgba(26, 28, 30, var(--medium-emphasis-opacity));
+                font-size: 1rem;
+            }
+
+            .hero__tile-list li {
+                margin: 6px 0;
             }
 
             .card-grid {
@@ -565,10 +640,166 @@
             }
 
             .footer {
-                padding: 32px 18px 44px;
+                background: color-mix(in srgb, var(--background) 92%, var(--secondary));
+                border-top: 1px solid rgba(26, 28, 30, var(--border-opacity));
+                color: rgba(26, 28, 30, var(--medium-emphasis-opacity));
+            }
+
+            .footer__inner {
+                padding: 14px 18px;
                 max-width: var(--container-max);
                 margin: 0 auto;
-                color: rgba(26, 28, 30, var(--medium-emphasis-opacity));
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .footer__terms {
+                flex: 1 1 auto;
+                appearance: none;
+                border: 0;
+                background: transparent;
+                padding: 8px 10px;
+                border-radius: 12px;
+                color: rgba(26, 28, 30, var(--high-emphasis-opacity));
+                text-decoration: underline;
+                cursor: pointer;
+                transition: background-color 160ms ease;
+                font: inherit;
+            }
+            .footer__terms:hover {
+                background: rgba(28, 142, 230, 0.08);
+            }
+            .footer__terms:focus {
+                outline: 2px solid rgba(0, 98, 158, 0.35);
+                outline-offset: 2px;
+            }
+
+            .footer__github {
+                flex: 0 0 auto;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 44px;
+                height: 44px;
+                border-radius: 14px;
+                color: rgba(26, 28, 30, var(--high-emphasis-opacity));
+                text-decoration: none;
+                transition: background-color 160ms ease;
+            }
+            .footer__github:hover {
+                background: rgba(28, 142, 230, 0.08);
+            }
+            .footer__github:focus {
+                outline: 2px solid rgba(0, 98, 158, 0.35);
+                outline-offset: 2px;
+            }
+            .footer__github svg {
+                width: 22px;
+                height: 22px;
+                display: block;
+            }
+
+            .modal {
+                position: fixed;
+                inset: 0;
+                width: 100vw;
+                height: 100vh;
+                padding: 16px;
+                border: 0;
+                background: transparent;
+                overflow: hidden;
+                margin: 0;
+                max-width: none;
+                max-height: none;
+            }
+
+            .modal:not([open]) {
+                display: none;
+            }
+
+            .modal[open] {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            @media (min-width: 720px) {
+                .modal {
+                    padding: 24px;
+                }
+            }
+
+            .modal::backdrop {
+                background: rgba(26, 28, 30, 0.48);
+            }
+
+            .modal__panel {
+                width: 100%;
+                max-width: 720px;
+                max-height: 78vh;
+                margin-left: auto;
+                margin-right: auto;
+                border-radius: var(--radius);
+                background: var(--surface);
+                border: 1px solid rgba(26, 28, 30, var(--border-opacity));
+                overflow: hidden;
+            }
+
+            .modal__header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                flex-wrap: wrap;
+                padding: 16px 18px;
+                border-bottom: 1px solid rgba(26, 28, 30, var(--border-opacity));
+            }
+
+            .modal__header h2 {
+                margin: 0;
+                font-size: 1.1rem;
+                color: rgba(26, 28, 30, var(--high-emphasis-opacity));
+                min-width: 0;
+            }
+
+            .modal__close {
+                appearance: none;
+                border: 0;
+                background: transparent;
+                padding: 8px 10px;
+                border-radius: 12px;
+                color: rgba(26, 28, 30, var(--high-emphasis-opacity));
+                cursor: pointer;
+                transition: background-color 160ms ease;
+                font: inherit;
+            }
+            .modal__close:hover {
+                background: rgba(28, 142, 230, 0.08);
+            }
+            .modal__close:focus {
+                outline: 2px solid rgba(0, 98, 158, 0.35);
+                outline-offset: 0;
+            }
+
+            .modal__body {
+                padding: 16px 18px 40px;
+                overflow: hidden auto;
+                max-height: calc(78vh - 58px);
+                color: rgba(26, 28, 30, var(--high-emphasis-opacity));
+                overflow-wrap: anywhere;
+                word-break: break-word;
+            }
+
+            .modal__body p {
+                margin: 0 0 12px;
+            }
+
+            .modal__body h3 {
+                margin: 18px 0 10px;
+                font-size: 1rem;
             }
 
             /* Scroll-reveal transitions */
@@ -703,6 +934,28 @@
                         <span class="cta">
                             <a class="button button--ghost" href="#discovery">Discovery</a>
                         </span>
+
+                        <details class="nav__mobile" id="nav-mobile">
+                            <summary class="button button--ghost nav__mobile-trigger" aria-label="Open menu">
+                                <svg
+                                    class="nav__mobile-icon"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 24 24"
+                                    aria-hidden="true"
+                                    focusable="false"
+                                >
+                                    <circle cx="12" cy="5" r="2" fill="currentColor" />
+                                    <circle cx="12" cy="12" r="2" fill="currentColor" />
+                                    <circle cx="12" cy="19" r="2" fill="currentColor" />
+                                </svg>
+                            </summary>
+
+                            <div class="nav__mobile-panel" role="menu" aria-label="Primary menu">
+                                <a role="menuitem" href="#value">Value</a>
+                                <a role="menuitem" href="#offer">Engagement</a>
+                                <a role="menuitem" href="#discovery">Discovery</a>
+                            </div>
+                        </details>
                     </nav>
                 </div>
             </header>
@@ -802,7 +1055,13 @@
                                     d="M12,5A3.5,3.5 0 0,0 8.5,8.5A3.5,3.5 0 0,0 12,12A3.5,3.5 0 0,0 15.5,8.5A3.5,3.5 0 0,0 12,5M12,7A1.5,1.5 0 0,1 13.5,8.5A1.5,1.5 0 0,1 12,10A1.5,1.5 0 0,1 10.5,8.5A1.5,1.5 0 0,1 12,7M5.5,8A2.5,2.5 0 0,0 3,10.5C3,11.44 3.53,12.25 4.29,12.68C4.65,12.88 5.06,13 5.5,13C5.94,13 6.35,12.88 6.71,12.68C7.08,12.47 7.39,12.17 7.62,11.81C6.89,10.86 6.5,9.7 6.5,8.5C6.5,8.41 6.5,8.31 6.5,8.22C6.2,8.08 5.86,8 5.5,8M18.5,8C18.14,8 17.8,8.08 17.5,8.22C17.5,8.31 17.5,8.41 17.5,8.5C17.5,9.7 17.11,10.86 16.38,11.81C16.5,12 16.63,12.15 16.78,12.3C16.94,12.45 17.1,12.58 17.29,12.68C17.65,12.88 18.06,13 18.5,13C18.94,13 19.35,12.88 19.71,12.68C20.47,12.25 21,11.44 21,10.5A2.5,2.5 0 0,0 18.5,8M12,14C9.66,14 5,15.17 5,17.5V19H19V17.5C19,15.17 14.34,14 12,14M4.71,14.55C2.78,14.78 0,15.76 0,17.5V19H3V17.07C3,16.06 3.69,15.22 4.71,14.55M19.29,14.55C20.31,15.22 21,16.06 21,17.07V19H24V17.5C24,15.76 21.22,14.78 19.29,14.55M12,16C13.53,16 15.24,16.5 16.23,17H7.77C8.76,16.5 10.47,16 12,16Z"
                                 />
                             </svg>
-                            <p>Team capability, not vendor dependency</p>
+                            <div class="hero__tile-content">
+                                <p class="hero__tile-caption">Team capability, not vendor dependency</p>
+                                <ul class="hero__tile-list">
+                                    <li>Own the knowledge, reduce reliance</li>
+                                    <li>Lower risk, lower long-term cost</li>
+                                </ul>
+                            </div>
                         </div>
                         <div class="hero__tile reveal">
                             <svg
@@ -817,7 +1076,13 @@
                                     d="M17.5 15.5C17.5 16.61 16.61 17.5 15.5 17.5S13.5 16.61 13.5 15.5 14.4 13.5 15.5 13.5 17.5 14.4 17.5 15.5M8.5 13.5C7.4 13.5 6.5 14.4 6.5 15.5S7.4 17.5 8.5 17.5 10.5 16.61 10.5 15.5 9.61 13.5 8.5 13.5M23 15V18C23 18.55 22.55 19 22 19H21V20C21 21.11 20.11 22 19 22H5C3.9 22 3 21.11 3 20V19H2C1.45 19 1 18.55 1 18V15C1 14.45 1.45 14 2 14H3C3 10.13 6.13 7 10 7H11V5.73C10.4 5.39 10 4.74 10 4C10 2.9 10.9 2 12 2S14 2.9 14 4C14 4.74 13.6 5.39 13 5.73V7H14C17.87 7 21 10.13 21 14H22C22.55 14 23 14.45 23 15M21 16H19V14C19 11.24 16.76 9 14 9H10C7.24 9 5 11.24 5 14V16H3V17H5V20H19V17H21V16Z"
                                 />
                             </svg>
-                            <p>AI-enabled learning and delivery</p>
+                            <div class="hero__tile-content">
+                                <p class="hero__tile-caption">AI-enabled learning and delivery</p>
+                                <ul class="hero__tile-list">
+                                    <li>Faster learning, smarter delivery</li>
+                                    <li>AI applied where it matters</li>
+                                </ul>
+                            </div>
                         </div>
                         <div class="hero__tile reveal">
                             <svg
@@ -832,7 +1097,13 @@
                                     d="M6.5 18H13V20H6.5C5 20 3.69 19.5 2.61 18.43C1.54 17.38 1 16.09 1 14.58C1 13.28 1.39 12.12 2.17 11.1S4 9.43 5.25 9.15C5.67 7.62 6.5 6.38 7.75 5.43S10.42 4 12 4C13.95 4 15.6 4.68 16.96 6.04C18.08 7.16 18.73 8.5 18.93 10C18.23 10 17.56 10.19 16.95 10.46C16.84 9.31 16.38 8.31 15.54 7.46C14.56 6.5 13.38 6 12 6S9.44 6.5 8.46 7.46C7.5 8.44 7 9.62 7 11H6.5C5.53 11 4.71 11.34 4.03 12.03C3.34 12.71 3 13.53 3 14.5S3.34 16.29 4.03 17C4.71 17.66 5.53 18 6.5 18M23 17.3V20.8C23 21.4 22.4 22 21.7 22H16.2C15.6 22 15 21.4 15 20.7V17.2C15 16.6 15.6 16 16.2 16V14.5C16.2 13.1 17.6 12 19 12S21.8 13.1 21.8 14.5V16C22.4 16 23 16.6 23 17.3M20.5 14.5C20.5 13.7 19.8 13.2 19 13.2S17.5 13.7 17.5 14.5V16H20.5V14.5Z"
                                 />
                             </svg>
-                            <p>Secure cloud + DevOps foundations</p>
+                            <div class="hero__tile-content">
+                                <p class="hero__tile-caption">Secure cloud + DevOps foundations</p>
+                                <ul class="hero__tile-list">
+                                    <li>Secure-by-design cloud platforms</li>
+                                    <li>Reliable, automated delivery pipelines</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -935,7 +1206,7 @@
 
                         <div class="outcome reveal">
                             <p>
-                                <strong>Outcome:</strong> A production-ready, business-class application—built,
+                                <strong>Outcome:</strong> A production-ready, business-class application - built,
                                 owned, and operated by your team.
                             </p>
                         </div>
@@ -1024,20 +1295,86 @@
             </main>
 
             <footer class="footer" role="contentinfo">
-                <div class="reveal">
-                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap">
-                        <span style="font-weight: 800; color: rgba(26, 28, 30, var(--high-emphasis-opacity))"
-                            >OdbVue</span
-                        >
-                        <span aria-hidden="true">•</span>
-                        <span>Empowering organizations to take ownership of their technology.</span>
-                    </div>
+                <div class="footer__inner">
+                    <button class="footer__terms" type="button" id="terms-open">terms and conditions</button>
+                    <a
+                        class="footer__github"
+                        href="https://github.com/odbvue/odbvue"
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label="OdbVue on GitHub"
+                        title="GitHub"
+                    >
+                        <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path
+                                fill="currentColor"
+                                d="M12 .5C5.73.5.75 5.73.75 12.2c0 5.2 3.44 9.6 8.2 11.16.6.12.82-.27.82-.58v-2.15c-3.34.75-4.04-1.66-4.04-1.66-.55-1.43-1.34-1.8-1.34-1.8-1.1-.77.08-.76.08-.76 1.22.09 1.86 1.3 1.86 1.3 1.08 1.9 2.84 1.35 3.53 1.03.11-.81.42-1.35.76-1.66-2.66-.31-5.46-1.37-5.46-6.08 0-1.34.46-2.44 1.22-3.3-.12-.31-.53-1.57.12-3.27 0 0 1-.33 3.3 1.26.96-.27 1.99-.4 3.01-.4s2.05.14 3.01.4c2.3-1.6 3.3-1.26 3.3-1.26.65 1.7.24 2.96.12 3.27.76.86 1.22 1.96 1.22 3.3 0 4.72-2.8 5.77-5.47 6.07.43.38.81 1.13.81 2.28v3.37c0 .31.22.7.82.58 4.76-1.56 8.2-5.96 8.2-11.16C23.25 5.73 18.27.5 12 .5z"
+                            />
+                        </svg>
+                    </a>
                 </div>
             </footer>
+
+            <dialog class="modal" id="terms-dialog" aria-labelledby="terms-title">
+                <div class="modal__panel">
+                    <div class="modal__header">
+                        <h2 id="terms-title">Terms &amp; Conditions</h2>
+                        <button class="modal__close" type="button" id="terms-close" aria-label="Close">Close</button>
+                    </div>
+
+                    <div class="modal__body">
+                        <p>
+                            The OdbVue demo experience is currently in a <strong>discovery phase</strong>. Its goal is to
+                            investigate whether there is real demand for the product and its approach.
+                        </p>
+
+                        <h3>1. Purpose of the Service</h3>
+                        <p>
+                            The OdbVue Demo Application (the “Service”) is provided solely for demonstration, testing, and
+                            evaluation of technical capabilities related to OdbVue technologies. It is not intended for
+                            production use, commercial deployment, or handling of critical or sensitive data.
+                        </p>
+
+                        <h3>2. Open-Source Availability</h3>
+                        <p>
+                            The underlying OdbVue project is open-source and available on GitHub under the MIT License.
+                            These Terms &amp; Conditions apply only to the hosted demo service and do not limit rights
+                            granted by the MIT License.
+                        </p>
+
+                        <h3>3. No Warranties</h3>
+                        <p>
+                            The Service is provided “as is” and “as available”, without warranties of any kind, express or
+                            implied, including (but not limited to) accuracy, reliability, availability, security, fitness
+                            for a particular purpose, or non-infringement.
+                        </p>
+
+                        <h3>4. Limitation of Liability</h3>
+                        <p>
+                            To the fullest extent permitted by law, the Service provider assumes <strong>zero liability</strong>
+                            for any damages arising from access to or use of the Service, including direct, indirect,
+                            incidental, consequential, or special damages. You use the demo entirely at your own risk.
+                        </p>
+
+                        <h3>5. User Responsibilities</h3>
+                        <p>
+                            You are solely responsible for any information or data you input. Do not upload confidential,
+                            sensitive, or production data. Data may be lost, modified, deleted, or exposed due to the
+                            experimental nature of the platform.
+                        </p>
+
+                        <h3>6. Modifications and Termination</h3>
+                        <p>
+                            The Service may be modified, suspended, or terminated at any time without notice. Terms may be
+                            updated periodically; continued use constitutes acceptance of the latest version.
+                        </p>
+                    </div>
+                </div>
+            </dialog>
         </div>
 
         <button id="continue" class="button continue" type="button">
-            Continue
+            <span class="continue__label">Continue</span>
             <svg
                 class="continue__icon"
                 xmlns="http://www.w3.org/2000/svg"
@@ -1104,6 +1441,8 @@
                     return;
                 }
 
+                var label = button.querySelector('.continue__label');
+
                 var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
                 var sections = Array.prototype.slice.call(document.querySelectorAll('main > section'));
                 if (sections.length === 0) {
@@ -1114,6 +1453,18 @@
                 var header = document.querySelector('.topbar');
                 var headerOffset = header && header instanceof HTMLElement ? header.getBoundingClientRect().height : 72;
                 var ticking = false;
+
+                function getSectionTitle(section) {
+                    var heading = section.querySelector('h2, h1');
+                    if (heading && heading.textContent) {
+                        var text = heading.textContent.trim();
+                        if (text) {
+                            return text;
+                        }
+                    }
+
+                    return section.id ? section.id : 'Continue';
+                }
 
                 function getCurrentSectionIndex() {
                     var bestIndex = 0;
@@ -1135,7 +1486,13 @@
 
                 function updateButtonState() {
                     var index = getCurrentSectionIndex();
-                    button.disabled = index >= sections.length - 1;
+                    var next = sections[index + 1];
+                    button.disabled = !next;
+                    button.hidden = !next;
+
+                    if (label) {
+                        label.textContent = next ? getSectionTitle(next) : 'Continue';
+                    }
                 }
 
                 function onScroll() {
@@ -1247,6 +1604,85 @@
                         .finally(function () {
                             setSubmitting(false);
                         });
+                });
+            })();
+
+            (function () {
+                var menu = document.getElementById('nav-mobile');
+                if (!menu || !(menu instanceof HTMLDetailsElement)) {
+                    return;
+                }
+
+                var closeMenu = function () {
+                    menu.removeAttribute('open');
+                };
+
+                menu.addEventListener('click', function (event) {
+                    var target = event.target;
+                    if (target instanceof HTMLAnchorElement) {
+                        closeMenu();
+                    }
+                });
+
+                document.addEventListener('click', function (event) {
+                    if (!menu.hasAttribute('open')) {
+                        return;
+                    }
+
+                    var target = event.target;
+                    if (target instanceof Node && !menu.contains(target)) {
+                        closeMenu();
+                    }
+                });
+
+                document.addEventListener('keydown', function (event) {
+                    if (event.key === 'Escape') {
+                        closeMenu();
+                    }
+                });
+            })();
+
+            (function () {
+                var openButton = document.getElementById('terms-open');
+                var closeButton = document.getElementById('terms-close');
+                var dialog = document.getElementById('terms-dialog');
+
+                if (!openButton || !dialog || !(dialog instanceof HTMLDialogElement)) {
+                    return;
+                }
+
+                function openDialog() {
+                    if (typeof dialog.showModal === 'function') {
+                        dialog.showModal();
+                        return;
+                    }
+
+                    dialog.setAttribute('open', '');
+                }
+
+                function closeDialog() {
+                    if (dialog.open) {
+                        dialog.close();
+                        return;
+                    }
+
+                    dialog.removeAttribute('open');
+                }
+
+                openButton.addEventListener('click', function () {
+                    openDialog();
+                });
+
+                if (closeButton) {
+                    closeButton.addEventListener('click', function () {
+                        closeDialog();
+                    });
+                }
+
+                dialog.addEventListener('click', function (event) {
+                    if (event.target === dialog) {
+                        closeDialog();
+                    }
                 });
             })();
         </script>
