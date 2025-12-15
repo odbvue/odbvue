@@ -968,7 +968,6 @@
                                 id="discovery-form"
                                 class="form"
                                 novalidate
-                                data-endpoint="__DISCOVERY_ENDPOINT__"
                             >
                                 <div class="form__grid">
                                     <label class="field">
@@ -1051,6 +1050,9 @@
         </button>
 
         <script>
+            const DISCOVERY_ENDPOINT =
+                'https://g9d4ea764c074f7-odbvueadb.adb.eu-stockholm-1.oraclecloudapps.com/ords/odbvue/crm/request/';
+
             (function () {
                 var header = document.querySelector('.topbar');
                 if (header && header instanceof HTMLElement) {
@@ -1184,31 +1186,8 @@
                     }
                 }
 
-                function getDefaultEndpoint() {
-                    var host = window.location && window.location.hostname ? window.location.hostname : '';
-                    var parts = host ? host.split('.') : [];
-
-                    if (parts.length >= 2) {
-                        var baseDomain = parts.slice(-2).join('.');
-                        return 'https://apps.' + baseDomain + '/api/crm/request/';
-                    }
-
-                    return 'https://apps.' + host + '/api/crm/request/';
-                }
-
                 function getEndpoint() {
-                    var attr = form.getAttribute('data-endpoint');
-
-                    if (!attr) {
-                        return getDefaultEndpoint();
-                    }
-
-                    var value = attr.trim();
-                    if (!value || value.indexOf('__') === 0) {
-                        return getDefaultEndpoint();
-                    }
-
-                    return value;
+                    return DISCOVERY_ENDPOINT;
                 }
 
                 function readValue(name) {

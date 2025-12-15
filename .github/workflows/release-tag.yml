@@ -69,46 +69,6 @@ jobs:
           cp -r apps/.vitepress/dist/* build-bundle/wiki/ || true
           cp -r main/* build-bundle/main/ || true
 
-          # Inject Discovery endpoint into the static landing page.
-          # Uses apps/.env.production: VITE_API__URI + 'crm/request/'
-          node <<'NODE'
-          const fs = require('fs');
-
-          function readEnvVar(filePath, key) {
-            const content = fs.readFileSync(filePath, 'utf8');
-            const line = content
-              .split(/\r?\n/)
-              .find((l) => l.trim().length > 0 && !l.trim().startsWith('#') && l.startsWith(key + '='));
-
-            if (!line) {
-              throw new Error(`Missing ${key} in ${filePath}`);
-            }
-
-            let value = line.slice((key + '=').length).trim();
-            if (
-              (value.startsWith('"') && value.endsWith('"')) ||
-              (value.startsWith("'") && value.endsWith("'"))
-            ) {
-              value = value.slice(1, -1);
-            }
-            return value;
-          }
-
-          const apiBase = readEnvVar('apps/.env.production', 'VITE_API__URI');
-          const base = apiBase.endsWith('/') ? apiBase : apiBase + '/';
-          const endpoint = base + 'crm/request/';
-
-          const landingPath = 'build-bundle/main/index.html';
-          const placeholder = '__DISCOVERY_ENDPOINT__';
-          const html = fs.readFileSync(landingPath, 'utf8');
-          if (!html.includes(placeholder)) {
-            throw new Error(`Placeholder ${placeholder} not found in ${landingPath}`);
-          }
-
-          fs.writeFileSync(landingPath, html.split(placeholder).join(endpoint));
-          console.log(`Injected discovery endpoint: ${endpoint}`);
-          NODE
-
           cp "${{ steps.db.outputs.zip }}" build-bundle/db/
           tar -czf "release-${GITHUB_REF_NAME}.tar.gz" -C build-bundle .
           sha256sum "release-${GITHUB_REF_NAME}.tar.gz" > "release-${GITHUB_REF_NAME}.sha256"
