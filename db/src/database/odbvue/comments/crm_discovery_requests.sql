@@ -17,7 +17,7 @@ COMMENT ON COLUMN odbvue.crm_discovery_requests.organization IS
     'Organization name of the requester';
 
 COMMENT ON COLUMN odbvue.crm_discovery_requests.phone IS
-    'Phone number of the requester';
+    'Phone number provided by the lead.';
 
 
--- sqlcl_snapshot {"hash":"140279f5e56e7b6beb9b2fbb02c70557a81c2b43","type":"COMMENT","name":"crm_discovery_requests","schemaName":"odbvue","sxml":""}
+-- sqlcl_snapshot {"hash":"56707bf14787a850d9294ecc285641a5d87f270c","type":"COMMENT","name":"crm_discovery_requests","schemaName":"odbvue","sxml":""}

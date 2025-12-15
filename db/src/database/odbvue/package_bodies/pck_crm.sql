@@ -1,10 +1,10 @@
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_crm AS
 
-    PROCEDURE get_request (
-        p_search   IN VARCHAR2,
-        p_filter   IN VARCHAR2,
-        p_offset   IN NUMBER,
-        p_limit    IN NUMBER,
+    PROCEDURE get_requests (
+        p_search   IN VARCHAR2 DEFAULT NULL,
+        p_filter   IN VARCHAR2 DEFAULT NULL,
+        p_offset   IN NUMBER DEFAULT NULL,
+        p_limit    IN NUMBER DEFAULT NULL,
         r_requests OUT SYS_REFCURSOR
     ) AS
 
@@ -44,7 +44,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_crm AS
                                created DESC
                            OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY;
 
-    END get_request;
+    END get_requests;
 
     PROCEDURE post_request (
         p_name         IN VARCHAR2,
@@ -80,4 +80,4 @@ END pck_crm;
 /
 
 
--- sqlcl_snapshot {"hash":"27553aef6af852d0c1c1dbc7635022acb9572efe","type":"PACKAGE_BODY","name":"PCK_CRM","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"44712dca2f80ccc13bc1835969aac6caf20eae77","type":"PACKAGE_BODY","name":"PCK_CRM","schemaName":"ODBVUE","sxml":""}

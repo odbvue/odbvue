@@ -1,10 +1,10 @@
 CREATE OR REPLACE PACKAGE odbvue.pck_crm AS -- CRM
 
-    PROCEDURE get_request ( -- Method to get requests with pagination and filtering
-        p_search   IN VARCHAR2, -- Search term for filtering requests
-        p_filter   IN VARCHAR2, -- Additional filter criteria
-        p_offset   IN NUMBER, -- Offset for pagination
-        p_limit    IN NUMBER, -- Limit for pagination
+    PROCEDURE get_requests ( -- Method to get requests with pagination and filtering
+        p_search   IN VARCHAR2 DEFAULT NULL, -- Search term for filtering requests
+        p_filter   IN VARCHAR2 DEFAULT NULL, -- Additional filter criteria
+        p_offset   IN NUMBER DEFAULT NULL, -- Offset for pagination
+        p_limit    IN NUMBER DEFAULT NULL, -- Limit for pagination
         r_requests OUT SYS_REFCURSOR -- Output cursor for the requests
     );
 
@@ -20,4 +20,4 @@ END pck_crm;
 /
 
 
--- sqlcl_snapshot {"hash":"0ce41c13851123888ccc4cd4bd4d661a1ce64e4f","type":"PACKAGE_SPEC","name":"PCK_CRM","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"b1a6bd88b2d5c3d2773560bc8b2a4d295cd8be43","type":"PACKAGE_SPEC","name":"PCK_CRM","schemaName":"ODBVUE","sxml":""}
