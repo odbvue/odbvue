@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.242
+
+### Patch Changes
+
+- 975e14d: crm requests method
+
 ## 0.0.241
 
 ### Patch Changes
