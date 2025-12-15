@@ -6,6 +6,7 @@
 definePage({
   meta: {
     title: 'CRM',
+    color: '#4CAF50',
     description: 'Discovery requests',
     icon: '$mdiAccountBoxMultiple',
     visibility: 'when-authenticated',
