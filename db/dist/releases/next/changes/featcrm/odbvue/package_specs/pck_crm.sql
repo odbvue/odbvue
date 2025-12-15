@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1765808323923 stripComments:false  logicalFilePath:featcrm\odbvue\package_specs\pck_crm.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_specs/pck_crm.sql:0ce41c13851123888ccc4cd4bd4d661a1ce64e4f:b1a6bd88b2d5c3d2773560bc8b2a4d295cd8be43:alter
+
 CREATE OR REPLACE PACKAGE odbvue.pck_crm AS -- CRM
 
     PROCEDURE get_requests ( -- Method to get requests with pagination and filtering
@@ -19,5 +23,3 @@ CREATE OR REPLACE PACKAGE odbvue.pck_crm AS -- CRM
 END pck_crm;
 /
 
-
--- sqlcl_snapshot {"hash":"b1a6bd88b2d5c3d2773560bc8b2a4d295cd8be43","type":"PACKAGE_SPEC","name":"PCK_CRM","schemaName":"ODBVUE","sxml":""}
