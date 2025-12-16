@@ -55,6 +55,10 @@
                 --container-max: 1120px;
                 --radius: 18px;
 
+                --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+                --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+                --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
                 /* Updated at runtime to match the sticky header height */
                 --header-offset: 72px;
             }
@@ -272,11 +276,13 @@
             }
 
             .button--primary {
-                background: var(--primary);
+                background: linear-gradient(135deg, var(--primary) 0%, #0077be 100%);
                 color: var(--on-primary);
+                box-shadow: var(--shadow);
             }
             .button--primary:hover {
-                background: rgba(0, 98, 158, 0.92);
+                background: linear-gradient(135deg, #0077be 0%, var(--primary) 100%);
+                box-shadow: var(--shadow-lg);
             }
 
             .button--ghost {
@@ -369,6 +375,10 @@
             }
 
             .hero h1 .accent {
+                background: linear-gradient(135deg, var(--primary) 0%, var(--info) 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
                 color: var(--primary);
             }
 
@@ -397,10 +407,11 @@
             .hero__panel {
                 border-radius: var(--radius);
                 background: var(--surface);
-                border: 1px solid rgba(26, 28, 30, var(--border-opacity));
+                border: 1px solid rgba(26, 28, 30, 0.08);
                 padding: 22px;
                 position: relative;
                 overflow: hidden;
+                box-shadow: var(--shadow);
             }
 
             .hero__panel::before {
@@ -443,27 +454,35 @@
             .hero__tile {
                 border-radius: var(--radius);
                 background: var(--surface);
-                border: 1px solid rgba(26, 28, 30, var(--border-opacity));
-                padding: 16px 16px 14px;
+                border: 1px solid rgba(26, 28, 30, 0.08);
+                padding: 24px;
                 display: flex;
+                flex-direction: column;
                 align-items: flex-start;
-                gap: 12px;
+                gap: 0;
+                box-shadow: var(--shadow-sm);
+                transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+                height: 100%;
+            }
+            .hero__tile:hover {
+                transform: translateY(-4px);
+                box-shadow: var(--shadow-lg);
+                border-color: rgba(0, 98, 158, 0.3);
             }
 
             .hero__tile-icon {
-                width: 32px;
-                height: 32px;
-                flex: 0 0 auto;
-                margin-top: 2px;
+                width: 36px;
+                height: 36px;
+                margin-bottom: 16px;
                 color: var(--primary);
+                display: block;
             }
 
             .hero__tile-caption {
-                margin: 0 0 1.02rem;
-                font-size: 1.02rem;
+                margin: 0 0 12px;
+                font-size: 1.15rem;
                 font-weight: 800;
                 line-height: 1.25;
-                min-height: calc(2 * 1.02em);
                 color: rgba(26, 28, 30, var(--high-emphasis-opacity));
             }
 
@@ -496,8 +515,23 @@
                 grid-column: span 6;
                 border-radius: var(--radius);
                 background: var(--surface);
-                border: 1px solid rgba(26, 28, 30, var(--border-opacity));
-                padding: 18px 18px 16px;
+                border: 1px solid rgba(26, 28, 30, 0.08);
+                padding: 24px;
+                box-shadow: var(--shadow-sm);
+                transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            }
+            .card:hover {
+                transform: translateY(-4px);
+                box-shadow: var(--shadow-lg);
+                border-color: rgba(0, 98, 158, 0.3);
+            }
+
+            .card__icon {
+                width: 36px;
+                height: 36px;
+                margin-bottom: 16px;
+                color: var(--primary);
+                display: block;
             }
 
             .card h3 {
@@ -581,13 +615,16 @@
                 font: inherit;
                 color: rgba(26, 28, 30, var(--high-emphasis-opacity));
                 border-radius: 12px;
-                border: 1px solid rgba(26, 28, 30, var(--border-opacity));
-                background: rgba(255, 255, 255, 0.6);
-                padding: 10px 12px;
+                border: 1px solid rgba(26, 28, 30, 0.15);
+                background: #fff;
+                padding: 12px 16px;
                 outline: none;
+                box-shadow: var(--shadow-sm);
+                transition: border-color 0.15s ease, box-shadow 0.15s ease;
             }
             .field__input:focus {
                 border-color: var(--primary);
+                box-shadow: 0 0 0 3px rgba(0, 98, 158, 0.15);
             }
 
             .field__textarea {
@@ -619,8 +656,15 @@
             .step {
                 border-radius: var(--radius);
                 background: var(--surface);
-                border: 1px solid rgba(26, 28, 30, var(--border-opacity));
-                padding: 18px;
+                border: 1px solid rgba(26, 28, 30, 0.08);
+                padding: 24px;
+                box-shadow: var(--shadow-sm);
+                transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            }
+            .step:hover {
+                transform: translateY(-4px);
+                box-shadow: var(--shadow-lg);
+                border-color: rgba(0, 98, 158, 0.3);
             }
 
             .step h3 {
@@ -634,6 +678,7 @@
                 background: rgba(65, 163, 92, 0.08);
                 border: 1px solid rgba(65, 163, 92, 0.22);
                 padding: 18px;
+                font-size: 1.15rem;
             }
             .outcome strong {
                 color: rgba(0, 0, 0, 0.78);
@@ -677,7 +722,8 @@
                 outline-offset: 2px;
             }
 
-            .footer__github {
+            .footer__github,
+            .footer__discord {
                 flex: 0 0 auto;
                 display: inline-flex;
                 align-items: center;
@@ -689,14 +735,17 @@
                 text-decoration: none;
                 transition: background-color 160ms ease;
             }
-            .footer__github:hover {
+            .footer__github:hover,
+            .footer__discord:hover {
                 background: rgba(28, 142, 230, 0.08);
             }
-            .footer__github:focus {
+            .footer__github:focus,
+            .footer__discord:focus {
                 outline: 2px solid rgba(0, 98, 158, 0.35);
                 outline-offset: 2px;
             }
-            .footer__github svg {
+            .footer__github svg,
+            .footer__discord svg {
                 width: 22px;
                 height: 22px;
                 display: block;
@@ -800,6 +849,60 @@
             .modal__body h3 {
                 margin: 18px 0 10px;
                 font-size: 1rem;
+            }
+
+            .vision-cta {
+                margin-top: 48px;
+                display: flex;
+                justify-content: center;
+            }
+
+            .vision-link {
+                display: inline-flex;
+                align-items: center;
+                gap: 12px;
+                padding: 16px 32px;
+                background: linear-gradient(135deg, #fff 0%, #f0f7ff 100%);
+                border: 1px solid rgba(0, 98, 158, 0.2);
+                border-radius: 100px;
+                color: var(--primary);
+                font-weight: 800;
+                font-size: 1.15rem;
+                text-decoration: none;
+                box-shadow: 0 4px 20px rgba(0, 98, 158, 0.15);
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                position: relative;
+                overflow: hidden;
+            }
+
+            .vision-link::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                background: linear-gradient(135deg, var(--primary) 0%, var(--info) 100%);
+                opacity: 0;
+                transition: opacity 0.3s ease;
+                z-index: 0;
+            }
+
+            .vision-link span, .vision-link svg {
+                position: relative;
+                z-index: 1;
+                transition: color 0.3s ease;
+            }
+
+            .vision-link:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 12px 28px rgba(0, 98, 158, 0.25);
+                border-color: transparent;
+            }
+
+            .vision-link:hover::before {
+                opacity: 1;
+            }
+
+            .vision-link:hover span, .vision-link:hover svg {
+                color: white;
             }
 
             /* Scroll-reveal transitions */
@@ -1133,6 +1236,9 @@
 
                     <div class="card-grid">
                         <article class="card reveal">
+                            <svg class="card__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <path fill="currentColor" d="M12 5.5A3.5 3.5 0 0 1 15.5 9A3.5 3.5 0 0 1 12 12.5A3.5 3.5 0 0 1 8.5 9A3.5 3.5 0 0 1 12 5.5M5 8C5.56 8 6.08 8.15 6.53 8.42C6.38 9.85 6.8 11.27 7.66 12.38C7.16 13.34 6.16 14 5 14A3 3 0 0 1 2 11A3 3 0 0 1 5 8M19 8A3 3 0 0 1 22 11A3 3 0 0 1 19 14C17.84 14 16.84 13.34 16.34 12.38C17.2 11.27 17.62 9.85 17.47 8.42C17.92 8.15 18.44 8 19 8M5.5 18.25C5.5 16.18 8.41 14.5 12 14.5C15.59 14.5 18.5 16.18 18.5 18.25V20H5.5V18.25M0 20V18.5C0 17.11 1.89 15.94 4.45 15.6C3.86 16.28 3.5 17.22 3.5 18.25V20H0M24 20H20.5V18.25C20.5 17.22 20.14 16.28 19.55 15.6C22.11 15.94 24 17.11 24 18.5V20Z" />
+                            </svg>
                             <h3>Build &amp; Empower Your Team</h3>
                             <p>
                                 From role definition to recruitment, coaching, and leadership, we help you
@@ -1141,6 +1247,9 @@
                         </article>
 
                         <article class="card reveal">
+                            <svg class="card__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <path fill="currentColor" d="M12 3L1 9L12 15L21 10.09V17H23V9M5 13.18V17.18L12 21L19 17.18V13.18L12 17L5 13.18Z" />
+                            </svg>
                             <h3>Skill Transfer, Not Lock-In</h3>
                             <p>
                                 We up-skill your people in the Oracle + Vue.js stack—creating lasting internal
@@ -1149,6 +1258,9 @@
                         </article>
 
                         <article class="card reveal">
+                            <svg class="card__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4C9.11 4 6.6 5.64 5.35 8.04C2.34 8.36 0 10.91 0 14C0 17.31 2.69 20 6 20H19C21.76 20 24 17.76 24 15C24 12.36 21.95 10.22 19.35 10.04Z" />
+                            </svg>
                             <h3>Cloud &amp; DevOps Foundations</h3>
                             <p>
                                 Deploy to secure, resilient Oracle Cloud infrastructure with automated CI/CD
@@ -1157,12 +1269,22 @@
                         </article>
 
                         <article class="card reveal">
+                            <svg class="card__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <path fill="currentColor" d="M18 1C15.24 1 13 3.24 13 6V8H4C2.9 8 2 8.9 2 10V20C2 21.1 2.9 22 4 22H20C21.1 22 22 21.1 22 20V10C22 8.9 21.1 8 20 8H15V6C15 4.34 16.34 3 18 3C19.66 3 21 4.34 21 6V8H23V6C23 3.24 20.76 1 18 1M4 10H20V20H4V10Z" />
+                            </svg>
                             <h3>Vendor Independence</h3>
                             <p>
                                 Transition smoothly from external providers to internal control—gaining
                                 ownership over cost, quality, and innovation.
                             </p>
                         </article>
+                    </div>
+
+                    <div class="vision-cta reveal">
+                        <a href="http://wiki.odbvue.com/introduction/vision.html" target="_blank" rel="noreferrer" class="vision-link">
+                            <span>Why OdbVue?</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+                        </a>
                     </div>
                 </section>
 
@@ -1297,21 +1419,38 @@
             <footer class="footer" role="contentinfo">
                 <div class="footer__inner">
                     <button class="footer__terms" type="button" id="terms-open">terms and conditions</button>
-                    <a
-                        class="footer__github"
-                        href="https://github.com/odbvue/odbvue"
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label="OdbVue on GitHub"
-                        title="GitHub"
-                    >
-                        <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path
-                                fill="currentColor"
-                                d="M12 .5C5.73.5.75 5.73.75 12.2c0 5.2 3.44 9.6 8.2 11.16.6.12.82-.27.82-.58v-2.15c-3.34.75-4.04-1.66-4.04-1.66-.55-1.43-1.34-1.8-1.34-1.8-1.1-.77.08-.76.08-.76 1.22.09 1.86 1.3 1.86 1.3 1.08 1.9 2.84 1.35 3.53 1.03.11-.81.42-1.35.76-1.66-2.66-.31-5.46-1.37-5.46-6.08 0-1.34.46-2.44 1.22-3.3-.12-.31-.53-1.57.12-3.27 0 0 1-.33 3.3 1.26.96-.27 1.99-.4 3.01-.4s2.05.14 3.01.4c2.3-1.6 3.3-1.26 3.3-1.26.65 1.7.24 2.96.12 3.27.76.86 1.22 1.96 1.22 3.3 0 4.72-2.8 5.77-5.47 6.07.43.38.81 1.13.81 2.28v3.37c0 .31.22.7.82.58 4.76-1.56 8.2-5.96 8.2-11.16C23.25 5.73 18.27.5 12 .5z"
-                            />
-                        </svg>
-                    </a>
+                    <div style="display: flex; gap: 8px;">
+                        <a
+                            class="footer__discord"
+                            href="https://discord.gg/w9HE5FV3"
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label="OdbVue on Discord"
+                            title="Discord"
+                        >
+                            <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path
+                                    fill="currentColor"
+                                    d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.419-2.1568 2.419zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.419-2.1568 2.419z"
+                                />
+                            </svg>
+                        </a>
+                        <a
+                            class="footer__github"
+                            href="https://github.com/odbvue/odbvue"
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label="OdbVue on GitHub"
+                            title="GitHub"
+                        >
+                            <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path
+                                    fill="currentColor"
+                                    d="M12 .5C5.73.5.75 5.73.75 12.2c0 5.2 3.44 9.6 8.2 11.16.6.12.82-.27.82-.58v-2.15c-3.34.75-4.04-1.66-4.04-1.66-.55-1.43-1.34-1.8-1.34-1.8-1.1-.77.08-.76.08-.76 1.22.09 1.86 1.3 1.86 1.3 1.08 1.9 2.84 1.35 3.53 1.03.11-.81.42-1.35.76-1.66-2.66-.31-5.46-1.37-5.46-6.08 0-1.34.46-2.44 1.22-3.3-.12-.31-.53-1.57.12-3.27 0 0 1-.33 3.3 1.26.96-.27 1.99-.4 3.01-.4s2.05.14 3.01.4c2.3-1.6 3.3-1.26 3.3-1.26.65 1.7.24 2.96.12 3.27.76.86 1.22 1.96 1.22 3.3 0 4.72-2.8 5.77-5.47 6.07.43.38.81 1.13.81 2.28v3.37c0 .31.22.7.82.58 4.76-1.56 8.2-5.96 8.2-11.16C23.25 5.73 18.27.5 12 .5z"
+                                />
+                            </svg>
+                        </a>
+                    </div>
                 </div>
             </footer>
 
@@ -1324,49 +1463,13 @@
 
                     <div class="modal__body">
                         <p>
-                            The OdbVue demo experience is currently in a <strong>discovery phase</strong>. Its goal is to
-                            investigate whether there is real demand for the product and its approach.
+                            The OdbVue demo is in an early <strong>discovery phase</strong>. Its purpose is to explore real-world interest,
+                            gather feedback, and experiment openly with ideas and use cases.
                         </p>
 
-                        <h3>1. Purpose of the Service</h3>
                         <p>
-                            The OdbVue Demo Application (the “Service”) is provided solely for demonstration, testing, and
-                            evaluation of technical capabilities related to OdbVue technologies. It is not intended for
-                            production use, commercial deployment, or handling of critical or sensitive data.
-                        </p>
-
-                        <h3>2. Open-Source Availability</h3>
-                        <p>
-                            The underlying OdbVue project is open-source and available on GitHub under the MIT License.
-                            These Terms &amp; Conditions apply only to the hosted demo service and do not limit rights
-                            granted by the MIT License.
-                        </p>
-
-                        <h3>3. No Warranties</h3>
-                        <p>
-                            The Service is provided “as is” and “as available”, without warranties of any kind, express or
-                            implied, including (but not limited to) accuracy, reliability, availability, security, fitness
-                            for a particular purpose, or non-infringement.
-                        </p>
-
-                        <h3>4. Limitation of Liability</h3>
-                        <p>
-                            To the fullest extent permitted by law, the Service provider assumes <strong>zero liability</strong>
-                            for any damages arising from access to or use of the Service, including direct, indirect,
-                            incidental, consequential, or special damages. You use the demo entirely at your own risk.
-                        </p>
-
-                        <h3>5. User Responsibilities</h3>
-                        <p>
-                            You are solely responsible for any information or data you input. Do not upload confidential,
-                            sensitive, or production data. Data may be lost, modified, deleted, or exposed due to the
-                            experimental nature of the platform.
-                        </p>
-
-                        <h3>6. Modifications and Termination</h3>
-                        <p>
-                            The Service may be modified, suspended, or terminated at any time without notice. Terms may be
-                            updated periodically; continued use constitutes acceptance of the latest version.
+                            We are <strong>open to all types of collaboration</strong> — feedback, discussions, experiments, and potential
+                            partnerships are welcome.
                         </p>
                     </div>
                 </div>
