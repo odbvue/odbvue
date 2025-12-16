@@ -1,4 +1,4 @@
-# Openai
+# Open AI
 
 Package provides implementation of Open AI API 
 
