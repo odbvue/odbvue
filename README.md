@@ -1,9 +1,15 @@
 # OdbVue
 
-OdbVue is a template + reference implementation for building and deploying business-class apps with **Oracle AI Database** and **Vue 3**.
+OdbVue is a template + reference implementation for building and deploying business-class apps with **Oracle AI Database** and **VueJs**.
 
 - Demo: https://apps.odbvue.com
 - Documentation: https://wiki.odbvue.com
+
+---
+
+![OdbVue](apps/public/pwa-64x64.png)
+
+[Why OdbVue?](https://wiki.odbvue.com/introduction/vision.html)
 
 ## Quick start (local DB + apps)
 
@@ -46,4 +52,4 @@ Open the URLs shown in the terminal (typically `http://localhost:5173` for the a
 
 ## License
 
-MIT — see [LICENSE](/LICENSE).
+MIT - see [LICENSE](/LICENSE).
