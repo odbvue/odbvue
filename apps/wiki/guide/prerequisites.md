@@ -24,5 +24,5 @@ Recommended VS Code extensions:
 
 4. [GitHub Copilot](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) - an AI assistant.
 
-> [TIP!]
+> [!TIP]
 > [AI model comparison](https://docs.github.com/en/copilot/reference/ai-models/model-comparison)

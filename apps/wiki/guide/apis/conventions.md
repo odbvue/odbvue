@@ -11,7 +11,7 @@ All tables and business logic shall be organized in packages by domain.
 
 ## Usage of object types
 
-| Ok to use | :warning: With caution              | :triangular_flag_on_post: Red flag                   |
+| :white_check_mark: Ok to use | :warning: With caution              | :triangular_flag_on_post: Red flag                   |
 | --------- | ----------------------------------- | ---------------------------------------------------- |
 | Tables    | Views                               | Business logic in triggers                           |
 | Sequences | Types                               | Java / C / etc. procedures                           |

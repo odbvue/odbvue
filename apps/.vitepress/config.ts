@@ -29,8 +29,8 @@ export default defineConfig({
       { text: 'OdbVue', link: 'https://odbvue.com' },
       { text: 'Apps', link: 'https://apps.odbvue.com' },
       { text: 'Introduction', link: '/introduction/vision' },
-      { text: 'Guide', link: '/guide' },
-      { text: 'Features', link: '/features' },
+      { text: 'Guide', link: '/guide/overview' },
+      { text: 'Features', link: '/features/overview' },
     ],
 
     sidebar: {
@@ -48,7 +48,7 @@ export default defineConfig({
         {
           text: 'Getting Started',
           items: [
-            { text: 'Overview', link: '/guide' },
+            { text: 'Overview', link: '/guide/overview' },
             { text: 'Prerequisites', link: '/guide/prerequisites' },
             { text: 'Getting started', link: '/guide/getting-started' },
           ],
@@ -198,7 +198,7 @@ export default defineConfig({
         {
           text: 'Features',
           items: [
-            { text: 'Overview', link: '/features' },
+            { text: 'Overview', link: '/features/overview' },
             { text: 'Application', link: '/features/app' },
             { text: 'Administration', link: '/features/adm' },
             { text: 'Travail', link: '/features/travail' },
