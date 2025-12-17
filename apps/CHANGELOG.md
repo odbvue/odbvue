@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.246
+
+### Patch Changes
+
+- 77aed86: favicon
+
 ## 0.0.245
 
 ### Patch Changes
