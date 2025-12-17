@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.245
+
+### Patch Changes
+
+- d34b802: upgrade sqlcl
+
 ## 0.0.244
 
 ### Patch Changes
