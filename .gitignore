@@ -1,2 +1,31 @@
-db/config.json
-db/.config.json
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+
+# Build & dist
+dist/
+.next/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test results
+test-results/
+playwright-report/
