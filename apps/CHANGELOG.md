@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.244
+
+### Patch Changes
+
+- 8bc5ca5: chore gitignore
+
 ## 0.0.243
 
 ### Patch Changes
