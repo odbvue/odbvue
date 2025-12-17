@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.247
+
+### Patch Changes
+
+- 633fecc: sqlcl upgrade
+
 ## 0.0.246
 
 ### Patch Changes
