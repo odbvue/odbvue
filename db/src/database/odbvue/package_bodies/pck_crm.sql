@@ -54,6 +54,12 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_crm AS
         p_message      IN CLOB
     ) AS
     BEGIN
+        IF ( p_name IS NULL
+             OR p_email IS NULL ) THEN
+            pck_api_auth.http(400, 'Name and Email are required fields.');
+            RETURN;
+        END IF;
+
         INSERT INTO crm_discovery_requests (
             name,
             organization,
@@ -80,4 +86,4 @@ END pck_crm;
 /
 
 
--- sqlcl_snapshot {"hash":"44712dca2f80ccc13bc1835969aac6caf20eae77","type":"PACKAGE_BODY","name":"PCK_CRM","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"970e9aabc605f4bbb7e176af8084589d4027dec9","type":"PACKAGE_BODY","name":"PCK_CRM","schemaName":"ODBVUE","sxml":""}
