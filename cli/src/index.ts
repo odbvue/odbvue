@@ -622,11 +622,9 @@ program
         try {
           const isWindows = platform() === 'win32';
           const shell = isWindows ? 'powershell.exe' : '/bin/bash';
-          const piping = isWindows
-            ? `type "${tempScriptPath}" | sql /nolog`
-            : `cat "${tempScriptPath}" | sql /nolog`;
+          const sqlclCommand = `sql /nolog "@${tempScriptPath}"`;
 
-          execSync(piping, {
+          execSync(sqlclCommand, {
             cwd: dbDir,
             stdio: 'inherit',
             shell,
@@ -671,11 +669,9 @@ program
         try {
           const isWindows = platform() === 'win32';
           const shell = isWindows ? 'powershell.exe' : '/bin/bash';
-          const piping = isWindows
-            ? `type "${tempScriptPath}" | sql /nolog`
-            : `cat "${tempScriptPath}" | sql /nolog`;
+          const sqlclCommand = `sql /nolog "@${tempScriptPath}"`;
 
-          execSync(piping, {
+          execSync(sqlclCommand, {
             cwd: dbDir,
             stdio: 'inherit',
             shell,
@@ -886,6 +882,7 @@ program
 
       const message = options.message ? ` ${options.message}` : '';
       const commitMessage = `release: ${version}${message}`;
+
       execSync(`git commit -m "${commitMessage}"`, { cwd: rootDir, stdio: 'inherit' });
 
       logger.info('Creating and pushing tag...');
