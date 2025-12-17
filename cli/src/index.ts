@@ -737,11 +737,9 @@ program
         try {
           const isWindows = platform() === 'win32';
           const shell = isWindows ? 'powershell.exe' : '/bin/bash';
-          const piping = isWindows
-            ? `type "${tempScriptPath}" | sql /nolog`
-            : `cat "${tempScriptPath}" | sql /nolog`;
+          const sqlclCommand = `sql /nolog "@${tempScriptPath}"`;
 
-          execSync(piping, {
+          execSync(sqlclCommand, {
             cwd: dbDir,
             stdio: 'inherit',
             shell,
