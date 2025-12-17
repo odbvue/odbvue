@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.248
+
+### Patch Changes
+
+- f1785c7: sqlcl
+
 ## 0.0.247
 
 ### Patch Changes
