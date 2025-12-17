@@ -886,22 +886,7 @@ program
 
       const message = options.message ? ` ${options.message}` : '';
       const commitMessage = `release: ${version}${message}`;
-      
-      // Check if there are any changes to commit
-      const hasChanges = (() => {
-        try {
-          execSync('git diff --cached --quiet', { cwd: rootDir, stdio: 'pipe' });
-          return false;
-        } catch {
-          return true;
-        }
-      })();
-
-      if (hasChanges) {
-        execSync(`git commit -m "${commitMessage}"`, { cwd: rootDir, stdio: 'inherit' });
-      } else {
-        logger.warn('No changes to commit, skipping commit step');
-      }
+      execSync(`git commit -m "${commitMessage}"`, { cwd: rootDir, stdio: 'inherit' });
 
       logger.info('Creating and pushing tag...');
       const tagMessage = `Release ${version}${message}`;
