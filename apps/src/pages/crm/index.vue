@@ -12,7 +12,6 @@ definePage({
     visibility: 'with-role',
     access: 'with-role',
     roles: ['admin'],
-
   },
 })
 
