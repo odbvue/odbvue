@@ -1,35 +1,34 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+# Dependencies
+node_modules/
+pnpm-lock.yaml
 
-node_modules
+# Build & dist
+dist/
+.next/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+
+# OS
 .DS_Store
-dist
-dist-ssr
-coverage
-*.local
+Thumbs.db
 
-/cypress/videos/
-/cypress/screenshots/
+# Logs
+*.log
+logs/
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-*.tsbuildinfo
-
+# Test results
 test-results/
 playwright-report/
 
-.vitepress/cache/
+# Cache
+cache/
