@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.250
+
+### Patch Changes
+
+- e18172e: debug ebr
+
 ## 0.0.249
 
 ### Patch Changes
