@@ -8,6 +8,7 @@ CREATE OR REPLACE PACKAGE odbvue.pck_adm AS -- Administration package
     );
 
     PROCEDURE get_users ( -- Get user list with filtering and pagination
+        p_filter VARCHAR2 DEFAULT NULL, -- user UUID
         p_search VARCHAR2 DEFAULT NULL, -- search term (username)
         p_limit  PLS_INTEGER DEFAULT 10, -- number of records to return
         p_offset PLS_INTEGER DEFAULT 0, -- offset for pagination
@@ -96,8 +97,15 @@ CREATE OR REPLACE PACKAGE odbvue.pck_adm AS -- Administration package
         r_alerts OUT SYS_REFCURSOR -- ref cursor for alert records [{alert_type, message, created}]
     );
 
+    PROCEDURE post_role ( -- Create or update a role
+        p_role        VARCHAR2, -- role name
+        p_description VARCHAR2, -- role description
+        r_error       OUT VARCHAR2, -- error message, if any
+        r_errors      OUT SYS_REFCURSOR -- ref cursor for validation errors [{name, message}]
+    );
+
 END pck_adm;
 /
 
 
--- sqlcl_snapshot {"hash":"7866c617e38a6ced5fcb0ec9549fb5b5fce936a2","type":"PACKAGE_SPEC","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"91c480b61aa8d5a6809b63b388606b800a34b6c5","type":"PACKAGE_SPEC","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}

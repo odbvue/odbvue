@@ -79,6 +79,20 @@ declare module 'vue-router/auto-routes' {
       { name: ParamValue<false> },
       | never
     >,
+    '/admin/roles/': RouteRecordInfo<
+      '/admin/roles/',
+      '/admin/roles',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/admin/roles/[role]': RouteRecordInfo<
+      '/admin/roles/[role]',
+      '/admin/roles/:role',
+      { role: ParamValue<true> },
+      { role: ParamValue<false> },
+      | never
+    >,
     '/admin/settings': RouteRecordInfo<
       '/admin/settings',
       '/admin/settings',
@@ -305,6 +319,18 @@ declare module 'vue-router/auto-routes' {
     'src/pages/admin/jobs/[name].vue': {
       routes:
         | '/admin/jobs/[name]'
+      views:
+        | never
+    }
+    'src/pages/admin/roles/index.vue': {
+      routes:
+        | '/admin/roles/'
+      views:
+        | never
+    }
+    'src/pages/admin/roles/[role].vue': {
+      routes:
+        | '/admin/roles/[role]'
       views:
         | never
     }

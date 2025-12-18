@@ -126,12 +126,15 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_adm AS
     END get_audit;
 
     PROCEDURE get_users (
+        p_filter VARCHAR2 DEFAULT NULL,
         p_search VARCHAR2 DEFAULT NULL,
         p_limit  PLS_INTEGER DEFAULT 10,
         p_offset PLS_INTEGER DEFAULT 0,
         r_users  OUT SYS_REFCURSOR
     ) AS
+
         v_search VARCHAR2(2000 CHAR) := utl_url.unescape(coalesce(p_search, ''));
+        v_filter VARCHAR2(2000 CHAR) := utl_url.unescape(coalesce(p_filter, '{}'));
     BEGIN
         IF pck_api_auth.role(NULL, 'ADMIN') IS NULL THEN
             pck_api_auth.http_401;
@@ -162,10 +165,32 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_adm AS
             -- Search by username
                             AND ( v_search IS NULL
                                   OR u.username LIKE upper(v_search)
-                                                     || '%' )
-            -- Search by UUID
-                            OR ( v_search IS NULL
-                                 OR u.uuid = v_search )
+                                                     || '%'
+                                  OR u.uuid = v_search )
+            -- Search by filter: roles
+                            AND ( NOT JSON_EXISTS ( v_filter, '$.roles' )
+                                      OR EXISTS (
+                                SELECT
+                                    1
+                                FROM
+                                        JSON_TABLE ( JSON_QUERY(v_filter, '$.roles'), '$[*]'
+                                            COLUMNS (
+                                                role VARCHAR2 ( 100 ) PATH '$'
+                                            )
+                                        )
+                                    j
+                                WHERE
+                                    EXISTS (
+                                        SELECT
+                                            1
+                                        FROM
+                                                 app_permissions p
+                                            JOIN app_roles r ON r.id = p.id_role
+                                        WHERE
+                                                p.id_user = u.id
+                                            AND r.role = j.role
+                                    )
+                            ) )
                         ORDER BY
                             u.username ASC
                         OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY;
@@ -1680,8 +1705,59 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_adm AS
 
     END get_alerts;
 
+    PROCEDURE post_role (
+        p_role        VARCHAR2,
+        p_description VARCHAR2,
+        r_error       OUT VARCHAR2,
+        r_errors      OUT SYS_REFCURSOR
+    ) AS
+
+        v_role        app_roles.role%TYPE := upper(trim(p_role));
+        v_description app_roles.description%TYPE := trim(p_description);
+    BEGIN
+        IF pck_api_auth.role(NULL, 'ADMIN') IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+
+        IF v_role IS NULL THEN
+            pck_api_audit.errors(r_errors, 'role', 'required');
+            RETURN;
+        END IF;
+
+        UPDATE app_roles
+        SET
+            description = v_description
+        WHERE
+            role = v_role;
+
+        IF SQL%rowcount = 0 THEN
+            INSERT INTO app_roles (
+                role,
+                description
+            ) VALUES ( v_role,
+                       v_description );
+
+        END IF;
+
+        COMMIT;
+        pck_api_audit.info('Roles',
+                           pck_api_audit.attributes('role',
+                                                    v_role,
+                                                    'uuid',
+                                                    pck_api_auth.uuid(NULL)));
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            pck_api_audit.error('Roles',
+                                pck_api_audit.attributes('role',
+                                                         v_role,
+                                                         'uuid',
+                                                         pck_api_auth.uuid(NULL)));
+    END post_role;
+
 END pck_adm;
 /
 
 
--- sqlcl_snapshot {"hash":"d811876d7be2545462dafd43d333b8204efa7908","type":"PACKAGE_BODY","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"18b009ae3a10152c1a7f1dfbf732f0d53f83ba88","type":"PACKAGE_BODY","name":"PCK_ADM","schemaName":"ODBVUE","sxml":""}

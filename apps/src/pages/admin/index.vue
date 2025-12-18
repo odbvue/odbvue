@@ -70,6 +70,7 @@ const cardBackground = useCardBackground('#ffffee')
 
 const widgets = ref([
   { name: 'Users', path: '/admin/users', icon: '$mdiAccountGroup', color: 'primary' },
+  { name: 'Roles', path: '/admin/roles', icon: '$mdiAccountKey', color: 'primary' },
   { name: 'Audit Logs', path: '/admin/audit', icon: '$mdiClipboardList', color: 'primary' },
   { name: 'Emails', path: '/admin/emails', icon: '$mdiEmail', color: 'primary' },
   { name: 'Job Scheduler', path: '/admin/jobs', icon: '$mdiCalendarClock', color: 'primary' },

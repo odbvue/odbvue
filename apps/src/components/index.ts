@@ -487,13 +487,15 @@ export const renderViewItem = (
       }
 
       const hidden = (props as Record<string, unknown>)['hidden'] === true
+      const isNavigationAction =
+        !!(props as Record<string, unknown>).to || !!(props as Record<string, unknown>).href
       if (!hidden) {
         children.push(
           h(VBtn, {
             ...props,
-            onClick: () => {
-              onEmit?.('action', actionObj.name, valueStr)
-            },
+            ...(isNavigationAction
+              ? {}
+              : { onClick: () => onEmit?.('action', actionObj.name, valueStr) }),
           }),
         )
       }
