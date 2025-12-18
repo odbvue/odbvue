@@ -48,5 +48,7 @@
   "from.invalid.format": "From invalid format",
   "to.invalid.format": "To invalid format",
   "Message": "Message",
-  "Attributes": "Attributes"
+  "Attributes": "Attributes",
+  "insert": "Insert",
+  "users": "Users"
 }
