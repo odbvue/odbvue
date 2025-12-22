@@ -5,19 +5,20 @@ data "oci_identity_availability_domains" "available" {
 
 # Compute constants
 locals {
-  instance_shape   = "VM.Standard.E5.Flex"
+  instance_shape   = "VM.Standard.E2.1.Micro"
   instance_display = "odbvue-web"
 }
 
-# Find Oracle Linux 9 image
-data "oci_core_images" "ol9" {
-  compartment_id             = local.compartment_ocid
-  operating_system           = "Oracle Linux"
-  operating_system_version   = "9"
-  shape                      = local.instance_shape
-  sort_by                    = "TIMECREATED"
-  sort_order                 = "DESC"
-  state                      = "AVAILABLE"
+# Find Oracle Linux 9 Minimal image (platform images are in tenancy root)
+data "oci_core_images" "ol9_minimal" {
+  compartment_id = local.tenancy_ocid
+
+  filter {
+    name   = "display_name"
+    values = ["Oracle-Linux-9.6-Minimal-2025.06.30-0"]
+  }
+
+  state = "AVAILABLE"
 }
 
 resource "oci_core_instance" "web" {
@@ -26,14 +27,9 @@ resource "oci_core_instance" "web" {
   display_name        = local.instance_display
   shape               = local.instance_shape
 
-  shape_config {
-    ocpus         = 1
-    memory_in_gbs = 4
-  }
-
   source_details {
     source_type = "image"
-    source_id   = data.oci_core_images.ol9.images[0].id
+    source_id   = data.oci_core_images.ol9_minimal.images[0].id
     # Minimum boot volume size is 50GB; set explicitly to avoid provider attempts
     # to retain a smaller inherited size (e.g., 47GB) on shape changes.
     boot_volume_size_in_gbs = 50
@@ -48,19 +44,6 @@ resource "oci_core_instance" "web" {
 
   metadata = {
     ssh_authorized_keys = file(var.ssh_public_key_path)
-    user_data           = base64encode(<<-EOT
-      #cloud-config
-      runcmd:
-      - yum install -y nginx
-      - systemctl enable --now nginx
-      - bash -c 'echo "<!doctype html><title>OdbVue</title><h1>It works!</h1>" > /usr/share/nginx/html/index.html'
-      - sudo systemctl start firewalld || true
-      - sudo firewall-cmd --permanent --add-service=http
-      - sudo firewall-cmd --permanent --add-service=https
-      - sudo firewall-cmd --reload
-      - sudo firewall-cmd --list-services
-      EOT
-    )
   }
 }
 
