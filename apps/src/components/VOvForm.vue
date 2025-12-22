@@ -20,6 +20,7 @@
             <component
               :is="field.component"
               :id="field.name"
+              :ref="(el: unknown) => setFieldRef(field.name, el)"
               v-model="values[field.name]"
               v-bind="field.props"
               :autocomplete="field.props.autocomplete || 'off'"
@@ -54,7 +55,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, nextTick } from 'vue'
 import {
   VTextField,
   VSelect,
@@ -141,6 +142,53 @@ const { mobile } = useDisplay()
 
 const form = ref()
 const showPwd = ref(false)
+
+// Refs for field components
+const fieldRefs = ref<Record<string, unknown>>({})
+
+const setFieldRef = (fieldName: string, el: unknown) => {
+  if (el) {
+    fieldRefs.value[fieldName] = el
+  }
+}
+
+const focusField = (fieldName: string, position: 'start' | 'end' | number = 'end') => {
+  const fieldRef = fieldRefs.value[fieldName]
+  if (!fieldRef) {
+    formFocus(fieldName)
+    return
+  }
+  // Check if component has exposed focus method
+  if (typeof fieldRef === 'object' && fieldRef !== null) {
+    const component = fieldRef as Record<string, unknown>
+    if (typeof component.focus === 'function') {
+      component.focus(position)
+      return
+    }
+    // For TipTap editor, focus via the editor instance
+    if (component.editor && typeof component.editor === 'object') {
+      const editor = component.editor as {
+        value?: { commands?: { focus: (pos: 'start' | 'end' | number) => void } }
+      }
+      editor.value?.commands?.focus(position)
+      return
+    }
+  }
+  formFocus(fieldName)
+}
+
+const scrollToAndFocus = (fieldName: string, position: 'start' | 'end' | number = 'end') => {
+  nextTick(() => {
+    // Scroll the form into view
+    if (form.value?.$el && typeof form.value.$el.scrollIntoView === 'function') {
+      form.value.$el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    // Wait for editor to update content, then focus
+    setTimeout(() => {
+      focusField(fieldName, position)
+    }, 100)
+  })
+}
 
 // State for async autocomplete fields
 const asyncItems = ref<Record<string, OvFormSelectItem[]>>({})
@@ -471,5 +519,12 @@ onMounted(() => {
       formFocus(firstField.name)
     }
   }
+})
+
+defineExpose({
+  focusField,
+  scrollToAndFocus,
+  form,
+  values,
 })
 </script>

@@ -14,6 +14,7 @@
       <v-col cols="12" sm="6" v-if="num != 'new-task'">
         <h2>Comments</h2>
         <v-ov-form
+          ref="notesFormRef"
           :data="notesData"
           :options="notesOptions"
           @submit="saveNotes"
@@ -22,7 +23,7 @@
         <v-sheet v-for="note in travail.notes" :key="note.id" class="pa-4 border-b-sm">
           <v-label class="text-subtitle-2">{{ note.author_fullname }} ({{ note.created }})</v-label>
           <v-sheet class="ml-2">
-            <div class="mt-2" v-html="mdToHtml(note.content)"></div>
+            <div class="mt-2 markdown-content" v-html="mdToHtml(note.content)"></div>
             <v-btn
               class="mt-2"
               variant="text"
@@ -31,6 +32,15 @@
               prepend-icon="$mdiDownload"
             >
               {{ formatFileName(note.file_name) }}
+            </v-btn>
+            <v-btn
+              class="mt-2"
+              variant="text"
+              size="small"
+              @click="replyToNote(note)"
+              prepend-icon="$mdiReply"
+            >
+              Reply
             </v-btn>
             <v-sheet v-if="note.assistant" class="text-body-2 font-italic ma-2 mt-4">
               <v-icon left>$mdiRobot</v-icon>
@@ -239,6 +249,23 @@ const handleNotesAction = async (action: string, data: OvFormData) => {
 }
 
 const notesData = ref<OvFormData>({})
+const notesFormRef = ref<{
+  $el?: Element
+  focusField: (name: string, position?: 'start' | 'end' | number) => void
+  scrollToAndFocus: (name: string, position?: 'start' | 'end' | number) => void
+} | null>(null)
+
+const replyToNote = (note: { content: string; author_fullname: string }) => {
+  const quotedContent = note.content
+    .split('\n')
+    .map((line) => `> ${line}`)
+    .join('\n')
+  // Use non-breaking space to create an empty line that markdown won't strip
+  const replyText = `\u00A0\n\n> **${note.author_fullname}:**\n${quotedContent}`
+  notesData.value = { ...notesData.value, content: replyText }
+  notesFormRef.value?.scrollToAndFocus('content', 'start')
+}
+
 const notesOptions = computed<OvFormOptions>(() => ({
   fields: [
     {
@@ -253,6 +280,15 @@ const notesOptions = computed<OvFormOptions>(() => ({
       label: 'comment',
       minHeight: '200px',
       maxHeight: '200px',
+      toolbar: [
+        'bold',
+        'italic',
+        'heading1',
+        'heading2',
+        'bulletList',
+        'orderedList',
+        'blockquote',
+      ],
     },
     {
       type: 'file',
@@ -275,3 +311,17 @@ const showDialog = (title: string, content: string) => {
   dialogVisible.value = true
 }
 </script>
+
+<style scoped>
+.markdown-content :deep(blockquote) {
+  border-left: 3px solid rgba(var(--v-theme-primary), 0.5);
+  margin: 0.5rem 0;
+  padding-left: 1rem;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  font-style: italic;
+}
+
+.markdown-content :deep(blockquote p) {
+  margin: 0;
+}
+</style>
