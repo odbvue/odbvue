@@ -282,18 +282,27 @@ tune_memory() {
     sudo sysctl -q vm.vfs_cache_pressure=50
 }
 
-install_nginx() {
-    if rpm -q nginx &>/dev/null; then
-        log_success "nginx already installed, skipping..."
+install_packages() {
+    local packages=("nginx" "rsync")
+    local to_install=()
+
+    for pkg in "${packages[@]}"; do
+        if ! rpm -q "$pkg" &>/dev/null; then
+            to_install+=("$pkg")
+        fi
+    done
+
+    if [[ ${#to_install[@]} -eq 0 ]]; then
+        log_success "All packages already installed (nginx, rsync)"
         return 0
     fi
 
-    log_info "Installing nginx (this may take a few minutes)..."
-    sudo dnf install -y --setopt=install_weak_deps=False --setopt=keepcache=0 nginx || {
-        log_error "Failed to install nginx. Check network/dnf configuration."
+    log_info "Installing ${to_install[*]} (this may take a few minutes)..."
+    sudo dnf install -y --setopt=install_weak_deps=False --setopt=keepcache=0 "${to_install[@]}" || {
+        log_error "Failed to install packages. Check network/dnf configuration."
         exit 1
     }
-    log_success "nginx installed"
+    log_success "Packages installed: ${to_install[*]}"
 }
 
 configure_firewall() {
@@ -316,7 +325,7 @@ main() {
 
     ensure_swap
     tune_memory
-    install_nginx
+    install_packages
     configure_firewall
 
     check_local_files
