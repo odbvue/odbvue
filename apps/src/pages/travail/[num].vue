@@ -37,6 +37,7 @@
               class="mt-2"
               variant="text"
               size="small"
+              v-if="note.content"
               @click="replyToNote(note)"
               prepend-icon="$mdiReply"
             >
@@ -255,7 +256,12 @@ const notesFormRef = ref<{
   scrollToAndFocus: (name: string, position?: 'start' | 'end' | number) => void
 } | null>(null)
 
-const replyToNote = (note: { content: string; author_fullname: string }) => {
+const replyToNote = (note: { content: string | null; author_fullname: string }) => {
+  if (!note.content) {
+    // If there's no content, just focus the editor
+    notesFormRef.value?.scrollToAndFocus('content', 'start')
+    return
+  }
   const quotedContent = note.content
     .split('\n')
     .map((line) => `> ${line}`)
