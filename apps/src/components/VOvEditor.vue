@@ -1,5 +1,6 @@
 <template>
   <div
+    ref="editorRoot"
     class="v-input v-input--horizontal v-input--density-default v-ov-editor"
     :class="{ 'v-input--disabled': props.disabled }"
   >
@@ -70,6 +71,7 @@ defineOptions({
 
 const model = defineModel({ type: String, default: '' })
 const isFocused = ref(false)
+const editorRoot = ref<HTMLElement | null>(null)
 
 const turndown = new TurndownService()
 const markdownIt = new MarkdownIt()
@@ -236,6 +238,12 @@ const buttonConfig: Record<string, ToolbarButton> = {
     action: (editor) => editor.chain().focus().toggleHeading({ level: 3 }).run(),
     isActive: (editor) => editor.isActive('heading', { level: 3 }),
   },
+  blockquote: {
+    id: 'blockquote',
+    icon: '$mdiFormatQuoteClose',
+    action: (editor) => editor.chain().focus().toggleBlockquote().run(),
+    isActive: (editor) => editor.isActive('blockquote'),
+  },
 }
 
 const editor = useEditor({
@@ -295,8 +303,20 @@ onBeforeUnmount(() => {
   }
 })
 
+const focus = (position: 'start' | 'end' | number = 'end') => {
+  if (editor.value) {
+    editor.value.commands.focus(position)
+  } else if (editorRoot.value) {
+    const proseMirror = editorRoot.value.querySelector('.ProseMirror') as HTMLElement
+    if (proseMirror) {
+      proseMirror.focus()
+    }
+  }
+}
+
 defineExpose({
   editor,
+  focus,
   getMarkdown: () => turndown.turndown(editor.value?.getHTML() || ''),
   getHTML: () => pretty(editor.value?.getHTML() || ''),
 })
@@ -315,5 +335,17 @@ defineExpose({
 :deep(.ProseMirror) ul,
 :deep(.ProseMirror) ol {
   padding-left: 1.5rem;
+}
+
+:deep(.ProseMirror) blockquote {
+  border-left: 3px solid rgba(var(--v-theme-primary), 0.5);
+  margin: 0.5rem 0;
+  padding-left: 1rem;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  font-style: italic;
+}
+
+:deep(.ProseMirror) blockquote p {
+  margin: 0;
 }
 </style>
