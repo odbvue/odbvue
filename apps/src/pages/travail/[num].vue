@@ -228,6 +228,7 @@ const mdToHtml = (md: string): string => {
 
 const saveNotes = async (notes: OvFormData) => {
   await travail.postNote(notes)
+  notesData.value = {}
 }
 
 const handleNotesAction = async (action: string, data: OvFormData) => {

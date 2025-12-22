@@ -125,8 +125,13 @@ const emits = defineEmits<{
 watch(
   () => data,
   (newData: OvFormData | undefined) => {
-    if (newData && Object.keys(newData).length) {
-      values.value = { ...values.value, ...newData }
+    if (newData) {
+      if (Object.keys(newData).length) {
+        values.value = { ...values.value, ...newData }
+      } else {
+        // Reset all values to their defaults when empty object is passed
+        values.value = {}
+      }
     }
   },
   { deep: true },
