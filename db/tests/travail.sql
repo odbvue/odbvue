@@ -141,16 +141,11 @@ CREATE INDEX idx_tra_notes_created ON tra_notes(created);
 
 CREATE TABLE tra_acls (
     board VARCHAR2(32 CHAR) NOT NULL,
-    role VARCHAR2(32 CHAR),
-    uuid CHAR(32 CHAR),
-    CONSTRAINT cpk_tra_acls PRIMARY KEY (board, role, uuid),
+    role VARCHAR2(32 CHAR) NOT NULL,
+    CONSTRAINT cpk_tra_acls PRIMARY KEY (board, role),
     CONSTRAINT cfk_tra_acls_board FOREIGN KEY (board) REFERENCES tra_boards(key) ON DELETE CASCADE,
-    CONSTRAINT cfk_tra_acls_role FOREIGN KEY (role) REFERENCES app_roles(role) ON DELETE CASCADE,
-    CONSTRAINT cfk_tra_acls_uuid FOREIGN KEY (uuid) REFERENCES app_users(uuid) ON DELETE CASCADE
+    CONSTRAINT cfk_tra_acls_role FOREIGN KEY (role) REFERENCES app_roles(role) ON DELETE CASCADE
 );
-
-CREATE INDEX idx_tra_acls_role ON tra_acls(role);
-CREATE INDEX idx_tra_acls_uuid ON tra_acls(uuid);
 /
 
 drop procedure prc_drop_table_if_exists;

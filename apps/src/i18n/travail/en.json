@@ -32,5 +32,8 @@
   "invalid.json": "Invalid json",
   "num": "Num",
   "archived": "Archived",
-  "archive": "Archive"
+  "archive": "Archive",
+  "board": "Board",
+  "user": "User",
+  "already.exists": "Already exists"
 }

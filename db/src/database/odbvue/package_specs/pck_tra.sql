@@ -75,14 +75,16 @@ CREATE OR REPLACE PACKAGE odbvue.pck_tra AS
         r_acls   OUT SYS_REFCURSOR -- Resulting ACL list
     );
 
-    PROCEDURE post_acl ( -- Method to create or update an ACL
-        p_data   CLOB, -- ACL data in JSON format
+    PROCEDURE post_acl_add ( -- Method to create or update an ACL
+        p_board  VARCHAR2, -- Board key
+        p_role   VARCHAR2, -- Role name
         r_error  OUT VARCHAR2, -- Error message if any
         r_errors OUT SYS_REFCURSOR -- Resulting errors if any
     );
 
-    PROCEDURE delete_acl (
-        p_data   CLOB, -- ACL data in JSON format
+    PROCEDURE post_acl_remove ( -- Method to remove an ACL
+        p_board  VARCHAR2, -- Board key
+        p_role   VARCHAR2, -- Role name
         r_error  OUT VARCHAR2, -- Error message if any
         r_errors OUT SYS_REFCURSOR -- Resulting errors if any
     );
@@ -91,4 +93,4 @@ END pck_tra;
 /
 
 
--- sqlcl_snapshot {"hash":"c434aebc27e4bef57f011ca9ec0aa4f74084715f","type":"PACKAGE_SPEC","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"d51e18f8aa853bbc1726f7091369fd6729244617","type":"PACKAGE_SPEC","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}

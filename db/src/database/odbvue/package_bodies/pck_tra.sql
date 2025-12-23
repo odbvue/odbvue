@@ -215,14 +215,54 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
                                               LEFT JOIN tra_links  l ON t.id = l.child_id
                                               LEFT JOIN tra_tasks  pt ON l.parent_id = pt.id
                          WHERE 
+                -- check if user has access to the board
+                             ( NOT EXISTS (
+                                 SELECT
+                                     1
+                                 FROM
+                                     tra_acls a
+                                 WHERE
+                                     a.board = t.key
+                             )
+                                   OR EXISTS (
+                                 SELECT
+                                     1
+                                 FROM
+                                     tra_acls a
+                                 WHERE
+                                         a.board = t.key
+                                     AND a.role IN (
+                                         SELECT
+                                             r.role
+                                         FROM
+                                             app_roles r
+                                         WHERE
+                                             r.id IN (
+                                                 SELECT
+                                                     id_role
+                                                 FROM
+                                                     app_permissions
+                                                 WHERE
+                                                     id_user = (
+                                                         SELECT
+                                                             id
+                                                         FROM
+                                                             app_users
+                                                         WHERE
+                                                             uuid = v_uuid
+                                                     )
+                                             )
+                                     )
+                             ) )
+                             AND
                 -- Search by title or description
-                             ( v_search IS NULL
-                               OR t.num LIKE '%'
-                               || upper(v_search)
-                               || '%'
-                                  OR upper(t.title) LIKE '%'
-                                                         || upper(v_search)
-                                                         || '%' )
+                              ( v_search IS NULL
+                                   OR t.num LIKE '%'
+                                   || upper(v_search)
+                                   || '%'
+                                      OR upper(t.title) LIKE '%'
+                                                             || upper(v_search)
+                                                             || '%' )
                              AND
                -- include archived or not
                               ( NOT JSON_EXISTS ( v_filter, '$.archived' )
@@ -908,65 +948,100 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
             RETURN;
         END IF;
         OPEN r_acls FOR SELECT
-                                            a.board AS "key",
+                                            a.board AS "board",
                                             b.title AS "title",
-                                            a.uuid  AS "uuid",
-                                            u.fullname
-                                            || ' ('
-                                            || lower(u.username)
-                                            || ')'  AS "user",
                                             a.role  AS "role"
                                         FROM
                                                  tra_acls a
                                             JOIN tra_boards b ON a.board = b.key
-                                            LEFT JOIN app_users  u ON a.uuid = u.uuid
                         WHERE 
-                -- search by board key or title
+                -- search by board key or title OR role
                             ( v_search IS NULL
                               OR b.title LIKE '%'
                               || upper(v_search)
                               || '%'
                                  OR b.key LIKE '%'
-                                               || upper(v_search)
-                                               || '%' )
+                              || upper(v_search)
+                              || '%'
+                                 OR a.role LIKE '%'
+                                                || upper(v_search)
+                                                || '%' )
                         ORDER BY
                             a.board
                         OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY;
 
     END get_acls;
 
-    PROCEDURE post_acl (
-        p_data   CLOB,
+    PROCEDURE post_acl_add (
+        p_board  VARCHAR2,
+        p_role   VARCHAR2,
         r_error  OUT VARCHAR2,
         r_errors OUT SYS_REFCURSOR
     ) AS
-
-        v_uuid CHAR(32 CHAR) := pck_api_auth.uuid;
-        v_data CLOB := utl_url.unescape(coalesce(p_data, '{}'));
+        v_uuid  CHAR(32 CHAR) := pck_api_auth.uuid;
+        v_count PLS_INTEGER;
     BEGIN
         IF v_uuid IS NULL THEN
             pck_api_auth.http_401;
             RETURN;
         END IF;
-    END post_acl;
+        SELECT
+            COUNT(*)
+        INTO v_count
+        FROM
+            tra_acls
+        WHERE
+                board = p_board
+            AND role = p_role;
 
-    PROCEDURE delete_acl (
-        p_data   CLOB,
+        IF v_count > 0 THEN
+            pck_api_audit.errors(r_errors, 'role', 'already.exists');
+            RETURN;
+        END IF;
+
+        INSERT INTO tra_acls (
+            board,
+            role
+        ) VALUES ( p_board,
+                   p_role );
+
+        COMMIT;
+        pck_api_audit.info('Travail',
+                           pck_api_audit.attributes('board', p_board, 'role', p_role, 'uuid',
+                                                    v_uuid));
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            ROLLBACK;
+            pck_api_audit.error('Travail',
+                                pck_api_audit.attributes('board', p_board, 'role', p_role, 'uuid',
+                                                         v_uuid));
+
+            r_error := 'something.went.wrong';
+    END post_acl_add;
+
+    PROCEDURE post_acl_remove (
+        p_board  VARCHAR2,
+        p_role   VARCHAR2,
         r_error  OUT VARCHAR2,
         r_errors OUT SYS_REFCURSOR
     ) AS
-
         v_uuid CHAR(32 CHAR) := pck_api_auth.uuid;
-        v_data CLOB := utl_url.unescape(coalesce(p_data, '{}'));
     BEGIN
         IF v_uuid IS NULL THEN
             pck_api_auth.http_401;
             RETURN;
         END IF;
-    END delete_acl;
+        DELETE FROM tra_acls
+        WHERE
+                board = p_board
+            AND role = p_role;
+
+        COMMIT;
+    END post_acl_remove;
 
 END pck_tra;
 /
 
 
--- sqlcl_snapshot {"hash":"bd8badf325f80e6b363c1482d550ef944d6168b9","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"0349adfce535f91b0ea7a2cb1efd3093f96c0399","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}

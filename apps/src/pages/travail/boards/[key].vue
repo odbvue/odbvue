@@ -6,6 +6,7 @@
     @submit="save"
     @cancel="cancel"
   />
+  <travail-board-acls v-if="!isNew" :board-key="key" />
 </template>
 
 <script setup lang="ts">
@@ -26,6 +27,7 @@ const key = param('key')
 const isNew = computed(() => key.value === 'new')
 
 import { useTravailStore } from '../travail'
+import TravailBoardAcls from '../_components/TravailBoardAcls.vue'
 const travail = useTravailStore()
 
 type BoardSettings = {
