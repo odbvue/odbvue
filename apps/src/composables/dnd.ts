@@ -16,12 +16,10 @@ export function useHtml5DragDrop<Payload, DropKey extends string = string>(
   const dragEnterCounts = reactive<Record<string, number>>({})
 
   // Default styles (theme-aware via Vuetify CSS variables when present)
-  const dndCardBaseStyle: CSSProperties = {
-    cursor: 'grab',
-  }
+  // Note: cursor is handled via CSS classes (.ov-dnd-card) for immediate responsiveness
+  const dndCardBaseStyle: CSSProperties = {}
 
   const dndCardDraggingStyle: CSSProperties = {
-    cursor: 'grabbing',
     opacity: 0.85,
   }
 
@@ -44,10 +42,10 @@ export function useHtml5DragDrop<Payload, DropKey extends string = string>(
   }
 
   const startDrag = (payload: Payload, event: DragEvent) => {
-    draggingPayload.value = payload
-
     const dt = event.dataTransfer
     if (!dt) return
+
+    draggingPayload.value = payload
 
     dt.effectAllowed = 'move'
 
