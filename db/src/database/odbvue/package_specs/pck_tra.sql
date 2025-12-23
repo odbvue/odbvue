@@ -27,6 +27,12 @@ CREATE OR REPLACE PACKAGE odbvue.pck_tra AS
         r_errors OUT SYS_REFCURSOR -- Resulting errors if any
     );
 
+    PROCEDURE post_archive ( -- Method to archive a task
+        p_key    IN VARCHAR2, -- Task identifier
+        r_error  OUT VARCHAR2, -- Error message if any
+        r_errors OUT SYS_REFCURSOR -- Resulting errors if any
+    );
+
     PROCEDURE get_assignees ( -- Method to get list of assignees
         p_filter    IN VARCHAR2 DEFAULT NULL, -- Filter in URL encoded JSON format
         p_search    IN VARCHAR2 DEFAULT NULL, -- Search string
@@ -65,4 +71,4 @@ END pck_tra;
 /
 
 
--- sqlcl_snapshot {"hash":"fe51f1f211c5c7f8fef23aaec1b85d574fef9e95","type":"PACKAGE_SPEC","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"dd6b4b067507399146a0f6d4e4c6878fcd1b4dd1","type":"PACKAGE_SPEC","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}

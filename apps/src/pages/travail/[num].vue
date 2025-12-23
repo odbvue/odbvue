@@ -122,7 +122,7 @@ const travail = useTravailStore()
 
 onMounted(async () => {
   if (num.value && num.value !== 'new-task') {
-    const task = travail.tasks.find((t) => t.num === num.value)
+    const task = await travail.getTask(num.value)
     taskData.value = task || {}
     await travail.fetchNotesPage(num.value, 1)
   }
@@ -222,6 +222,12 @@ const taskOptions = computed<OvFormOptions>(() => ({
       label: 'assignee',
       clearable: true,
       fetchItems: (search: string) => travail.getAssignees(search),
+    },
+    {
+      type: 'date',
+      name: 'archived',
+      label: 'archived',
+      clearable: true,
     },
   ],
   errors: errors.value,

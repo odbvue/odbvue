@@ -107,6 +107,11 @@
             >
               {{ statusTitleByValue[task.status] || task.status }}
               <v-speed-dial activator="parent" location="top left">
+                <v-btn key="-1" color="secondary" @click="travail.postTaskArchive(task.num)">
+                  {{ t('archive') }}
+                </v-btn>
+                <v-spacer key="-2"></v-spacer>
+                <v-spacer key="-3"></v-spacer>
                 <v-btn
                   v-for="s in travail.statuses"
                   :key="s.value"

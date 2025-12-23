@@ -187,9 +187,10 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
                                                           )
                                                   )
                                               AS "{}due_details",
-                                              t.reminder                                   AS "reminder",
-                                              t.started                                    AS "started",
-                                              t.completed                                  AS "completed",
+                                              to_char(t.reminder, 'YYYY-MM-DD')            AS "reminder",
+                                              to_char(t.started, 'YYYY-MM-DD')             AS "started",
+                                              to_char(t.completed, 'YYYY-MM-DD')           AS "completed",
+                                              to_char(t.archived, 'YYYY-MM-DD')            AS "archived",
                                               t.status                                     AS "status",
                                               t.priority                                   AS "priority",
                                               t.estimated                                  AS "estimated",
@@ -214,9 +215,36 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
                                               LEFT JOIN tra_links  l ON t.id = l.child_id
                                               LEFT JOIN tra_tasks  pt ON l.parent_id = pt.id
                          WHERE 
+                -- Search by title or description
+                             ( v_search IS NULL
+                               OR t.num LIKE '%'
+                               || upper(v_search)
+                               || '%'
+                                  OR upper(t.title) LIKE '%'
+                                                         || upper(v_search)
+                                                         || '%' )
+                             AND
+               -- include archived or not
+                              ( NOT JSON_EXISTS ( v_filter, '$.archived' )
+                                       AND t.archived IS NULL
+                                       OR EXISTS (
+                                 SELECT
+                                     1
+                                 FROM
+                                         JSON_TABLE ( JSON_QUERY(v_filter, '$.archived'), '$[*]'
+                                             COLUMNS (
+                                                 value VARCHAR2 ( 100 ) PATH '$'
+                                             )
+                                         )
+                                     j
+                                 WHERE
+                                     t.archived IS NOT NULL
+                                     OR j.value = 'true'
+                             ) )
+                             AND
                 -- search by key
-                             ( NOT JSON_EXISTS ( v_filter, '$.key' )
-                                   OR EXISTS (
+                              ( NOT JSON_EXISTS ( v_filter, '$.key' )
+                                       OR EXISTS (
                                  SELECT
                                      1
                                  FROM
@@ -273,6 +301,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
             JSON_VALUE(v_data, '$.estimated'),
             0
         ) );
+        v_archived    tra_tasks.archived%TYPE := ts(JSON_VALUE(v_data, '$.archived'));
     BEGIN
         IF v_uuid IS NULL THEN
             pck_api_auth.http_401;
@@ -310,6 +339,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
             title = v_title,
             description = v_description,
             due = v_due,
+            archived = v_archived,
             status = v_status,
             priority = v_priority,
             estimated = v_estimeated,
@@ -325,6 +355,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
                 title,
                 description,
                 due,
+                archived,
                 status,
                 priority,
                 estimated,
@@ -334,6 +365,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
                        v_title,
                        v_description,
                        v_due,
+                       v_archived,
                        v_status,
                        v_priority,
                        v_estimeated,
@@ -378,6 +410,40 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
 
             r_error := 'something.went.wrong';
     END post_task;
+
+    PROCEDURE post_archive (
+        p_key    IN VARCHAR2,
+        r_error  OUT VARCHAR2,
+        r_errors OUT SYS_REFCURSOR
+    ) AS
+
+        v_uuid CHAR(32 CHAR) := pck_api_auth.uuid;
+        v_num  tra_tasks.num%TYPE := upper(trim(p_key));
+    BEGIN
+        IF v_uuid IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+        UPDATE tra_tasks
+        SET
+            archived = systimestamp,
+            editor = v_uuid,
+            modified = systimestamp
+        WHERE
+            num = v_num;
+
+        COMMIT;
+        pck_api_audit.info('Travail',
+                           pck_api_audit.attributes('num', v_num, 'uuid', v_uuid));
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            ROLLBACK;
+            pck_api_audit.error('Travail',
+                                pck_api_audit.attributes('num', v_num, 'uuid', v_uuid));
+
+            r_error := 'something.went.wrong';
+    END post_archive;
 
     PROCEDURE get_assignees (
         p_filter    IN VARCHAR2 DEFAULT NULL,
@@ -829,4 +895,4 @@ END pck_tra;
 /
 
 
--- sqlcl_snapshot {"hash":"4f81b6a34f6e548d19a6fb5f3b5c51d510bb179f","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"24a07174ae8198a19fda14378a26b870bf7d742f","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
