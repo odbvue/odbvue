@@ -65,6 +65,7 @@ export const useTravailStore = defineStore(
       reminder?: string
       started?: string
       completed?: string
+      archived?: string
 
       status: string
       priority?: string
@@ -99,7 +100,7 @@ export const useTravailStore = defineStore(
       value: string
     }
 
-    const viewModes = ['board', 'calendar'] as const
+    const viewModes = ['board', 'calendar', 'list'] as const
     const viewMode = ref('board')
 
     const boards = ref<Board[]>([])
@@ -176,6 +177,18 @@ export const useTravailStore = defineStore(
       await init()
     }
 
+    const getTask = async (num: string) => {
+      const { data } = await http.get<{ tasks: Task[] }>('tra/tasks/', {
+        params: {
+          search: '',
+          filter: JSON.stringify({ num: [num], archived: ['true'] }),
+          offset: 0,
+          limit: 1,
+        },
+      })
+      return data?.tasks[0] || null
+    }
+
     const getTasks = async (
       search?: string,
       filter?: string,
@@ -211,6 +224,13 @@ export const useTravailStore = defineStore(
       return await http.post<PostTaskResponse>('tra/task/', {
         data: encodeURIComponent(JSON.stringify(normalizedTask)),
       })
+    }
+
+    const postTaskArchive = async (num: string) => {
+      startLoading()
+      await http.post<PostTaskResponse>('tra/archive/', { key: num })
+      tasks.value = tasks.value.filter((t) => t.num !== num)
+      stopLoading()
     }
 
     const postTaskStatus = async (num: string, status: string) => {
@@ -374,9 +394,11 @@ export const useTravailStore = defineStore(
       postTaskStatus,
       postTaskRank,
       postTaskMove,
+      postTaskArchive,
       taskDetails,
       getAssignees,
       init,
+      getTask,
       getTasks,
       tasks,
       boardFilters,

@@ -21,11 +21,19 @@
           <v-btn size="small" value="calendar" :title="t('calendar-view')">
             <v-icon>$mdiCalendarMonth</v-icon>
           </v-btn>
+          <v-btn size="small" value="list" :title="t('list-view')">
+            <v-icon>$mdiViewList</v-icon>
+          </v-btn>
         </v-btn-toggle>
       </v-col>
     </v-row>
     <TravailBoardView v-if="travail.viewMode === 'board'" :travail="travail" />
-    <TravailCalendarView v-else :travail="travail" @openTask="openTask" />
+    <TravailCalendarView
+      v-else-if="travail.viewMode === 'calendar'"
+      :travail="travail"
+      @openTask="openTask"
+    />
+    <TravailListView v-else />
   </v-container>
 </template>
 
@@ -44,6 +52,7 @@ definePage({
 import { useTravailStore } from './travail.ts'
 import TravailBoardView from './_components/TravailBoardView.vue'
 import TravailCalendarView from './_components/TravailCalendarView.vue'
+import TravailListView from './_components/TravailListView.vue'
 const travail = useTravailStore()
 const { t } = useI18n()
 const router = useRouter()

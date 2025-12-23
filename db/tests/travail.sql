@@ -65,6 +65,7 @@ CREATE TABLE tra_tasks (
     reminder TIMESTAMP,
     started TIMESTAMP,
     completed TIMESTAMP,
+    archived TIMESTAMP,
     
     status VARCHAR2(30 CHAR),
     priority VARCHAR2(30 CHAR),
@@ -96,6 +97,7 @@ CREATE INDEX idx_tra_tasks_started ON tra_tasks(started);
 CREATE INDEX idx_tra_tasks_completed ON tra_tasks(completed);
 CREATE INDEX idx_tra_tasks_author ON tra_tasks(author);
 CREATE INDEX idx_tra_tasks_created ON tra_tasks(created);
+CREATE INDEX idx_tra_tasks_archived ON tra_tasks(archived);
 / 
 
 CREATE TABLE tra_ranks(

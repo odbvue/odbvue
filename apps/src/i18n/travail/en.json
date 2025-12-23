@@ -22,11 +22,15 @@
   "Done": "Done",
   "board-view": "Board-view",
   "calendar-view": "Calendar-view",
+  "list-view": "List-view",
   "today": "Today",
   "key": "Key",
   "title": "Title",
   "description": "Description",
   "settingsText": "SettingsText",
   "settings": "Settings",
-  "invalid.json": "Invalid json"
+  "invalid.json": "Invalid json",
+  "num": "Num",
+  "archived": "Archived",
+  "archive": "Archive"
 }
