@@ -67,8 +67,28 @@ CREATE OR REPLACE PACKAGE odbvue.pck_tra AS
         p_after  IN VARCHAR2
     );
 
+    PROCEDURE get_acls (
+        p_filter IN VARCHAR2 DEFAULT NULL, -- Filter in URL encoded JSON format
+        p_search IN VARCHAR2 DEFAULT NULL, -- Search string
+        p_offset IN PLS_INTEGER DEFAULT 0, -- Offset for pagination
+        p_limit  IN PLS_INTEGER DEFAULT 10, -- Limit for pagination
+        r_acls   OUT SYS_REFCURSOR -- Resulting ACL list
+    );
+
+    PROCEDURE post_acl ( -- Method to create or update an ACL
+        p_data   CLOB, -- ACL data in JSON format
+        r_error  OUT VARCHAR2, -- Error message if any
+        r_errors OUT SYS_REFCURSOR -- Resulting errors if any
+    );
+
+    PROCEDURE delete_acl (
+        p_data   CLOB, -- ACL data in JSON format
+        r_error  OUT VARCHAR2, -- Error message if any
+        r_errors OUT SYS_REFCURSOR -- Resulting errors if any
+    );
+
 END pck_tra;
 /
 
 
--- sqlcl_snapshot {"hash":"dd6b4b067507399146a0f6d4e4c6878fcd1b4dd1","type":"PACKAGE_SPEC","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"c434aebc27e4bef57f011ca9ec0aa4f74084715f","type":"PACKAGE_SPEC","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}

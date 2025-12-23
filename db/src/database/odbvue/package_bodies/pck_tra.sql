@@ -891,8 +891,82 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
             pck_api_auth.http(400, 'something.went.wrong');
     END post_rank;
 
+    PROCEDURE get_acls (
+        p_filter IN VARCHAR2 DEFAULT NULL,
+        p_search IN VARCHAR2 DEFAULT NULL,
+        p_offset IN PLS_INTEGER DEFAULT 0,
+        p_limit  IN PLS_INTEGER DEFAULT 10,
+        r_acls   OUT SYS_REFCURSOR
+    ) AS
+
+        v_uuid   CHAR(32 CHAR) := pck_api_auth.uuid;
+        v_search VARCHAR2(2000 CHAR) := utl_url.unescape(coalesce(p_search, ''));
+        v_filter VARCHAR2(2000 CHAR) := utl_url.unescape(coalesce(p_filter, '{}'));
+    BEGIN
+        IF v_uuid IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+        OPEN r_acls FOR SELECT
+                                            a.board AS "key",
+                                            b.title AS "title",
+                                            a.uuid  AS "uuid",
+                                            u.fullname
+                                            || ' ('
+                                            || lower(u.username)
+                                            || ')'  AS "user",
+                                            a.role  AS "role"
+                                        FROM
+                                                 tra_acls a
+                                            JOIN tra_boards b ON a.board = b.key
+                                            LEFT JOIN app_users  u ON a.uuid = u.uuid
+                        WHERE 
+                -- search by board key or title
+                            ( v_search IS NULL
+                              OR b.title LIKE '%'
+                              || upper(v_search)
+                              || '%'
+                                 OR b.key LIKE '%'
+                                               || upper(v_search)
+                                               || '%' )
+                        ORDER BY
+                            a.board
+                        OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY;
+
+    END get_acls;
+
+    PROCEDURE post_acl (
+        p_data   CLOB,
+        r_error  OUT VARCHAR2,
+        r_errors OUT SYS_REFCURSOR
+    ) AS
+
+        v_uuid CHAR(32 CHAR) := pck_api_auth.uuid;
+        v_data CLOB := utl_url.unescape(coalesce(p_data, '{}'));
+    BEGIN
+        IF v_uuid IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+    END post_acl;
+
+    PROCEDURE delete_acl (
+        p_data   CLOB,
+        r_error  OUT VARCHAR2,
+        r_errors OUT SYS_REFCURSOR
+    ) AS
+
+        v_uuid CHAR(32 CHAR) := pck_api_auth.uuid;
+        v_data CLOB := utl_url.unescape(coalesce(p_data, '{}'));
+    BEGIN
+        IF v_uuid IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+    END delete_acl;
+
 END pck_tra;
 /
 
 
--- sqlcl_snapshot {"hash":"24a07174ae8198a19fda14378a26b870bf7d742f","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"bd8badf325f80e6b363c1482d550ef944d6168b9","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}

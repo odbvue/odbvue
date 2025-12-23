@@ -160,10 +160,21 @@ export const useTravailStore = defineStore(
       offset: number = 0,
       limit: number = 10,
     ) => {
+      startLoading()
       const { data } = await http.get<{ boards: Board[] }>('tra/boards/', {
         params: { filter, search, offset, limit },
       })
+      stopLoading()
       boards.value = data?.boards || []
+    }
+
+    const getBoard = async (boardKey: string) => {
+      startLoading()
+      const { data } = await http.get<{ boards: Board[] }>('tra/boards/', {
+        params: { search: '', filter: `{"key": ["${boardKey}"]}`, offset: 0, limit: 1 },
+      })
+      stopLoading()
+      return data?.boards[0] || null
     }
 
     const postBoard = async (board: OvFormData) => {
@@ -386,6 +397,7 @@ export const useTravailStore = defineStore(
       boards,
       board,
       getBoards,
+      getBoard,
       statuses,
       priorities,
       postBoard,
