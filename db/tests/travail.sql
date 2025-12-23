@@ -13,6 +13,7 @@ END;
 /    
 
 begin
+    prc_drop_table_if_exists('tra_acls');
     prc_drop_table_if_exists('tra_notes');
     prc_drop_table_if_exists('tra_links');
     prc_drop_table_if_exists('tra_ranks');
@@ -136,6 +137,15 @@ CREATE TABLE tra_notes (
 CREATE INDEX idx_tra_notes_task_id ON tra_notes(task_id);
 CREATE INDEX idx_tra_notes_storage_id ON tra_notes(storage_id);
 CREATE INDEX idx_tra_notes_created ON tra_notes(created);
+/
+
+CREATE TABLE tra_acls (
+    board VARCHAR2(32 CHAR) NOT NULL,
+    role VARCHAR2(32 CHAR) NOT NULL,
+    CONSTRAINT cpk_tra_acls PRIMARY KEY (board, role),
+    CONSTRAINT cfk_tra_acls_board FOREIGN KEY (board) REFERENCES tra_boards(key) ON DELETE CASCADE,
+    CONSTRAINT cfk_tra_acls_role FOREIGN KEY (role) REFERENCES app_roles(role) ON DELETE CASCADE
+);
 /
 
 drop procedure prc_drop_table_if_exists;

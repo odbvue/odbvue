@@ -254,11 +254,18 @@ declare module 'vue-router/auto-routes' {
       { num: ParamValue<false> },
       | never
     >,
-    '/travail/boards': RouteRecordInfo<
-      '/travail/boards',
+    '/travail/boards/': RouteRecordInfo<
+      '/travail/boards/',
       '/travail/boards',
       Record<never, never>,
       Record<never, never>,
+      | never
+    >,
+    '/travail/boards/[key]': RouteRecordInfo<
+      '/travail/boards/[key]',
+      '/travail/boards/:key',
+      { key: ParamValue<true> },
+      { key: ParamValue<false> },
       | never
     >,
   }
@@ -472,9 +479,15 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
-    'src/pages/travail/boards.vue': {
+    'src/pages/travail/boards/index.vue': {
       routes:
-        | '/travail/boards'
+        | '/travail/boards/'
+      views:
+        | never
+    }
+    'src/pages/travail/boards/[key].vue': {
+      routes:
+        | '/travail/boards/[key]'
       views:
         | never
     }

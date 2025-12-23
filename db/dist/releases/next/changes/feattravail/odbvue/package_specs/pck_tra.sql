@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1766496654646 stripComments:false  logicalFilePath:feattravail\odbvue\package_specs\pck_tra.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_specs/pck_tra.sql:dd6b4b067507399146a0f6d4e4c6878fcd1b4dd1:d51e18f8aa853bbc1726f7091369fd6729244617:alter
+
 CREATE OR REPLACE PACKAGE odbvue.pck_tra AS
     PROCEDURE get_boards ( -- Method to get list of plans
         p_filter IN VARCHAR2 DEFAULT NULL, -- Filter in URL encoded JSON format 
@@ -92,5 +96,3 @@ CREATE OR REPLACE PACKAGE odbvue.pck_tra AS
 END pck_tra;
 /
 
-
--- sqlcl_snapshot {"hash":"d51e18f8aa853bbc1726f7091369fd6729244617","type":"PACKAGE_SPEC","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}

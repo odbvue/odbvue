@@ -48,7 +48,7 @@
         </v-row>
       </v-form>
       <v-overlay :model-value="loading" persistent contained class="align-center justify-center">
-        <v-progress-circular indeterminate />
+        <v-progress-circular indeterminate size="48" />
       </v-overlay>
     </v-container>
   </v-defaults-provider>
