@@ -205,6 +205,13 @@ const taskOptions = computed<OvFormOptions>(() => ({
     },
     {
       type: 'select',
+      name: 'type',
+      label: 'type',
+      items: travail.types,
+      clearable: true,
+    },
+    {
+      type: 'select',
       name: 'status',
       label: 'status',
       items: travail.statuses,

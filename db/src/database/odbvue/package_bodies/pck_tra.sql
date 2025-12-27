@@ -192,6 +192,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
                                               to_char(t.completed, 'YYYY-MM-DD')           AS "completed",
                                               to_char(t.archived, 'YYYY-MM-DD')            AS "archived",
                                               t.status                                     AS "status",
+                                              t.type                                       AS "type",
                                               t.priority                                   AS "priority",
                                               t.estimated                                  AS "estimated",
                                               t.remaining                                  AS "remaining",
@@ -334,6 +335,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
         v_description tra_tasks.description%TYPE := JSON_VALUE(v_data, '$.description');
         v_due         tra_tasks.due%TYPE := ts(JSON_VALUE(v_data, '$.due'));
         v_status      tra_tasks.status%TYPE := JSON_VALUE(v_data, '$.status');
+        v_type        tra_tasks.type%TYPE := JSON_VALUE(v_data, '$.type');
         v_priority    tra_tasks.priority%TYPE := JSON_VALUE(v_data, '$.priority');
         v_assignee    tra_tasks.assignee%TYPE := JSON_VALUE(v_data, '$.assignee');
         v_parent_num  tra_tasks.num%TYPE := upper(trim(JSON_VALUE(v_data, '$.parent')));
@@ -381,6 +383,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
             due = v_due,
             archived = v_archived,
             status = v_status,
+            type = v_type,
             priority = v_priority,
             estimated = v_estimeated,
             assignee = v_assignee,
@@ -397,6 +400,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
                 due,
                 archived,
                 status,
+                type,
                 priority,
                 estimated,
                 assignee,
@@ -407,6 +411,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
                        v_due,
                        v_archived,
                        v_status,
+                       v_type,
                        v_priority,
                        v_estimeated,
                        v_assignee,
@@ -1044,4 +1049,4 @@ END pck_tra;
 /
 
 
--- sqlcl_snapshot {"hash":"0349adfce535f91b0ea7a2cb1efd3093f96c0399","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"34d41415b6aa3ce786d57602346e8a53d4df6da2","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
