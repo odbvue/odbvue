@@ -35,5 +35,6 @@
   "archive": "Archive",
   "board": "Board",
   "user": "User",
-  "already.exists": "Already exists"
+  "already.exists": "Already exists",
+  "type": "Type"
 }

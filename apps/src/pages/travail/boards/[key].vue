@@ -27,7 +27,7 @@ const key = param('key')
 const isNew = computed(() => key.value === 'new')
 
 import { useTravailStore } from '../travail'
-import TravailBoardAcls from '../_components/TravailBoardAcls.vue'
+import TravailBoardAcls from './_components/TravailBoardAcls.vue'
 const travail = useTravailStore()
 
 type BoardSettings = {

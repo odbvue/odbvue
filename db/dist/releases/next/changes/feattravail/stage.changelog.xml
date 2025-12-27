@@ -3,6 +3,7 @@
                    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
-<!--CHANGES-->
-<include file="changes/feattravail/stage.changelog.xml" relativeToChangelogFile="true"/>
+<include file="_custom/010_travail_types.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_tra_tasks_type.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_bodies/pck_tra.sql" relativeToChangelogFile="true"/>
 </databaseChangeLog>

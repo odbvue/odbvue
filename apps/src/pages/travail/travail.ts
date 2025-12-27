@@ -37,6 +37,15 @@ export const useTravailStore = defineStore(
             }
           }
         }>
+        types: Array<{
+          value: string
+          title: string
+          attrs: {
+            format: {
+              color: string
+            }
+          }
+        }>
         priorities: Array<{
           value: string
           title: string
@@ -68,6 +77,7 @@ export const useTravailStore = defineStore(
       archived?: string
 
       status: string
+      type?: string
       priority?: string
 
       estimated?: number
@@ -139,6 +149,7 @@ export const useTravailStore = defineStore(
     }
 
     const statuses = computed(() => board.value?.settings.statuses || [])
+    const types = computed(() => board.value?.settings.types || [])
     const priorities = computed(() => board.value?.settings.priorities || [])
 
     const tasks = ref<Task[]>([])
@@ -293,6 +304,12 @@ export const useTravailStore = defineStore(
           color: task.due_details.format.color,
         })
       }
+      if (task.type)
+        result.push({
+          value: types.value.find((t) => t.value === task.type)?.title || task.type,
+          label: 'type',
+          color: types.value.find((t) => t.value === task.type)?.attrs.format.color || '',
+        })
       if (task.priority)
         result.push({
           value: priorities.value.find((p) => p.value === task.priority)?.title || task.priority,
@@ -399,6 +416,7 @@ export const useTravailStore = defineStore(
       getBoards,
       getBoard,
       statuses,
+      types,
       priorities,
       postBoard,
       setActiveBoard,
