@@ -61,9 +61,49 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
                                                 JOIN app_users ua ON b.author = ua.uuid
                                                 LEFT JOIN app_users ue ON b.editor = ue.uuid
                           WHERE
-                -- filter by key 
-                              ( NOT JSON_EXISTS ( v_filter, '$.key' )
+                -- check if user has access to the board
+                              ( NOT EXISTS (
+                                  SELECT
+                                      1
+                                  FROM
+                                      tra_acls a
+                                  WHERE
+                                      a.board = b.key
+                              )
                                     OR EXISTS (
+                                  SELECT
+                                      1
+                                  FROM
+                                      tra_acls a
+                                  WHERE
+                                          a.board = b.key
+                                      AND a.role IN (
+                                          SELECT
+                                              r.role
+                                          FROM
+                                              app_roles r
+                                          WHERE
+                                              r.id IN (
+                                                  SELECT
+                                                      id_role
+                                                  FROM
+                                                      app_permissions
+                                                  WHERE
+                                                      id_user = (
+                                                          SELECT
+                                                              id
+                                                          FROM
+                                                              app_users
+                                                          WHERE
+                                                              uuid = v_uuid
+                                                      )
+                                              )
+                                      )
+                              ) )
+                              AND
+                -- filter by key 
+                               ( NOT JSON_EXISTS ( v_filter, '$.key' )
+                                        OR EXISTS (
                                   SELECT
                                       1
                                   FROM
@@ -1049,4 +1089,4 @@ END pck_tra;
 /
 
 
--- sqlcl_snapshot {"hash":"34d41415b6aa3ce786d57602346e8a53d4df6da2","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"863386f922907140d2ed48b91116e1ce55d45407","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}

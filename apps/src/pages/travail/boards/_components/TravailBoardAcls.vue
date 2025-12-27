@@ -35,7 +35,7 @@ const { action } = useFormAction({
 })
 
 const options = computed<OvTableOptions>(() => ({
-  key: 'board',
+  key: 'role',
   search: { placeholder: 'board' },
   itemsPerPage: 5,
   columns: [
@@ -47,6 +47,7 @@ const options = computed<OvTableOptions>(() => ({
       actions: [
         {
           name: 'remove',
+          key: 'role',
           format: { icon: '$mdiDelete', color: 'error' },
         },
       ],

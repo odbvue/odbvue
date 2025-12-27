@@ -613,8 +613,25 @@ async function handleSortUpdate(sortName: string, sortAction: string) {
 
 // actions
 
+const onActionComplete = (formErrors?: OvFormFieldError[], shouldRefetch?: boolean) => {
+  if (formErrors && formErrors.length > 0) {
+    formOptions.value = {
+      ...(formOptions.value || {}),
+      errors: formErrors,
+    }
+    return
+  }
+
+  if (shouldRefetch) {
+    fetch()
+  } else {
+    localData.value[formRowIndex.value] = formData.value
+  }
+  form.value = false
+}
+
 async function handleFormAction(actionName: string, actionData: OvFormData) {
-  await emits('action', actionName, localData.value, actionData)
+  await emits('action', actionName, localData.value, actionData, onActionComplete)
 }
 
 async function handleFormSubmit(actionData: OvFormData) {
@@ -627,23 +644,6 @@ async function handleFormSubmit(actionData: OvFormData) {
     await fetch(1)
     form.value = false
     return
-  }
-
-  const onActionComplete = (formErrors?: OvFormFieldError[], shouldRefetch?: boolean) => {
-    if (formErrors && formErrors.length > 0) {
-      formOptions.value = {
-        ...(formOptions.value || {}),
-        errors: formErrors,
-      }
-      return
-    }
-
-    if (shouldRefetch) {
-      fetch()
-    } else {
-      localData.value[formRowIndex.value] = actionData
-    }
-    form.value = false
   }
 
   emits('action', formActionName.value, localData.value, actionData, onActionComplete)
@@ -672,7 +672,7 @@ async function handleRowAction(columnName: string, actionName: string, keyValue?
     return
   }
 
-  await emits('action', actionName, localData.value, localData.value[rowIndex])
+  await emits('action', actionName, localData.value, localData.value[rowIndex], onActionComplete)
 }
 
 async function handleTableAction(actionName: string) {
@@ -689,7 +689,7 @@ async function handleTableAction(actionName: string) {
     formRowIndex.value = -1
     formActionName.value = action.name
     form.value = true
-  } else await emits('action', actionName, localData.value, formData.value)
+  } else await emits('action', actionName, localData.value, formData.value, onActionComplete)
 }
 
 async function fetch(newPage?: number) {
