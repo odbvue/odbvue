@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.255
+
+### Patch Changes
+
+- 3651ec1: travail acl & types
+
 ## 0.0.254
 
 ### Patch Changes
