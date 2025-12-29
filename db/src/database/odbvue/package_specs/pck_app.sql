@@ -62,8 +62,14 @@ CREATE OR REPLACE PACKAGE odbvue.pck_app AS -- Package for the main application
         p_data IN CLOB -- Audit data [{severity, message, attributes, created}]
     );
 
+    PROCEDURE post_user ( -- Method to update user profile
+        p_data   CLOB, -- Data (fullname)
+        r_errors OUT SYS_REFCURSOR, -- Errors [{name, message}] (NULL if success)
+        r_error  OUT VARCHAR2 -- Error (NULL if success)
+    );
+
 END pck_app;
 /
 
 
--- sqlcl_snapshot {"hash":"96da94279d8c04982dff57d45a2b92fd1ba8969e","type":"PACKAGE_SPEC","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"93f0c185cc0364a30c6f31c57c3f16c95761eb49","type":"PACKAGE_SPEC","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}

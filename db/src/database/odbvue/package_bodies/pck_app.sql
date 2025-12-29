@@ -81,10 +81,11 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
             RETURN;
         END IF;
         OPEN r_user FOR SELECT
-                                            uuid           AS "uuid",
-                                            username       AS "username",
-                                            fullname       AS "fullname",
-                                            created        AS "created",
+                                            uuid                                    AS "uuid",
+                                            username                                AS "username",
+                                            fullname                                AS "fullname",
+                                            to_char(created, 'YYYY-MM-DD HH24:MI')  AS "created",
+                                            to_char(accessed, 'YYYY-MM-DD HH24:MI') AS "accessed",
                                             coalesce((
                                                 SELECT
                                                     JSON_ARRAYAGG(
@@ -102,7 +103,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
                                                 WHERE
                                                     u.uuid = v_uuid
                                             ),
-                                                     '[]') AS "{}privileges"
+                                                     '[]')                          AS "{}privileges"
                                         FROM
                                             app_users
                         WHERE
@@ -542,6 +543,46 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_app AS
         pck_api_audit.bulk(p_data);
     END post_audit;
 
+    PROCEDURE post_user (
+        p_data   CLOB,
+        r_errors OUT SYS_REFCURSOR,
+        r_error  OUT VARCHAR2
+    ) AS
+
+        v_uuid     app_users.uuid%TYPE := pck_api_auth.uuid;
+        v_fullname app_users.fullname%TYPE := JSON_VALUE(p_data, '$.fullname');
+    BEGIN
+        IF v_uuid IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+        pck_api_validate.validate('fullname',
+                                  v_fullname,
+                                  pck_api_validate.rule('required', NULL, 'full.name.is.required'),
+                                  r_error,
+                                  r_errors);
+
+        IF r_error IS NOT NULL THEN
+            RETURN;
+        END IF;
+        UPDATE app_users
+        SET
+            fullname = v_fullname
+        WHERE
+            uuid = v_uuid;
+
+        COMMIT;
+        pck_api_audit.info('Profile',
+                           pck_api_audit.attributes('uuid', v_uuid, 'fullname', v_fullname));
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            pck_api_audit.error('Profile',
+                                pck_api_audit.attributes('uuid', v_uuid, 'fullname', v_fullname));
+
+            r_error := 'something.went.wrong';
+    END post_user;
+
 BEGIN
     WITH edition AS (
         SELECT
@@ -564,4 +605,4 @@ END pck_app;
 /
 
 
--- sqlcl_snapshot {"hash":"9a8d8ce5e1c9508d29d81a040f0849a925cc8df2","type":"PACKAGE_BODY","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"4779f163216b2ddb715e366fb8422d581ba3a97a","type":"PACKAGE_BODY","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
