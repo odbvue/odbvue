@@ -195,25 +195,33 @@ Manages UI feedback state:
 7. **Confirm Email** (`/confirm-email/[token]`) - Email verification
    - Token validation and account activation
 
-8. **Sandbox** (`/sandbox`) - Development testing
+8. **Profile** (`/profile`) - User profile management
+   - Displays user information in a structured view
+   - Username (read-only)
+   - Fullname with inline edit action
+   - Account creation and last access timestamps
+   - Uses `VOvView` component for displaying user data
+   - API endpoint: `POST /api/app/user/` with data payload containing fullname
+
+9. **Sandbox** (`/sandbox`) - Development testing
    - UI component demonstrations
    - Alert and loading testing
    - Protected routes and features testing
 
-9. **REST API** (`/rest`) - Interactive API documentation
-   - Displays all available API modules with version information
-   - Expandable endpoint panels showing method, path, and description
-   - Parameters documentation with type, location (path/query/header), and required status
-   - Request body schema display
-   - Response codes and schema documentation
-   - "Try it out" functionality with parameter inputs and request body editor
-   - Live API execution with response display
-   - Copy response to clipboard
-   - Security indicator for protected endpoints
+10. **REST API** (`/rest`) - Interactive API documentation
+    - Displays all available API modules with version information
+    - Expandable endpoint panels showing method, path, and description
+    - Parameters documentation with type, location (path/query/header), and required status
+    - Request body schema display
+    - Response codes and schema documentation
+    - "Try it out" functionality with parameter inputs and request body editor
+    - Live API execution with response display
+    - Copy response to clipboard
+    - Security indicator for protected endpoints
 
-10. **Page Not Found** (`/[...path]`) - 404 error page
-   - Fullscreen layout
-   - Navigation back to home
+11. **Page Not Found** (`/[...path]`) - 404 error page
+    - Fullscreen layout
+    - Navigation back to home
 
 ## Accessibility
 

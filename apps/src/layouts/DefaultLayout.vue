@@ -31,7 +31,7 @@
       </v-list>
       <v-divider v-if="app.auth.isAuthenticated" />
       <v-list v-if="app.auth.isAuthenticated">
-        <v-list-item>
+        <v-list-item to="/profile">
           <strong>{{ app.user?.fullname }}</strong>
         </v-list-item>
         <v-list-item link prepend-icon="$mdiLogout" @click="logout()">

@@ -24,6 +24,7 @@ export const useAppStore = defineStore(
         username: string
         fullname: string
         created: string
+        accessed: string
         privileges: {
           role: string
           permission: string
@@ -48,6 +49,7 @@ export const useAppStore = defineStore(
       username: '',
       fullname: '',
       created: '',
+      accessed: '',
       privileges: [] as {
         role: string
         permission: string

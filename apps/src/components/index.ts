@@ -582,6 +582,7 @@ export interface UseFormActionOptions {
   endpoints?: Record<string, string>
   transformPayload?: (actionName: string, payload: OvFormData) => OvFormData
   refetchOn?: string[]
+  onSuccess?: (actionName: string, payload: OvFormData) => void
 }
 
 export interface UseFormActionReturn {
@@ -633,6 +634,9 @@ export function useFormAction(options: UseFormActionOptions): UseFormActionRetur
       if (res?.data && res.data.errors) {
         callback?.(res.data.errors, false)
       } else {
+        if (value) {
+          options.onSuccess?.(name, value)
+        }
         callback?.(undefined, shouldRefetch(name))
       }
     } finally {
