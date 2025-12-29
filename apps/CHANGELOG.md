@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.256
+
+### Patch Changes
+
+- 74e325c: user profile
+
 ## 0.0.255
 
 ### Patch Changes
