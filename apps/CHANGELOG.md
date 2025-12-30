@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.258
+
+### Patch Changes
+
+- f13ef91: travail copy link and auditing
+
 ## 0.0.257
 
 ### Patch Changes
