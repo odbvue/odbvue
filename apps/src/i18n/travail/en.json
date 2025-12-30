@@ -41,5 +41,6 @@
   "duration": "Duration",
   "notes": "Notes",
   "log.work": "Log work",
-  "worklog": "Worklog"
+  "worklog": "Worklog",
+  "invested.effort": "Invested effort"
 }
