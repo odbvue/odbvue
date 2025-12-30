@@ -82,6 +82,9 @@ import {
   type OvFormSelectionField,
   type OvFormSelectItem,
   type OvFormFileField,
+  minutesToDuration,
+  durationToMinutes,
+  isValidDuration,
 } from './index'
 import VOvEditor from './VOvEditor.vue'
 
@@ -123,12 +126,29 @@ const emits = defineEmits<{
   (event: 'change', fieldName: string, value: unknown, allValues: OvFormData): void
 }>()
 
+// Get duration field names for transformation
+const getDurationFieldNames = () =>
+  options.fields.filter((f) => f.type === 'duration').map((f) => f.name)
+
+// Transform incoming numeric values to duration strings for display
+const transformIncomingData = (data: OvFormData): OvFormData => {
+  const result = { ...data }
+  const durationFields = getDurationFieldNames()
+  for (const fieldName of durationFields) {
+    const val = result[fieldName]
+    if (typeof val === 'number') {
+      result[fieldName] = minutesToDuration(val)
+    }
+  }
+  return result
+}
+
 watch(
   () => data,
   (newData: OvFormData | undefined) => {
     if (newData) {
       if (Object.keys(newData).length) {
-        values.value = { ...values.value, ...newData }
+        values.value = { ...values.value, ...transformIncomingData(newData) }
       } else {
         // Reset all values to their defaults when empty object is passed
         values.value = {}
@@ -275,6 +295,7 @@ const fields = computed(() => {
     date: VTextField,
     time: VTextField,
     datetime: VTextField,
+    duration: VTextField,
   }
 
   return (options.fields.filter((field) => !field.hidden) || []).map((field) => {
@@ -287,11 +308,23 @@ const fields = computed(() => {
             ? showPwd.value
               ? 'text'
               : 'password'
-            : field.type,
+            : field.type === 'duration'
+              ? 'text'
+              : field.type,
       label: field.label ? t(field.label) : undefined,
-      placeholder: field.placeholder ? t(field.placeholder) : undefined,
+      placeholder:
+        field.type === 'duration' && !field.placeholder
+          ? '1w 2d 3h 4m'
+          : field.placeholder
+            ? t(field.placeholder)
+            : undefined,
       autocomplete: field.autocomplete || options.autocomplete,
-      hint: field.hint ? t(field.hint) : undefined,
+      hint:
+        field.type === 'duration' && !field.hint
+          ? 'w=40h, d=8h, h=60m'
+          : field.hint
+            ? t(field.hint)
+            : undefined,
       clearable: field.clearable,
       prependIcon: field.prependIcon,
       appendIcon: field.appendIcon,
@@ -406,15 +439,25 @@ const fields = computed(() => {
           .filter((error: OvFormFieldError) => error.name === field.name)
           .map((error: OvFormFieldError) => t(error.message || ''))
       },
-      rules: () =>
-        (field.rules || []).map((rule) => (value: unknown) => {
+      rules: () => {
+        const fieldRules = (field.rules || []).map((rule) => (value: unknown) => {
           let params = rule.params
           // For 'same-as' rule, resolve the field name to its actual value
           if (rule.type === 'same-as' && typeof params === 'string') {
             params = values.value[params]
           }
           return OvRuleValidate(value, rule.type, params, t(rule.message))
-        }),
+        })
+        // Add duration format validation for duration fields
+        if (field.type === 'duration') {
+          fieldRules.push((value: unknown) => {
+            if (!value || (typeof value === 'string' && value.trim() === '')) return true
+            if (typeof value === 'string' && isValidDuration(value)) return true
+            return t('invalid.duration.format') || 'Invalid format. Use: 1w 2d 3h 4m'
+          })
+        }
+        return fieldRules
+      },
     }
   })
 })
@@ -432,6 +475,21 @@ const actions = computed(() => {
 
 const values = ref<OvFormData>({})
 const previousValues = ref<OvFormData>({})
+
+// Transform duration strings back to minutes for emitting
+const getTransformedValues = (): OvFormData => {
+  const result = { ...values.value }
+  const durationFields = getDurationFieldNames()
+  for (const fieldName of durationFields) {
+    const val = result[fieldName]
+    if (typeof val === 'string' && val.trim() !== '') {
+      result[fieldName] = durationToMinutes(val)
+    } else if (val === '' || val === null || val === undefined) {
+      result[fieldName] = null
+    }
+  }
+  return result
+}
 
 watch(
   () => values.value,
@@ -467,7 +525,7 @@ const handleAction = async (actionName: string) => {
       formFocus(errors[0]?.id)
       return
     }
-    await emits('submit', values.value)
+    await emits('submit', getTransformedValues())
     return
   }
 
@@ -475,14 +533,14 @@ const handleAction = async (actionName: string) => {
     const { valid, errors } = await form.value.validate()
     if (!valid) {
       formFocus(errors[0]?.id)
-      await emits('validate', values.value, errors)
+      await emits('validate', getTransformedValues(), errors)
       return
     }
-    await emits('validate', values.value)
+    await emits('validate', getTransformedValues())
     return
   }
 
-  await emits('action', action.name, values.value)
+  await emits('action', action.name, getTransformedValues())
 }
 
 async function handleFieldEnter(fieldName: string) {

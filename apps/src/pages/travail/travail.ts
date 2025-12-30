@@ -1,5 +1,9 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
-import { processFormDataWithFiles, type OvFormFieldError } from '@/components/index.ts'
+import {
+  processFormDataWithFiles,
+  type OvFormFieldError,
+  minutesToDuration,
+} from '@/components/index.ts'
 
 export type PostTaskResponse = {
   error?: string
@@ -317,9 +321,8 @@ export const useTravailStore = defineStore(
           color: priorities.value.find((p) => p.value === task.priority)?.attrs.format.color || '',
         })
       if (task.estimated && task.estimated > 0) {
-        const units = board.value?.settings.units || 'units'
         result.push({
-          value: `${task.estimated} ${units}`,
+          value: minutesToDuration(task.estimated),
           label: 'estimated.effort',
         })
       }

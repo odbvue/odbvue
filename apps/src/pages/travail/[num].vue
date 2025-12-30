@@ -218,7 +218,7 @@ const taskOptions = computed<OvFormOptions>(() => ({
       value: status.value || '',
     },
     {
-      type: 'number',
+      type: 'duration',
       name: 'estimated',
       label: `effort`,
       clearable: true,
