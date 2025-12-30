@@ -78,7 +78,14 @@
           @dragstart="onDragStart(task, $event)"
           @dragend="endDrag"
         >
-          <v-card-title>
+          <v-card-title class="d-flex align-center">
+            <v-btn
+              icon="$mdiContentCopy"
+              size="small"
+              variant="text"
+              class="mr-2"
+              @click="copyTaskLinkToClipboard(task.num)"
+            />
             <v-badge bordered :content="task.num" :offset-x="-8">{{ task.title }}</v-badge>
           </v-card-title>
 
@@ -360,5 +367,14 @@ const onDropRank = async (
 
   await travail.postTaskMove(payload.num, toStatus, before, after)
   endDrag()
+}
+
+const copyTaskLinkToClipboard = async (taskNum: string) => {
+  const url = `${window.location.origin}/travail/${taskNum}`
+  try {
+    await navigator.clipboard.writeText(url)
+  } catch (error) {
+    console.error('Failed to copy to clipboard:', error)
+  }
 }
 </script>
