@@ -178,6 +178,9 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
         END IF;
 
         COMMIT;
+        pck_api_audit.info('Travail',
+                           pck_api_audit.attributes('data', v_data, 'uuid', v_uuid));
+
     EXCEPTION
         WHEN OTHERS THEN
             ROLLBACK;
@@ -487,6 +490,9 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
         END IF;
 
         COMMIT;
+        pck_api_audit.info('Travail',
+                           pck_api_audit.attributes('data', v_data, 'uuid', v_uuid));
+
     EXCEPTION
         WHEN OTHERS THEN
             ROLLBACK;
@@ -706,6 +712,16 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
         END IF;
 
         COMMIT;
+        pck_api_audit.info('Travail',
+                           pck_api_audit.attributes('data', v_data, 'uuid', v_uuid));
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            ROLLBACK;
+            pck_api_audit.error('Travail',
+                                pck_api_audit.attributes('data', v_data, 'uuid', v_uuid));
+
+            r_error := 'something.went.wrong';
     END post_note;
 
     PROCEDURE job_assistant AS
@@ -967,6 +983,10 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
               src3.rank_value );
 
         COMMIT;
+        pck_api_audit.info('Travail',
+                           pck_api_audit.attributes('num', v_num, 'before', v_before_num, 'after',
+                                                    v_after_num, 'uuid', v_uuid));
+
     EXCEPTION
         WHEN OTHERS THEN
             ROLLBACK;
@@ -1083,10 +1103,22 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
             AND role = p_role;
 
         COMMIT;
+        pck_api_audit.info('Travail',
+                           pck_api_audit.attributes('board', p_board, 'role', p_role, 'uuid',
+                                                    v_uuid));
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            ROLLBACK;
+            pck_api_audit.error('Travail',
+                                pck_api_audit.attributes('board', p_board, 'role', p_role, 'uuid',
+                                                         v_uuid));
+
+            r_error := 'something.went.wrong';
     END post_acl_remove;
 
 END pck_tra;
 /
 
 
--- sqlcl_snapshot {"hash":"863386f922907140d2ed48b91116e1ce55d45407","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"20297104697e1be3ad39856b18adff726d0c120d","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
