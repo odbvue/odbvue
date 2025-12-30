@@ -326,6 +326,12 @@ export const useTravailStore = defineStore(
           label: 'estimated.effort',
         })
       }
+      if (task.invested && task.invested > 0) {
+        result.push({
+          value: minutesToDuration(task.invested),
+          label: 'invested.effort',
+        })
+      }
       if (task.assignee?.value)
         result.push({
           value: task.assignee.title,
@@ -410,6 +416,50 @@ export const useTravailStore = defineStore(
       }
     }
 
+    type Work = {
+      key: string
+      workdate: string
+      duration: number
+      notes: string
+      author: string
+      created: string
+      editor: string
+      modified: string
+    }
+
+    const worklog = ref<Work[]>([])
+    const worklogPage = ref(1)
+    const worklogPerPage = 10
+    const worklogHasNext = ref(false)
+
+    const getWorklog = async (
+      search?: string,
+      filter?: string,
+      offset: number = 0,
+      limit: number = worklogPerPage + 1,
+    ) => {
+      const { data } = await http.get<{ works: Work[] }>('tra/works/', {
+        params: { filter, search, offset, limit },
+      })
+      const allWork = data?.works || []
+      worklogHasNext.value = allWork.length > worklogPerPage
+      worklog.value = allWork.slice(0, worklogPerPage)
+    }
+
+    const fetchWorklogPage = async (num: string, page: number) => {
+      worklogPage.value = page
+      const offset = (page - 1) * worklogPerPage
+      await getWorklog('', `{"num": ["${num}"]}`, offset, worklogPerPage + 1)
+    }
+
+    const postWork = async (work: OvFormData) => {
+      await http.post<PostTaskResponse>('tra/work/', {
+        data: JSON.stringify(work),
+      })
+      worklogPage.value = 1
+      await getWorklog('', `{"num": ["${work.num}"]}`)
+    }
+
     return {
       viewModes,
       viewMode,
@@ -448,6 +498,13 @@ export const useTravailStore = defineStore(
       fetchNotesPage,
       postNote,
       downloadFile,
+      getWorklog,
+      worklog,
+      worklogPage,
+      worklogPerPage,
+      worklogHasNext,
+      fetchWorklogPage,
+      postWork,
     }
   },
   {

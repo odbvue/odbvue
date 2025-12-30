@@ -81,6 +81,53 @@
           </v-col>
         </v-row>
       </v-col>
+      <v-col cols="12" sm="6" v-if="num != 'new-task'">
+        <h2>Worklog</h2>
+        <v-ov-form :data="worklogData" :options="worklogOptions" @submit="saveWorklog" />
+        <v-sheet
+          v-for="work in travail.worklog"
+          :key="work.key + work.created"
+          class="pa-4 border-b-sm"
+        >
+          <v-label class="text-subtitle-2">{{ work.author }} ({{ work.created }})</v-label>
+          <v-sheet class="ml-2">
+            <div class="d-flex align-center gap-2 mt-2">
+              <v-chip size="small" color="primary" variant="tonal">
+                {{ work.workdate }}
+              </v-chip>
+              <v-chip size="small" color="secondary" variant="tonal">
+                {{ formatDuration(work.duration) }}
+              </v-chip>
+            </div>
+            <div v-if="work.notes" class="mt-2 text-body-2">{{ work.notes }}</div>
+          </v-sheet>
+        </v-sheet>
+        <v-row no-gutters class="mt-4">
+          <v-col cols="8">
+            <v-btn
+              v-if="hasPrevWorklogPage || hasNextWorklogPage"
+              size="small"
+              variant="tonal"
+              class="ma-1"
+              icon="$mdiChevronLeft"
+              :disabled="!hasPrevWorklogPage"
+              @click="goToWorklogPage(travail.worklogPage - 1)"
+            />
+            <v-btn
+              v-if="hasPrevWorklogPage || hasNextWorklogPage"
+              size="small"
+              variant="tonal"
+              class="ma-1"
+              icon="$mdiChevronRight"
+              :disabled="!hasNextWorklogPage"
+              @click="goToWorklogPage(travail.worklogPage + 1)"
+            />
+          </v-col>
+          <v-col cols="4" class="text-right">
+            <v-btn size="small" variant="tonal" icon="$mdiRefresh" @click="refreshWorklog" />
+          </v-col>
+        </v-row>
+      </v-col>
     </v-row>
 
     <v-ov-dialog
@@ -125,11 +172,67 @@ onMounted(async () => {
     const task = await travail.getTask(num.value)
     taskData.value = task || {}
     await travail.fetchNotesPage(num.value, 1)
+    await travail.fetchWorklogPage(num.value, 1)
   }
 })
 
 const hasPrevNotesPage = computed(() => travail.notesPage > 1)
 const hasNextNotesPage = computed(() => travail.notesHasNext)
+
+const hasPrevWorklogPage = computed(() => travail.worklogPage > 1)
+const hasNextWorklogPage = computed(() => travail.worklogHasNext)
+
+const goToWorklogPage = async (page: number) => {
+  await travail.fetchWorklogPage(num.value, page)
+}
+
+const refreshWorklog = async () => {
+  await travail.fetchWorklogPage(num.value, travail.worklogPage)
+}
+
+import { minutesToDuration } from '@/components/index.ts'
+
+const formatDuration = (minutes: number): string => {
+  return minutesToDuration(minutes)
+}
+
+const worklogData = ref<OvFormData>({})
+
+const saveWorklog = async (work: OvFormData) => {
+  await travail.postWork(work)
+  worklogData.value = {}
+}
+
+const worklogOptions = computed<OvFormOptions>(() => ({
+  cols: 2,
+  fields: [
+    {
+      type: 'text',
+      name: 'num',
+      value: num.value || '',
+      hidden: true,
+    },
+    {
+      type: 'date',
+      name: 'work_date',
+      label: 'date',
+      value: new Date().toISOString().split('T')[0],
+    },
+    {
+      type: 'duration',
+      name: 'duration',
+      label: 'duration',
+    },
+    {
+      type: 'textarea',
+      name: 'notes',
+      label: 'notes',
+      rows: 3,
+    },
+  ],
+  actions: [{ name: 'log.work' }],
+  actionSubmit: 'log.work',
+}))
 
 const goToNotesPage = async (page: number) => {
   await travail.fetchNotesPage(num.value, page)
