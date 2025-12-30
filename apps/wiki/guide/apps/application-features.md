@@ -78,7 +78,7 @@ Add logo `./apps/public/logo.sv` and change default layout.
         <v-row>
           <v-col cols="4">
             <a href="/" class="d-block">
-              <v-img eager class="rounded-lg border-thin" :alt="title" src="./logo.svg"> </v-img>
+              <v-img eager class="rounded-lg border-thin" :alt="title" src="/logo.svg"> </v-img>
             </a>
           </v-col>
         </v-row>
