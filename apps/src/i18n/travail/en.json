@@ -36,5 +36,10 @@
   "board": "Board",
   "user": "User",
   "already.exists": "Already exists",
-  "type": "Type"
+  "type": "Type",
+  "date": "Date",
+  "duration": "Duration",
+  "notes": "Notes",
+  "log.work": "Log work",
+  "worklog": "Worklog"
 }

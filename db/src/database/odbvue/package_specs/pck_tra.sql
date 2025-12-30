@@ -89,8 +89,22 @@ CREATE OR REPLACE PACKAGE odbvue.pck_tra AS
         r_errors OUT SYS_REFCURSOR -- Resulting errors if any
     );
 
+    PROCEDURE get_works ( -- Method to get list of work log entries
+        p_filter IN VARCHAR2 DEFAULT NULL, -- Filter in URL encoded JSON format 
+        p_search IN VARCHAR2 DEFAULT NULL, -- Search string
+        p_offset IN PLS_INTEGER DEFAULT 0, -- Offset for pagination
+        p_limit  IN PLS_INTEGER DEFAULT 10, -- Limit for pagination
+        r_works  OUT SYS_REFCURSOR -- Resulting work log list [{created, author, duration}]
+    );
+
+    PROCEDURE post_work ( -- Method to create or update a work log entry
+        p_data   CLOB, -- Work log data in JSON format
+        r_error  OUT VARCHAR2, -- Error message if any
+        r_errors OUT SYS_REFCURSOR -- Resulting errors if any
+    );
+
 END pck_tra;
 /
 
 
--- sqlcl_snapshot {"hash":"d51e18f8aa853bbc1726f7091369fd6729244617","type":"PACKAGE_SPEC","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"d11b3b73565f0660083b19a978f577e5b6b9e0e3","type":"PACKAGE_SPEC","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}

@@ -239,7 +239,14 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
                                               t.priority                                   AS "priority",
                                               t.estimated                                  AS "estimated",
                                               t.remaining                                  AS "remaining",
-                                              t.invested                                   AS "invested",
+                                              (
+                                                  SELECT
+                                                      SUM(duration)
+                                                  FROM
+                                                      tra_work w
+                                                  WHERE
+                                                      w.task_id = t.id
+                                              )                                            AS "invested",
                                               JSON_OBJECT(
                                                       'value' VALUE t.assignee,
                                                       'title' VALUE u.fullname
@@ -1117,8 +1124,124 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
             r_error := 'something.went.wrong';
     END post_acl_remove;
 
+    PROCEDURE get_works (
+        p_filter IN VARCHAR2 DEFAULT NULL,
+        p_search IN VARCHAR2 DEFAULT NULL,
+        p_offset IN PLS_INTEGER DEFAULT 0,
+        p_limit  IN PLS_INTEGER DEFAULT 10,
+        r_works  OUT SYS_REFCURSOR
+    ) AS
+
+        v_uuid   CHAR(32 CHAR) := pck_api_auth.uuid;
+        v_search VARCHAR2(2000 CHAR) := utl_url.unescape(coalesce(p_search, ''));
+        v_filter VARCHAR2(2000 CHAR) := utl_url.unescape(coalesce(p_filter, '{}'));
+    BEGIN
+        IF v_uuid IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+        OPEN r_works FOR SELECT
+                                              t.num                                     AS "key",
+                                              to_char(w.work_date, 'YYYY-MM-DD')        AS "workdate",
+                                              w.duration                                AS "duration",
+                                              w.notes                                   AS "notes",
+                                              ua.fullname                               AS "author",
+                                              to_char(w.created, 'YYYY-MM-DD HH24:MI')  AS "created",
+                                              ue.fullname                               AS "editor",
+                                              to_char(w.modified, 'YYYY-MM-DD HH24:MI') AS "modified"
+                                          FROM
+                                                   tra_work w
+                                              JOIN tra_tasks t ON w.task_id = t.id
+                                              JOIN app_users ua ON w.author = ua.uuid
+                                              LEFT JOIN app_users ue ON w.editor = ue.uuid
+                         WHERE 
+                    -- filter by task_id 
+                             ( NOT JSON_EXISTS ( v_filter, '$.num' )
+                                   OR EXISTS (
+                                 SELECT
+                                     1
+                                 FROM
+                                         JSON_TABLE ( JSON_QUERY(v_filter, '$.num'), '$[*]'
+                                             COLUMNS (
+                                                 value VARCHAR2 ( 100 CHAR ) PATH '$'
+                                             )
+                                         )
+                                     j
+                                 WHERE
+                                     w.task_id = (
+                                         SELECT
+                                             id
+                                         FROM
+                                             tra_tasks
+                                         WHERE
+                                             num = j.value
+                                     )
+                             ) )
+                         ORDER BY
+                             w.work_date DESC
+                         OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY;
+
+    END;
+
+    PROCEDURE post_work (
+        p_data   CLOB,
+        r_error  OUT VARCHAR2,
+        r_errors OUT SYS_REFCURSOR
+    ) AS
+
+        v_uuid      CHAR(32 CHAR) := pck_api_auth.uuid;
+        v_data      CLOB := coalesce(p_data, '{}');
+        v_num       tra_tasks.num%TYPE := JSON_VALUE(v_data, '$.num');
+        v_work_date DATE := TO_DATE ( JSON_VALUE(v_data, '$.work_date'), 'YYYY-MM-DD' );
+        v_duration  NUMBER := TO_NUMBER ( coalesce(
+            JSON_VALUE(v_data, '$.duration'),
+            '0'
+        ) );
+        v_notes     tra_work.notes%TYPE := JSON_VALUE(v_data, '$.notes');
+    BEGIN
+        IF v_uuid IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+        IF v_num IS NULL THEN
+            pck_api_audit.errors(r_errors, 'num', 'required');
+            RETURN;
+        END IF;
+
+        INSERT INTO tra_work (
+            task_id,
+            work_date,
+            duration,
+            notes,
+            author
+        ) VALUES ( (
+            SELECT
+                id
+            FROM
+                tra_tasks
+            WHERE
+                num = v_num
+        ),
+                   v_work_date,
+                   v_duration,
+                   v_notes,
+                   v_uuid );
+
+        COMMIT;
+        pck_api_audit.info('Travail',
+                           pck_api_audit.attributes('data', v_data, 'uuid', v_uuid));
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            ROLLBACK;
+            pck_api_audit.error('Travail',
+                                pck_api_audit.attributes('data', v_data, 'uuid', v_uuid));
+
+            r_error := 'something.went.wrong';
+    END post_work;
+
 END pck_tra;
 /
 
 
--- sqlcl_snapshot {"hash":"20297104697e1be3ad39856b18adff726d0c120d","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"f7053849f152508ec30dd3d6ff43d710f2f1ae01","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
