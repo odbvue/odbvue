@@ -68,6 +68,7 @@ type OvFormFieldBase = {
     | 'date'
     | 'time'
     | 'datetime'
+    | 'duration'
   name: string
   value?: unknown
   label?: string
@@ -648,4 +649,104 @@ export function useFormAction(options: UseFormActionOptions): UseFormActionRetur
     loading,
     action,
   }
+}
+
+/**
+ * Duration constants for JIRA-style effort tracking
+ * w = week (40 hours), d = day (8 hours), h = hour (60 minutes), m = minute
+ */
+const MINUTES_PER_HOUR = 60
+const HOURS_PER_DAY = 8
+const HOURS_PER_WEEK = 40
+const MINUTES_PER_DAY = HOURS_PER_DAY * MINUTES_PER_HOUR
+const MINUTES_PER_WEEK = HOURS_PER_WEEK * MINUTES_PER_HOUR
+
+/**
+ * Converts minutes (numeric) to JIRA-style duration string (e.g., "2w 3d 4h 15m")
+ * @param minutes - Total minutes as number
+ * @returns Formatted duration string (e.g., "1w 2d 4h 30m") or empty string if 0/null
+ */
+export function minutesToDuration(minutes: number | null | undefined): string {
+  if (minutes === null || minutes === undefined || minutes === 0) return ''
+
+  let remaining = Math.abs(Math.round(minutes))
+  const parts: string[] = []
+
+  const weeks = Math.floor(remaining / MINUTES_PER_WEEK)
+  if (weeks > 0) {
+    parts.push(`${weeks}w`)
+    remaining -= weeks * MINUTES_PER_WEEK
+  }
+
+  const days = Math.floor(remaining / MINUTES_PER_DAY)
+  if (days > 0) {
+    parts.push(`${days}d`)
+    remaining -= days * MINUTES_PER_DAY
+  }
+
+  const hours = Math.floor(remaining / MINUTES_PER_HOUR)
+  if (hours > 0) {
+    parts.push(`${hours}h`)
+    remaining -= hours * MINUTES_PER_HOUR
+  }
+
+  if (remaining > 0) {
+    parts.push(`${remaining}m`)
+  }
+
+  const result = parts.join(' ')
+  return minutes < 0 ? `-${result}` : result
+}
+
+/**
+ * Converts JIRA-style duration string to minutes (numeric)
+ * Supports: w (weeks=40h), d (days=8h), h (hours), m (minutes)
+ * @param duration - Duration string (e.g., "2w 3d 4h 15m" or "2w3d4h15m")
+ * @returns Total minutes as number, or null if invalid format
+ */
+export function durationToMinutes(duration: string | null | undefined): number | null {
+  if (!duration || typeof duration !== 'string') return null
+
+  const trimmed = duration.trim()
+  if (trimmed === '') return null
+
+  // Check for negative duration
+  const isNegative = trimmed.startsWith('-')
+  const input = isNegative ? trimmed.slice(1) : trimmed
+
+  // Match patterns like "2w", "3d", "4h", "15m" with optional spaces
+  const pattern = /^\s*(\d+w)?\s*(\d+d)?\s*(\d+h)?\s*(\d+m)?\s*$/i
+  const match = input.match(pattern)
+
+  if (!match) return null
+
+  // If nothing matched (all groups undefined), invalid
+  if (!match[1] && !match[2] && !match[3] && !match[4]) return null
+
+  let totalMinutes = 0
+
+  if (match[1]) {
+    totalMinutes += parseInt(match[1]) * MINUTES_PER_WEEK
+  }
+  if (match[2]) {
+    totalMinutes += parseInt(match[2]) * MINUTES_PER_DAY
+  }
+  if (match[3]) {
+    totalMinutes += parseInt(match[3]) * MINUTES_PER_HOUR
+  }
+  if (match[4]) {
+    totalMinutes += parseInt(match[4])
+  }
+
+  return isNegative ? -totalMinutes : totalMinutes
+}
+
+/**
+ * Validates a JIRA-style duration string
+ * @param duration - Duration string to validate
+ * @returns true if valid format, false otherwise
+ */
+export function isValidDuration(duration: string | null | undefined): boolean {
+  if (!duration || typeof duration !== 'string') return true // empty is valid
+  return durationToMinutes(duration) !== null
 }

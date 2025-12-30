@@ -20,6 +20,7 @@ declare global {
   const customRef: typeof import('vue').customRef
   const defineAsyncComponent: typeof import('vue').defineAsyncComponent
   const defineComponent: typeof import('vue').defineComponent
+  const durationToMinutes: typeof import('./src/components/index').durationToMinutes
   const effectScope: typeof import('vue').effectScope
   const fileToBase64: typeof import('./src/components/index').fileToBase64
   const getCurrentInstance: typeof import('vue').getCurrentInstance
@@ -33,7 +34,9 @@ declare global {
   const isReadonly: typeof import('vue').isReadonly
   const isRef: typeof import('vue').isRef
   const isShallow: typeof import('vue').isShallow
+  const isValidDuration: typeof import('./src/components/index').isValidDuration
   const markRaw: typeof import('vue').markRaw
+  const minutesToDuration: typeof import('./src/components/index').minutesToDuration
   const nextTick: typeof import('vue').nextTick
   const onActivated: typeof import('vue').onActivated
   const onBeforeMount: typeof import('vue').onBeforeMount
