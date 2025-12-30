@@ -13,6 +13,7 @@ END;
 /    
 
 begin
+    prc_drop_table_if_exists('tra_work');
     prc_drop_table_if_exists('tra_acls');
     prc_drop_table_if_exists('tra_notes');
     prc_drop_table_if_exists('tra_links');
@@ -147,6 +148,27 @@ CREATE TABLE tra_acls (
     CONSTRAINT cfk_tra_acls_role FOREIGN KEY (role) REFERENCES app_roles(role) ON DELETE CASCADE
 );
 /
+
+CREATE TABLE tra_work (
+    id NUMBER(19) GENERATED ALWAYS AS IDENTITY  (START WITH 1 INCREMENT BY 1) PRIMARY KEY,
+    task_id NUMBER(19) NOT NULL,
+    work_date DATE DEFAULT TRUNC(SYSDATE) NOT NULL,
+    duration NUMBER(19) DEFAULT 0 NOT NULL,
+    notes CLOB,
+    author CHAR(32 CHAR) NOT NULL,
+    created TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
+    editor CHAR(32 CHAR),
+    modified TIMESTAMP,
+    CONSTRAINT cfk_tra_work_task FOREIGN KEY (task_id) REFERENCES tra_tasks(id) ON DELETE CASCADE
+);
+/
+
+CREATE INDEX idx_tra_work_task_id ON tra_work(task_id);
+CREATE INDEX idx_tra_work_work_date ON tra_work(work_date);
+CREATE INDEX idx_tra_work_author ON tra_work(author);
+/
+
+
 
 drop procedure prc_drop_table_if_exists;
 /
