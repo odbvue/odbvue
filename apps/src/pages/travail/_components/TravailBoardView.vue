@@ -37,27 +37,18 @@
         <div
           class="my-2"
           style="min-height: 12px"
-          :class="{
-            'ov-dnd-column--active':
-              activeDropKey === gapKey(status.value, beforeNum(status.value, idx), task.num),
-          }"
+          :class="{ 'ov-dnd-column--active': activeDropKey === `gap:${status.value}:${idx}` }"
           :style="
-            activeDropKey === gapKey(status.value, beforeNum(status.value, idx), task.num)
-              ? dndDropColumnActiveStyle
-              : undefined
+            activeDropKey === `gap:${status.value}:${idx}` ? dndDropColumnActiveStyle : undefined
           "
-          @dragenter.stop.prevent="
-            enterDropTarget(gapKey(status.value, beforeNum(status.value, idx), task.num))
-          "
-          @dragleave.stop="
-            leaveDropTarget(gapKey(status.value, beforeNum(status.value, idx), task.num))
-          "
+          @dragenter.stop.prevent="enterDropTarget(`gap:${status.value}:${idx}`)"
+          @dragleave.stop="leaveDropTarget(`gap:${status.value}:${idx}`)"
           @dragover.stop.prevent
-          @drop.stop="onDropRank(status.value, beforeNum(status.value, idx), task.num, $event)"
+          @drop.stop="onDropRank(status.value, idx, $event)"
         >
           <transition name="ov-drop-slot" mode="out-in">
             <v-card
-              v-if="isDragging && isGapActive(status.value, beforeNum(status.value, idx), task.num)"
+              v-if="isDragging && activeDropKey === `gap:${status.value}:${idx}`"
               key="placeholder"
               variant="outlined"
               color="primary"
@@ -69,10 +60,12 @@
         </div>
 
         <v-card
-          class="mt-4 mb-2 ov-dnd-card"
+          class="mt-4 mb-2 ov-dnd-card cursor-grab"
           :class="{ 'ov-dnd-card--dragging': draggingNum === task.num }"
           :style="
-            draggingNum === task.num ? [dndCardBaseStyle, dndCardDraggingStyle] : dndCardBaseStyle
+            draggingNum === task.num
+              ? [dndCardBaseStyle, dndCardDraggingStyle, cardBackgroundStyle(task.status)]
+              : [dndCardBaseStyle, cardBackgroundStyle(task.status)]
           "
           draggable="true"
           @dragstart="onDragStart(task, $event)"
@@ -146,23 +139,16 @@
       <div
         class="my-2"
         style="min-height: 12px"
-        :class="{
-          'ov-dnd-column--active':
-            activeDropKey === gapKey(status.value, lastNum(status.value), null),
-        }"
-        :style="
-          activeDropKey === gapKey(status.value, lastNum(status.value), null)
-            ? dndDropColumnActiveStyle
-            : undefined
-        "
-        @dragenter.stop.prevent="enterDropTarget(gapKey(status.value, lastNum(status.value), null))"
-        @dragleave.stop="leaveDropTarget(gapKey(status.value, lastNum(status.value), null))"
+        :class="{ 'ov-dnd-column--active': activeDropKey === `gap:${status.value}:last` }"
+        :style="activeDropKey === `gap:${status.value}:last` ? dndDropColumnActiveStyle : undefined"
+        @dragenter.stop.prevent="enterDropTarget(`gap:${status.value}:last`)"
+        @dragleave.stop="leaveDropTarget(`gap:${status.value}:last`)"
         @dragover.stop.prevent
-        @drop.stop="onDropRank(status.value, lastNum(status.value), null, $event)"
+        @drop.stop="onDropRankEnd(status.value, $event)"
       >
         <transition name="ov-drop-slot" mode="out-in">
           <v-card
-            v-if="isDragging && isGapActive(status.value, lastNum(status.value), null)"
+            v-if="isDragging && activeDropKey === `gap:${status.value}:last`"
             key="placeholder"
             variant="outlined"
             color="primary"
@@ -185,9 +171,25 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { TravailStore } from '../travail'
 import { useHtml5DragDrop } from '@/composables/dnd'
 import { truncateMiddle } from '../_utils/text'
+import { useCardBackground } from '@/composables/ui'
+
+const cardBackgroundStyle = (status: string): { background: string } => {
+  const bgComputed = useCardBackground(
+    status === 'doing'
+      ? '#E3F2FD'
+      : status === 'todo'
+        ? '#FFF3E0'
+        : status === 'done'
+          ? '#E8F5E9'
+          : '#FFFFFF',
+  )
+  return bgComputed.value
+}
 
 const props = defineProps<{ travail: TravailStore }>()
 const travail = props.travail
@@ -274,17 +276,6 @@ const tasksByStatus = computed<Record<string, Task[]>>(() => {
 
 const tasksInStatus = (status: string): Task[] => tasksByStatus.value[status] ?? []
 
-const beforeNum = (status: string, idx: number): string | null => {
-  if (idx <= 0) return null
-  const list = tasksInStatus(status)
-  return list[idx - 1]?.num ?? null
-}
-
-const lastNum = (status: string): string | null => {
-  const list = tasksInStatus(status)
-  return list.length ? list[list.length - 1]!.num : null
-}
-
 const statusColorByValue = computed<Record<string, string>>(() => {
   const map: Record<string, string> = {}
   for (const status of travail.statuses) map[status.value] = status.attrs.format.color
@@ -327,12 +318,6 @@ const {
 
 const draggingNum = computed(() => draggingPayload.value?.num ?? null)
 
-const gapKey = (status: string, before: string | null, after: string | null) =>
-  `gap:${status}:${before ?? 'START'}:${after ?? 'END'}`
-
-const isGapActive = (status: string, before: string | null, after: string | null) =>
-  activeDropKey.value === gapKey(status, before, after)
-
 const isDragging = computed(() => draggingPayload.value !== null)
 
 const onDragStart = (task: Task, event: DragEvent) => {
@@ -344,31 +329,40 @@ const onDrop = async (toStatus: string, event: DragEvent) => {
   const payload = extractPayload(event)
   if (!payload) return
 
-  const columnTasks = (tasksByStatus.value[toStatus] || []).filter((t) => t.num !== payload.num)
-  const before = columnTasks.length ? columnTasks[columnTasks.length - 1]!.num : null
-  await travail.postTaskMove(payload.num, toStatus, before, null)
+  await travail.postTaskMove(payload.num, toStatus, null, null)
   endDrag()
 }
 
-const onDropRank = async (
-  toStatus: string,
-  before: string | null,
-  after: string | null,
-  event: DragEvent,
-) => {
+const onDropRank = async (toStatus: string, beforeIdx: number, event: DragEvent) => {
   event.preventDefault()
   const payload = extractPayload(event)
   if (!payload) return
 
-  const task = travail.tasks.find((t) => t.num === payload.num)
-  if (!task) return
+  const tasks = tasksInStatus(toStatus)
+  const before = beforeIdx > 0 ? (tasks[beforeIdx - 1]?.num ?? null) : null
+  const after = beforeIdx < tasks.length ? (tasks[beforeIdx]?.num ?? null) : null
 
-  if (task.status === toStatus && (before === task.num || after === task.num)) {
+  if (
+    tasks.some((t) => t.num === payload.num) &&
+    (before === payload.num || after === payload.num)
+  ) {
     endDrag()
     return
   }
 
   await travail.postTaskMove(payload.num, toStatus, before, after)
+  endDrag()
+}
+
+const onDropRankEnd = async (toStatus: string, event: DragEvent) => {
+  event.preventDefault()
+  const payload = extractPayload(event)
+  if (!payload) return
+
+  const tasks = tasksInStatus(toStatus)
+  const before = tasks.length ? (tasks[tasks.length - 1]?.num ?? null) : null
+
+  await travail.postTaskMove(payload.num, toStatus, before, null)
   endDrag()
 }
 
