@@ -86,7 +86,9 @@
               class="mr-2"
               @click="copyTaskLinkToClipboard(task.num)"
             />
-            <v-badge bordered :content="task.num" :offset-x="-8">{{ task.title }}</v-badge>
+            <v-badge bordered :content="task.num" :offset-x="-8">{{
+              truncateMiddle(task.title, 12)
+            }}</v-badge>
           </v-card-title>
 
           <v-card-text class="flex-grow-1">
@@ -185,6 +187,7 @@
 <script setup lang="ts">
 import type { TravailStore } from '../travail'
 import { useHtml5DragDrop } from '@/composables/dnd'
+import { truncateMiddle } from '../_utils/text'
 
 const props = defineProps<{ travail: TravailStore }>()
 const travail = props.travail
