@@ -108,6 +108,11 @@ export type OvFormTextareaField = OvFormFieldBase & {
   autoGrow?: boolean
 }
 
+export type ImageUrlResult = {
+  displayUrl: string // Blob URL for display in editor
+  storageUrl: string // API path for storage in markdown
+}
+
 export type OvFormMarkdownField = OvFormFieldBase & {
   type: 'markdown'
   toolbar?: string[]
@@ -115,6 +120,8 @@ export type OvFormMarkdownField = OvFormFieldBase & {
   editorClass?: string
   minHeight?: string
   maxHeight?: string
+  imageUploader?: (base64Data: string) => Promise<string | null>
+  imageUrlResolver?: (imageId: string) => Promise<ImageUrlResult>
 }
 
 export type OvFormRatingField = OvFormFieldBase & {
@@ -401,6 +408,7 @@ export const OvActionFormat = (
 
 import { h, ref } from 'vue'
 import { VLabel, VIcon, VChip, VBtn } from 'vuetify/components'
+import MarkdownIt from 'markdown-it'
 export const renderViewItem = (
   value: unknown,
   item?: OvViewItem,
@@ -749,4 +757,25 @@ export function durationToMinutes(duration: string | null | undefined): number |
 export function isValidDuration(duration: string | null | undefined): boolean {
   if (!duration || typeof duration !== 'string') return true // empty is valid
   return durationToMinutes(duration) !== null
+}
+
+/**
+ * Renders markdown content with image reference resolution
+ * Converts tra-image:id references to actual image URLs
+ * @param markdown - Raw markdown content with image references
+ * @returns HTML with resolved image URLs
+ */
+export function renderMarkdownWithImages(markdown: string): string {
+  if (!markdown) return ''
+
+  // Replace tra-image:id references with actual download URLs
+  // Markdown format: ![alt](tra-image:storage_id) -> ![alt](/api/tra/image/storage_id)
+  const withImageUrls = markdown.replace(
+    /!\[([^\]]*)\]\(tra-image:([a-f0-9-]+)\)/g,
+    '![$1](/api/tra/image/$2)',
+  )
+
+  // Render markdown to HTML
+  const md = new MarkdownIt()
+  return md.render(withImageUrls)
 }

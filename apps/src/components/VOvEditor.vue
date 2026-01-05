@@ -59,11 +59,13 @@
 <script setup lang="ts">
 import { useEditor, EditorContent, Editor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import Image from '@tiptap/extension-image'
+import { computed, onBeforeUnmount, ref, watch, onMounted, type PropType } from 'vue'
 import TurndownService from 'turndown'
 import MarkdownIt from 'markdown-it'
 import pretty from 'pretty'
 import type { ValidationRule } from 'vuetify/lib/composables/validation.mjs'
+import type { ImageUrlResult } from '@/components/index'
 
 defineOptions({
   inheritAttrs: false,
@@ -75,6 +77,40 @@ const editorRoot = ref<HTMLElement | null>(null)
 
 const turndown = new TurndownService()
 const markdownIt = new MarkdownIt()
+
+// Add custom rule to convert img tags back to markdown format
+turndown.addRule('imageUrl', {
+  filter: (node) => {
+    return node.nodeName === 'IMG'
+  },
+  replacement: (content, node) => {
+    const img = node as HTMLImageElement
+    const alt = img.alt || 'image'
+    let src = img.src
+
+    // Check if it's a blob URL - extract the image ID from data attribute if available
+    if (src.startsWith('blob:')) {
+      // Get the original API path from data attribute
+      const originalSrc = img.getAttribute('data-original-src')
+      if (originalSrc) {
+        src = originalSrc
+      } else {
+        // Fallback: can't recover the original URL from blob
+        console.warn('Blob URL without data-original-src attribute:', src)
+        return `![${alt}](${src})`
+      }
+    } else {
+      // Extract relative path from full URL to ensure portability
+      try {
+        const url = new URL(src)
+        src = url.pathname // Get just the path, e.g., /api/tra/image/id
+      } catch {
+        // If it's already a relative path, keep it as-is
+      }
+    }
+    return `![${alt}](${src})`
+  },
+})
 
 const props = defineProps({
   // Vuetify input field props
@@ -139,18 +175,60 @@ const props = defineProps({
     type: String,
     default: undefined,
   },
+  imageUploader: {
+    type: Function as PropType<(base64Data: string) => Promise<string | null>>,
+    default: undefined,
+  },
+  imageUrlResolver: {
+    type: Function as PropType<(imageId: string) => Promise<ImageUrlResult>>,
+    default: undefined,
+  },
   class: {
     type: String,
     default: '',
   },
 })
 
-const emits = defineEmits(['updated', 'keyup'])
+const emits = defineEmits(['updated', 'keyup', 'imageUpload'])
+
+// Image upload handler
+const uploadImage = async (file: File): Promise<string | null> => {
+  if (!props.imageUploader) {
+    console.warn('Image upload not configured: imageUploader prop is not set')
+    return null
+  }
+  try {
+    const base64 = await fileToBase64(file)
+    return await props.imageUploader(base64)
+  } catch (error) {
+    console.error('Image upload failed:', error)
+    return null
+  }
+}
+
+// Helper to convert file to base64
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(',')[1] || ''
+      resolve(base64)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
 
 // Convert markdown to HTML for editor display
 const mdToHtml = (md: string): string => {
   if (!md) return ''
-  return markdownIt.render(md)
+  // Handle both tra-image:id references and direct /api/tra/image/id URLs
+  const withImageUrls = md.replace(
+    /!\[([^\]]*)\]\(tra-image:([a-f0-9-]+)\)/g,
+    '![$1](/api/tra/image/$2)',
+  )
+  // MarkdownIt will properly render ![alt](url) syntax to <img> tags
+  return markdownIt.render(withImageUrls)
 }
 
 // Convert HTML to markdown for output
@@ -244,17 +322,105 @@ const buttonConfig: Record<string, ToolbarButton> = {
     action: (editor) => editor.chain().focus().toggleBlockquote().run(),
     isActive: (editor) => editor.isActive('blockquote'),
   },
+  image: {
+    id: 'image',
+    icon: '$mdiImage',
+    action: () => {
+      if (!props.imageUploader || !props.imageUrlResolver) {
+        console.warn(
+          'Image upload not configured: imageUploader and imageUrlResolver props are required',
+        )
+        return
+      }
+      const resolver = props.imageUrlResolver
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = 'image/*'
+      input.onchange = async (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0]
+        if (file) {
+          const imageId = await uploadImage(file)
+          if (imageId && editor.value) {
+            const { displayUrl, storageUrl } = await resolver(imageId)
+            // Insert image with display URL as src and storage URL as data attribute
+            editor.value
+              .chain()
+              .focus()
+              .insertContent(
+                `<img src="${displayUrl}" alt="${file.name}" data-original-src="${storageUrl}" />`,
+              )
+              .run()
+            emits('imageUpload', imageId)
+          }
+        }
+      }
+      input.click()
+    },
+  },
 }
 
 const editor = useEditor({
   content: getInitialContent(),
-  extensions: [StarterKit],
+  extensions: [
+    StarterKit,
+    Image.configure({
+      inline: true,
+      allowBase64: false,
+    }),
+  ],
   onUpdate: ({ editor }) => {
     const html = editor.getHTML()
     const output = props.outputFormat === 'markdown' ? htmlToMd(html) : html
     model.value = output
     emits('updated', output)
   },
+})
+
+// Handle image paste via DOM event listener
+const handleEditorPaste = async (event: ClipboardEvent) => {
+  if (!props.imageUploader || !props.imageUrlResolver) return
+  if (!event.clipboardData) return
+
+  const resolver = props.imageUrlResolver
+  const files = event.clipboardData.files
+  const imageFiles = Array.from(files).filter((f) => f.type.startsWith('image/'))
+
+  if (imageFiles.length === 0) return
+
+  event.preventDefault()
+
+  // Handle first image paste
+  const imageFile = imageFiles[0] as File
+  const imageId = await uploadImage(imageFile)
+
+  if (imageId && editor.value) {
+    const { displayUrl, storageUrl } = await resolver(imageId)
+    // Insert image with display URL as src and storage URL as data attribute
+    editor.value
+      .chain()
+      .focus()
+      .insertContent(
+        `<img src="${displayUrl}" alt="${imageFile.name}" data-original-src="${storageUrl}" />`,
+      )
+      .run()
+    emits('imageUpload', imageId)
+  }
+}
+
+// Attach paste listener when editor is ready
+onMounted(() => {
+  if (editorRoot.value) {
+    editorRoot.value.addEventListener('paste', handleEditorPaste as unknown as EventListener)
+  }
+})
+
+onBeforeUnmount(() => {
+  if (editorRoot.value) {
+    editorRoot.value.removeEventListener('paste', handleEditorPaste as unknown as EventListener)
+  }
+  if (editor) {
+    editor.value?.destroy()
+  }
 })
 
 // Watch for external model changes and update editor content
@@ -298,6 +464,12 @@ const handleClick = (btn: ToolbarButton) => {
 }
 
 onBeforeUnmount(() => {
+  if (editorRoot.value) {
+    editorRoot.value.removeEventListener(
+      'paste',
+      handleEditorPaste as unknown as unknown as EventListener,
+    )
+  }
   if (editor) {
     editor.value?.destroy()
   }
@@ -347,5 +519,13 @@ defineExpose({
 
 :deep(.ProseMirror) blockquote p {
   margin: 0;
+}
+
+:deep(.ProseMirror) img {
+  max-width: 100%;
+  height: auto;
+  margin: 0.5rem 0;
+  border-radius: 4px;
+  display: block;
 }
 </style>
