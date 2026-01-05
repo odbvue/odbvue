@@ -9,3 +9,4 @@ Features:
 - Auto Rest
 - Auto Doc
 - Version control
+- Auto deploy
