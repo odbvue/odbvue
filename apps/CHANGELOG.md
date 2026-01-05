@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.262
+
+### Patch Changes
+
+- fffa1a2: travail images in markdown comments
+
 ## 0.0.261
 
 ### Patch Changes
