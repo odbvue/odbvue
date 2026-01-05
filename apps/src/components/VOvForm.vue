@@ -390,6 +390,8 @@ const fields = computed(() => {
         outputFormat: 'markdown',
         maxHeight: markdownField.maxHeight,
         style: markdownField.minHeight ? `min-height: ${markdownField.minHeight}` : undefined,
+        imageUploader: markdownField.imageUploader,
+        imageUrlResolver: markdownField.imageUrlResolver,
       }
     } else if (field.type === 'rating') {
       const ratingField = field as OvFormRatingField

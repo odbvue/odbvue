@@ -13,6 +13,7 @@
 
       <v-col cols="12" sm="6" v-if="num != 'new-task'">
         <h2>Comments</h2>
+
         <v-ov-form
           ref="notesFormRef"
           :data="notesData"
@@ -175,6 +176,18 @@ onMounted(async () => {
     await travail.fetchWorklogPage(num.value, 1)
   }
 })
+
+// Watch for notes changes and preload images
+watch(
+  () => travail.notes,
+  async (notes) => {
+    for (const note of notes) {
+      if (note.content) {
+        await processNoteImages(note.content)
+      }
+    }
+  },
+)
 
 const hasPrevNotesPage = computed(() => travail.notesPage > 1)
 const hasNextNotesPage = computed(() => travail.notesHasNext)
@@ -348,9 +361,44 @@ const taskOptions = computed<OvFormOptions>(() => ({
 
 import MarkdownIt from 'markdown-it'
 const markdownIt = new MarkdownIt()
+
+// Cache for resolved image URLs
+const imageUrlCache = ref<Record<string, string>>({})
+
+// Process markdown and replace image URLs with blob URLs
 const mdToHtml = (md: string): string => {
   if (!md) return ''
-  return markdownIt.render(md)
+  // Replace image references with cached blob URLs
+  let processed = md
+  for (const [imageId, blobUrl] of Object.entries(imageUrlCache.value)) {
+    // Match both /api/tra/image/id and tra/image/id patterns
+    const patterns = [
+      new RegExp(`!\\[([^\\]]*)\\]\\(/api/tra/image/${imageId}\\)`, 'g'),
+      new RegExp(`!\\[([^\\]]*)\\]\\(tra/image/${imageId}\\)`, 'g'),
+    ]
+    for (const pattern of patterns) {
+      processed = processed.replace(pattern, `![$1](${blobUrl})`)
+    }
+  }
+  return markdownIt.render(processed)
+}
+
+// Extract image IDs from markdown and fetch their blob URLs
+const processNoteImages = async (content: string) => {
+  if (!content) return
+  // Match image references: ![alt](/api/tra/image/id) or ![alt](tra/image/id)
+  const imagePattern = /!\[[^\]]*\]\((?:\/api\/)?tra\/image\/([a-f0-9-]+)\)/g
+  const matches = [...content.matchAll(imagePattern)]
+
+  for (const match of matches) {
+    const imageId = match[1]
+    if (imageId && !imageUrlCache.value[imageId]) {
+      const result = await travail.getImageUrl(imageId)
+      if (result.displayUrl) {
+        imageUrlCache.value[imageId] = result.displayUrl
+      }
+    }
+  }
 }
 
 const saveNotes = async (notes: OvFormData) => {
@@ -402,6 +450,8 @@ const notesOptions = computed<OvFormOptions>(() => ({
       label: 'comment',
       minHeight: '200px',
       maxHeight: '200px',
+      imageUploader: travail.uploadImage,
+      imageUrlResolver: travail.getImageUrl,
       toolbar: [
         'bold',
         'italic',
@@ -410,6 +460,7 @@ const notesOptions = computed<OvFormOptions>(() => ({
         'bulletList',
         'orderedList',
         'blockquote',
+        'image',
       ],
     },
     {
@@ -445,5 +496,13 @@ const showDialog = (title: string, content: string) => {
 
 .markdown-content :deep(blockquote p) {
   margin: 0;
+}
+
+.markdown-content :deep(img) {
+  max-width: 100%;
+  height: auto;
+  margin: 0.5rem 0;
+  border-radius: 4px;
+  display: block;
 }
 </style>

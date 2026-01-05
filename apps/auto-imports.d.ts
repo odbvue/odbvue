@@ -59,6 +59,7 @@ declare global {
   const reactive: typeof import('vue').reactive
   const readonly: typeof import('vue').readonly
   const ref: typeof import('vue').ref
+  const renderMarkdownWithImages: typeof import('./src/components/index').renderMarkdownWithImages
   const renderViewItem: typeof import('./src/components/index').renderViewItem
   const resolveComponent: typeof import('vue').resolveComponent
   const shallowReactive: typeof import('vue').shallowReactive
@@ -128,6 +129,6 @@ declare global {
   export type { Share, WindowFeatures, ShareOptions } from './src/components/VOvShare.vue'
   import('./src/components/VOvShare.vue')
   // @ts-ignore
-  export type { OvRule, OvFormat, OvAction, OvFormTextareaField, OvFormMarkdownField, OvFormRatingField, OvFormSelectItem, OvFormSelectionField, OvFormFileField, OvFormFileData, OvFormFieldError, OvAlign, OvFormOptions, OvTableColumn, OvFilterValue, OvTableOptions, OvViewItem, OvViewOptions, OvFormData, OvTableData, OvViewData, UseTableFetchOptions, UseTableFetchReturn, UseFormActionOptions, UseFormActionReturn } from './src/components/index'
+  export type { OvRule, OvFormat, OvAction, OvFormTextareaField, ImageUrlResult, OvFormMarkdownField, OvFormRatingField, OvFormSelectItem, OvFormSelectionField, OvFormFileField, OvFormFileData, OvFormFieldError, OvAlign, OvFormOptions, OvTableColumn, OvFilterValue, OvTableOptions, OvViewItem, OvViewOptions, OvFormData, OvTableData, OvViewData, UseTableFetchOptions, UseTableFetchReturn, UseFormActionOptions, UseFormActionReturn } from './src/components/index'
   import('./src/components/index')
 }

@@ -1240,8 +1240,57 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_tra AS
             r_error := 'something.went.wrong';
     END post_work;
 
+    PROCEDURE get_image (
+        p_id IN VARCHAR2
+    ) AS
+
+        v_uuid      CHAR(32 CHAR) := pck_api_auth.uuid;
+        v_mime_type app_storage.mime_type%TYPE;
+        v_file_size app_storage.file_size%TYPE;
+        v_file_ext  app_storage.file_ext%TYPE;
+        v_file_name app_storage.file_name%TYPE;
+        v_file      BLOB;
+    BEGIN
+        IF v_uuid IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+        pck_api_storage.download(p_id, v_file, v_file_name, v_file_size, v_file_ext,
+                                 v_mime_type);
+        owa_util.mime_header(v_mime_type, FALSE);
+        htp.p('Content-length: ' || v_file_size);
+        htp.p('Content-Disposition: filename="'
+              || v_file_name || '"');
+        owa_util.http_header_close;
+        wpg_docload.download_file(v_file);
+    END get_image;
+
+    PROCEDURE post_upload_image (
+        p_data  IN CLOB,
+        r_id    OUT VARCHAR2,
+        r_error OUT VARCHAR2
+    ) AS
+
+        v_uuid       CHAR(32 CHAR) := pck_api_auth.uuid;
+        v_file       BLOB := pck_api_lob.base64_to_blob(p_data);
+        v_file_name  VARCHAR2(500) := 'uploaded_image_'
+                                     || to_char(systimestamp, 'YYYYMMDDHH24MISSFF3')
+                                     || '.png';
+        v_storage_id tra_notes.storage_id%TYPE;
+    BEGIN
+        IF v_uuid IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+        pck_api_storage.upload(v_file, v_file_name, v_storage_id);
+        r_id := v_storage_id;
+    EXCEPTION
+        WHEN OTHERS THEN
+            r_error := 'something.went.wrong';
+    END post_upload_image;
+
 END pck_tra;
 /
 
 
--- sqlcl_snapshot {"hash":"f7053849f152508ec30dd3d6ff43d710f2f1ae01","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"9ed6fe87542a7528349c51f213ae81a0c6df1022","type":"PACKAGE_BODY","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}

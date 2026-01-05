@@ -103,8 +103,18 @@ CREATE OR REPLACE PACKAGE odbvue.pck_tra AS
         r_errors OUT SYS_REFCURSOR -- Resulting errors if any
     );
 
+    PROCEDURE get_image (
+        p_id IN VARCHAR2 -- Storage identifier of the image file
+    );
+
+    PROCEDURE post_upload_image (
+        p_data  IN CLOB, -- Image file Base64 encoded
+        r_id    OUT VARCHAR2, -- Resulting storage identifier
+        r_error OUT VARCHAR2 -- Error message if any
+    );
+
 END pck_tra;
 /
 
 
--- sqlcl_snapshot {"hash":"d11b3b73565f0660083b19a978f577e5b6b9e0e3","type":"PACKAGE_SPEC","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"1803cc7eb38e126788723c25116c695fc9939fa0","type":"PACKAGE_SPEC","name":"PCK_TRA","schemaName":"ODBVUE","sxml":""}

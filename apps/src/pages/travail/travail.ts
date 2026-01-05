@@ -2,6 +2,7 @@ import { defineStore, acceptHMRUpdate } from 'pinia'
 import {
   processFormDataWithFiles,
   type OvFormFieldError,
+  type ImageUrlResult,
   minutesToDuration,
 } from '@/components/index.ts'
 
@@ -416,6 +417,40 @@ export const useTravailStore = defineStore(
       }
     }
 
+    const uploadImage = async (base64Data: string): Promise<string | null> => {
+      try {
+        const response = await http.post<{ id?: string; error?: string }>('tra/upload-image/', {
+          data: base64Data,
+        })
+        if (response.data?.id) {
+          return response.data.id
+        } else if (response.data?.error) {
+          console.error('Image upload error:', response.data.error)
+          return null
+        }
+        return null
+      } catch (error) {
+        console.error('Image upload failed:', error)
+        return null
+      }
+    }
+
+    const getImageUrl = async (imageId: string): Promise<ImageUrlResult> => {
+      const storageUrl = `/api/tra/image/${imageId}`
+      try {
+        const response = await http.get<Blob>(`tra/image/${imageId}`)
+        if (response.status === 200 && response.data) {
+          // Response is already a Blob
+          const displayUrl = window.URL.createObjectURL(response.data)
+          return { displayUrl, storageUrl }
+        }
+      } catch (error) {
+        console.error('Image download failed:', error)
+      }
+      // Fallback: return storage URL for both if fetch fails
+      return { displayUrl: storageUrl, storageUrl }
+    }
+
     type Work = {
       key: string
       workdate: string
@@ -498,6 +533,8 @@ export const useTravailStore = defineStore(
       fetchNotesPage,
       postNote,
       downloadFile,
+      uploadImage,
+      getImageUrl,
       getWorklog,
       worklog,
       worklogPage,
