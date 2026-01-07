@@ -1,4 +1,13 @@
 <template>
+  <v-container>
+    <v-row>
+      <v-col cols="12" md="4">
+        <v-card color="primary" prepend-icon="$mdiCommentQuestion" to="crm/surveys" hover>
+          <v-card-title>{{ t('surveys') }}</v-card-title>
+        </v-card>
+      </v-col>
+    </v-row>
+  </v-container>
   <v-ov-table :options="options" :data="data" :loading="loading" @fetch="fetchRequests" />
 </template>
 
@@ -14,6 +23,8 @@ definePage({
     roles: ['admin'],
   },
 })
+
+const { t } = useI18n()
 
 type CrmRequestsResponse = {
   requests: OvTableData[]
