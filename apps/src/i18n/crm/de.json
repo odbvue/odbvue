@@ -1,1 +1,23 @@
-{}
+{
+  "organization": "Organisation",
+  "surveys": "Umfragen",
+  "survey": "Umfrage",
+  "questions": "Fragen",
+  "responses": "Antworten",
+  "title.description": "Titel / Beschreibung",
+  "valid.from": "Gültig ab",
+  "valid.to": "Gültig bis",
+  "question": "Frage",
+  "your.answer": "Ihre Antwort",
+  "prev": "Zurück",
+  "next": "Weiter",
+  "finish": "Fertig",
+  "required": "Erforderlich",
+  "field.required": "Dieses Feld ist erforderlich",
+  "survey.not.found": "Umfrage nicht gefunden oder inaktiv",
+  "survey.load.error": "Fehler beim Laden der Umfrage",
+  "survey.submit.error": "Fehler beim Absenden der Umfrage",
+  "survey.submitted": "Ihre Antwort wurde aufgezeichnet.",
+  "thank.you": "Vielen Dank!",
+  "no.questions": "Diese Umfrage hat keine Fragen"
+}

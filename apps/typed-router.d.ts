@@ -128,6 +128,20 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/crm/surveys/': RouteRecordInfo<
+      '/crm/surveys/',
+      '/crm/surveys',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/crm/surveys/[code]': RouteRecordInfo<
+      '/crm/surveys/[code]',
+      '/crm/surveys/:code',
+      { code: ParamValue<true> },
+      { code: ParamValue<false> },
+      | never
+    >,
     '/login': RouteRecordInfo<
       '/login',
       '/login',
@@ -245,6 +259,13 @@ declare module 'vue-router/auto-routes' {
       '/signup',
       Record<never, never>,
       Record<never, never>,
+      | never
+    >,
+    '/survey/[code]': RouteRecordInfo<
+      '/survey/[code]',
+      '/survey/:code',
+      { code: ParamValue<true> },
+      { code: ParamValue<false> },
       | never
     >,
     '/travail/': RouteRecordInfo<
@@ -378,6 +399,18 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/pages/crm/surveys/index.vue': {
+      routes:
+        | '/crm/surveys/'
+      views:
+        | never
+    }
+    'src/pages/crm/surveys/[code].vue': {
+      routes:
+        | '/crm/surveys/[code]'
+      views:
+        | never
+    }
     'src/pages/login.vue': {
       routes:
         | '/login'
@@ -477,6 +510,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/signup.vue': {
       routes:
         | '/signup'
+      views:
+        | never
+    }
+    'src/pages/survey/[code].vue': {
+      routes:
+        | '/survey/[code]'
       views:
         | never
     }

@@ -1,1 +1,23 @@
-{}
+{
+  "organization": "Organisation",
+  "surveys": "Enquêtes",
+  "survey": "Enquête",
+  "questions": "Questions",
+  "responses": "Réponses",
+  "title.description": "Titre / Description",
+  "valid.from": "Valide à partir de",
+  "valid.to": "Valide jusqu'à",
+  "question": "Question",
+  "your.answer": "Votre réponse",
+  "prev": "Précédent",
+  "next": "Suivant",
+  "finish": "Terminer",
+  "required": "Obligatoire",
+  "field.required": "Ce champ est obligatoire",
+  "survey.not.found": "Enquête introuvable ou inactive",
+  "survey.load.error": "Échec du chargement de l'enquête",
+  "survey.submit.error": "Échec de la soumission de l'enquête",
+  "survey.submitted": "Votre réponse a été enregistrée.",
+  "thank.you": "Merci!",
+  "no.questions": "Cette enquête n'a pas de questions"
+}

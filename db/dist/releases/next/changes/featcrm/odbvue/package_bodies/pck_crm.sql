@@ -1,3 +1,7 @@
+-- liquibase formatted sql
+-- changeset ODBVUE:1767794235529 stripComments:false  logicalFilePath:featcrm\odbvue\package_bodies\pck_crm.sql
+-- sqlcl_snapshot db/src/database/odbvue/package_bodies/pck_crm.sql:970e9aabc605f4bbb7e176af8084589d4027dec9:c1bbdb2d6d4d063097bc1942a00a6260cac0b571:alter
+
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_crm AS
 
     PROCEDURE get_requests (
@@ -868,5 +872,3 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_crm AS
 END pck_crm;
 /
 
-
--- sqlcl_snapshot {"hash":"c1bbdb2d6d4d063097bc1942a00a6260cac0b571","type":"PACKAGE_BODY","name":"PCK_CRM","schemaName":"ODBVUE","sxml":""}

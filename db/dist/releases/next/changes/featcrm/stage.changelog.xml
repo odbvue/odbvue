@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+<include file="odbvue/package_specs/pck_crm.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/tables/crm_surveys.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/tables/crm_survey_questions.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/tables/crm_survey_responses.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_bodies/pck_crm.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/comments/crm_surveys.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/comments/crm_survey_questions.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/comments/crm_survey_responses.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_crm_surveys_author.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_crm_surveys_created.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_crm_survey_questions_survey.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_crm_survey_responses_author.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_crm_survey_responses_created.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_crm_survey_responses_survey.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/ref_constraints/cfk_crm_surveys_author.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/ref_constraints/cfk_crm_surveys_editor.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/ref_constraints/cfk_crm_survey_questions_survey.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/ref_constraints/cfk_crm_survey_responses_author.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/ref_constraints/cfk_crm_survey_responses_survey.sql" relativeToChangelogFile="true"/>
+</databaseChangeLog>
