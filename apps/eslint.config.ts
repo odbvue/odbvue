@@ -32,7 +32,7 @@ export default defineConfigWithVueTs(
   },
   skipFormatting,
   {
-    files: ['src/pages/**/*.vue'],
+    files: ['src/pages/**/*.vue', 'src/modules/**/pages/**/*.vue'],
     rules: {
       'vue/multi-word-component-names': 'off',
     },

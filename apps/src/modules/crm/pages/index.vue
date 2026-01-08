@@ -8,6 +8,7 @@
       </v-col>
     </v-row>
   </v-container>
+  <h2>{{ t('discovery.requests') }}</h2>
   <v-ov-table :options="options" :data="data" :loading="loading" @fetch="fetchRequests" />
 </template>
 

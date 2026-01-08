@@ -1,0 +1,13 @@
+{
+  "module": "crm",
+  "prefix": "crm_",
+  "description": "Customer Relationship Management - Surveys, Discovery Requests",
+  "tables": [
+    "crm_discovery_requests",
+    "crm_surveys",
+    "crm_survey_questions",
+    "crm_survey_responses"
+  ],
+  "packages": ["pck_crm"],
+  "dependencies": ["@odbvue/core"]
+}

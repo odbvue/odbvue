@@ -26,7 +26,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, defineProps, computed, onBeforeUnmount, nextTick } from 'vue'
+import { ref, watch, onMounted, computed, onBeforeUnmount, nextTick } from 'vue'
 
 interface Coordinate {
   x: number

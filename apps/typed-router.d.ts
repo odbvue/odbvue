@@ -128,6 +128,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/crm/[code]': RouteRecordInfo<
+      '/crm/[code]',
+      '/crm/:code',
+      { code: ParamValue<true> },
+      { code: ParamValue<false> },
+      | never
+    >,
     '/crm/surveys/': RouteRecordInfo<
       '/crm/surveys/',
       '/crm/surveys',
@@ -393,19 +400,25 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
-    'src/pages/crm/index.vue': {
+    'src/modules/crm/pages/index.vue': {
       routes:
         | '/crm/'
       views:
         | never
     }
-    'src/pages/crm/surveys/index.vue': {
+    'src/modules/crm/pages/[code].vue': {
+      routes:
+        | '/crm/[code]'
+      views:
+        | never
+    }
+    'src/modules/crm/pages/surveys/index.vue': {
       routes:
         | '/crm/surveys/'
       views:
         | never
     }
-    'src/pages/crm/surveys/[code].vue': {
+    'src/modules/crm/pages/surveys/[code].vue': {
       routes:
         | '/crm/surveys/[code]'
       views:
@@ -519,25 +532,25 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
-    'src/pages/travail/index.vue': {
+    'src/modules/travail/pages/index.vue': {
       routes:
         | '/travail/'
       views:
         | never
     }
-    'src/pages/travail/[num].vue': {
+    'src/modules/travail/pages/[num].vue': {
       routes:
         | '/travail/[num]'
       views:
         | never
     }
-    'src/pages/travail/boards/index.vue': {
+    'src/modules/travail/pages/boards/index.vue': {
       routes:
         | '/travail/boards/'
       views:
         | never
     }
-    'src/pages/travail/boards/[key].vue': {
+    'src/modules/travail/pages/boards/[key].vue': {
       routes:
         | '/travail/boards/[key]'
       views:

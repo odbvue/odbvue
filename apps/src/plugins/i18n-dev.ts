@@ -1,4 +1,4 @@
-import { promises as fs } from 'node:fs'
+import { promises as fs, existsSync } from 'node:fs'
 import path from 'node:path'
 import type { Plugin, ViteDevServer } from 'vite'
 
@@ -10,6 +10,20 @@ type I18nCache = {
   locale: string
   key: string
   value: string
+}
+
+// Determine the correct i18n path for a module
+// If module exists in src/modules/{module}/, use src/modules/{module}/i18n/
+// Otherwise use the legacy src/i18n/{module}/ path
+function getI18nPath(module: string | undefined, locale: string): string {
+  if (module) {
+    const modulePath = path.resolve(process.cwd(), 'src', 'modules', module)
+    if (existsSync(modulePath)) {
+      return path.resolve(modulePath, 'i18n', `${locale}.json`)
+    }
+  }
+  // Legacy path or root translations
+  return path.resolve(process.cwd(), 'src', 'i18n', module || '', `${locale}.json`)
 }
 
 export function i18nDevPlugin(): Plugin {
@@ -26,13 +40,7 @@ export function i18nDevPlugin(): Plugin {
       const fileGroups = new Map<string, I18nCache[]>()
       for (const module of modules) {
         for (const locale of locales) {
-          const filePath = path.resolve(
-            process.cwd(),
-            'src',
-            'i18n',
-            module || '',
-            `${locale}.json`,
-          )
+          const filePath = getI18nPath(module, locale)
           if (!fileGroups.has(filePath)) {
             fileGroups.set(filePath, [])
           }
