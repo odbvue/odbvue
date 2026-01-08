@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.265
+
+### Patch Changes
+
+- 560bab0: crm survey bugfixes
+
 ## 0.0.264
 
 ### Patch Changes
