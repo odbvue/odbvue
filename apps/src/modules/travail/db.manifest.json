@@ -1,0 +1,19 @@
+{
+  "module": "travail",
+  "prefix": "tra_",
+  "description": "Project & Task Management - Boards, Tasks, Work Tracking",
+  "tables": [
+    "tra_acls",
+    "tra_boards",
+    "tra_items",
+    "tra_labels",
+    "tra_links",
+    "tra_notes",
+    "tra_plans",
+    "tra_ranks",
+    "tra_tasks",
+    "tra_work"
+  ],
+  "packages": ["pck_tra"],
+  "dependencies": ["@odbvue/core"]
+}

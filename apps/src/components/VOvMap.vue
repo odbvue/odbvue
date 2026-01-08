@@ -26,7 +26,7 @@
 <script setup lang="ts">
 import { GoogleMap, AdvancedMarker, InfoWindow } from 'vue3-google-map'
 import type { Ref, PropType } from 'vue'
-import { ref, watch, onMounted, defineProps, defineEmits, defineExpose } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 
 interface MapMouseEvent {
   latLng: {

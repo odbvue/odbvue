@@ -10,6 +10,8 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
+  statSync,
   unlinkSync,
   writeFileSync,
 } from 'fs';
@@ -1238,6 +1240,150 @@ program
       logger.error(`Failed to commit changes: ${error}`);
       process.exit(1);
     }
+  });
+
+// Database Import for specific module
+program
+  .command('db-import [module]')
+  .alias('di')
+  .description('Import database objects for a specific module (or all modules if not specified)')
+  .option('-c, --connection <connection>', 'Database connection (uses ODBVUE_DB_CONN if not provided)')
+  .option('-l, --list', 'List available modules')
+  .action(async (moduleName: string | undefined, options: { connection?: string; list?: boolean }) => {
+    const modulesDir = path.resolve(rootDir, 'apps/src/modules');
+
+    // Helper to list directories cross-platform using Node.js fs
+    const listDirectories = (dir: string): string[] => {
+      try {
+        return readdirSync(dir).filter((name: string) => {
+          const fullPath = path.resolve(dir, name);
+          return statSync(fullPath).isDirectory();
+        });
+      } catch {
+        return [];
+      }
+    };
+
+    // List available modules
+    if (options.list) {
+      logger.info('Available modules:');
+
+      if (!existsSync(modulesDir)) {
+        logger.warn('Modules directory not found');
+        return;
+      }
+
+      try {
+        const dirs = listDirectories(modulesDir);
+
+        for (const dir of dirs) {
+          const manifestPath = path.resolve(modulesDir, dir, 'db.manifest.json');
+          if (existsSync(manifestPath)) {
+            const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as {
+              module: string;
+              prefix: string;
+              description?: string;
+              tables: string[];
+              packages: string[];
+            };
+            console.log(
+              chalk.cyan(`  @odbvue/${manifest.module}`) +
+                chalk.gray(` (${manifest.prefix}*) - ${manifest.description || 'No description'}`)
+            );
+            console.log(chalk.gray(`    Tables: ${manifest.tables.length}, Packages: ${manifest.packages.length}`));
+          }
+        }
+      } catch {
+        logger.warn('Could not list modules directory');
+      }
+      return;
+    }
+
+    const connection = options.connection || process.env.ODBVUE_DB_CONN;
+    if (!connection) {
+      logger.error('Database connection not provided and ODBVUE_DB_CONN not set.');
+      process.exit(1);
+    }
+
+    // Find module manifest
+    const resolveModuleName = (name: string): string => {
+      // Handle @odbvue/crm or just crm
+      return name.replace('@odbvue/', '');
+    };
+
+    const getModuleManifest = (name: string) => {
+      const moduleDirName = resolveModuleName(name);
+      const manifestPath = path.resolve(modulesDir, moduleDirName, 'db.manifest.json');
+
+      if (!existsSync(manifestPath)) {
+        return null;
+      }
+
+      return JSON.parse(readFileSync(manifestPath, 'utf-8')) as {
+        module: string;
+        prefix: string;
+        description?: string;
+        tables: string[];
+        packages: string[];
+        dependencies?: string[];
+      };
+    };
+
+    const modulesToInstall: string[] = [];
+
+    if (moduleName) {
+      const manifest = getModuleManifest(moduleName);
+      if (!manifest) {
+        logger.error(`Module '${moduleName}' not found or has no db.manifest.json`);
+        process.exit(1);
+      }
+
+      // Add dependencies first
+      if (manifest.dependencies) {
+        for (const dep of manifest.dependencies) {
+          if (!modulesToInstall.includes(resolveModuleName(dep))) {
+            modulesToInstall.push(resolveModuleName(dep));
+          }
+        }
+      }
+      modulesToInstall.push(resolveModuleName(moduleName));
+    } else {
+      // Install all modules (core first, then others)
+      modulesToInstall.push('core');
+
+      try {
+        const dirs = listDirectories(modulesDir);
+
+        for (const dir of dirs) {
+          if (dir !== 'core' && existsSync(path.resolve(modulesDir, dir, 'db.manifest.json'))) {
+            modulesToInstall.push(dir);
+          }
+        }
+      } catch {
+        logger.error('Could not list modules directory');
+        process.exit(1);
+      }
+    }
+
+    logger.info(`Installing modules: ${modulesToInstall.map((m) => `@odbvue/${m}`).join(', ')}`);
+
+    for (const mod of modulesToInstall) {
+      const manifest = getModuleManifest(mod);
+      if (!manifest) {
+        logger.warn(`Skipping ${mod}: no db.manifest.json`);
+        continue;
+      }
+
+      logger.info(`Installing @odbvue/${mod} (${manifest.tables.length} tables, ${manifest.packages.length} packages)...`);
+
+      // For now, just log what would be installed
+      // Full implementation would run Liquibase with module-specific changelog
+      console.log(chalk.gray(`  Tables: ${manifest.tables.join(', ')}`));
+      console.log(chalk.gray(`  Packages: ${manifest.packages.join(', ')}`));
+    }
+
+    logger.success('Module database import completed');
+    logger.info('Note: Full Liquibase integration pending - currently shows manifest info only');
   });
 
 // Parse arguments

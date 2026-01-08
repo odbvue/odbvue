@@ -1,8 +1,57 @@
 import { fileURLToPath, URL } from 'node:url'
-import { promises as fs } from 'node:fs'
+import { promises as fs, existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 
 import { defineConfig, loadEnv } from 'vite'
+
+// Auto-detect modules with pages directories in src/modules/*
+function getModuleRoutesFolders() {
+  const modulesDir = path.resolve(__dirname, 'src/modules')
+  const routesFolders: Array<{ src: string; path: string; exclude: string[] }> = []
+
+  if (!existsSync(modulesDir)) return routesFolders
+
+  const modules = readdirSync(modulesDir, { withFileTypes: true })
+    .filter((dirent) => dirent.isDirectory())
+
+  for (const mod of modules) {
+    const pagesPath = path.join(modulesDir, mod.name, 'pages')
+    if (existsSync(pagesPath)) {
+      routesFolders.push({
+        src: `src/modules/${mod.name}/pages`,
+        path: `${mod.name}/`,
+        exclude: ['**/_components/**', '**/_utils/**'],
+      })
+    }
+  }
+
+  return routesFolders
+}
+
+// Get module i18n paths for VueI18nPlugin
+function getModuleI18nPaths() {
+  const modulesDir = path.resolve(__dirname, 'src/modules')
+  const i18nPaths: string[] = []
+
+  if (!existsSync(modulesDir)) return i18nPaths
+
+  const modules = readdirSync(modulesDir, { withFileTypes: true })
+    .filter((dirent) => dirent.isDirectory())
+
+  for (const mod of modules) {
+    const i18nPath = path.join(modulesDir, mod.name, 'i18n')
+    if (existsSync(i18nPath)) {
+      i18nPaths.push(path.resolve(__dirname, `src/modules/${mod.name}/i18n/**`))
+    }
+  }
+
+  return i18nPaths
+}
+
+// Build exclude patterns from detected modules
+function getExcludedModules() {
+  return ['**/_components/**', '**/modules/**']
+}
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import VueRouter from 'unplugin-vue-router/vite'
@@ -70,8 +119,9 @@ export default defineConfig(({ mode }) => {
         routesFolder: [
           {
             src: 'src/pages',
-            exclude: ['**/_components/**'],
+            exclude: getExcludedModules(),
           },
+          ...getModuleRoutesFolders(),
         ],
         extensions: ['.vue', '.md'],
         async extendRoute(route) {
@@ -86,7 +136,10 @@ export default defineConfig(({ mode }) => {
       }),
       Vuetify(),
       VueI18nPlugin({
-        include: path.resolve(__dirname, './src/i18n/**')
+        include: [
+          path.resolve(__dirname, './src/i18n/**'),
+          ...getModuleI18nPaths(),
+        ]
       }),
       i18nDevPlugin(),
       AutoImport({
