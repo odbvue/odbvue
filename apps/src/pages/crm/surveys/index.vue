@@ -28,7 +28,6 @@ definePage({
 })
 
 const router = useRouter()
-const { t } = useI18n()
 const http = useHttp()
 
 type SurveysResponse = {
@@ -112,8 +111,8 @@ const options = ref<OvTableOptions>({
         },
       ],
     },
-    { name: 'countQuestions', label: t('questions') },
-    { name: 'countResponses', label: t('responses') },
+    { name: 'countquestions', label: 'questions' },
+    { name: 'countresponses', label: 'responses' },
     { name: 'author' },
     { name: 'created' },
     {
