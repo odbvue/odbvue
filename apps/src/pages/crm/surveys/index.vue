@@ -28,7 +28,6 @@ definePage({
 })
 
 const router = useRouter()
-const { t } = useI18n()
 const http = useHttp()
 
 type SurveysResponse = {
@@ -77,6 +76,10 @@ const handleAction = async (
       window.URL.revokeObjectURL(url)
     }
     callback?.()
+  } else if (name === 'copy-link' && value?.code) {
+    const surveyLink = `${window.location.origin}/survey/${value.code}`
+    await navigator.clipboard.writeText(surveyLink)
+    callback?.()
   } else {
     await formAction(name, item, value, callback)
   }
@@ -108,8 +111,8 @@ const options = ref<OvTableOptions>({
         },
       ],
     },
-    { name: 'countQuestions', label: t('questions') },
-    { name: 'countResponses', label: t('responses') },
+    { name: 'countquestions', label: 'questions' },
+    { name: 'countresponses', label: 'responses' },
     { name: 'author' },
     { name: 'created' },
     {
@@ -120,6 +123,11 @@ const options = ref<OvTableOptions>({
           name: 'edit',
           key: 'code',
           format: { icon: '$mdiPencil', to: '/crm/surveys/{{value}}' },
+        },
+        {
+          name: 'copy-link',
+          key: 'code',
+          format: { icon: '$mdiContentCopy' },
         },
         {
           name: 'download',
