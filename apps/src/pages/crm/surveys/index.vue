@@ -77,6 +77,10 @@ const handleAction = async (
       window.URL.revokeObjectURL(url)
     }
     callback?.()
+  } else if (name === 'copy-link' && value?.code) {
+    const surveyLink = `${window.location.origin}/survey/${value.code}`
+    await navigator.clipboard.writeText(surveyLink)
+    callback?.()
   } else {
     await formAction(name, item, value, callback)
   }
@@ -120,6 +124,11 @@ const options = ref<OvTableOptions>({
           name: 'edit',
           key: 'code',
           format: { icon: '$mdiPencil', to: '/crm/surveys/{{value}}' },
+        },
+        {
+          name: 'copy-link',
+          key: 'code',
+          format: { icon: '$mdiContentCopy' },
         },
         {
           name: 'download',
