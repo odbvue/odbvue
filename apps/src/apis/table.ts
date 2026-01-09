@@ -369,10 +369,9 @@ export class Table {
     this.validate()
 
     // drop table if exists
-    let sql = `-- ${this.info.name}\n\n`
-
-    sql += `BEGIN\n`
+    let sql = `BEGIN\n`
     sql += `  EXECUTE IMMEDIATE 'DROP TABLE ${this.info.name}';\n`
+    sql += `  DBMS_OUTPUT.PUT_LINE('Dropped table ${this.info.name}');\n`
     sql += `EXCEPTION\n`
     sql += `  WHEN OTHERS THEN\n`
     sql += `    IF SQLCODE != -942 THEN\n`

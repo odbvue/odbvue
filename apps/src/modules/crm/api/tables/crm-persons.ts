@@ -1,4 +1,4 @@
-import { Table, columnType as ct } from '../../../../apis/tables'
+import { Table, columnType as ct } from '../../../../apis/table'
 
 export const crmPersons = new Table()
   .create('crm_persons', 'CRM Person Table')

@@ -1285,9 +1285,14 @@ program
         // Create a temporary loader script
         const fileUrl = `file://${path.resolve(apiDir, 'index.ts').replace(/\\/g, '/')}`
         const loaderScript = `import('${fileUrl}').then(m => {
+  const schema = m.schema;
   const tables = m.tables || [];
   const packages = m.packages || [];
   const sqlParts = [];
+  
+  if (schema && typeof schema.render === 'function') {
+    sqlParts.push(schema.render());
+  }
   
   for (const table of tables) {
     if (typeof table.render === 'function') {
