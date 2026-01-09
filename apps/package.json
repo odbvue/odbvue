@@ -76,6 +76,7 @@
                     "markdown-it": "^14.1.0",
                     "npm-run-all2": "^8.0.4",
                     "prettier": "3.6.2",
+                    "tsx": "^4.21.0",
                     "typescript": "~5.9.3",
                     "unplugin-auto-import": "^20.2.0",
                     "unplugin-vue-components": "^30.0.0",

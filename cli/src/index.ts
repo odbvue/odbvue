@@ -1242,148 +1242,166 @@ program
     }
   });
 
-// Database Import for specific module
+// Database Scaffold - Generate SQL from module API definitions
 program
-  .command('db-import [module]')
-  .alias('di')
-  .description('Import database objects for a specific module (or all modules if not specified)')
-  .option('-c, --connection <connection>', 'Database connection (uses ODBVUE_DB_CONN if not provided)')
-  .option('-l, --list', 'List available modules')
-  .action(async (moduleName: string | undefined, options: { connection?: string; list?: boolean }) => {
-    const modulesDir = path.resolve(rootDir, 'apps/src/modules');
+  .command('db-scaffold [path]')
+  .alias('ds')
+  .description('Generate SQL scripts from module API definitions (scans current directory if no path provided)')
+  .option('-o, --output <dir>', 'Output directory (defaults to ./dist relative to module)')
+  .action(async (pathArg: string | undefined, options: { output?: string }) => {
+    try {
+      const cwd = process.cwd();
+      let apiPath: string;
 
-    // Helper to list directories cross-platform using Node.js fs
-    const listDirectories = (dir: string): string[] => {
-      try {
-        return readdirSync(dir).filter((name: string) => {
-          const fullPath = path.resolve(dir, name);
-          return statSync(fullPath).isDirectory();
-        });
-      } catch {
-        return [];
-      }
-    };
-
-    // List available modules
-    if (options.list) {
-      logger.info('Available modules:');
-
-      if (!existsSync(modulesDir)) {
-        logger.warn('Modules directory not found');
-        return;
+      if (!pathArg) {
+        // Default: look for index.ts in current directory
+        apiPath = path.resolve(cwd, 'index.ts');
+      } else {
+        // Path provided: look for api/index.ts relative to that path
+        const targetDir = path.isAbsolute(pathArg) ? pathArg : path.resolve(cwd, pathArg);
+        apiPath = path.resolve(targetDir, 'api/index.ts');
       }
 
-      try {
-        const dirs = listDirectories(modulesDir);
-
-        for (const dir of dirs) {
-          const manifestPath = path.resolve(modulesDir, dir, 'db.manifest.json');
-          if (existsSync(manifestPath)) {
-            const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as {
-              module: string;
-              prefix: string;
-              description?: string;
-              tables: string[];
-              packages: string[];
-            };
-            console.log(
-              chalk.cyan(`  @odbvue/${manifest.module}`) +
-                chalk.gray(` (${manifest.prefix}*) - ${manifest.description || 'No description'}`)
-            );
-            console.log(chalk.gray(`    Tables: ${manifest.tables.length}, Packages: ${manifest.packages.length}`));
-          }
-        }
-      } catch {
-        logger.warn('Could not list modules directory');
+      if (!existsSync(apiPath)) {
+        logger.error(`API file not found: ${apiPath}`);
+        process.exit(1);
       }
-      return;
-    }
 
-    const connection = options.connection || process.env.ODBVUE_DB_CONN;
-    if (!connection) {
-      logger.error('Database connection not provided and ODBVUE_DB_CONN not set.');
+      await scaffoldModule(apiPath, options.output);
+    } catch (error) {
+      logger.error(`Failed to scaffold: ${error instanceof Error ? error.message : String(error)}`);
       process.exit(1);
     }
 
-    // Find module manifest
-    const resolveModuleName = (name: string): string => {
-      // Handle @odbvue/crm or just crm
-      return name.replace('@odbvue/', '');
-    };
+    async function scaffoldModule(apiPath: string, outputDir?: string): Promise<void> {
+      const moduleName = path.basename(path.dirname(path.dirname(apiPath)));
+      const apiDir = path.dirname(apiPath);
+      const distDir = outputDir || path.resolve(apiDir, 'dist');
 
-    const getModuleManifest = (name: string) => {
-      const moduleDirName = resolveModuleName(name);
-      const manifestPath = path.resolve(modulesDir, moduleDirName, 'db.manifest.json');
-
-      if (!existsSync(manifestPath)) {
-        return null;
-      }
-
-      return JSON.parse(readFileSync(manifestPath, 'utf-8')) as {
-        module: string;
-        prefix: string;
-        description?: string;
-        tables: string[];
-        packages: string[];
-        dependencies?: string[];
-      };
-    };
-
-    const modulesToInstall: string[] = [];
-
-    if (moduleName) {
-      const manifest = getModuleManifest(moduleName);
-      if (!manifest) {
-        logger.error(`Module '${moduleName}' not found or has no db.manifest.json`);
-        process.exit(1);
-      }
-
-      // Add dependencies first
-      if (manifest.dependencies) {
-        for (const dep of manifest.dependencies) {
-          if (!modulesToInstall.includes(resolveModuleName(dep))) {
-            modulesToInstall.push(resolveModuleName(dep));
-          }
-        }
-      }
-      modulesToInstall.push(resolveModuleName(moduleName));
-    } else {
-      // Install all modules (core first, then others)
-      modulesToInstall.push('core');
+      // Create dist directory if it doesn't exist
+      mkdirSync(distDir, { recursive: true });
 
       try {
-        const dirs = listDirectories(modulesDir);
+        // Create a temporary loader script
+        const fileUrl = `file://${path.resolve(apiDir, 'index.ts').replace(/\\/g, '/')}`
+        const loaderScript = `import('${fileUrl}').then(m => {
+  const schema = m.schema;
+  const tables = m.tables || [];
+  const packages = m.packages || [];
+  const sqlParts = [];
+  
+  if (schema && typeof schema.render === 'function') {
+    sqlParts.push(schema.render());
+  }
+  
+  for (const table of tables) {
+    if (typeof table.render === 'function') {
+      sqlParts.push(table.render());
+    }
+  }
+  
+  for (const pkg of packages) {
+    if (typeof pkg.render === 'function') {
+      sqlParts.push(pkg.render());
+    }
+  }
+  
+  console.log(JSON.stringify({ sqlParts, tableCount: tables.length, packageCount: packages.length }));
+}).catch(err => {
+  console.error(JSON.stringify({ error: err.message }));
+  process.exit(1);
+});`;
 
-        for (const dir of dirs) {
-          if (dir !== 'core' && existsSync(path.resolve(modulesDir, dir, 'db.manifest.json'))) {
-            modulesToInstall.push(dir);
+        const loaderPath = path.resolve(tmpdir(), `ov-scaffold-${Date.now()}.mjs`);
+        writeFileSync(loaderPath, loaderScript, 'utf-8');
+
+        try {
+          const result = execSync(`npx tsx ${loaderPath}`, {
+            cwd: rootDir,
+            encoding: 'utf-8',
+            stdio: ['pipe', 'pipe', 'pipe'],
+          });
+
+          const jsonMatch = result.match(/\{.*\}/s);
+          if (!jsonMatch) {
+            throw new Error('No JSON output found from loader script');
+          }
+
+          const output = JSON.parse(jsonMatch[0]);
+          
+          if (output.error) {
+            throw new Error(output.error);
+          }
+
+          const { sqlParts, tableCount, packageCount } = output;
+
+          if (tableCount === 0 && packageCount === 0) {
+            logger.warn(`No tables or packages exported from ${moduleName}`);
+            return;
+          }
+
+          if (sqlParts.length > 0) {
+            const sqlContent = sqlParts.join('\n\n');
+            const outputPath = path.resolve(distDir, 'index.sql');
+            writeFileSync(outputPath, sqlContent, 'utf-8');
+            logger.success(
+              `Scaffolded @odbvue/${moduleName} → ${path.relative(rootDir, outputPath)} (${tableCount} tables, ${packageCount} packages)`
+            );
+
+            // Prompt user to execute
+            const answer = await prompt('\nWould you like to execute this script? (y/n) ');
+            
+            if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
+              const connection = process.env.ODBVUE_DB_CONN;
+              if (!connection) {
+                logger.error('Database connection not set. Set ODBVUE_DB_CONN environment variable.');
+                return;
+              }
+
+              logger.info(`Executing with connection: ${connection}...`);
+
+              try {
+                const sqlScript = `connect ${connection}\n@${outputPath}\nexit\n`;
+                const tempScriptPath = path.resolve(distDir, '.sql_temp');
+                writeFileSync(tempScriptPath, sqlScript);
+
+                try {
+                  const isWindows = platform() === 'win32';
+                  const shell = isWindows ? 'powershell.exe' : '/bin/bash';
+                  const sqlclCommand = `sql /nolog "@${tempScriptPath}"`;
+
+                  execSync(sqlclCommand, {
+                    cwd: distDir,
+                    stdio: 'inherit',
+                    shell,
+                  });
+
+                  logger.success(`Script executed successfully.`);
+                } finally {
+                  // Clean up temporary file
+                  try {
+                    unlinkSync(tempScriptPath);
+                  } catch {
+                    // Ignore cleanup errors
+                  }
+                }
+              } catch (error) {
+                logger.error(`Script execution failed: ${error}`);
+              }
+            }
+          }
+        } finally {
+          // Clean up temp file
+          try {
+            unlinkSync(loaderPath);
+          } catch {
+            // Ignore cleanup errors
           }
         }
-      } catch {
-        logger.error('Could not list modules directory');
-        process.exit(1);
+      } catch (error) {
+        throw new Error(`Failed to process ${moduleName}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
-
-    logger.info(`Installing modules: ${modulesToInstall.map((m) => `@odbvue/${m}`).join(', ')}`);
-
-    for (const mod of modulesToInstall) {
-      const manifest = getModuleManifest(mod);
-      if (!manifest) {
-        logger.warn(`Skipping ${mod}: no db.manifest.json`);
-        continue;
-      }
-
-      logger.info(`Installing @odbvue/${mod} (${manifest.tables.length} tables, ${manifest.packages.length} packages)...`);
-
-      // For now, just log what would be installed
-      // Full implementation would run Liquibase with module-specific changelog
-      console.log(chalk.gray(`  Tables: ${manifest.tables.join(', ')}`));
-      console.log(chalk.gray(`  Packages: ${manifest.packages.join(', ')}`));
-    }
-
-    logger.success('Module database import completed');
-    logger.info('Note: Full Liquibase integration pending - currently shows manifest info only');
   });
 
 // Parse arguments
