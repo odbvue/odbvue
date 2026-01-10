@@ -33,6 +33,7 @@ type TextColumnType = BaseColumnType & {
 
 type BinaryColumnType = BaseColumnType & {
   type: 'binary'
+  default?: string
 }
 
 type CharColumnType = BaseColumnType & {
@@ -197,6 +198,11 @@ export class Column {
 
   check(condition: string | string[]): this {
     this.info.check = condition
+    return this
+  }
+
+  default(value: string | number | boolean): this {
+    this.info.type.default = value
     return this
   }
 

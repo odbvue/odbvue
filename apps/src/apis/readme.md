@@ -2,7 +2,13 @@
 
 ## Tables
 
-1. Typed table definition
-2. Table constructor
-3. Table validation
-4. Table DDL generator
+- Table definition
+
+# Packages
+
+- Package definition
+- Procedure definition
+
+# Queries
+
+- Query definition

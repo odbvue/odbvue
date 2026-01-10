@@ -12,6 +12,8 @@ declare global {
   const OvFormat: typeof import('./src/components/index').OvFormat
   const OvRuleValidate: typeof import('./src/components/index').OvRuleValidate
   const OvTextAlign: typeof import('./src/components/index').OvTextAlign
+  const camelToKebabCase: typeof import('./src/components/index').camelToKebabCase
+  const camelToSnakeCase: typeof import('./src/components/index').camelToSnakeCase
   const computed: typeof import('vue').computed
   const computedRouteParam: typeof import('./src/stores/app/navigation').computedRouteParam
   const computedRouteParams: typeof import('./src/stores/app/navigation').computedRouteParams
@@ -69,6 +71,8 @@ declare global {
   const toRef: typeof import('vue').toRef
   const toRefs: typeof import('vue').toRefs
   const toValue: typeof import('vue').toValue
+  const transformKeysToKebabCase: typeof import('./src/components/index').transformKeysToKebabCase
+  const transformKeysToSnakeCase: typeof import('./src/components/index').transformKeysToSnakeCase
   const triggerRef: typeof import('vue').triggerRef
   const unref: typeof import('vue').unref
   const useAppStore: typeof import('./src/stores/index').useAppStore
