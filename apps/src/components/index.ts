@@ -586,10 +586,33 @@ export function useTableFetch<T extends Record<string, unknown>>(
 
 // Table Form Action Composable
 
+/**
+ * Converts a camelCase string to kebab-case
+ * @param str - The camelCase string to convert
+ * @returns The kebab-case version of the string
+ */
+export function camelToKebabCase(str: string): string {
+  return str.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)
+}
+
+/**
+ * Converts all keys in an object from camelCase to kebab-case
+ * @param obj - The object with camelCase keys
+ * @returns A new object with kebab-case keys
+ */
+export function transformKeysToKebabCase(obj: OvFormData): OvFormData {
+  const result: OvFormData = {}
+  for (const [key, value] of Object.entries(obj)) {
+    result[camelToKebabCase(key)] = value
+  }
+  return result
+}
+
 export interface UseFormActionOptions {
   endpoint?: string
   endpoints?: Record<string, string>
   transformPayload?: (actionName: string, payload: OvFormData) => OvFormData
+  transformKeysToKebabCase?: boolean
   refetchOn?: string[]
   onSuccess?: (actionName: string, payload: OvFormData) => void
 }
@@ -634,6 +657,9 @@ export function useFormAction(options: UseFormActionOptions): UseFormActionRetur
       let payload = value
       if (options.transformPayload && payload) {
         payload = options.transformPayload(name, payload)
+      }
+      if (options.transformKeysToKebabCase && payload) {
+        payload = transformKeysToKebabCase(payload)
       }
       const endpoint = getEndpoint(name)
       const res: { data?: { errors?: OvFormFieldError[] } | null } = await http.post(

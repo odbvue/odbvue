@@ -25,6 +25,10 @@ const getPersons = new Procedure('get_persons', 'Gets list of persons')
 
 const personUpsert = new Upsert()
   .table_name('crm_persons')
+  .set(
+    'type',
+    "CASE WHEN p_first_name IS NOT NULL OR p_last_name IS NOT NULL THEN 'I' ELSE 'O' END",
+  )
   .set('first_name', 'p_first_name')
   .set('last_name', 'p_last_name')
   .set('legal_name', 'p_legal_name')
@@ -41,6 +45,7 @@ const postPerson = new Procedure('post_person', 'Create or update a person')
 
 const organizationUpsert = new Upsert()
   .table_name('crm_persons')
+  .set('type', "'O'")
   .set('legal_name', 'p_legal_name')
   .set('modified', 'SYSTIMESTAMP')
   .where('id = p_id')

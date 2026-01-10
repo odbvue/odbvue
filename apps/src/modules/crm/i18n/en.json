@@ -27,5 +27,15 @@
   "Responses": "Responses",
   "author": "Author",
   "position": "Position",
-  "code": "Code"
+  "code": "Code",
+  "persons": "Persons",
+  "discovery.requests": "Discovery requests",
+  "add.person": "Add person",
+  "fullname.type": "Fullname type",
+  "first.name": "First name",
+  "last.name": "Last name",
+  "legal.name": "Legal name",
+  "update": "Update",
+  "insertPerson": "InsertPerson",
+  "insertOrganization": "InsertOrganization"
 }

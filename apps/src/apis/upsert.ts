@@ -27,8 +27,17 @@ export class Upsert {
   set(column: string, value: string | number | boolean): this {
     this.updateStmt.set(column, value)
     // Also add to insert for columns that will be updated
-    if (value && typeof value === 'string' && value.startsWith('p_')) {
-      this.insertStmt.column(column, value)
+    // Include: parameters (p_*), expressions (contain spaces), quoted literals ('...')
+    // Exclude: SQL functions like SYSTIMESTAMP
+    if (value !== undefined && value !== null) {
+      if (typeof value === 'string') {
+        if (value.startsWith('p_') || value.includes(' ') || value.startsWith("'")) {
+          this.insertStmt.column(column, value)
+        }
+      } else {
+        // Non-string values (numbers, booleans)
+        this.insertStmt.column(column, value)
+      }
     }
     return this
   }

@@ -43,6 +43,14 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_crm_v2 AS
 
         UPDATE crm_persons
         SET
+            type =
+                CASE
+                    WHEN p_first_name IS NOT NULL
+                         OR p_last_name IS NOT NULL THEN
+                        'I'
+                    ELSE
+                        'O'
+                END,
             first_name = p_first_name,
             last_name = p_last_name,
             legal_name = p_legal_name,
@@ -52,12 +60,21 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_crm_v2 AS
 
         IF SQL%rowcount = 0 THEN
             INSERT INTO crm_persons (
+                type,
                 first_name,
                 last_name,
                 legal_name
-            ) VALUES ( p_first_name,
-                       p_last_name,
-                       p_legal_name );
+            ) VALUES (
+                CASE
+                    WHEN p_first_name IS NOT NULL
+                         OR p_last_name IS NOT NULL THEN
+                        'I'
+                    ELSE
+                        'O'
+                END,
+                p_first_name,
+                p_last_name,
+                p_legal_name );
 
         END IF;
 
@@ -76,13 +93,18 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_crm_v2 AS
 
         UPDATE crm_persons
         SET
+            type = 'O',
             legal_name = p_legal_name,
             modified = systimestamp
         WHERE
             id = p_id;
 
         IF SQL%rowcount = 0 THEN
-            INSERT INTO crm_persons ( legal_name ) VALUES ( p_legal_name );
+            INSERT INTO crm_persons (
+                type,
+                legal_name
+            ) VALUES ( 'O',
+                       p_legal_name );
 
         END IF;
 
@@ -93,4 +115,4 @@ END pck_crm_v2;
 /
 
 
--- sqlcl_snapshot {"hash":"c5775e658d7cc40243319fefabd0788e2140462f","type":"PACKAGE_BODY","name":"PCK_CRM_V2","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"024d0f9b9a8ddc59a4da8159673df4830919d9ed","type":"PACKAGE_BODY","name":"PCK_CRM_V2","schemaName":"ODBVUE","sxml":""}
