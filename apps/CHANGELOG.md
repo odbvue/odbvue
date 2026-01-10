@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.268
+
+### Patch Changes
+
+- 8aef3c4: db scaffolding
+
 ## 0.0.267
 
 ### Patch Changes
