@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+<include file="odbvue/package_specs/pck_crm_v2.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/tables/crm_persons.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/package_bodies/pck_crm_v2.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/comments/crm_persons.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_crm_persons_created.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_crm_persons_first_name_last_name.sql" relativeToChangelogFile="true"/>
+<include file="odbvue/indexes/idx_crm_persons_type_status.sql" relativeToChangelogFile="true"/>
+</databaseChangeLog>
