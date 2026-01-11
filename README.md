@@ -37,6 +37,9 @@ ov local-setup
 ov db-install-local
 
 # 4) start app + wiki dev servers
+cd apps
+pnpm install
+cd ..
 ov dev
 ```
 
