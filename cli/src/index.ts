@@ -205,6 +205,70 @@ const downloadWalletZipFromContainer = async (
   });
 };
 
+// Wait for container to be healthy with progress feedback
+const waitForContainerHealth = async (
+  podmanCmd: string,
+  containerName: string,
+  timeoutMs: number = 600000, // 10 minutes default
+  intervalMs: number = 5000, // 5 seconds between checks
+): Promise<void> => {
+  const startTime = Date.now();
+  const spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  let frameIndex = 0;
+
+  const getContainerStatus = (): string | null => {
+    try {
+      const result = execSync(
+        `${podmanCmd} inspect --format "{{.State.Health.Status}}" ${containerName}`,
+        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
+      ).trim();
+      return result;
+    } catch {
+      // Container might not exist yet or no health check defined
+      try {
+        const running = execSync(
+          `${podmanCmd} inspect --format "{{.State.Running}}" ${containerName}`,
+          { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
+        ).trim();
+        return running === 'true' ? 'running' : 'not-running';
+      } catch {
+        return null;
+      }
+    }
+  };
+
+  return new Promise((resolve, reject) => {
+    const check = () => {
+      const elapsed = Date.now() - startTime;
+      if (elapsed > timeoutMs) {
+        process.stdout.write('\n');
+        reject(new Error(`Timeout waiting for container ${containerName} to be healthy`));
+        return;
+      }
+
+      const status = getContainerStatus();
+      const elapsedMin = Math.floor(elapsed / 60000);
+      const elapsedSec = Math.floor((elapsed % 60000) / 1000);
+      const timeStr = elapsedMin > 0 ? `${elapsedMin}m ${elapsedSec}s` : `${elapsedSec}s`;
+
+      if (status === 'healthy') {
+        process.stdout.write('\r' + ' '.repeat(80) + '\r'); // Clear line
+        resolve();
+        return;
+      }
+
+      const spinner = spinnerFrames[frameIndex % spinnerFrames.length];
+      frameIndex++;
+      const statusDisplay = status ?? 'waiting';
+      process.stdout.write(`\r${chalk.blue(spinner)} Waiting for database to be ready... (${statusDisplay}, ${timeStr})`);
+
+      setTimeout(check, intervalMs);
+    };
+
+    check();
+  });
+};
+
 // Prompt utility for user input
 const prompt = (question: string): Promise<string> => {
   return new Promise((resolve) => {
@@ -321,8 +385,7 @@ localDbCmd
 program
   .command('local-setup')
   .description('Guided local setup: start local DB, create config files, and prepare app/wiki for local dev')
-  .option('-n, --name <name>', 'Local DB container name', 'odbvue-db-dev')
-  .action(async (options: { name: string }) => {
+  .action(async () => {
     const podmanCmd = getPodmanCommand();
     if (!podmanCmd) {
       logger.error('Podman not found. Install Podman first (or run manual setup from i13e/local/db).');
@@ -344,7 +407,11 @@ program
       process.exit(1);
     }
 
-    logger.info('Configuring local DB passwords...');
+    logger.info('Configuring local DB...');
+    const defaultContainerName = 'odbvue-db-dev';
+    const containerNameInput = await prompt(`Container name [${defaultContainerName}]: `);
+    const containerName = containerNameInput.trim() ? containerNameInput.trim() : defaultContainerName;
+
     const defaultPassword = 'MySecurePass123!';
     const adminPasswordInput = await prompt(`ADMIN_PASSWORD [${defaultPassword}]: `);
     const walletPasswordInput = await prompt(`WALLET_PASSWORD [${defaultPassword}]: `);
@@ -358,18 +425,28 @@ program
     }
     writeFileSync(
       localDbEnvPath,
-      `ADMIN_PASSWORD="${adminPassword}"\nWALLET_PASSWORD="${walletPassword}"\n`,
+      `CONTAINER_NAME="${containerName}"\nADMIN_PASSWORD="${adminPassword}"\nWALLET_PASSWORD="${walletPassword}"\n`,
       'utf-8',
     );
     logger.success('Local DB .env written');
 
     logger.info('Starting local DB container...');
     execSync(`${podmanCmd} compose up -d --build`, { cwd: localDbDir, stdio: 'inherit' });
-    logger.success('Local DB started');
+    logger.success('Local DB container started');
+
+    logger.info('Waiting for database to be healthy (this may take 3-5 minutes)...');
+    try {
+      await waitForContainerHealth(podmanCmd, containerName);
+      logger.success('Database is healthy');
+    } catch (error) {
+      logger.error(`${error}`);
+      logger.warn('You can manually wait and then run: ov local-wallet --name ' + containerName);
+      process.exit(1);
+    }
 
     const walletZipPath = path.resolve(homedir(), '.wallets/odbvue/local.zip');
     logger.info('Downloading wallet from container...');
-    await downloadWalletZipFromContainer(podmanCmd, options.name, walletZipPath);
+    await downloadWalletZipFromContainer(podmanCmd, containerName, walletZipPath);
     logger.success(`Wallet saved: ${walletZipPath}`);
 
     const walletExtractDir = path.resolve(tmpdir(), `odbvue-wallet-${Date.now()}`);
