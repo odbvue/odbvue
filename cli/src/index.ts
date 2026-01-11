@@ -445,19 +445,21 @@ program
     }
 
     const walletZipPath = path.resolve(homedir(), '.wallets/odbvue/local.zip');
+    const walletDir = path.resolve(homedir(), '.wallets/odbvue/local');
     logger.info('Downloading wallet from container...');
     await downloadWalletZipFromContainer(podmanCmd, containerName, walletZipPath);
     logger.success(`Wallet saved: ${walletZipPath}`);
 
-    const walletExtractDir = path.resolve(tmpdir(), `odbvue-wallet-${Date.now()}`);
-    logger.info('Detecting TNS alias from wallet...');
-    expandZipToDirectory(walletZipPath, walletExtractDir);
-    const tnsNamesPath = path.resolve(walletExtractDir, 'tnsnames.ora');
+    logger.info('Extracting wallet...');
+    expandZipToDirectory(walletZipPath, walletDir);
+    const tnsNamesPath = path.resolve(walletDir, 'tnsnames.ora');
     if (!existsSync(tnsNamesPath)) {
       logger.error('Could not find tnsnames.ora in extracted wallet.');
       process.exit(1);
     }
+    logger.success(`Wallet extracted: ${walletDir}`);
 
+    logger.info('Detecting TNS alias from wallet...');
     const tnsNames = readFileSync(tnsNamesPath, 'utf-8');
     const detectedAlias = detectPreferredTnsAlias(tnsNames);
     if (!detectedAlias) {
@@ -466,10 +468,16 @@ program
     }
     logger.success(`Using TNS alias: ${detectedAlias}`);
 
-    const sqlclWallet = normalizePathForSqlcl(walletZipPath);
-    const odbvueConn = `-cloudconfig ${sqlclWallet} admin/${adminPassword}@${detectedAlias}`;
-    writeFileSync(cliEnvPath, `ODBVUE_DB_CONN="${odbvueConn}"\n`, 'utf-8');
-    logger.success('Wrote cli/.env (ODBVUE_DB_CONN)');
+    // Store wallet directory and connection info separately
+    const sqlclWalletDir = normalizePathForSqlcl(walletDir);
+    const odbvueConn = `admin/${adminPassword}@${detectedAlias}`;
+    const odbvueTnsAdmin = sqlclWalletDir;
+    writeFileSync(
+      cliEnvPath,
+      `ODBVUE_DB_CONN="${odbvueConn}"\nODBVUE_TNS_ADMIN="${odbvueTnsAdmin}"\n`,
+      'utf-8',
+    );
+    logger.success('Wrote cli/.env (ODBVUE_DB_CONN, ODBVUE_TNS_ADMIN)');
 
     // Create db/.config.json from example if missing
     const dbConfigPath = path.resolve(dbDir, '.config.json');
@@ -533,13 +541,16 @@ program
   .alias('dil')
   .description('Install/upgrade schema + objects into the local DB using db/dist and db/.config.json')
   .option('-c, --connection <connection>', 'Database connection (uses ODBVUE_DB_CONN if not provided)')
+  .option('-t, --tns-admin <path>', 'TNS_ADMIN directory path (uses ODBVUE_TNS_ADMIN if not provided)')
   .option('-v, --version <version>', 'Version tag (defaults to apps/package.json version)')
-  .action((options: { connection?: string; version?: string }) => {
+  .action((options: { connection?: string; tnsAdmin?: string; version?: string }) => {
     const connection = options.connection || process.env.ODBVUE_DB_CONN;
     if (!connection) {
       logger.error('Database connection not provided and ODBVUE_DB_CONN not set (try: ov local-setup).');
       process.exit(1);
     }
+
+    const tnsAdmin = options.tnsAdmin || process.env.ODBVUE_TNS_ADMIN;
 
     const dbDir = path.resolve(rootDir, 'db');
     const dbDistDir = path.resolve(dbDir, 'dist');
@@ -591,10 +602,17 @@ program
       const shell = isWindows ? 'powershell.exe' : '/bin/bash';
       const sqlclCommand = `sql /nolog "@${tempScriptPath}"`;
 
+      // Pass TNS_ADMIN environment variable if set
+      const env = { ...process.env };
+      if (tnsAdmin) {
+        env.TNS_ADMIN = tnsAdmin;
+      }
+
       execSync(sqlclCommand, {
         cwd: dbDistDir,
         stdio: 'inherit',
         shell,
+        env,
       });
 
       logger.success('Database install completed');
