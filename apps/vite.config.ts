@@ -98,6 +98,21 @@ export default defineConfig(({ mode }) => {
   const isProduction = mode === 'production'
 
   return {
+    optimizeDeps: {
+      entries: [
+        'src/main.ts',
+        'src/App.vue',
+        'src/pages/**/*.{vue,md}',
+        'src/modules/**/pages/**/*.{vue,md}',
+      ],
+      include: [
+        'vuetify',
+        'vuetify/styles',
+        'vuetify/components',
+        'vuetify/directives',
+        'vuetify/iconsets/mdi-svg',
+      ],
+    },
     build: {
       rollupOptions: {
         external: ['workbox-window'],

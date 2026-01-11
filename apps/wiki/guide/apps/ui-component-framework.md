@@ -20,7 +20,22 @@ pnpm install -D vite-plugin-vuetify
 import Vuetify from 'vite-plugin-vuetify'
 
 export default defineConfig({
-  plugins: [
+    optimizeDeps: {
+      entries: [
+        'src/main.ts',
+        'src/App.vue',
+        'src/pages/**/*.{vue,md}',
+        'src/modules/**/pages/**/*.{vue,md}',
+      ],
+      include: [
+        'vuetify',
+        'vuetify/styles',
+        'vuetify/components',
+        'vuetify/directives',
+        'vuetify/iconsets/mdi-svg',
+      ],
+    },
+    plugins: [
     // ...
     Vuetify(),
   ],
