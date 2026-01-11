@@ -2,7 +2,7 @@ services:
   odbvue-db:
     build:
       context: .
-    container_name: odbvue-db-dev
+    container_name: ${CONTAINER_NAME:-odbvue-db-dev}
     ports:
       - "1521:1521"
       - "1522:1522"
