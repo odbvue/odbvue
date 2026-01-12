@@ -1,5 +1,12 @@
 # odbvue
 
+## 0.0.271
+
+### Patch Changes
+
+- fix(db): add missing columns (phone, email) to crm_persons table
+- fix(db): fix corrupted PL/SQL package specs (pck_api_auth, pck_api_openai, pck_api_settings, pck_app)
+
 ## 0.0.270
 
 ### Patch Changes
