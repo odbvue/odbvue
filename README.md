@@ -39,6 +39,7 @@ ov db-install-local
 # 4) start app + wiki dev servers
 cd apps
 pnpm install
+pnpm exec playwright install 
 cd ..
 ov dev
 ```
