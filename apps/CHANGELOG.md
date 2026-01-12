@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.270
+
+### Patch Changes
+
+- fix(db): remove non-existent edition grant odbvue_v0_0_268
+
 ## 0.0.269
 
 ### Patch Changes
