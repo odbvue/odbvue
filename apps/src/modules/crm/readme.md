@@ -1,4 +1,4 @@
-# Surveys
+# CRM Module
 
 ## General instructions
 
@@ -6,15 +6,36 @@
 
 ## Stories
 
+### Surveys
+
 User with role CRM must be able to view list of surveys
 User with role CRM must be able to create new survey
 User with role CRM must be able to edit survey
+
+### Products
+
+User with role CRM must be able to view list of products
+User with role CRM must be able to create new product
+User with role CRM must be able to edit existing product
 
 ..
 
 ## Data model
 
-crm_surveys:
+### crm_products
+
+id: number generated always primary key
+guid: guid default unique not null
+code: string 200 unique not null
+name: string 200 not null
+description: string 2000
+price: number not null
+status: A | I (Active | Inactive) default A
+created: timestamp not null default systimestamp
+modified: timestamp
+
+### crm_surveys
+
 id: number generated always primary key
 code: hex virtual always generate from id unique
 title: string 200
@@ -43,6 +64,29 @@ type: free text | number | single choice | multiple choices | rating 5 | none
 required: Y | N
 
 ## API
+
+### Products
+
+get:
+products:
+query params:
+filter: string
+sort: string
+limit: number default 10
+offset: number default 0
+output:
+products: [id, code, name, description, price, status, created]
+
+post:
+product:
+body params:
+id: guid (null for insert)
+code: string
+name: string
+description: string
+price: number
+
+### Surveys
 
 get:
 surveys:
@@ -93,6 +137,11 @@ body params:
 data: [code, responses]
 
 ## UI
+
+### crm (main page)
+
+Tab: Products - VOvTable with product list, columns: code, name, description, price
+Actions: Add new product, Edit product (row action)
 
 ### crm/surveys
 

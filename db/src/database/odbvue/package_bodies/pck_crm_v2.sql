@@ -1,5 +1,72 @@
 CREATE OR REPLACE PACKAGE BODY odbvue.pck_crm_v2 AS
 
+    PROCEDURE get_products (
+        p_filter   IN VARCHAR2 DEFAULT NULL,
+        p_sort     IN VARCHAR2 DEFAULT NULL,
+        p_limit    IN PLS_INTEGER DEFAULT NULL,
+        p_offset   IN PLS_INTEGER DEFAULT NULL,
+        r_products OUT SYS_REFCURSOR
+    ) IS
+    BEGIN
+        IF pck_api_auth.role(NULL, 'crm') IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+
+        OPEN r_products FOR SELECT
+                                                  code        AS "id",
+                                                  code        AS "code",
+                                                  name        AS "name",
+                                                  description AS "description",
+                                                  price       AS "price",
+                                                  status      AS "status",
+                                                  created     AS "created"
+                                              FROM
+                                                  crm_products
+                           ORDER BY
+                               name ASC
+                           OFFSET p_offset ROWS FETCH NEXT p_limit ROWS ONLY;
+
+    END get_products;
+
+    PROCEDURE post_product (
+        p_code        IN VARCHAR2,
+        p_name        IN VARCHAR2,
+        p_description IN VARCHAR2,
+        p_price       IN NUMBER
+    ) IS
+    BEGIN
+        IF pck_api_auth.role(NULL, 'crm') IS NULL THEN
+            pck_api_auth.http_401;
+            RETURN;
+        END IF;
+
+        UPDATE crm_products
+        SET
+            code = p_code,
+            name = p_name,
+            description = p_description,
+            price = p_price,
+            modified = systimestamp
+        WHERE
+            code = p_code;
+
+        IF SQL%rowcount = 0 THEN
+            INSERT INTO crm_products (
+                code,
+                name,
+                description,
+                price
+            ) VALUES ( p_code,
+                       p_name,
+                       p_description,
+                       p_price );
+
+        END IF;
+
+        COMMIT;
+    END post_product;
+
     PROCEDURE get_persons (
         p_filter  IN VARCHAR2 DEFAULT NULL,
         p_sort    IN VARCHAR2 DEFAULT NULL,
@@ -107,4 +174,4 @@ END pck_crm_v2;
 /
 
 
--- sqlcl_snapshot {"hash":"1e73b9bf4165d1546f65f0190e360e4cf64a4154","type":"PACKAGE_BODY","name":"PCK_CRM_V2","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"c4818cec17fcaf43dc014af587725ccb67e9e3f7","type":"PACKAGE_BODY","name":"PCK_CRM_V2","schemaName":"ODBVUE","sxml":""}

@@ -1,5 +1,20 @@
 CREATE OR REPLACE PACKAGE odbvue.pck_crm_v2 AS -- CRM Package
 
+    PROCEDURE get_products ( -- Gets list of products
+        p_filter   IN VARCHAR2 DEFAULT NULL, -- Filter for products
+        p_sort     IN VARCHAR2 DEFAULT NULL, -- Sort order for products
+        p_limit    IN PLS_INTEGER DEFAULT NULL, -- Limit number of products
+        p_offset   IN PLS_INTEGER DEFAULT NULL, -- Offset for pagination
+        r_products OUT SYS_REFCURSOR -- List of products
+    );
+
+    PROCEDURE post_product ( -- Create or update a product
+        p_code        IN VARCHAR2, -- Product code
+        p_name        IN VARCHAR2, -- Product name
+        p_description IN VARCHAR2, -- Product description
+        p_price       IN NUMBER -- Product price
+    );
+
     PROCEDURE get_persons ( -- Gets list of persons
         p_filter  IN VARCHAR2 DEFAULT NULL, -- Filter for persons
         p_sort    IN VARCHAR2 DEFAULT NULL, -- Sort order for persons
@@ -25,4 +40,4 @@ END pck_crm_v2;
 /
 
 
--- sqlcl_snapshot {"hash":"91ef6f4bb64992a62fbef2ddf595b696b2e1b285","type":"PACKAGE_SPEC","name":"PCK_CRM_V2","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"c03a9eb1a2eb04d32e38c5a1f075a66c62863151","type":"PACKAGE_SPEC","name":"PCK_CRM_V2","schemaName":"ODBVUE","sxml":""}

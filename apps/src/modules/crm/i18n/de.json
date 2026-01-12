@@ -1,5 +1,12 @@
 {
   "organization": "Organisation",
+  "products": "Produkte",
+  "product.code": "Produktcode",
+  "product.name": "Produktname",
+  "product.description": "Beschreibung",
+  "product.price": "Preis",
+  "code.name.description": "Code Name Beschreibung",
+  "saveProduct": "Produkt speichern",
   "surveys": "Umfragen",
   "survey": "Umfrage",
   "questions": "Fragen",
