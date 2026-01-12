@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.272
+
+### Patch Changes
+
+- fix(db): include crm_persons_add_columns.sql in v0.0.269 stage changelog to add columns before comments
+
 ## 0.0.271
 
 ### Patch Changes
