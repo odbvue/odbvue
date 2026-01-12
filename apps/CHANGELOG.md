@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.273
+
+### Patch Changes
+
+- fix(db): remove corrupted adn_alerts_job.sql from v0.0.269 stage changelog
+
 ## 0.0.272
 
 ### Patch Changes
