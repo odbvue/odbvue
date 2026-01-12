@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.269
+
+### Patch Changes
+
+- 31cf58c: db reexport
+
 ## 0.0.268
 
 ### Patch Changes
