@@ -1,5 +1,5 @@
-CREATE OR REPLACE PACKAGE odbvue.pck_api_auth AS -- Package provides methods for issuing and validating tokens 
-    FUNCTION pwd ( -- Function returns hashed password
+create or replace 
+PACKAGE ODBVUE.pck_api_auth AS -- Package provides methods for issuing and validating tokens     FUNCTION pwd ( -- Function returns hashed password
         p_password VARCHAR2 -- Password
     ) RETURN VARCHAR2; -- Hashed password
 
@@ -81,4 +81,5 @@ END;
 /
 
 
--- sqlcl_snapshot {"hash":"32a85bd52f884d7ea0c09f707dc191d8e2aa85fe","type":"PACKAGE_SPEC","name":"PCK_API_AUTH","schemaName":"ODBVUE","sxml":""}
+
+-- sqlcl_snapshot {"hash":"a19cb766bd913ceadb1aae9b4f43059b628fe420","type":"PACKAGE_SPEC","name":"PCK_API_AUTH","schemaName":"ODBVUE","sxml":""}

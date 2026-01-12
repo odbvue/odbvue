@@ -8,6 +8,8 @@ const query = new Query()
     'guid AS "id"',
     "TRIM(first_name || ' ' || last_name || ' ' || legal_name) AS \"fullname\"",
     'type AS "type"',
+    'phone AS "phone"',
+    'email AS "email"',
     'created AS "created"',
   ])
   .orderBy('created', 'DESC')
@@ -25,13 +27,11 @@ const getPersons = new Procedure('get_persons', 'Gets list of persons')
 
 const personUpsert = new Upsert()
   .table_name('crm_persons')
-  .set(
-    'type',
-    "CASE WHEN p_first_name IS NOT NULL OR p_last_name IS NOT NULL THEN 'I' ELSE 'O' END",
-  )
+  .set('type', "'I'")
   .set('first_name', 'p_first_name')
   .set('last_name', 'p_last_name')
-  .set('legal_name', 'p_legal_name')
+  .set('phone', 'p_phone')
+  .set('email', 'p_email')
   .set('modified', 'SYSTIMESTAMP')
   .where('id = p_id')
 
@@ -39,7 +39,8 @@ const postPerson = new Procedure('post_person', 'Create or update a person')
   .addParameter('p_id', pt.Integer, 'Person ID (null for insert)', 'IN', { notNull: false })
   .addParameter('p_first_name', pt.String, 'First name', 'IN')
   .addParameter('p_last_name', pt.String, 'Last name', 'IN')
-  .addParameter('p_legal_name', pt.String, 'Legal name', 'IN')
+  .addParameter('p_phone', pt.String, 'Phone number', 'IN')
+  .addParameter('p_email', pt.String, 'Email address', 'IN')
   .navigationGuard('role', 'crm')
   .upsertStatement(personUpsert)
 

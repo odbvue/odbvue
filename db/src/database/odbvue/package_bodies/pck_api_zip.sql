@@ -950,7 +950,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_zip AS
 
                 l_salt := utl_raw.substr(l_crypto_buf, 1, l_salt_len);
                 FOR i IN 1..ceil(l_key_len / 20) LOOP
-                    l_mac := sys.dbms_crypto.mac(
+                    l_mac := dbms_crypto.mac(
                         utl_raw.concat(l_salt,
                                        to_char(i, 'fm0xxxxxxx')),
                         dbms_crypto.hmac_sh1,
@@ -959,7 +959,7 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_zip AS
 
                     l_sum := l_mac;
                     FOR j IN 1..999 LOOP
-                        l_mac := sys.dbms_crypto.mac(l_mac, dbms_crypto.hmac_sh1, p_password);
+                        l_mac := dbms_crypto.mac(l_mac, dbms_crypto.hmac_sh1, p_password);
                         l_sum := utl_raw.bit_xor(l_mac, l_sum);
                     END LOOP;
 
@@ -2698,4 +2698,4 @@ END;
 /
 
 
--- sqlcl_snapshot {"hash":"e2ec7bfc44a8db3cf36a45ff529d93be28bdee6f","type":"PACKAGE_BODY","name":"PCK_API_ZIP","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"5d474760eaf28afc70147389944722b2f8eab921","type":"PACKAGE_BODY","name":"PCK_API_ZIP","schemaName":"ODBVUE","sxml":""}

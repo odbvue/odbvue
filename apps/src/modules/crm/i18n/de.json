@@ -19,5 +19,15 @@
   "survey.submit.error": "Fehler beim Absenden der Umfrage",
   "survey.submitted": "Ihre Antwort wurde aufgezeichnet.",
   "thank.you": "Vielen Dank!",
-  "no.questions": "Diese Umfrage hat keine Fragen"
+  "no.questions": "Diese Umfrage hat keine Fragen",
+  "persons": "Personen",
+  "discovery.requests": "Discovery-Anfragen",
+  "first.name": "Vorname",
+  "last.name": "Nachname",
+  "legal.name": "Rechtlicher Name",
+  "phone": "Telefon",
+  "email": "E-Mail",
+  "fullname.type.phone.email": "Vollständiger Name Typ Telefon E-Mail",
+  "insertPerson": "Person einfügen",
+  "insertOrganization": "Organisation einfügen"
 }

@@ -160,7 +160,7 @@ BEGIN
         line(c.comments);
         line;
         line('::: details example');
-        line('<<< ../../../../../db/tests/'
+        line('<<< ../../../../../db/src/database/odbvue/tests/'
              || lower(c.package_name) || '.sql');
         line(':::');
         line;
@@ -439,4 +439,4 @@ END;
 /
 
 
--- sqlcl_snapshot {"hash":"54e3aaf0f01c8eeaa08af33152f04a0063d1f709","type":"PROCEDURE","name":"PRC_MDIFY","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"e1a79bd375cb67c5c75c83b21bc0e15df54b9b65","type":"PROCEDURE","name":"PRC_MDIFY","schemaName":"ODBVUE","sxml":""}

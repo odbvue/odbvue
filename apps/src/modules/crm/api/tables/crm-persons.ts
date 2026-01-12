@@ -14,6 +14,8 @@ export const crmPersons = new Table()
   .col('first_name', ct.string200, 'First name')
   .col('last_name', ct.string200, 'Last name')
   .col('legal_name', ct.string2000, 'Legal name')
+  .col('phone', ct.string200, 'Phone number')
+  .col('email', ct.string200, 'Email address')
   .col('status', ct.symbol, 'Status (A = Active, B = Blocked, C = Closed)')
   .notNullable()
   .check(['A', 'B', 'C'])
@@ -23,7 +25,4 @@ export const crmPersons = new Table()
   .notNullable()
   .indexed()
   .col('modified', ct.timestampAudit, 'Last modification timestamp')
-  .addIndexes([
-    ['type', 'status'],
-    ['first_name', 'last_name'],
-  ])
+  .addIndexes([['type', 'status'], ['first_name', 'last_name'], ['phone'], ['email']])

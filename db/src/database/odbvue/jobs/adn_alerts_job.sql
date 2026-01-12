@@ -21,9 +21,8 @@ BEGIN
         value     => 3
     );
 
-    dbms_scheduler.enable('"ODBVUE"."ADN_ALERTS_JOB"');
 END;
 /
 
 
--- sqlcl_snapshot {"hash":"aba899e5ed4adef14abe4cf670fafc9cb760d3b5","type":"JOB","name":"ADN_ALERTS_JOB","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"6e273b8370f944783e4a8666ed21cfecfd1d3700","type":"JOB","name":"ADN_ALERTS_JOB","schemaName":"ODBVUE","sxml":""}

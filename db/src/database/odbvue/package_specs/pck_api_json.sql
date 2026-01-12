@@ -1,6 +1,5 @@
-CREATE OR REPLACE PACKAGE odbvue.pck_api_json AS -- Package for handling json 
-    FUNCTION init -- Function to initialize empty json object 
-     RETURN CLOB; -- Returns a clob representing an empty json object
+CREATE OR REPLACE PACKAGE odbvue.pck_api_json AS -- Package for handling json     FUNCTION init -- Function to initialize empty json object 
+    return CLOB; -- Returns a clob representing an empty json object
 
     FUNCTION EXISTS ( -- Function to check if a path exists in a json object
         c IN CLOB, -- The json object as clob
@@ -48,4 +47,4 @@ END pck_api_json;
 /
 
 
--- sqlcl_snapshot {"hash":"4bad7a546521a79a9064501f597e37e1fb991124","type":"PACKAGE_SPEC","name":"PCK_API_JSON","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"c085c7beecf309e6685515606b944caab3a02dba","type":"PACKAGE_SPEC","name":"PCK_API_JSON","schemaName":"ODBVUE","sxml":""}

@@ -1,5 +1,4 @@
-CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_auth AS 
-    -- PRIVATE
+CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_auth AS     -- PRIVATE
 
     g_auth_jwt_issuer    VARCHAR2(200);
     g_auth_jwt_audience  VARCHAR2(200);

@@ -20,6 +20,8 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_crm_v2 AS
                                                      || last_name
                                                      || ' ' || legal_name) AS "fullname",
                                                 type                  AS "type",
+                                                phone                 AS "phone",
+                                                email                 AS "email",
                                                 created               AS "created"
                                             FROM
                                                 crm_persons
@@ -33,7 +35,8 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_crm_v2 AS
         p_id         IN PLS_INTEGER,
         p_first_name IN VARCHAR2,
         p_last_name  IN VARCHAR2,
-        p_legal_name IN VARCHAR2
+        p_phone      IN VARCHAR2,
+        p_email      IN VARCHAR2
     ) IS
     BEGIN
         IF pck_api_auth.role(NULL, 'crm') IS NULL THEN
@@ -43,17 +46,11 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_crm_v2 AS
 
         UPDATE crm_persons
         SET
-            type =
-                CASE
-                    WHEN p_first_name IS NOT NULL
-                         OR p_last_name IS NOT NULL THEN
-                        'I'
-                    ELSE
-                        'O'
-                END,
+            type = 'I',
             first_name = p_first_name,
             last_name = p_last_name,
-            legal_name = p_legal_name,
+            phone = p_phone,
+            email = p_email,
             modified = systimestamp
         WHERE
             id = p_id;
@@ -63,18 +60,13 @@ CREATE OR REPLACE PACKAGE BODY odbvue.pck_crm_v2 AS
                 type,
                 first_name,
                 last_name,
-                legal_name
-            ) VALUES (
-                CASE
-                    WHEN p_first_name IS NOT NULL
-                         OR p_last_name IS NOT NULL THEN
-                        'I'
-                    ELSE
-                        'O'
-                END,
-                p_first_name,
-                p_last_name,
-                p_legal_name );
+                phone,
+                email
+            ) VALUES ( 'I',
+                       p_first_name,
+                       p_last_name,
+                       p_phone,
+                       p_email );
 
         END IF;
 
@@ -115,4 +107,4 @@ END pck_crm_v2;
 /
 
 
--- sqlcl_snapshot {"hash":"024d0f9b9a8ddc59a4da8159673df4830919d9ed","type":"PACKAGE_BODY","name":"PCK_CRM_V2","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"1e73b9bf4165d1546f65f0190e360e4cf64a4154","type":"PACKAGE_BODY","name":"PCK_CRM_V2","schemaName":"ODBVUE","sxml":""}
