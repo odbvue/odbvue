@@ -3,7 +3,7 @@
                    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
-<include file="odbvue/tables/crm_persons_add_columns.sql" relativeToChangelogFile="true"/>
+<!-- Removed duplicate table/comments/indexes - now handled in v0.0.269 -->
 <include file="odbvue/package_specs/pck_api_auth.sql" relativeToChangelogFile="true"/>
 <include file="odbvue/package_specs/pck_api_openai.sql" relativeToChangelogFile="true"/>
 <include file="odbvue/package_specs/pck_api_settings.sql" relativeToChangelogFile="true"/>
@@ -11,7 +11,4 @@
 <include file="odbvue/package_bodies/pck_api_auth.sql" relativeToChangelogFile="true"/>
 <include file="odbvue/package_bodies/pck_api_openai.sql" relativeToChangelogFile="true"/>
 <include file="odbvue/package_bodies/pck_crm_v2.sql" relativeToChangelogFile="true"/>
-<include file="odbvue/comments/crm_persons.sql" relativeToChangelogFile="true"/>
-<include file="odbvue/indexes/idx_crm_persons_email.sql" relativeToChangelogFile="true"/>
-<include file="odbvue/indexes/idx_crm_persons_phone.sql" relativeToChangelogFile="true"/>
 </databaseChangeLog>

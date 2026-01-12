@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.274
+
+### Patch Changes
+
+- fix(db): remove duplicate table/comments/indexes from v0.0.271 (now handled in v0.0.269)
+
 ## 0.0.273
 
 ### Patch Changes
