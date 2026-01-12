@@ -2,6 +2,13 @@
   "organization": "Organization",
   "name / organization / phone / email": "Name / organization / phone / email",
   "name.organization.phone.email": "Name organization phone email",
+  "products": "Products",
+  "product.code": "Product Code",
+  "product.name": "Product Name",
+  "product.description": "Description",
+  "product.price": "Price",
+  "code.name.description": "Code name description",
+  "saveProduct": "Save Product",
   "surveys": "Surveys",
   "survey": "Survey",
   "questions": "Questions",
@@ -40,5 +47,6 @@
   "fullname.type.phone.email": "Fullname type phone email",
   "update": "Update",
   "insertPerson": "InsertPerson",
-  "insertOrganization": "InsertOrganization"
+  "insertOrganization": "InsertOrganization",
+  "price": "Price"
 }

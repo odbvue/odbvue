@@ -2,6 +2,7 @@
   <v-container>
     <v-tabs v-model="activeTab">
       <v-tab value="persons">{{ t('persons') }}</v-tab>
+      <v-tab value="products">{{ t('products') }}</v-tab>
       <v-tab value="discovery">{{ t('discovery.requests') }}</v-tab>
       <v-tab value="surveys">{{ t('surveys') }}</v-tab>
     </v-tabs>
@@ -14,6 +15,16 @@
           :loading="personsLoading"
           @fetch="fetchPersons"
           @action="actionPerson"
+        />
+      </v-window-item>
+
+      <v-window-item value="products">
+        <v-ov-table
+          :options="productsOptions"
+          :data="productsData"
+          :loading="productsLoading"
+          @fetch="fetchProducts"
+          @action="actionProduct"
         />
       </v-window-item>
 
@@ -80,6 +91,92 @@ const actionPerson = (
     actionInsertOrganization(actionName, oldData, newData, callback)
   }
 }
+
+// Products
+type CrmProductsResponse = {
+  products: OvTableData[]
+}
+
+const {
+  loading: productsLoading,
+  data: productsData,
+  fetch: fetchProducts,
+} = useTableFetch<CrmProductsResponse>({
+  endpoint: 'crm-v2/products/',
+  responseKey: 'products',
+})
+
+const { action: actionSaveProduct } = useFormAction({
+  endpoints: {
+    saveProduct: 'crm-v2/product/',
+  },
+  transformKeysToKebabCase: true,
+  refetchOn: ['saveProduct'],
+})
+
+const actionProduct = (
+  actionName: string,
+  oldData: OvFormData,
+  newData: OvFormData,
+  callback?: (errors?: OvFormFieldError[], shouldRefetch?: boolean) => void,
+) => {
+  if (actionName === 'saveProduct') {
+    actionSaveProduct(actionName, oldData, newData, callback)
+  }
+}
+
+const productsOptions = ref<OvTableOptions>({
+  key: 'code',
+  search: {
+    placeholder: 'code.name.description',
+  },
+  columns: [
+    { name: 'code' },
+    { name: 'name' },
+    { name: 'description', maxLength: 50 },
+    { name: 'price' },
+    {
+      name: 'actions',
+      label: '',
+      actions: [
+        {
+          name: 'saveProduct',
+          format: { icon: '$mdiPencil', variant: 'text' },
+          form: {
+            fields: [
+              { type: 'text', name: 'code', label: 'product.code', required: true, disabled: true },
+              { type: 'text', name: 'name', label: 'product.name', required: true },
+              { type: 'textarea', name: 'description', label: 'product.description' },
+              { type: 'number', name: 'price', label: 'product.price', required: true },
+            ],
+            actions: ['save', { name: 'cancel', format: { variant: 'outlined' } }],
+            actionSubmit: 'save',
+            actionCancel: 'cancel',
+          },
+        },
+      ],
+    },
+  ],
+  actions: [
+    {
+      name: 'saveProduct',
+      key: 'code',
+      format: { icon: '$mdiPackageVariantClosed', variant: 'flat' },
+      form: {
+        fields: [
+          { type: 'text', name: 'code', label: 'product.code', required: true },
+          { type: 'text', name: 'name', label: 'product.name', required: true },
+          { type: 'textarea', name: 'description', label: 'product.description' },
+          { type: 'number', name: 'price', label: 'product.price', required: true },
+        ],
+        actions: ['save', { name: 'cancel', format: { variant: 'outlined' } }],
+        actionSubmit: 'save',
+        actionCancel: 'cancel',
+      },
+    },
+  ],
+  maxLength: 30,
+})
 
 // Discovery Requests
 type CrmRequestsResponse = {

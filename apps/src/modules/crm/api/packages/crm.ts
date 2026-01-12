@@ -2,6 +2,49 @@ import { ParamType as pt, Procedure, Package } from '../../../../apis/package'
 import { Query } from '../../../../apis/query'
 import { Upsert } from '../../../../apis/upsert'
 
+// Products Query
+const productsQuery = new Query()
+  .from('crm_products')
+  .select([
+    'code AS "id"',
+    'code AS "code"',
+    'name AS "name"',
+    'description AS "description"',
+    'price AS "price"',
+    'status AS "status"',
+    'created AS "created"',
+  ])
+  .orderBy('name', 'ASC')
+  .offsetP('p_offset')
+  .limitP('p_limit')
+
+const getProducts = new Procedure('get_products', 'Gets list of products')
+  .addQueryParameter('p_filter', pt.String, 'Filter for products')
+  .addQueryParameter('p_sort', pt.String, 'Sort order for products')
+  .addQueryParameter('p_limit', pt.Integer, 'Limit number of products')
+  .addQueryParameter('p_offset', pt.Integer, 'Offset for pagination')
+  .addResponse('r_products', pt.Object, 'List of products')
+  .navigationGuard('role', 'crm')
+  .returnQuery(productsQuery, 'r_products')
+
+const productUpsert = new Upsert()
+  .table_name('crm_products')
+  .set('code', 'p_code')
+  .set('name', 'p_name')
+  .set('description', 'p_description')
+  .set('price', 'p_price')
+  .set('modified', 'SYSTIMESTAMP')
+  .where('code = p_code')
+
+const postProduct = new Procedure('post_product', 'Create or update a product')
+  .addParameter('p_code', pt.String, 'Product code', 'IN')
+  .addParameter('p_name', pt.String, 'Product name', 'IN')
+  .addParameter('p_description', pt.String, 'Product description', 'IN', { notNull: false })
+  .addParameter('p_price', pt.Number, 'Product price', 'IN')
+  .navigationGuard('role', 'crm')
+  .upsertStatement(productUpsert)
+
+// Persons Query
 const query = new Query()
   .from('crm_persons')
   .select([
@@ -59,6 +102,8 @@ const postOrganization = new Procedure('post_organization', 'Create or update an
 
 export const crmPackage = new Package('pck_crm_v2', 'CRM Package')
   .editionable()
+  .addProcedure(getProducts)
+  .addProcedure(postProduct)
   .addProcedure(getPersons)
   .addProcedure(postPerson)
   .addProcedure(postOrganization)

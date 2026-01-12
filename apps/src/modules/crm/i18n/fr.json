@@ -1,5 +1,12 @@
 {
   "organization": "Organisation",
+  "products": "Produits",
+  "product.code": "Code du produit",
+  "product.name": "Nom du produit",
+  "product.description": "Description",
+  "product.price": "Prix",
+  "code.name.description": "Code nom description",
+  "saveProduct": "Enregistrer le produit",
   "surveys": "Enquêtes",
   "survey": "Enquête",
   "questions": "Questions",
@@ -29,5 +36,9 @@
   "email": "E-mail",
   "fullname.type.phone.email": "Nom complet type téléphone e-mail",
   "insertPerson": "Insérer une personne",
-  "insertOrganization": "Insérer une organisation"
+  "insertOrganization": "Insérer une organisation",
+  "type": "Type",
+  "code": "Code",
+  "description": "Description",
+  "price": "Price"
 }
