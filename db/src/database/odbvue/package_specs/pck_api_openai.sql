@@ -1,5 +1,5 @@
-CREATE OR REPLACE PACKAGE odbvue.pck_api_openai AS -- Package provides implementation of Open AI API 
-    PROCEDURE responses (
+create or replace 
+PACKAGE ODBVUE.pck_api_openai AS -- Package provides implementation of Open AI API     PROCEDURE responses (
         p_api_key VARCHAR2, -- OpenAI API Key
         p_model   VARCHAR2, -- Model (tts-1, tts-1-hd)
         p_input   VARCHAR2, -- Text prompt
@@ -92,4 +92,5 @@ END;
 /
 
 
--- sqlcl_snapshot {"hash":"8065ac0c3131fcea3af09fdc3b7fc195bc8888cc","type":"PACKAGE_SPEC","name":"PCK_API_OPENAI","schemaName":"ODBVUE","sxml":""}
+
+-- sqlcl_snapshot {"hash":"f278095da11c44111459178a77147ebd8abafb76","type":"PACKAGE_SPEC","name":"PCK_API_OPENAI","schemaName":"ODBVUE","sxml":""}

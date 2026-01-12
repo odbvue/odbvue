@@ -1,5 +1,4 @@
-CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_openai AS 
-  -- PRIVATE
+CREATE OR REPLACE PACKAGE BODY odbvue.pck_api_openai AS   -- PRIVATE
   
   -- PRIVATE
     FUNCTION j (

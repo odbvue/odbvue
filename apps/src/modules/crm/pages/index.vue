@@ -128,9 +128,15 @@ const {
 const personsOptions = ref<OvTableOptions>({
   key: 'id',
   search: {
-    placeholder: 'fullname.type',
+    placeholder: 'fullname.type.phone.email',
   },
-  columns: [{ name: 'created' }, { name: 'fullname' }, { name: 'type' }],
+  columns: [
+    { name: 'created' },
+    { name: 'fullname' },
+    { name: 'type' },
+    { name: 'phone' },
+    { name: 'email' },
+  ],
   actions: [
     {
       name: 'insertPerson',
@@ -140,7 +146,8 @@ const personsOptions = ref<OvTableOptions>({
         fields: [
           { type: 'text', name: 'firstName', label: 'first.name' },
           { type: 'text', name: 'lastName', label: 'last.name' },
-          { type: 'text', name: 'legalName', label: 'legal.name' },
+          { type: 'text', name: 'phone', label: 'phone' },
+          { type: 'text', name: 'email', label: 'email' },
         ],
         actions: ['save', { name: 'cancel', format: { variant: 'outlined' } }],
         actionSubmit: 'save',

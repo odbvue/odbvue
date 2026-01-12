@@ -35,6 +35,9 @@
   "first.name": "First name",
   "last.name": "Last name",
   "legal.name": "Legal name",
+  "phone": "Phone",
+  "email": "Email",
+  "fullname.type.phone.email": "Fullname type phone email",
   "update": "Update",
   "insertPerson": "InsertPerson",
   "insertOrganization": "InsertOrganization"

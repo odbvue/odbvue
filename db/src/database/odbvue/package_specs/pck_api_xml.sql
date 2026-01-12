@@ -1,6 +1,5 @@
-CREATE OR REPLACE PACKAGE odbvue.pck_api_xml AS -- Package for handling xml 
-    FUNCTION init -- Function to initialize empty xml object 
-     RETURN CLOB; -- Returns a clob representing an empty xml object
+CREATE OR REPLACE PACKAGE odbvue.pck_api_xml AS -- Package for handling xml     FUNCTION init -- Function to initialize empty xml object 
+    return CLOB; -- Returns a clob representing an empty xml object
 
     FUNCTION EXISTS ( -- Function to check if a path exists in a xml object
         c IN CLOB, -- The xml object as clob
@@ -48,4 +47,4 @@ END pck_api_xml;
 /
 
 
--- sqlcl_snapshot {"hash":"583a940c4ff1890ef6535d0e768f1677c3f80e79","type":"PACKAGE_SPEC","name":"PCK_API_XML","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"6cba759e799b7b028fc45c5b2b6e832fabd7421b","type":"PACKAGE_SPEC","name":"PCK_API_XML","schemaName":"ODBVUE","sxml":""}

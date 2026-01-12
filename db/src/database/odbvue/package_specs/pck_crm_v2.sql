@@ -12,7 +12,8 @@ CREATE OR REPLACE PACKAGE odbvue.pck_crm_v2 AS -- CRM Package
         p_id         IN PLS_INTEGER, -- Person ID (null for insert)
         p_first_name IN VARCHAR2, -- First name
         p_last_name  IN VARCHAR2, -- Last name
-        p_legal_name IN VARCHAR2 -- Legal name
+        p_phone      IN VARCHAR2, -- Phone number
+        p_email      IN VARCHAR2 -- Email address
     );
 
     PROCEDURE post_organization ( -- Create or update an organization
@@ -24,4 +25,4 @@ END pck_crm_v2;
 /
 
 
--- sqlcl_snapshot {"hash":"fecb4b4b92ffb96149e58720aa4eeaddb90d8983","type":"PACKAGE_SPEC","name":"PCK_CRM_V2","schemaName":"ODBVUE","sxml":""}
+-- sqlcl_snapshot {"hash":"91ef6f4bb64992a62fbef2ddf595b696b2e1b285","type":"PACKAGE_SPEC","name":"PCK_CRM_V2","schemaName":"ODBVUE","sxml":""}

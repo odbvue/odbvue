@@ -7,6 +7,9 @@ COMMENT ON COLUMN odbvue.crm_persons.attributes IS
 COMMENT ON COLUMN odbvue.crm_persons.created IS
     'Creation timestamp';
 
+COMMENT ON COLUMN odbvue.crm_persons.email IS
+    'Email address';
+
 COMMENT ON COLUMN odbvue.crm_persons.first_name IS
     'First name';
 
@@ -25,6 +28,9 @@ COMMENT ON COLUMN odbvue.crm_persons.legal_name IS
 COMMENT ON COLUMN odbvue.crm_persons.modified IS
     'Last modification timestamp';
 
+COMMENT ON COLUMN odbvue.crm_persons.phone IS
+    'Phone number';
+
 COMMENT ON COLUMN odbvue.crm_persons.status IS
     'Status (A = Active, B = Blocked, C = Closed)';
 
@@ -32,4 +38,4 @@ COMMENT ON COLUMN odbvue.crm_persons.type IS
     'Person type (I = Individual, O = Organization)';
 
 
--- sqlcl_snapshot {"hash":"bf2890e6e0b7f49057b2300bf1e4bc9a8e1a048c","type":"COMMENT","name":"crm_persons","schemaName":"odbvue","sxml":""}
+-- sqlcl_snapshot {"hash":"7d44b4a726ecb521c629729a1928d64788e36cba","type":"COMMENT","name":"crm_persons","schemaName":"odbvue","sxml":""}

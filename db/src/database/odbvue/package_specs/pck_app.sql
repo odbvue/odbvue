@@ -1,5 +1,5 @@
-CREATE OR REPLACE PACKAGE odbvue.pck_app AS -- Package for the main application     
-    PROCEDURE get_context ( -- Returns application context
+create or replace 
+PACKAGE ODBVUE.pck_app AS -- Package for the main application     PROCEDURE get_context ( -- Returns application context
         r_version  OUT VARCHAR2, -- Application version
         r_user     OUT SYS_REFCURSOR, -- User data [{uuid, username, fullname, created}]
         r_consents OUT SYS_REFCURSOR, -- Consents [{id, language, name, created}]
@@ -72,4 +72,5 @@ END pck_app;
 /
 
 
--- sqlcl_snapshot {"hash":"93f0c185cc0364a30c6f31c57c3f16c95761eb49","type":"PACKAGE_SPEC","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}
+
+-- sqlcl_snapshot {"hash":"731f0694f1f44a7fbda3dab7629683850aa91636","type":"PACKAGE_SPEC","name":"PCK_APP","schemaName":"ODBVUE","sxml":""}

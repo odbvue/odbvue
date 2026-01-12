@@ -1,5 +1,5 @@
-CREATE OR REPLACE PACKAGE odbvue.pck_api_settings AS -- Package provides methods for managing application settings 
-    PROCEDURE write ( -- Procedure sets value of the setting with the specified id
+create or replace 
+PACKAGE ODBVUE.pck_api_settings AS -- Package provides methods for managing application settings     PROCEDURE write ( -- Procedure sets value of the setting with the specified id
         p_id      app_settings.id%TYPE, -- Id of the setting
         p_name    app_settings.name%TYPE, -- Name of the setting
         p_value   app_settings.value%TYPE, -- Value of the setting (variable character)
@@ -30,4 +30,5 @@ END;
 /
 
 
--- sqlcl_snapshot {"hash":"02ca166ff7acc5301b31cfc9b97dd50766def49f","type":"PACKAGE_SPEC","name":"PCK_API_SETTINGS","schemaName":"ODBVUE","sxml":""}
+
+-- sqlcl_snapshot {"hash":"775a114f755348ee150ff68706f066571cf5c2f8","type":"PACKAGE_SPEC","name":"PCK_API_SETTINGS","schemaName":"ODBVUE","sxml":""}

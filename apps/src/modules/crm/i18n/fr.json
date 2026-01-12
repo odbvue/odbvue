@@ -19,5 +19,15 @@
   "survey.submit.error": "Échec de la soumission de l'enquête",
   "survey.submitted": "Votre réponse a été enregistrée.",
   "thank.you": "Merci!",
-  "no.questions": "Cette enquête n'a pas de questions"
+  "no.questions": "Cette enquête n'a pas de questions",
+  "persons": "Personnes",
+  "discovery.requests": "Demandes de découverte",
+  "first.name": "Prénom",
+  "last.name": "Nom de famille",
+  "legal.name": "Nom légal",
+  "phone": "Téléphone",
+  "email": "E-mail",
+  "fullname.type.phone.email": "Nom complet type téléphone e-mail",
+  "insertPerson": "Insérer une personne",
+  "insertOrganization": "Insérer une organisation"
 }
