@@ -15,14 +15,18 @@ OdbVue is a template + reference implementation for building and deploying busin
 
 Prerequisites:
 
-- Node.js: `^20.19.0` or `>=22.12.0`
-- pnpm: `10.x`
-- Podman (for local Oracle ADB Free container)
-- Oracle SQLcl (`sql` on PATH)
+- [Node.js `^20.19.0` or `>=22.12.0`](https://nodejs.org/en/download)
+- [pnpm: `10.x`](https://pnpm.io/installation)
+- [Podman](https://podman.io/docs/installation)
+- [Oracle SQLcl](https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/download/)
 
 From the repo root:
 
 ```sh
+# 0) clone project 
+git clone https://github.com/odbvue/odbvue.git
+cd odbvue
+
 # 1) build + link the ov CLI
 cd cli
 pnpm install
