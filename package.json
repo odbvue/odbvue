@@ -10,7 +10,8 @@
     "lint": "eslint apps wiki cli --cache",
     "lint:fix": "eslint apps wiki cli --fix --cache",
     "format": "prettier -w .",
-    "format:check": "prettier -c ."
+    "format:check": "prettier -c .",
+    "type-check": "pnpm -r type-check"
   },
   "devDependencies": {
     "@vitest/eslint-plugin": "^1.6.5",

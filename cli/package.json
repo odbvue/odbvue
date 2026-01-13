@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "pnpm -w exec tsc -p cli/tsconfig.json",
+    "type-check": "pnpm -w exec tsc -p cli/tsconfig.json",
     "lint": "pnpm -w exec eslint cli --cache",
     "lint:fix": "pnpm -w exec eslint cli --fix --cache",
     "format": "pnpm -w exec prettier -w cli",
