@@ -180,7 +180,7 @@ async function handleCommitAll() {
       stdio: 'inherit',
     })
 
-    logger.success(`✓ Committed: ${chalk.cyan(commitMessage)}`)
+    logger.success(`Committed: ${chalk.cyan(commitMessage)}`)
   } catch (error) {
     logger.error(
       `Failed to commit changes: ${error instanceof Error ? error.message : String(error)}`,
