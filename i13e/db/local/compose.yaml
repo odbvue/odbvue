@@ -1,0 +1,19 @@
+name: odbvue
+services:
+  odbvue-db:
+    build:
+      context: .
+    container_name: ${CONTAINER_NAME:-odbvue-db-dev}
+    ports:
+      - '1521:1521'
+      - '1522:1522'
+      - '8443:8443'
+      - '27017:27017'
+    environment:
+      WORKLOAD_TYPE: ATP
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      WALLET_PASSWORD: ${WALLET_PASSWORD}
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - '/dev/fuse:/dev/fuse'

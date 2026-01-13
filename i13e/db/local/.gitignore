@@ -1,0 +1,7 @@
+# Environment files
+.env
+.env.local
+
+# Wallet files (sensitive data)
+.wallets/
+*.zip
