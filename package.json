@@ -1,0 +1,26 @@
+{
+  "name": "odbvue",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "setup": "pnpm install && ov setup",
+    "build": "pnpm -r build",
+    "dev": "pnpm -r --parallel dev",
+    "lint": "eslint apps wiki cli --cache",
+    "lint:fix": "eslint apps wiki cli --fix --cache",
+    "format": "prettier -w .",
+    "format:check": "prettier -c ."
+  },
+  "devDependencies": {
+    "@vitest/eslint-plugin": "^1.6.5",
+    "@vue/eslint-config-prettier": "^10.2.0",
+    "@vue/eslint-config-typescript": "^14.6.0",
+    "eslint": "^9.39.2",
+    "eslint-plugin-playwright": "^2.4.0",
+    "eslint-plugin-vue": "~10.6.2",
+    "jiti": "^2.6.1",
+    "prettier": "3.7.4",
+    "typescript": "~5.9.3"
+  }
+}

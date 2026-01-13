@@ -1,0 +1,10 @@
+**/node_modules/**
+**/dist/**
+**/dist-ssr/**
+**/coverage/**
+**/.vite/**
+**/.turbo/**
+**/.cache/**
+wiki/**/.vitepress/cache/**
+wiki/**/.vitepress/dist/**
+pnpm-lock.yaml
