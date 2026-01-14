@@ -3,7 +3,7 @@ services:
   odbvue-db:
     build:
       context: .
-    container_name: ${CONTAINER_NAME:-odbvue-db-dev}
+    container_name: ${DB_CONTAINER_NAME}
     ports:
       - '1521:1521'
       - '1522:1522'
@@ -11,8 +11,8 @@ services:
       - '27017:27017'
     environment:
       WORKLOAD_TYPE: ATP
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-      WALLET_PASSWORD: ${WALLET_PASSWORD}
+      ADMIN_PASSWORD: ${DB_ADMIN_PASSWORD}
+      WALLET_PASSWORD: ${DB_WALLET_PASSWORD}
     cap_add:
       - SYS_ADMIN
     devices:

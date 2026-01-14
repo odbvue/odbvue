@@ -1,17 +1,73 @@
-import chalk from 'chalk'
 import prompts from 'prompts'
 import { execSync, spawn } from 'child_process'
 import path from 'path'
-import { writeFileSync, readFileSync, existsSync, mkdirSync, createWriteStream } from 'fs'
-import {
-  logger,
-  dbLocalDir,
-  getPodmanCommand,
-  checkPodmanInstalled,
-  checkPodmanRunning,
-  startPodmanMachine,
-  checkPodmanResources,
-} from './utils.js'
+import { writeFileSync, existsSync, mkdirSync, createWriteStream } from 'fs'
+import { config } from 'dotenv'
+
+import { logger, rootDir } from './index.js'
+
+const getDbLocalDir = () => path.resolve(rootDir, 'i13e/db/local')
+
+// Utility to check if Podman command exists
+export function getPodmanCommand(): string | null {
+  try {
+    execSync('podman --version', { stdio: 'pipe' })
+    return 'podman'
+  } catch {
+    return null
+  }
+}
+
+// Podman utilities
+async function checkPodmanInstalled(): Promise<boolean> {
+  try {
+    execSync('podman --version', { stdio: 'pipe' })
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function checkPodmanRunning(): Promise<boolean> {
+  try {
+    execSync('podman info', { stdio: 'pipe' })
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function startPodmanMachine(): Promise<boolean> {
+  try {
+    logger.info('Starting Podman machine...')
+    execSync('podman machine start', { stdio: 'inherit' })
+    logger.success('Podman machine started')
+    return true
+  } catch {
+    logger.error('Failed to start Podman machine')
+    return false
+  }
+}
+
+async function checkPodmanResources(): Promise<void> {
+  try {
+    const info = execSync('podman system info --format json', { stdio: 'pipe' }).toString()
+    const systemInfo = JSON.parse(info)
+
+    const cpus = systemInfo.host?.cpus || 0
+    const memoryBytes = systemInfo.host?.memFree || 0
+    const memoryGb = memoryBytes / (1024 * 1024 * 1024)
+
+    if (cpus < 4 || memoryGb < 8) {
+      logger.warn(
+        `Podman resources below recommended: ${cpus} CPU(s), ${memoryGb.toFixed(2)} GB RAM`,
+      )
+      logger.warn('Recommended: 4 CPU(s) and 8 GB RAM')
+    }
+  } catch {
+    // Silently fail if unable to check resources
+  }
+}
 
 // Wait for container to be healthy with static feedback
 async function waitForContainerHealth(
@@ -105,7 +161,20 @@ async function downloadWalletZipFromContainer(
   })
 }
 
-// Get list of running database containers
+// Get list of database containers
+async function getDatabaseContainers(podmanCmd: string): Promise<string[]> {
+  try {
+    const output = execSync(`${podmanCmd} ps -a --format "{{.Names}}"`, {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim()
+    return output.split('\n').filter((name) => name && name.includes('db'))
+  } catch {
+    return []
+  }
+}
+
+// Get list of database containers
 async function getRunningDatabaseContainers(podmanCmd: string): Promise<string[]> {
   try {
     const output = execSync(`${podmanCmd} ps --format "{{.Names}}"`, {
@@ -118,48 +187,29 @@ async function getRunningDatabaseContainers(podmanCmd: string): Promise<string[]
   }
 }
 
-// Check if a port is in use and get the container using it
-async function getContainerUsingPort(podmanCmd: string, port: number): Promise<string | null> {
-  try {
-    const containers = execSync(`${podmanCmd} ps --format "{{.Names}}"`, {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    })
-      .trim()
-      .split('\n')
-      .filter((name) => name)
+// Stop a container (currently unused, kept for future use)
+// async function stopContainer(podmanCmd: string, containerName: string): Promise<boolean> {
+//   try {
+//     logger.info(`Stopping container "${containerName}"...`)
+//     execSync(`${podmanCmd} stop ${containerName}`, { stdio: 'pipe' })
+//     logger.success(`Container "${containerName}" stopped`)
+//     return true
+//   } catch (error) {
+//     logger.error(`Failed to stop container: ${error}`)
+//     return false
+//   }
+// }
 
-    for (const container of containers) {
-      try {
-        const inspect = execSync(`${podmanCmd} inspect ${container}`, {
-          encoding: 'utf-8',
-          stdio: ['pipe', 'pipe', 'pipe'],
-        })
-        const data = JSON.parse(inspect)
-        const portBindings = data[0]?.NetworkSettings?.Ports?.[`${port}/tcp`]
-        if (portBindings && portBindings.length > 0) {
-          return container
-        }
-      } catch {
-        // Container might not have port bindings, continue
-      }
-    }
-  } catch {
-    // Silently fail
-  }
-  return null
-}
-
-// Stop a container
-async function stopContainer(podmanCmd: string, containerName: string): Promise<boolean> {
+// Wait for database to be ready
+async function waitForDatabaseReady(podmanCmd: string, containerName: string): Promise<void> {
+  logger.info('Waiting for database to be up and ready...')
+  logger.muted('This may take a few minutes while the database initializes. Please wait...\n')
   try {
-    logger.info(`Stopping container "${containerName}"...`)
-    execSync(`${podmanCmd} stop ${containerName}`, { stdio: 'pipe' })
-    logger.success(`Container "${containerName}" stopped`)
-    return true
+    await waitForContainerHealth(podmanCmd, containerName)
+    logger.success('Database is up and ready')
   } catch (error) {
-    logger.error(`Failed to stop container: ${error}`)
-    return false
+    logger.error(`${error}`)
+    process.exit(1)
   }
 }
 
@@ -220,7 +270,7 @@ export async function removeLocalDatabase(containerName?: string): Promise<void>
   }
 
   try {
-    execSync(`${podmanCmd} compose down`, { cwd: dbLocalDir, stdio: 'pipe' })
+    execSync(`${podmanCmd} compose down`, { cwd: getDbLocalDir(), stdio: 'pipe' })
     logger.success(`Container "${targetContainer}" removed successfully`)
   } catch (error) {
     logger.error(`Failed to remove container: ${error}`)
@@ -229,13 +279,18 @@ export async function removeLocalDatabase(containerName?: string): Promise<void>
 }
 
 // Setup local database mode
-export async function setupLocalDatabase(): Promise<void> {
-  logger.info('Setting up local Oracle Database...')
+export async function setupLocalDatabase(
+  project: string = 'odbvue',
+  environment: string = 'dev',
+): Promise<void> {
+  logger.info(
+    `Setting up local Oracle Database for project: ${project}, environment: ${environment}...`,
+  )
 
   const podmanInstalled = await checkPodmanInstalled()
   if (!podmanInstalled) {
     logger.error('Podman is not installed')
-    console.log(chalk.yellow('\nPlease install Podman from: https://podman.io/docs/installation\n'))
+    logger.warn('Please install Podman from: https://podman.io/docs/installation')
     process.exit(1)
   }
 
@@ -264,125 +319,132 @@ export async function setupLocalDatabase(): Promise<void> {
   }
 
   logger.success('Podman is running and ready')
+
   await checkPodmanResources()
 
-  // Prompt for database parameters
-  logger.info('Configuring database parameters...')
-  const envExamplePath = path.resolve(dbLocalDir, '.env.example')
+  const getExampleConfigDir = () => path.resolve(rootDir, 'config', 'example', environment)
+  const exampleConfigPath = path.resolve(getExampleConfigDir(), '.env.example')
 
-  // Read defaults from .env.example
-  let defaultContainerName = 'odbvue-db-dev'
-  let defaultAdminPassword = 'MySecurePass123!'
-  let defaultWalletPassword = 'MySecurePass123!'
+  const getTargetConfigDir = () => path.resolve(rootDir, 'config', project, environment)
 
-  if (existsSync(envExamplePath)) {
-    const exampleContent = readFileSync(envExamplePath, 'utf-8')
-    const containerMatch = exampleContent.match(/CONTAINER_NAME=(.+)/)
-    const adminMatch = exampleContent.match(/ADMIN_PASSWORD="?([^"]+)"?/)
-    const walletMatch = exampleContent.match(/WALLET_PASSWORD="?([^"]+)"?/)
+  if (!existsSync(exampleConfigPath)) {
+    logger.error(`Example .env file not found at: ${exampleConfigPath}`)
+    process.exit(1)
+  }
 
-    if (containerMatch) defaultContainerName = containerMatch[1].trim()
-    if (adminMatch) defaultAdminPassword = adminMatch[1].trim()
-    if (walletMatch) defaultWalletPassword = walletMatch[1].trim()
+  // Load and display content as object from config/example/dev/.env.example
+  const exampleConfigObject = config({ path: exampleConfigPath }).parsed || {}
+
+  // Password validation function
+  const validatePassword = (password: string): boolean | string => {
+    if (password.length < 12) {
+      return 'Password must be at least 12 characters'
+    }
+    if (!/[A-Z]/.test(password)) {
+      return 'Password must contain at least one uppercase letter'
+    }
+    if (!/[a-z]/.test(password)) {
+      return 'Password must contain at least one lowercase letter'
+    }
+    if (!/[0-9]/.test(password)) {
+      return 'Password must contain at least one number'
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+      return 'Password must contain at least one symbol'
+    }
+    return true
   }
 
   const dbParams = await prompts([
     {
       type: 'text',
       name: 'containerName',
-      message: 'Container name',
-      initial: defaultContainerName,
+      message: 'CONTAINER_NAME',
+      initial: `${project}-db-${environment}`,
       validate: (value) => (value.trim() ? true : 'Container name cannot be empty'),
     },
     {
       type: 'password',
       name: 'adminPassword',
       message: 'ADMIN_PASSWORD',
-      initial: defaultAdminPassword,
+      initial: exampleConfigObject['DB_ADMIN_PASSWORD'] || 'MySecurePass123!',
+      validate: validatePassword,
     },
     {
       type: 'password',
       name: 'walletPassword',
       message: 'WALLET_PASSWORD',
-      initial: defaultWalletPassword,
+      initial: exampleConfigObject['DB_WALLET_PASSWORD'] || 'MySecurePass123!',
+      validate: validatePassword,
     },
   ])
 
-  // Generate .env file
+  // Generate .env file in config directory
   logger.info('Generating .env file...')
-  const envPath = path.resolve(dbLocalDir, '.env')
-  const envContent = `CONTAINER_NAME=${dbParams.containerName}\nADMIN_PASSWORD="${dbParams.adminPassword}"\nWALLET_PASSWORD="${dbParams.walletPassword}"\n`
+  mkdirSync(getTargetConfigDir(), { recursive: true })
+  const envPath = path.resolve(getTargetConfigDir(), '.env')
+  const envContent = `DB_CONTAINER_NAME="${dbParams.containerName}"\nDB_ADMIN_USERNAME="ADMIN"\nDB_ADMIN_PASSWORD="${dbParams.adminPassword}"\nDB_WALLET_PASSWORD="${dbParams.walletPassword}"\n`
   writeFileSync(envPath, envContent, 'utf-8')
-  logger.success('Generated .env file')
+  logger.success(`Generated .env file at: ${envPath}`)
 
-  // Start container
-  logger.info('Starting database container with podman compose...')
-  console.log(
-    chalk.gray(
-      'This may take a few minutes while the image is being pulled and built. Please wait...\n',
-    ),
-  )
+  // check if container with same name is already running
   const podmanCmd = getPodmanCommand()
   if (!podmanCmd) {
     logger.error('Podman command not found')
     process.exit(1)
   }
 
-  // Check if port 1521 is already in use
-  const containerUsingPort = await getContainerUsingPort(podmanCmd, 1521)
-  if (containerUsingPort) {
-    logger.warn(`Port 1521 is already in use by container "${containerUsingPort}"`)
-    const response = await prompts({
-      type: 'select',
-      name: 'action',
-      message: 'What would you like to do?',
-      choices: [
-        { title: 'Stop the other container and continue', value: 'stop' },
-        { title: 'Exit', value: 'exit' },
-      ],
-    })
+  const existingContainers = await getDatabaseContainers(podmanCmd)
 
-    if (response.action === 'exit') {
-      logger.info('Setup cancelled')
-      process.exit(0)
+  if (!existingContainers.includes(dbParams.containerName)) {
+    try {
+      const envFilePath = path.resolve(getTargetConfigDir(), '.env')
+      execSync(`${podmanCmd} compose --env-file "${envFilePath}" up -d --build`, {
+        cwd: getDbLocalDir(),
+        stdio: 'pipe',
+      })
+      logger.success('Database container started')
+    } catch (error) {
+      logger.error(`Failed to start container: ${error}`)
+      process.exit(1)
     }
 
-    if (response.action === 'stop') {
-      const stopped = await stopContainer(podmanCmd, containerUsingPort)
-      if (!stopped) {
-        logger.error('Cannot proceed without stopping the conflicting container')
-        process.exit(1)
+    // Wait for container to be up and ready
+    await waitForDatabaseReady(podmanCmd, dbParams.containerName)
+  } else {
+    logger.warn(`Container with name "${dbParams.containerName}" already exists.`)
+
+    const existingRunningContainers = await getRunningDatabaseContainers(podmanCmd)
+    if (!existingRunningContainers.includes(dbParams.containerName)) {
+      const response = await prompts({
+        type: 'confirm',
+        name: 'startExisting',
+        message: `The container "${dbParams.containerName}" is not running. Do you want to start it?`,
+        initial: true,
+      })
+
+      if (response.startExisting) {
+        // Start existing container
+        logger.info(`Starting existing container "${dbParams.containerName}"...`)
+        try {
+          execSync(`${podmanCmd} start ${dbParams.containerName}`, { stdio: 'pipe' })
+          logger.success(`Container "${dbParams.containerName}" started successfully`)
+        } catch (error) {
+          logger.error(`Failed to start container: ${error}`)
+          process.exit(1)
+        }
+
+        // Wait for container to be up and ready
+        await waitForDatabaseReady(podmanCmd, dbParams.containerName)
+      } else {
+        logger.info('Setup cancelled')
+        process.exit(0)
       }
     }
   }
-
-  try {
-    execSync(`${podmanCmd} compose --env-file .env up -d --build`, {
-      cwd: dbLocalDir,
-      stdio: 'pipe',
-    })
-    logger.success('Database container started')
-  } catch (error) {
-    logger.error(`Failed to start container: ${error}`)
-    process.exit(1)
-  }
-
-  // Wait for container to be up and ready
-  logger.info('Waiting for database to be up and ready...')
-  console.log(
-    chalk.gray('This may take a few minutes while the database initializes. Please wait...\n'),
-  )
-  try {
-    await waitForContainerHealth(podmanCmd, dbParams.containerName)
-    logger.success('Database is up and ready')
-  } catch (error) {
-    logger.error(`${error}`)
-    process.exit(1)
-  }
-
   // Download wallet
   logger.info('Downloading wallet from container...')
-  const walletsDir = path.resolve(dbLocalDir, '.wallets')
+  const walletsDir = path.resolve(getTargetConfigDir(), '.wallets')
   const walletZipPath = path.resolve(walletsDir, `${dbParams.containerName}.zip`)
 
   try {
@@ -393,14 +455,12 @@ export async function setupLocalDatabase(): Promise<void> {
     process.exit(1)
   }
 
+  // Final success message
   logger.success('Local database setup completed successfully!')
-  console.log(
-    chalk.gray(`Oracle Rest Data Services is running at: `) +
-      chalk.cyan(`https://localhost:8443/ords/`),
-  )
-  console.log(chalk.gray(`Configure database connection: `))
-  console.log(chalk.gray(`  wallet: `) + chalk.cyan(`${walletZipPath}`))
-  console.log(chalk.gray(`  username: `) + chalk.cyan(`ADMIN`))
-  console.log(chalk.gray(`  password: `) + chalk.cyan(`************`))
-  console.log('')
+  logger.muted(`Oracle Rest Data Services is running at: https://localhost:8443/ords/`)
+  logger.muted('Configure database connection: ')
+  logger.muted(`  username: ADMIN`)
+  logger.muted(`  password: ************`)
+  logger.muted(`  wallet: ${walletZipPath}`)
+  logger.muted('')
 }
