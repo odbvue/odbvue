@@ -1,16 +1,27 @@
 import chalk from 'chalk'
 import prompts from 'prompts'
 import { setupLocalDatabase, removeLocalDatabase } from './db-local.js'
-//import { runSqlFile } from './db-run.js'
+import { runSqlFile } from './db-run.js'
 import { handleCommitAll } from './cicd.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import fs from 'fs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // Get root directory (parent of cli folder)
 export const rootDir = path.resolve(__dirname, '../../')
+
+// Load config with default profile
+function loadConfig() {
+  const configPath = path.join(rootDir, 'config.json')
+  try {
+    return JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+  } catch {
+    return { defaultProfile: { project: 'odbvue', environment: 'dev' } }
+  }
+}
 
 // Simple logger utility
 export const logger = {
@@ -26,6 +37,9 @@ export default logger
 
 // Main function to handle CLI commands
 export async function main(argv = process.argv.slice(2)) {
+  const config = loadConfig()
+  const { project: defaultProject, environment: defaultEnvironment } = config.defaultProfile
+
   const command = argv[0]
   const args = argv.slice(1)
 
@@ -40,14 +54,14 @@ export async function main(argv = process.argv.slice(2)) {
         type: 'text',
         name: 'project',
         message: 'Project',
-        initial: 'odbvue',
+        initial: defaultProject,
         validate: (value) => (value.trim() ? true : 'Project cannot be empty'),
       },
       {
         type: 'text',
         name: 'environment',
         message: 'Environment',
-        initial: 'dev',
+        initial: defaultEnvironment,
         validate: (value) => (value.trim() ? true : 'Environment cannot be empty'),
       },
       {
@@ -76,8 +90,8 @@ export async function main(argv = process.argv.slice(2)) {
   }
 
   if (command === 'db-setup-local') {
-    const project = args[0] || 'odbvue'
-    const environment = args[1] || 'dev'
+    const project = args[0] || defaultProject
+    const environment = args[1] || defaultEnvironment
     await setupLocalDatabase(project, environment)
     return
   }
@@ -99,7 +113,12 @@ export async function main(argv = process.argv.slice(2)) {
       logger.log('')
       process.exit(1)
     }
-    //await runSqlFile(sqlFilePath)
+    try {
+      await runSqlFile(defaultProject, defaultEnvironment, sqlFilePath)
+    } catch {
+      logger.error('Failed to execute SQL file')
+      process.exit(1)
+    }
     return
   }
 

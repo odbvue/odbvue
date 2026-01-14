@@ -187,19 +187,6 @@ async function getRunningDatabaseContainers(podmanCmd: string): Promise<string[]
   }
 }
 
-// Stop a container (currently unused, kept for future use)
-// async function stopContainer(podmanCmd: string, containerName: string): Promise<boolean> {
-//   try {
-//     logger.info(`Stopping container "${containerName}"...`)
-//     execSync(`${podmanCmd} stop ${containerName}`, { stdio: 'pipe' })
-//     logger.success(`Container "${containerName}" stopped`)
-//     return true
-//   } catch (error) {
-//     logger.error(`Failed to stop container: ${error}`)
-//     return false
-//   }
-// }
-
 // Wait for database to be ready
 async function waitForDatabaseReady(podmanCmd: string, containerName: string): Promise<void> {
   logger.info('Waiting for database to be up and ready...')
