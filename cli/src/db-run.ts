@@ -4,6 +4,7 @@ import path from 'path'
 import os from 'os'
 import dotenv from 'dotenv'
 import unzipper from 'unzipper'
+import { execSync } from 'child_process'
 import { rootDir, logger } from './index.js'
 
 // Thin mode is default — no client install required
@@ -57,7 +58,9 @@ function loadEnv(project: string, environment: string): Record<string, string> {
 
 function buildBinds(sql: string, env: Record<string, string>): oracledb.BindParameters {
   const bindNames = new Set<string>()
-  const regex = /:(\w+)/g
+  // Match bind variables that start with a letter (Oracle bind vars must start with a letter)
+  // This avoids matching timestamps like 13:36:55 where :36 and :55 would be incorrectly matched
+  const regex = /:([a-zA-Z]\w*)/g
   let match: RegExpExecArray | null
 
   while ((match = regex.exec(sql)) !== null) {
@@ -109,6 +112,83 @@ function buildBinds(sql: string, env: Record<string, string>): oracledb.BindPara
   }
 
   return binds as oracledb.BindParameters
+}
+
+/**
+ * Parse SQL file content into individual executable statements.
+ * Handles:
+ * - PL/SQL blocks (BEGIN...END, CREATE PACKAGE, etc.) terminated by / on its own line
+ * - Single SQL statements terminated by ; (but not ; inside PL/SQL blocks)
+ */
+function parseSqlStatements(content: string): string[] {
+  const statements: string[] = []
+  const lines = content.split('\n')
+  let currentStatement = ''
+  let inPlsqlBlock = false
+
+  for (const line of lines) {
+    const trimmedLine = line.trim()
+
+    // Skip empty lines and comments at the start of a new statement
+    if (!currentStatement && (trimmedLine === '' || trimmedLine.startsWith('--'))) {
+      continue
+    }
+
+    // Check if we're entering a PL/SQL block
+    if (!inPlsqlBlock) {
+      const upperLine = trimmedLine.toUpperCase()
+      if (
+        upperLine.startsWith('BEGIN') ||
+        upperLine.startsWith('DECLARE') ||
+        upperLine.match(/^CREATE\s+(OR\s+REPLACE\s+)?(EDITIONABLE\s+)?PACKAGE/) ||
+        upperLine.match(/^CREATE\s+(OR\s+REPLACE\s+)?(EDITIONABLE\s+)?PROCEDURE/) ||
+        upperLine.match(/^CREATE\s+(OR\s+REPLACE\s+)?(EDITIONABLE\s+)?FUNCTION/) ||
+        upperLine.match(/^CREATE\s+(OR\s+REPLACE\s+)?(EDITIONABLE\s+)?TRIGGER/) ||
+        upperLine.match(/^CREATE\s+(OR\s+REPLACE\s+)?(EDITIONABLE\s+)?TYPE/)
+      ) {
+        inPlsqlBlock = true
+      }
+    }
+
+    // Check for / on its own line (PL/SQL block terminator)
+    if (trimmedLine === '/') {
+      if (currentStatement.trim()) {
+        statements.push(currentStatement.trim())
+        currentStatement = ''
+      }
+      inPlsqlBlock = false
+      continue
+    }
+
+    // If in PL/SQL block, just accumulate lines
+    if (inPlsqlBlock) {
+      currentStatement += line + '\n'
+      continue
+    }
+
+    // For regular SQL, check if line ends with ;
+    if (trimmedLine.endsWith(';')) {
+      currentStatement += line + '\n'
+      // Remove trailing semicolon for oracledb (it doesn't like them)
+      const stmt = currentStatement.trim().replace(/;$/, '').trim()
+      if (stmt) {
+        statements.push(stmt)
+      }
+      currentStatement = ''
+    } else {
+      currentStatement += line + '\n'
+    }
+  }
+
+  // Handle any remaining statement
+  if (currentStatement.trim()) {
+    const stmt = currentStatement.trim().replace(/;$/, '').trim()
+    if (stmt) {
+      statements.push(stmt)
+    }
+  }
+
+  return statements
 }
 
 /**
@@ -277,11 +357,10 @@ export async function runSqlFile(
     // Read SQL file
     const sqlContent = fs.readFileSync(absoluteSqlPath, 'utf8')
 
-    // Split on / (Oracle statement delimiter), not ; (which breaks PL/SQL)
-    const statements = sqlContent
-      .split(/\n\/\s*$/m) // Split on newline followed by / at end of line
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0)
+    // Parse SQL statements - handles both:
+    // 1. PL/SQL blocks terminated by / on its own line
+    // 2. Single SQL statements terminated by ;
+    const statements = parseSqlStatements(sqlContent)
 
     if (statements.length === 0) {
       logger.warn('No SQL statements found in file')
@@ -357,5 +436,164 @@ export async function runSqlFile(
         logger.warn(`Warning: Failed to close connection: ${err}`)
       }
     }
+  }
+}
+
+/**
+ * Generate SQL scaffold from a TypeScript API module
+ * Returns the path to the generated SQL file
+ */
+export async function scaffoldModule(apiPath: string, outputDir?: string): Promise<string> {
+  const absoluteApiPath = path.isAbsolute(apiPath) ? apiPath : path.resolve(rootDir, apiPath)
+
+  if (!fs.existsSync(absoluteApiPath)) {
+    throw new Error(`API file not found: ${absoluteApiPath}`)
+  }
+
+  const moduleName = path.basename(path.dirname(absoluteApiPath))
+  const apiDir = path.dirname(absoluteApiPath)
+  const distDir = outputDir || path.resolve(apiDir, 'dist')
+
+  // Find the project root that contains tsconfig.json with path mappings
+  // Walk up from the API file to find the nearest tsconfig.json
+  let projectRoot = apiDir
+  let tsconfigPath = ''
+  while (projectRoot !== path.dirname(projectRoot)) {
+    // Prefer tsconfig.app.json if it exists (has path aliases in Vue projects)
+    const appConfig = path.join(projectRoot, 'tsconfig.app.json')
+    const baseConfig = path.join(projectRoot, 'tsconfig.json')
+    if (fs.existsSync(appConfig)) {
+      tsconfigPath = appConfig
+      break
+    }
+    if (fs.existsSync(baseConfig)) {
+      tsconfigPath = baseConfig
+      break
+    }
+    projectRoot = path.dirname(projectRoot)
+  }
+
+  // Create dist directory if it doesn't exist
+  fs.mkdirSync(distDir, { recursive: true })
+
+  // Create a temporary loader script
+  const fileUrl = `file://${absoluteApiPath.replace(/\\/g, '/')}`
+  const loaderScript = `import('${fileUrl}').then(m => {
+  const schema = m.schema;
+  const tables = m.tables || [];
+  const packages = m.packages || [];
+  const sqlParts = [];
+  
+  if (schema && typeof schema.render === 'function') {
+    sqlParts.push(schema.render());
+  }
+  
+  for (const table of tables) {
+    if (typeof table.render === 'function') {
+      sqlParts.push(table.render());
+    }
+  }
+  
+  for (const pkg of packages) {
+    if (typeof pkg.render === 'function') {
+      sqlParts.push(pkg.render());
+    }
+  }
+  
+  console.log(JSON.stringify({ sqlParts, tableCount: tables.length, packageCount: packages.length }));
+}).catch(err => {
+  console.error(JSON.stringify({ error: err.message }));
+  process.exit(1);
+});`
+
+  const loaderPath = path.resolve(os.tmpdir(), `ov-scaffold-${Date.now()}.mjs`)
+  fs.writeFileSync(loaderPath, loaderScript, 'utf-8')
+
+  try {
+    let result: string
+    try {
+      const tsxCmd = tsconfigPath
+        ? `npx tsx --tsconfig "${tsconfigPath}" ${loaderPath}`
+        : `npx tsx ${loaderPath}`
+      result = execSync(tsxCmd, {
+        cwd: projectRoot,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      })
+    } catch (execError) {
+      const err = execError as { stderr?: string; stdout?: string; message?: string }
+      logger.error(`Scaffold execution failed:`)
+      if (err.stderr) logger.error(err.stderr)
+      if (err.stdout) logger.muted(err.stdout)
+      throw new Error(err.message || 'Failed to execute scaffold script')
+    }
+
+    const jsonMatch = result.match(/\{.*\}/s)
+    if (!jsonMatch) {
+      throw new Error('No JSON output found from loader script')
+    }
+
+    const output = JSON.parse(jsonMatch[0])
+
+    if (output.error) {
+      throw new Error(output.error)
+    }
+
+    const { sqlParts, tableCount, packageCount } = output
+
+    if (tableCount === 0 && packageCount === 0) {
+      logger.warn(`No tables or packages exported from ${moduleName}`)
+    }
+
+    if (sqlParts.length > 0) {
+      const sqlContent = sqlParts.join('\n\n')
+      const outputPath = path.resolve(distDir, 'index.sql')
+      fs.writeFileSync(outputPath, sqlContent, 'utf-8')
+      logger.success(
+        `Scaffolded ${moduleName} → ${path.relative(rootDir, outputPath)} (${tableCount} tables, ${packageCount} packages)`,
+      )
+      return outputPath
+    }
+
+    throw new Error(`No SQL content generated from ${moduleName}`)
+  } finally {
+    // Clean up temp file
+    try {
+      fs.unlinkSync(loaderPath)
+    } catch {
+      // Ignore cleanup errors
+    }
+  }
+}
+
+/**
+ * Run a file against the database
+ * - If .ts file: first scaffold to SQL, then execute
+ * - If .sql file: execute directly
+ */
+export async function runFile(
+  project: string,
+  environment: string,
+  filePath: string,
+): Promise<void> {
+  const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(rootDir, filePath)
+
+  if (!fs.existsSync(absolutePath)) {
+    throw new Error(`File not found: ${absolutePath}`)
+  }
+
+  const ext = path.extname(absolutePath).toLowerCase()
+
+  if (ext === '.ts') {
+    // TypeScript file - scaffold first, then run the generated SQL
+    logger.info(`Scaffolding TypeScript module: ${absolutePath}`)
+    const sqlPath = await scaffoldModule(absolutePath)
+    logger.info(`Running generated SQL: ${sqlPath}`)
+    await runSqlFile(project, environment, sqlPath)
+  } else if (ext === '.sql') {
+    // SQL file - run directly
+    await runSqlFile(project, environment, absolutePath)
+  } else {
+    throw new Error(`Unsupported file type: ${ext}. Expected .ts or .sql`)
   }
 }

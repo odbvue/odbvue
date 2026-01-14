@@ -1,7 +1,7 @@
 import chalk from 'chalk'
 import prompts from 'prompts'
 import { setupLocalDatabase, removeLocalDatabase } from './db-local.js'
-import { runSqlFile } from './db-run.js'
+import { runFile } from './db-run.js'
 import { handleCommitAll } from './cicd.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -103,20 +103,24 @@ export async function main(argv = process.argv.slice(2)) {
   }
 
   if (command === 'db-run' || command === 'dr') {
-    const sqlFilePath = args[0]
-    if (!sqlFilePath) {
-      logger.error('SQL file path is required')
+    const filePath = args[0]
+    if (!filePath) {
+      logger.error('File path is required')
       logger.log('')
       logger.log(chalk.cyan('Usage:'))
-      logger.log(chalk.gray('  $ ov db-run <sql-file-path>'))
-      logger.log(chalk.gray('  $ ov dr <sql-file-path>'))
+      logger.log(chalk.gray('  $ ov db-run <file-path>'))
+      logger.log(chalk.gray('  $ ov dr <file-path>'))
+      logger.log('')
+      logger.log(chalk.cyan('Supported file types:'))
+      logger.log(chalk.gray('  .sql - Execute SQL file directly'))
+      logger.log(chalk.gray('  .ts  - Scaffold API module to SQL, then execute'))
       logger.log('')
       process.exit(1)
     }
     try {
-      await runSqlFile(defaultProject, defaultEnvironment, sqlFilePath)
+      await runFile(defaultProject, defaultEnvironment, filePath)
     } catch {
-      logger.error('Failed to execute SQL file')
+      logger.error('Failed to execute file')
       process.exit(1)
     }
     return
@@ -133,7 +137,7 @@ export async function main(argv = process.argv.slice(2)) {
   )
   logger.log(
     chalk.gray('  db-run, dr [path]') +
-      chalk.reset('      Execute SQL file against Oracle Database'),
+      chalk.reset('      Execute SQL or TypeScript API file against Oracle Database'),
   )
   logger.log(
     chalk.gray('  commit-all, ca') +
@@ -148,6 +152,7 @@ export async function main(argv = process.argv.slice(2)) {
   logger.log(chalk.gray('  $ ov db-remove-local db-dev'))
   logger.log(chalk.gray('  $ ov db-run ./schema.sql'))
   logger.log(chalk.gray('  $ ov dr ./data.sql'))
+  logger.log(chalk.gray('  $ ov dr apps/src/api/index.ts'))
 }
 
 main()
