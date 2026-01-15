@@ -1,7 +1,6 @@
 import chalk from 'chalk'
 import prompts from 'prompts'
-import { setupLocalDatabase, removeLocalDatabase } from './db-local.js'
-import { runFile } from './db-run.js'
+import { setupLocalDatabase, removeLocalDatabase, runFile } from './db.js'
 import { handleCommitAll } from './cicd.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
