@@ -1,0 +1,2 @@
+@./scripts/before/setup.sql
+

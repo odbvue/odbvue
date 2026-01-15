@@ -115,6 +115,65 @@ function buildBinds(sql: string, env: Record<string, string>): oracledb.BindPara
 }
 
 /**
+ * Recursively resolve @include directives in SQL content
+ * Replaces @path/to/file.sql with the file contents
+ * Handles nested includes and circular references
+ */
+function resolveIncludes(
+  content: string,
+  baseDir: string,
+  processedFiles: Set<string> = new Set(),
+): string {
+  const lines: string[] = []
+  const contentLines = content.split('\n')
+
+  for (const line of contentLines) {
+    const trimmed = line.trim()
+
+    // Check for @file directive (SQLPlus/SQLcl include syntax)
+    if (trimmed.startsWith('@')) {
+      const includePath = trimmed.substring(1).trim()
+
+      // Resolve relative to baseDir
+      const absoluteIncludePath = path.isAbsolute(includePath)
+        ? includePath
+        : path.resolve(baseDir, includePath)
+
+      // Check for circular includes
+      if (processedFiles.has(absoluteIncludePath)) {
+        logger.warn(`Skipping circular include: ${absoluteIncludePath}`)
+        continue
+      }
+
+      // Check if file exists
+      if (!fs.existsSync(absoluteIncludePath)) {
+        logger.warn(`Include file not found: ${absoluteIncludePath}`)
+        continue
+      }
+
+      logger.muted(`  Including: ${path.relative(baseDir, absoluteIncludePath)}`)
+
+      // Mark as processed
+      processedFiles.add(absoluteIncludePath)
+
+      // Load and recursively process the included file
+      const includeContent = fs.readFileSync(absoluteIncludePath, 'utf8')
+      const includeDir = path.dirname(absoluteIncludePath)
+      const resolvedContent = resolveIncludes(includeContent, includeDir, processedFiles)
+
+      // Append resolved content (with newlines for safety)
+      lines.push('')
+      lines.push(resolvedContent)
+      lines.push('')
+    } else {
+      lines.push(line)
+    }
+  }
+
+  return lines.join('\n')
+}
+
+/**
  * Parse SQL file content into individual executable statements.
  * Handles:
  * - PL/SQL blocks (BEGIN...END, CREATE PACKAGE, etc.) terminated by / on its own line
@@ -355,7 +414,12 @@ export async function runSqlFile(
     }
 
     // Read SQL file
-    const sqlContent = fs.readFileSync(absoluteSqlPath, 'utf8')
+    let sqlContent = fs.readFileSync(absoluteSqlPath, 'utf8')
+
+    // Resolve @include directives (SQLPlus/SQLcl syntax)
+    logger.info('Resolving includes...')
+    const sqlDir = path.dirname(absoluteSqlPath)
+    sqlContent = resolveIncludes(sqlContent, sqlDir)
 
     // Parse SQL statements - handles both:
     // 1. PL/SQL blocks terminated by / on its own line

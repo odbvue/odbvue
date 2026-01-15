@@ -364,13 +364,26 @@ export async function setupLocalDatabase(
       initial: exampleConfigObject['DB_WALLET_PASSWORD'] || 'MySecurePass123!',
       validate: validatePassword,
     },
+    {
+      type: 'text',
+      name: 'schemaName',
+      message: 'SCHEMA_NAME',
+      initial: 'ODBVUE',
+    },
+    {
+      type: 'password',
+      name: 'schemaPassword',
+      message: 'SCHEMA_PASSWORD',
+      initial: 'MySecurePass123!',
+      validate: validatePassword,
+    },
   ])
 
   // Generate .env file in config directory
   logger.info('Generating .env file...')
   mkdirSync(getTargetConfigDir(), { recursive: true })
   const envPath = path.resolve(getTargetConfigDir(), '.env')
-  const envContent = `DB_CONTAINER_NAME="${dbParams.containerName}"\nDB_ADMIN_USERNAME="ADMIN"\nDB_ADMIN_PASSWORD="${dbParams.adminPassword}"\nDB_WALLET_PASSWORD="${dbParams.walletPassword}"\n`
+  const envContent = `DB_CONTAINER_NAME="${dbParams.containerName}"\nDB_ADMIN_USERNAME="ADMIN"\nDB_ADMIN_PASSWORD="${dbParams.adminPassword}"\nDB_WALLET_PASSWORD="${dbParams.walletPassword}"\nDB_SCHEMA_USERNAME="${dbParams.schemaName}"\nDB_SCHEMA_PASSWORD="${dbParams.schemaPassword}"`
   writeFileSync(envPath, envContent, 'utf-8')
   logger.success(`Generated .env file at: ${envPath}`)
 

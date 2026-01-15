@@ -82,6 +82,8 @@ export async function main(argv = process.argv.slice(2)) {
 
     if (setupMode.database === 'local') {
       await setupLocalDatabase(setupMode.project, setupMode.environment)
+      logger.info('Running database setup scripts...')
+      await runFile(setupMode.project, setupMode.environment, 'db/releases/next/setup.sql')
     } else if (setupMode.database === 'oci') {
       logger.info('Cloud setup coming soon...')
     }
@@ -131,6 +133,47 @@ export async function main(argv = process.argv.slice(2)) {
     return
   }
 
+  if (command === 'load-env' || command === 'le') {
+    const envPath = args[0]
+    if (!envPath) {
+      logger.error('Environment file path is required')
+      logger.log('')
+      logger.log(chalk.cyan('Usage:'))
+      logger.log(chalk.gray('  $ ov load-env <path>'))
+      logger.log(chalk.gray('  $ ov le <path>'))
+      logger.log('')
+      process.exit(1)
+    }
+
+    try {
+      const absolutePath = path.isAbsolute(envPath) ? envPath : path.resolve(rootDir, envPath)
+
+      if (!fs.existsSync(absolutePath)) {
+        throw new Error(`Environment file not found: ${absolutePath}`)
+      }
+
+      const envContent = fs.readFileSync(absolutePath, 'utf-8')
+      const lines = envContent.split('\n')
+
+      logger.success(`Loaded environment from: ${absolutePath}`)
+      logger.log('')
+      logger.log(chalk.cyan('Environment variables:'))
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (trimmed && !trimmed.startsWith('#')) {
+          const [key] = trimmed.split('=')
+          logger.muted(`  ${key}=${trimmed.split('=').slice(1).join('=').replace(/"/g, '')}`)
+        }
+      }
+    } catch (err) {
+      logger.error(
+        `Failed to load environment file: ${err instanceof Error ? err.message : String(err)}`,
+      )
+      process.exit(1)
+    }
+    return
+  }
+
   logger.log(
     chalk.gray('  db-setup-local [project] [environment]') +
       chalk.reset('   Setup local database (default: odbvue, dev)'),
@@ -138,6 +181,10 @@ export async function main(argv = process.argv.slice(2)) {
   logger.log(
     chalk.gray('  db-run, dr [path]') +
       chalk.reset('      Execute SQL or TypeScript API file against Oracle Database'),
+  )
+  logger.log(
+    chalk.gray('  load-env, le [path]') +
+      chalk.reset('       Load and display environment variables from .env file'),
   )
   logger.log(
     chalk.gray('  commit-all, ca') +
@@ -153,6 +200,8 @@ export async function main(argv = process.argv.slice(2)) {
   logger.log(chalk.gray('  $ ov db-run ./schema.sql'))
   logger.log(chalk.gray('  $ ov dr ./data.sql'))
   logger.log(chalk.gray('  $ ov dr apps/src/api/index.ts'))
+  logger.log(chalk.gray('  $ ov load-env ./config/odbvue/dev/.env'))
+  logger.log(chalk.gray('  $ ov le ./config/odbvue/dev/.env'))
 }
 
 main()
