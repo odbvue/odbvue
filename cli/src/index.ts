@@ -107,15 +107,16 @@ export async function main(argv = process.argv.slice(2)) {
   if (command === 'db-run' || command === 'dr') {
     const filePath = args[0]
     if (!filePath) {
-      logger.error('File path is required')
+      logger.error('File or folder path is required')
       logger.log('')
       logger.log(chalk.cyan('Usage:'))
-      logger.log(chalk.gray('  $ ov db-run <file-path>'))
-      logger.log(chalk.gray('  $ ov dr <file-path>'))
+      logger.log(chalk.gray('  $ ov db-run <path>'))
+      logger.log(chalk.gray('  $ ov dr <path>'))
       logger.log('')
-      logger.log(chalk.cyan('Supported file types:'))
-      logger.log(chalk.gray('  .sql - Execute SQL file directly'))
-      logger.log(chalk.gray('  .ts  - Scaffold API module to SQL, then execute'))
+      logger.log(chalk.cyan('Supported input types:'))
+      logger.log(chalk.gray('  .sql   - Execute SQL file directly'))
+      logger.log(chalk.gray('  .ts    - Scaffold API module to SQL, then execute'))
+      logger.log(chalk.gray('  folder - Consolidate SQL files from subfolders, then execute'))
       logger.log('')
       process.exit(1)
     }

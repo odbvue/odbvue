@@ -631,9 +631,74 @@ export async function scaffoldModule(apiPath: string, outputDir?: string): Promi
 }
 
 /**
- * Run a file against the database
+ * Generate consolidated SQL file from folder structure
+ * Scans predefined subfolders and warns if SQL files are found in other locations
+ */
+function generateSqlFromFolder(folderPath: string, folderName: string): string {
+  const subfolders = [
+    'scripts/before',
+    'tables',
+    'types',
+    'sequences',
+    'packages/specs',
+    'packages/bodies',
+    'triggers',
+    'scripts/after',
+  ]
+  const sqlLines: string[] = []
+
+  for (const subfolder of subfolders) {
+    const subfolderPath = path.join(folderPath, subfolder)
+
+    if (!fs.existsSync(subfolderPath)) {
+      continue
+    }
+
+    const files = fs.readdirSync(subfolderPath, { recursive: false })
+    const sqlFiles = files
+      .filter((file): file is string => typeof file === 'string' && file.endsWith('.sql'))
+      .sort()
+
+    for (const sqlFile of sqlFiles) {
+      const relativePath = `./${subfolder}/${sqlFile}`
+      sqlLines.push(`@${relativePath}`)
+    }
+  }
+
+  // Check for SQL files in other subfolders
+  const allEntries = fs.readdirSync(folderPath)
+  for (const entry of allEntries) {
+    const entryPath = path.join(folderPath, entry)
+    const stats = fs.statSync(entryPath)
+
+    if (stats.isDirectory() && !subfolders.includes(entry)) {
+      const files = fs.readdirSync(entryPath, { recursive: false })
+      const sqlFiles = files.filter(
+        (file): file is string => typeof file === 'string' && file.endsWith('.sql'),
+      )
+
+      if (sqlFiles.length > 0) {
+        logger.warn(
+          `Found ${sqlFiles.length} SQL file(s) in unregistered subfolder: ./${entry}/ (not included in consolidation)`,
+        )
+      }
+    }
+  }
+
+  // Generate output file in the folder
+  const outputPath = path.join(folderPath, `${folderName}.sql`)
+  const content = sqlLines.join('\n')
+  fs.writeFileSync(outputPath, content, 'utf-8')
+
+  logger.info(`Generated ${folderName}.sql with ${sqlLines.length} include(s)`)
+  return outputPath
+}
+
+/**
+ * Run a file or folder against the database
  * - If .ts file: first scaffold to SQL, then execute
  * - If .sql file: execute directly
+ * - If folder: generate consolidated SQL file, then execute
  */
 export async function runFile(
   project: string,
@@ -643,21 +708,32 @@ export async function runFile(
   const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(rootDir, filePath)
 
   if (!fs.existsSync(absolutePath)) {
-    throw new Error(`File not found: ${absolutePath}`)
+    throw new Error(`Path not found: ${absolutePath}`)
   }
 
-  const ext = path.extname(absolutePath).toLowerCase()
+  const stats = fs.statSync(absolutePath)
 
-  if (ext === '.ts') {
-    // TypeScript file - scaffold first, then run the generated SQL
-    logger.info(`Scaffolding TypeScript module: ${absolutePath}`)
-    const sqlPath = await scaffoldModule(absolutePath)
-    logger.info(`Running generated SQL: ${sqlPath}`)
+  if (stats.isDirectory()) {
+    // Folder - generate consolidated SQL and run
+    const folderName = path.basename(absolutePath)
+    logger.info(`Consolidating SQL files from folder: ${absolutePath}`)
+    const sqlPath = generateSqlFromFolder(absolutePath, folderName)
+    logger.info(`Running consolidated SQL: ${sqlPath}`)
     await runSqlFile(project, environment, sqlPath)
-  } else if (ext === '.sql') {
-    // SQL file - run directly
-    await runSqlFile(project, environment, absolutePath)
   } else {
-    throw new Error(`Unsupported file type: ${ext}. Expected .ts or .sql`)
+    const ext = path.extname(absolutePath).toLowerCase()
+
+    if (ext === '.ts') {
+      // TypeScript file - scaffold first, then run the generated SQL
+      logger.info(`Scaffolding TypeScript module: ${absolutePath}`)
+      const sqlPath = await scaffoldModule(absolutePath)
+      logger.info(`Running generated SQL: ${sqlPath}`)
+      await runSqlFile(project, environment, sqlPath)
+    } else if (ext === '.sql') {
+      // SQL file - run directly
+      await runSqlFile(project, environment, absolutePath)
+    } else {
+      throw new Error(`Unsupported file type: ${ext}. Expected .ts or .sql`)
+    }
   }
 }
