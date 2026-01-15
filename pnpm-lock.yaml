@@ -7,14 +7,7 @@ settings:
 importers:
 
   .:
-    dependencies:
-      unzipper:
-        specifier: ^0.12.3
-        version: 0.12.3
     devDependencies:
-      '@types/unzipper':
-        specifier: ^0.10.11
-        version: 0.10.11
       '@vitest/eslint-plugin':
         specifier: ^1.6.5
         version: 1.6.6(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)(vitest@4.0.17(@types/node@24.10.7)(jiti@2.6.1)(jsdom@27.4.0)(lightningcss@1.30.2))
@@ -55,6 +48,9 @@ importers:
         specifier: ^4.6.4
         version: 4.6.4(vue@3.5.26(typescript@5.9.3))
     devDependencies:
+      '@odbvue/db':
+        specifier: workspace:^
+        version: link:../db
       '@playwright/test':
         specifier: ^1.57.0
         version: 1.57.0
@@ -112,6 +108,9 @@ importers:
       prompts:
         specifier: ^2.4.2
         version: 2.4.2
+      unzipper:
+        specifier: ^0.12.3
+        version: 0.12.3
     devDependencies:
       '@types/node':
         specifier: ^24.10.4
@@ -122,6 +121,40 @@ importers:
       '@types/prompts':
         specifier: ^2.4.9
         version: 2.4.9
+      '@types/unzipper':
+        specifier: ^0.10.11
+        version: 0.10.11
+
+  db:
+    dependencies:
+      chalk:
+        specifier: ^5.6.2
+        version: 5.6.2
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
+      oracledb:
+        specifier: ^6.5.0
+        version: 6.10.0
+      prompts:
+        specifier: ^2.4.2
+        version: 2.4.2
+      unzipper:
+        specifier: ^0.12.3
+        version: 0.12.3
+    devDependencies:
+      '@types/node':
+        specifier: ^24.10.4
+        version: 24.10.7
+      '@types/oracledb':
+        specifier: ^6.10.0
+        version: 6.10.0
+      '@types/prompts':
+        specifier: ^2.4.9
+        version: 2.4.9
+      '@types/unzipper':
+        specifier: ^0.10.11
+        version: 0.10.11
 
   wiki:
     devDependencies:

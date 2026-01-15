@@ -1,4 +1,5 @@
-import { Schema } from './schema'
+import { Schema } from '@odbvue/db'
+
 import { crmPersons } from './tables/crm-persons'
 import { crmPackage } from './packages/crm'
 

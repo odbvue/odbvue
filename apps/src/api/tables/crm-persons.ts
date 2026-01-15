@@ -1,4 +1,4 @@
-import { Table, columnType as ct } from '@/api/table'
+import { Table, columnType as ct } from '@odbvue/db'
 
 export const crmPersons = new Table()
   .create('crm_persons', 'CRM Person Table')

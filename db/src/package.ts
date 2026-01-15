@@ -10,10 +10,10 @@ export const ParamType = {
   Object: 'SYS_REFCURSOR',
 } as const
 
-import { Query } from './query'
-import { Insert } from './insert'
-import { Update } from './update'
-import { Upsert } from './upsert'
+import { Query } from './query.js'
+import { Insert } from './insert.js'
+import { Update } from './update.js'
+import { Upsert } from './upsert.js'
 
 export type ProcedureInfo = {
   name: string
@@ -182,25 +182,25 @@ export class Procedure {
 
     if (this.info.bodyStatement) {
       const stmtLines = this.info.bodyStatement.split('\n')
-      sql += stmtLines.map((line) => `    ${line}`).join('\n')
+      sql += stmtLines.map((line: string) => `    ${line}`).join('\n')
       sql += `\n`
     } else if (this.info.upsertStatement) {
       const upsertSql = this.info.upsertStatement.toString()
       const upsertLines = upsertSql.split('\n')
-      sql += upsertLines.map((line) => `    ${line}`).join('\n')
+      sql += upsertLines.map((line: string) => `    ${line}`).join('\n')
       sql += `\n`
     } else if (this.info.updateStatement || this.info.insertStatement) {
       if (this.info.updateStatement) {
         const updateSql = this.info.updateStatement.build()
         const updateLines = updateSql.split('\n')
-        sql += updateLines.map((line) => `    ${line}`).join('\n')
+        sql += updateLines.map((line: string) => `    ${line}`).join('\n')
         sql += `;\n\n`
       }
       if (this.info.insertStatement) {
         sql += `    IF SQL%rowcount = 0 THEN\n`
         const insertSql = this.info.insertStatement.build()
         const insertLines = insertSql.split('\n')
-        sql += insertLines.map((line) => `      ${line}`).join('\n')
+        sql += insertLines.map((line: string) => `      ${line}`).join('\n')
         sql += `;\n`
         sql += `    END IF;\n`
       }
@@ -210,7 +210,7 @@ export class Procedure {
       const queryStr = this.info.query.build()
       sql += `    OPEN ${cursorName} FOR\n`
       const queryLines = queryStr.split('\n')
-      sql += queryLines.map((line) => `      ${line}`).join('\n')
+      sql += queryLines.map((line: string) => `      ${line}`).join('\n')
       sql += `;\n`
     }
 

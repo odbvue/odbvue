@@ -1,5 +1,5 @@
-import { Update } from './update'
-import { Insert } from './insert'
+import { Update } from './update.js'
+import { Insert } from './insert.js'
 
 export class Upsert {
   private updateStmt: Update = new Update()

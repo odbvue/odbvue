@@ -1,6 +1,4 @@
-import { ParamType as pt, Procedure, Package } from '@/api/package'
-import { Query } from '@/api/query'
-import { Upsert } from '@/api/upsert'
+import { ParamType as pt, Procedure, Package, Query, Upsert } from '@odbvue/db'
 
 const query = new Query()
   .from('crm_persons')
