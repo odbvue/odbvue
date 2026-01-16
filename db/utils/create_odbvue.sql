@@ -286,8 +286,8 @@ CREATE OR REPLACE PACKAGE BODY odbvue AS
         v_col_name VARCHAR2(128 CHAR);
         v_col_type VARCHAR2(128 CHAR);
         v_col_default CLOB;
-        v_col_nullable VARCHAR2(1 CHAR);
-        v_col_identity VARCHAR2(3 CHAR);
+        v_col_nullable NUMBER;
+        v_col_identity NUMBER;
         v_first  BOOLEAN;
         v_idx_name VARCHAR2(128 CHAR);
         v_is_unique NUMBER;
@@ -298,6 +298,11 @@ CREATE OR REPLACE PACKAGE BODY odbvue AS
         v_fk_constraint_name VARCHAR2(128 CHAR);
         v_uq_constraint_num  PLS_INTEGER := 0;
         v_fk_constraint_num  PLS_INTEGER := 0;
+        v_unique_element JSON_ELEMENT_T;
+        v_fk_element JSON_ELEMENT_T;
+        v_index_element JSON_ELEMENT_T;
+        v_table_element JSON_ELEMENT_T;
+        v_column_element JSON_ELEMENT_T;
         
         PROCEDURE append(p_text IN VARCHAR2) IS
         BEGIN
@@ -325,7 +330,8 @@ CREATE OR REPLACE PACKAGE BODY odbvue AS
         
         -- First pass: Create all tables with columns and primary keys
         FOR i IN 0 .. v_tables.get_size() - 1 LOOP
-            v_table := TREAT(v_tables.get(i) AS JSON_OBJECT_T);
+            v_table_element := v_tables.get(i);
+            v_table := TREAT(v_table_element AS JSON_OBJECT_T);
             v_table_name := v_table.get_String('name');
             v_columns := v_table.get_Array('columns');
             v_pk := v_table.get_Array('primary_key');
@@ -343,7 +349,8 @@ CREATE OR REPLACE PACKAGE BODY odbvue AS
             
             v_first := TRUE;
             FOR j IN 0 .. v_columns.get_size() - 1 LOOP
-                v_column := TREAT(v_columns.get(j) AS JSON_OBJECT_T);
+                v_column_element := v_columns.get(j);
+                v_column := TREAT(v_column_element AS JSON_OBJECT_T);
                 v_col_name := v_column.get_String('name');
                 v_col_type := v_column.get_String('type');
                 v_col_nullable := CASE WHEN v_column.get_Boolean('nullable') THEN 1 ELSE 0 END;
@@ -404,13 +411,15 @@ CREATE OR REPLACE PACKAGE BODY odbvue AS
         
         -- Second pass: Add unique constraints
         FOR i IN 0 .. v_tables.get_size() - 1 LOOP
-            v_table := TREAT(v_tables.get(i) AS JSON_OBJECT_T);
+            v_table_element := v_tables.get(i);
+            v_table := TREAT(v_table_element AS JSON_OBJECT_T);
             v_table_name := v_table.get_String('name');
             v_unique := v_table.get_Array('unique');
             
             IF v_unique IS NOT NULL AND v_unique.get_size() > 0 THEN
                 FOR u IN 0 .. v_unique.get_size() - 1 LOOP
-                    v_unique_cols := TREAT(v_unique.get(u) AS JSON_ARRAY_T);
+                    v_unique_element := v_unique.get(u);
+                    v_unique_cols := TREAT(v_unique_element AS JSON_ARRAY_T);
                     IF v_unique_cols IS NOT NULL AND v_unique_cols.get_size() > 0 THEN
                         v_uq_constraint_num := v_uq_constraint_num + 1;
                         v_uq_constraint_name := 'UQ_' || v_table_name || '_' || v_uq_constraint_num;
@@ -461,16 +470,18 @@ CREATE OR REPLACE PACKAGE BODY odbvue AS
         
         -- Third pass: Create indexes
         FOR i IN 0 .. v_tables.get_size() - 1 LOOP
-            v_table := TREAT(v_tables.get(i) AS JSON_OBJECT_T);
+            v_table_element := v_tables.get(i);
+            v_table := TREAT(v_table_element AS JSON_OBJECT_T);
             v_table_name := v_table.get_String('name');
             v_indexes := v_table.get_Array('indexes');
             
             IF v_indexes IS NOT NULL AND v_indexes.get_size() > 0 THEN
                 FOR idx IN 0 .. v_indexes.get_size() - 1 LOOP
-                    v_index := TREAT(v_indexes.get(idx) AS JSON_OBJECT_T);
+                    v_index_element := v_indexes.get(idx);
+                    v_index := TREAT(v_index_element AS JSON_OBJECT_T);
                     v_idx_name := v_index.get_String('name');
                     v_idx_cols := v_index.get_Array('columns');
-                    v_is_unique := v_index.get_Number('unique');
+                    v_is_unique := COALESCE(v_index.get_Number('unique'), 0);
                     
                     append('DECLARE');
                     append('    v_exists NUMBER;');
@@ -507,13 +518,15 @@ CREATE OR REPLACE PACKAGE BODY odbvue AS
         
         -- Fourth pass: Add foreign key constraints
         FOR i IN 0 .. v_tables.get_size() - 1 LOOP
-            v_table := TREAT(v_tables.get(i) AS JSON_OBJECT_T);
+            v_table_element := v_tables.get(i);
+            v_table := TREAT(v_table_element AS JSON_OBJECT_T);
             v_table_name := v_table.get_String('name');
             v_fks := v_table.get_Array('foreignKeys');
             
             IF v_fks IS NOT NULL AND v_fks.get_size() > 0 THEN
                 FOR f IN 0 .. v_fks.get_size() - 1 LOOP
-                    v_fk := TREAT(v_fks.get(f) AS JSON_OBJECT_T);
+                    v_fk_element := v_fks.get(f);
+                    v_fk := TREAT(v_fk_element AS JSON_OBJECT_T);
                     v_fk_cols := v_fk.get_Array('columns');
                     v_ref_table := v_fk.get_String('refTable');
                     v_ref_cols := v_fk.get_Array('refColumns');
