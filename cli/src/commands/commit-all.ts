@@ -1,10 +1,8 @@
 import prompts from 'prompts'
-import { logger } from '../index.js'
+import { logger, rootDir } from '../index.js'
 
 export async function handleCommitAll() {
   const { execSync } = await import('child_process')
-
-  const rootDir = process.cwd()
 
   try {
     logger.info('Running pnpm format...')
@@ -98,10 +96,6 @@ export async function handleCommitAll() {
     logger.info('Creating commit...')
     execSync(`git commit -m "${commitMessage}"`, { cwd: rootDir, stdio: 'inherit' })
     logger.success('Commit created successfully')
-
-    logger.info('Pushing changes...')
-    execSync('git push', { cwd: rootDir, stdio: 'inherit' })
-    logger.success('Changes pushed successfully')
   } catch (error) {
     logger.error('Error during commit process')
     console.error(error)
