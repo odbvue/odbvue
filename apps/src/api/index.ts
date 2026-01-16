@@ -1,8 +1,8 @@
 import { Schema } from '@odbvue/db'
 
-import { crmPersons } from './tables/crm-persons'
-import { crmPackage } from './packages/crm'
+import { crmPersons } from './tables/crmPersons'
+import { appUsers } from './tables/appUsers'
 
-export const schema = new Schema('odbvue')
-export const tables = [crmPersons]
-export const packages = [crmPackage]
+export const schema = new Schema('odbvue').addTable(crmPersons).addTable(appUsers)
+
+console.log(schema.render())

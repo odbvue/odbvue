@@ -129,8 +129,8 @@ export async function main(argv = process.argv.slice(2)) {
     return
   }
 
-  if (command === 'db-scaffold') {
-    await handleDbScaffold(args, defaultProject, defaultEnvironment)
+  if (command === 'db-scaffold' || command === 'ds') {
+    await handleDbScaffold(args)
     return
   }
 
@@ -202,8 +202,8 @@ export async function main(argv = process.argv.slice(2)) {
       chalk.reset('  Generate SQL DDL from JSON schema'),
   )
   logger.log(
-    chalk.gray('  db-scaffold') +
-      chalk.reset('                   Generate JSON schema from TypeScript definitions'),
+    chalk.gray('  db-scaffold, ds <input-path>') +
+      chalk.reset('        Generate JSON schema from TypeScript definitions'),
   )
   logger.log(
     chalk.gray('  db-diff <schema.json>') +
@@ -237,6 +237,8 @@ export async function main(argv = process.argv.slice(2)) {
   logger.log(chalk.gray('  $ ov de ./schema.json'))
   logger.log(chalk.gray('  $ ov db-import ./schema.json ./schema.sql'))
   logger.log(chalk.gray('  $ ov di ./schema.json ./schema.sql'))
+  logger.log(chalk.gray('  $ ov db-scaffold apps/src/api    # → db/schema/src.json'))
+  logger.log(chalk.gray('  $ ov ds apps/src/api             # → db/schema/src.json'))
   logger.log(chalk.gray('  $ ov load-env ./config/odbvue/dev/.env'))
   logger.log(chalk.gray('  $ ov le ./config/odbvue/dev/.env'))
 }

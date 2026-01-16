@@ -1,5 +1,5 @@
 export { Schema } from './schema.js'
-export { Table, columnType } from './table.js'
+export { Table } from './table.js'
 export { Package, ParamType, Procedure } from './package.js'
 export { Query } from './query.js'
 export { Insert } from './insert.js'

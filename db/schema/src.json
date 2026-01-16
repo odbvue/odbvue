@@ -1,0 +1,136 @@
+{
+  "schema": "ODBVUE",
+  "exported": "2026-01-16T11:39:57.341Z",
+  "tables": [
+    {
+      "name": "CRM_PERSONS",
+      "columns": [
+        {
+          "name": "ID",
+          "type": "NUMBER(19,0)",
+          "default": null,
+          "nullable": false,
+          "identity": true
+        },
+        {
+          "name": "GUID",
+          "type": "RAW(16)",
+          "default": "SYS_GUID() ",
+          "nullable": false,
+          "identity": false
+        },
+        {
+          "name": "TYPE",
+          "type": "CHAR(1 CHAR)",
+          "default": null,
+          "nullable": false,
+          "identity": false
+        },
+        {
+          "name": "FIRST_NAME",
+          "type": "VARCHAR2(200 CHAR)",
+          "default": null,
+          "nullable": true,
+          "identity": false
+        },
+        {
+          "name": "LAST_NAME",
+          "type": "VARCHAR2(200 CHAR)",
+          "default": null,
+          "nullable": true,
+          "identity": false
+        },
+        {
+          "name": "LEGAL_NAME",
+          "type": "VARCHAR2(2000 CHAR)",
+          "default": null,
+          "nullable": true,
+          "identity": false
+        },
+        {
+          "name": "STATUS",
+          "type": "CHAR(1 CHAR)",
+          "default": "A",
+          "nullable": false,
+          "identity": false
+        },
+        {
+          "name": "ATTRIBUTES",
+          "type": "CLOB",
+          "default": null,
+          "nullable": true,
+          "identity": false
+        },
+        {
+          "name": "CREATED",
+          "type": "TIMESTAMP(6)",
+          "default": "SYSTIMESTAMP ",
+          "nullable": false,
+          "identity": false
+        },
+        {
+          "name": "MODIFIED",
+          "type": "TIMESTAMP(6)",
+          "default": "SYSTIMESTAMP ",
+          "nullable": true,
+          "identity": false
+        }
+      ],
+      "primary_key": ["ID"],
+      "unique": [["guid"], ["GUID"]],
+      "indexes": [
+        ["TYPE", "STATUS"],
+        ["FIRST_NAME", "LAST_NAME"]
+      ]
+    },
+    {
+      "name": "APP_USERS",
+      "columns": [
+        {
+          "name": "ID",
+          "type": "NUMBER(19,0)",
+          "default": null,
+          "nullable": false,
+          "identity": true
+        },
+        {
+          "name": "UUID",
+          "type": "RAW(16)",
+          "default": "SYS_GUID() ",
+          "nullable": false,
+          "identity": false
+        },
+        {
+          "name": "USERNAME",
+          "type": "VARCHAR2(203 CHAR)",
+          "default": null,
+          "nullable": false,
+          "identity": false
+        },
+        {
+          "name": "FULLNAME",
+          "type": "VARCHAR2(200 CHAR)",
+          "default": null,
+          "nullable": false,
+          "identity": false
+        },
+        {
+          "name": "CREATED",
+          "type": "TIMESTAMP(6)",
+          "default": "SYSTIMESTAMP ",
+          "nullable": false,
+          "identity": false
+        },
+        {
+          "name": "UPDATED",
+          "type": "TIMESTAMP(6)",
+          "default": null,
+          "nullable": true,
+          "identity": false
+        }
+      ],
+      "primary_key": ["ID"],
+      "unique": [["UUID"], ["USERNAME"]]
+    }
+  ]
+}
