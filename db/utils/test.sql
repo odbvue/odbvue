@@ -1,5 +1,5 @@
 -- Schema: ODBVUE
--- Generated: 2026-01-16 08:13:04
+-- Generated: 2026-01-16 09:06:38
 -- Idempotent DDL - safe to run multiple times
 
 -- Table: APP_USERS
