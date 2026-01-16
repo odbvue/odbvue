@@ -1,13 +1,13 @@
 import chalk from 'chalk'
 import prompts from 'prompts'
-import {
-  setupLocalDatabase,
-  removeLocalDatabase,
-  runFile,
-  exportSchema,
-  importSchema,
-} from './db.js'
-import { handleCommitAll } from './cicd.js'
+import { setupLocalDatabase, removeLocalDatabase, runFile } from './db.js'
+import { handleDbRun } from './commands/db-run.js'
+import { handleDbExport } from './commands/db-export.js'
+import { handleDbImport } from './commands/db-import.js'
+import { handleCommitAll } from './commands/commit-all.js'
+import { handleDbScaffold } from './commands/db-scaffold.js'
+import { handleDbDiff } from './commands/db-diff.js'
+import { handleDbRelease } from './commands/db-release.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
@@ -110,85 +110,37 @@ export async function main(argv = process.argv.slice(2)) {
   }
 
   if (command === 'db-run' || command === 'dr') {
-    const filePath = args[0]
-    const outputFile = args[1]
-    if (!filePath) {
-      logger.error('File or folder path is required')
-      logger.log('')
-      logger.log(chalk.cyan('Usage:'))
-      logger.log(chalk.gray('  $ ov db-run <path> [output-file]'))
-      logger.log(chalk.gray('  $ ov dr <path> [output-file]'))
-      logger.log('')
-      logger.log(chalk.cyan('Supported input types:'))
-      logger.log(chalk.gray('  .sql   - Execute SQL file directly'))
-      logger.log(chalk.gray('  .ts    - Scaffold API module to SQL, then execute'))
-      logger.log(chalk.gray('  folder - Consolidate SQL files from subfolders, then execute'))
-      logger.log('')
-      logger.log(chalk.cyan('Options:'))
-      logger.log(chalk.gray('  [output-file] - Save DBMS output to specified file (optional)'))
-      logger.log('')
-      process.exit(1)
-    }
-    try {
-      await runFile(defaultProject, defaultEnvironment, filePath, outputFile)
-    } catch {
-      logger.error('Failed to execute file')
-      process.exit(1)
-    }
+    await handleDbRun(args, defaultProject, defaultEnvironment)
     return
   }
 
   if (command === 'db-export' || command === 'de') {
-    const outputFile = args[0]
-    if (!outputFile) {
-      logger.error('Output file path is required')
-      logger.log('')
-      logger.log(chalk.cyan('Usage:'))
-      logger.log(chalk.gray('  $ ov db-export <output.json>'))
-      logger.log(chalk.gray('  $ ov de <output.json>'))
-      logger.log('')
-      logger.log(chalk.cyan('Description:'))
-      logger.log(chalk.gray('  Exports database schema to JSON using odbvue.export_schema'))
-      logger.log(chalk.gray('  Uses DB_SCHEMA_USERNAME from .env for the schema to export'))
-      logger.log('')
-      process.exit(1)
-    }
-    try {
-      await exportSchema(defaultProject, defaultEnvironment, outputFile)
-    } catch {
-      logger.error('Failed to export schema')
-      process.exit(1)
-    }
+    await handleDbExport(args, defaultProject, defaultEnvironment)
     return
   }
 
   if (command === 'db-import' || command === 'di') {
-    const inputFile = args[0]
-    const outputFile = args[1]
-    if (!inputFile || !outputFile) {
-      logger.error('Input JSON file and output SQL file are required')
-      logger.log('')
-      logger.log(chalk.cyan('Usage:'))
-      logger.log(chalk.gray('  $ ov db-import <input.json> <output.sql>'))
-      logger.log(chalk.gray('  $ ov di <input.json> <output.sql>'))
-      logger.log('')
-      logger.log(chalk.cyan('Description:'))
-      logger.log(chalk.gray('  Generates SQL DDL from JSON schema using odbvue.import_schema'))
-      logger.log(chalk.gray('  Uses DB_SCHEMA_USERNAME from .env for the target schema'))
-      logger.log('')
-      process.exit(1)
-    }
-    try {
-      await importSchema(defaultProject, defaultEnvironment, inputFile, outputFile)
-    } catch {
-      logger.error('Failed to import schema')
-      process.exit(1)
-    }
+    await handleDbImport(args, defaultProject, defaultEnvironment)
     return
   }
 
   if (command === 'commit-all' || command === 'ca') {
     await handleCommitAll()
+    return
+  }
+
+  if (command === 'db-scaffold') {
+    await handleDbScaffold(args, defaultProject, defaultEnvironment)
+    return
+  }
+
+  if (command === 'db-diff') {
+    await handleDbDiff(args, defaultProject, defaultEnvironment)
+    return
+  }
+
+  if (command === 'db-release') {
+    await handleDbRelease(args, defaultProject, defaultEnvironment)
     return
   }
 
@@ -248,6 +200,18 @@ export async function main(argv = process.argv.slice(2)) {
   logger.log(
     chalk.gray('  db-import, di <input.json> <output.sql>') +
       chalk.reset('  Generate SQL DDL from JSON schema'),
+  )
+  logger.log(
+    chalk.gray('  db-scaffold') +
+      chalk.reset('                   Generate JSON schema from TypeScript definitions'),
+  )
+  logger.log(
+    chalk.gray('  db-diff <schema.json>') +
+      chalk.reset('            Compare JSON schema against database and generate migration SQL'),
+  )
+  logger.log(
+    chalk.gray('  db-release <version>') +
+      chalk.reset('          Tag version and manage release bundles'),
   )
   logger.log(
     chalk.gray('  load-env, le [path]') +

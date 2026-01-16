@@ -1,0 +1,3 @@
+-- commit-all.sql
+-- Placeholder for commit-all related SQL scripts
+-- This directory contains SQL files managed by the commit-all command

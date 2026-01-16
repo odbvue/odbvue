@@ -1,0 +1,3 @@
+-- db-run.sql
+-- Placeholder for executed SQL scripts
+-- This directory contains SQL files executed by the db-run command
