@@ -1,0 +1,2 @@
+DROP PACKAGE odbvue;
+/

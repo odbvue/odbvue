@@ -326,6 +326,7 @@ export async function runSqlFile(
   project: string,
   environment: string,
   sqlFilePath: string,
+  outputFile?: string,
 ): Promise<void> {
   // Resolve absolute path to SQL file
   const absoluteSqlPath = path.isAbsolute(sqlFilePath)
@@ -334,6 +335,19 @@ export async function runSqlFile(
 
   if (!fs.existsSync(absoluteSqlPath)) {
     throw new Error(`SQL file not found: ${absoluteSqlPath}`)
+  }
+
+  // Resolve output file path if provided
+  let absoluteOutputPath: string | undefined
+  if (outputFile) {
+    absoluteOutputPath = path.isAbsolute(outputFile)
+      ? outputFile
+      : path.resolve(rootDir, outputFile)
+    // Create output directory if it doesn't exist
+    const outputDir = path.dirname(absoluteOutputPath)
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true })
+    }
   }
 
   // Load environment config
@@ -367,6 +381,7 @@ export async function runSqlFile(
   }
 
   let connection: oracledb.Connection | undefined
+  let outputStream: ReturnType<typeof createWriteStream> | undefined
   try {
     logger.info(`Using wallet from: ${walletPath}`)
 
@@ -415,6 +430,12 @@ export async function runSqlFile(
 
     logger.success('Connected to database')
 
+    // Initialize output stream if file path provided
+    if (absoluteOutputPath) {
+      outputStream = createWriteStream(absoluteOutputPath, { flags: 'w' })
+      logger.info(`DBMS output will be saved to: ${absoluteOutputPath}`)
+    }
+
     try {
       await enableDbmsOutput(connection)
       logger.muted('DBMS_OUTPUT enabled')
@@ -452,11 +473,15 @@ export async function runSqlFile(
         const binds = buildBinds(stmt, env)
         await connection.execute(stmt, binds, { autoCommit: true })
 
-        // Print DBMS_OUTPUT emitted by this statement (if any)
+        // Capture DBMS_OUTPUT emitted by this statement (if any)
         try {
           const outputLines = await drainDbmsOutput(connection)
           for (const line of outputLines) {
             logger.log(line)
+            // Also write to output file if specified
+            if (outputStream) {
+              outputStream.write(line + '\n')
+            }
           }
         } catch {
           // Ignore DBMS_OUTPUT failures during execution
@@ -469,6 +494,9 @@ export async function runSqlFile(
     }
 
     logger.success(`Successfully executed ${statements.length} statement(s)`)
+    if (outputStream) {
+      logger.success(`Output saved to: ${absoluteOutputPath}`)
+    }
   } catch (error) {
     if (error instanceof Error) {
       logger.error(`Database error: ${error.message}`)
@@ -497,6 +525,341 @@ export async function runSqlFile(
         logger.info('  2. Re-download wallet via: ov db-setup-local')
         logger.info('  3. If using a custom wallet password, confirm DB_WALLET_PASSWORD matches')
       }
+    } else {
+      logger.error(`Unknown error: ${error}`)
+    }
+    throw error
+  } finally {
+    // Close output stream if it was created
+    if (outputStream) {
+      await new Promise<void>((resolve, reject) => {
+        outputStream!.end((err: NodeJS.ErrnoException | null) => {
+          if (err) reject(err)
+          else resolve()
+        })
+      })
+    }
+
+    if (connection) {
+      try {
+        await connection.close()
+        logger.muted('Connection closed')
+      } catch (err) {
+        logger.warn(`Warning: Failed to close connection: ${err}`)
+      }
+    }
+  }
+}
+
+// ============================================================================
+// Schema Export/Import
+// ============================================================================
+
+/**
+ * Export schema to JSON file using odbvue.export_schema
+ * - Connects to database and calls odbvue.export_schema
+ * - Captures DBMS_OUTPUT and writes to outputFile
+ */
+export async function exportSchema(
+  project: string,
+  environment: string,
+  outputFile: string,
+): Promise<void> {
+  // Load environment config
+  const env = loadEnv(project, environment)
+
+  const walletBasePath = path.join(rootDir, 'config', project, environment, '.wallets')
+  const user = env.DB_ADMIN_USERNAME
+  const password = env.DB_ADMIN_PASSWORD
+  const connectString = env.DB_CONNECT_STRING || 'myatp_high'
+  const schemaUsername = env.DB_SCHEMA_USERNAME
+
+  if (!user || !password) {
+    throw new Error(
+      `Missing DB credentials in ${project}/${environment} config. ` +
+        'Set DB_ADMIN_USERNAME and DB_ADMIN_PASSWORD in .env',
+    )
+  }
+
+  if (!schemaUsername) {
+    throw new Error(`Missing DB_SCHEMA_USERNAME in ${project}/${environment} config.`)
+  }
+
+  logger.info(`Connecting to ${connectString} as ${user}...`)
+
+  // Extract wallet if needed
+  let walletPath: string
+  try {
+    walletPath = await ensureWalletExtracted(walletBasePath)
+    logger.info(`Wallet: ${walletPath}`)
+  } catch (error) {
+    if (error instanceof Error) {
+      logger.error(error.message)
+    }
+    throw error
+  }
+
+  let connection: oracledb.Connection | undefined
+  try {
+    logger.info(`Using wallet from: ${walletPath}`)
+
+    const originalTNS_ADMIN = process.env.TNS_ADMIN
+    process.env.TNS_ADMIN = walletPath
+
+    const walletPassword = env.DB_WALLET_PASSWORD?.trim()
+
+    try {
+      const connectionConfig: Record<string, unknown> = {
+        user,
+        password,
+        connectString,
+        configDir: walletPath,
+        walletLocation: walletPath,
+      }
+
+      if (walletPassword) {
+        connectionConfig.walletPassword = walletPassword
+      }
+
+      connection = await oracledb.getConnection(connectionConfig)
+    } catch (primaryError) {
+      try {
+        const fallbackConfig: Record<string, unknown> = {
+          user,
+          password,
+          connectString,
+        }
+        connection = await oracledb.getConnection(fallbackConfig)
+      } catch {
+        throw primaryError
+      }
+    } finally {
+      if (originalTNS_ADMIN === undefined) {
+        delete process.env.TNS_ADMIN
+      } else {
+        process.env.TNS_ADMIN = originalTNS_ADMIN
+      }
+    }
+
+    logger.success('Connected to database')
+
+    // Enable DBMS_OUTPUT
+    await enableDbmsOutput(connection)
+    logger.muted('DBMS_OUTPUT enabled')
+
+    // First, ensure odbvue package exists by running create_odbvue.sql
+    const createOdbvuePath = path.join(rootDir, 'db', 'utils', 'create_odbvue.sql')
+    if (fs.existsSync(createOdbvuePath)) {
+      logger.info('Creating/updating odbvue package...')
+      const createSql = fs.readFileSync(createOdbvuePath, 'utf8')
+      const statements = parseSqlStatements(createSql)
+      for (const stmt of statements) {
+        try {
+          await connection.execute(stmt, {}, { autoCommit: true })
+        } catch (err) {
+          // Log but continue - package might already exist
+          logger.warn(`Warning creating package: ${err instanceof Error ? err.message : err}`)
+        }
+      }
+    }
+
+    // Call odbvue.export_schema
+    logger.info(`Exporting schema: ${schemaUsername}...`)
+    const exportSql = `BEGIN odbvue.export_schema(:schema_username); END;`
+    await connection.execute(exportSql, { schema_username: schemaUsername }, { autoCommit: true })
+
+    // Drain DBMS_OUTPUT to get the JSON
+    const outputLines = await drainDbmsOutput(connection)
+    const jsonOutput = outputLines.join('\n')
+
+    // Resolve output file path
+    const absoluteOutputPath = path.isAbsolute(outputFile)
+      ? outputFile
+      : path.resolve(rootDir, outputFile)
+
+    // Create output directory if it doesn't exist
+    const outputDir = path.dirname(absoluteOutputPath)
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true })
+    }
+
+    // Write JSON to file
+    fs.writeFileSync(absoluteOutputPath, jsonOutput, 'utf8')
+    logger.success(`Schema exported to: ${absoluteOutputPath}`)
+  } catch (error) {
+    if (error instanceof Error) {
+      logger.error(`Database error: ${error.message}`)
+    } else {
+      logger.error(`Unknown error: ${error}`)
+    }
+    throw error
+  } finally {
+    if (connection) {
+      try {
+        await connection.close()
+        logger.muted('Connection closed')
+      } catch (err) {
+        logger.warn(`Warning: Failed to close connection: ${err}`)
+      }
+    }
+  }
+}
+
+/**
+ * Import schema from JSON file using odbvue.import_schema
+ * - Reads JSON file
+ * - Connects to database and calls odbvue.import_schema
+ * - Captures DBMS_OUTPUT (generated SQL) and writes to outputFile
+ */
+export async function importSchema(
+  project: string,
+  environment: string,
+  inputFile: string,
+  outputFile: string,
+): Promise<void> {
+  // Resolve input file path
+  const absoluteInputPath = path.isAbsolute(inputFile)
+    ? inputFile
+    : path.resolve(rootDir, inputFile)
+
+  if (!fs.existsSync(absoluteInputPath)) {
+    throw new Error(`Input JSON file not found: ${absoluteInputPath}`)
+  }
+
+  // Read JSON file
+  const jsonContent = fs.readFileSync(absoluteInputPath, 'utf8')
+
+  // Load environment config
+  const env = loadEnv(project, environment)
+
+  const walletBasePath = path.join(rootDir, 'config', project, environment, '.wallets')
+  const user = env.DB_ADMIN_USERNAME
+  const password = env.DB_ADMIN_PASSWORD
+  const connectString = env.DB_CONNECT_STRING || 'myatp_high'
+  const schemaUsername = env.DB_SCHEMA_USERNAME
+
+  if (!user || !password) {
+    throw new Error(
+      `Missing DB credentials in ${project}/${environment} config. ` +
+        'Set DB_ADMIN_USERNAME and DB_ADMIN_PASSWORD in .env',
+    )
+  }
+
+  if (!schemaUsername) {
+    throw new Error(`Missing DB_SCHEMA_USERNAME in ${project}/${environment} config.`)
+  }
+
+  logger.info(`Connecting to ${connectString} as ${user}...`)
+
+  // Extract wallet if needed
+  let walletPath: string
+  try {
+    walletPath = await ensureWalletExtracted(walletBasePath)
+    logger.info(`Wallet: ${walletPath}`)
+  } catch (error) {
+    if (error instanceof Error) {
+      logger.error(error.message)
+    }
+    throw error
+  }
+
+  let connection: oracledb.Connection | undefined
+  try {
+    logger.info(`Using wallet from: ${walletPath}`)
+
+    const originalTNS_ADMIN = process.env.TNS_ADMIN
+    process.env.TNS_ADMIN = walletPath
+
+    const walletPassword = env.DB_WALLET_PASSWORD?.trim()
+
+    try {
+      const connectionConfig: Record<string, unknown> = {
+        user,
+        password,
+        connectString,
+        configDir: walletPath,
+        walletLocation: walletPath,
+      }
+
+      if (walletPassword) {
+        connectionConfig.walletPassword = walletPassword
+      }
+
+      connection = await oracledb.getConnection(connectionConfig)
+    } catch (primaryError) {
+      try {
+        const fallbackConfig: Record<string, unknown> = {
+          user,
+          password,
+          connectString,
+        }
+        connection = await oracledb.getConnection(fallbackConfig)
+      } catch {
+        throw primaryError
+      }
+    } finally {
+      if (originalTNS_ADMIN === undefined) {
+        delete process.env.TNS_ADMIN
+      } else {
+        process.env.TNS_ADMIN = originalTNS_ADMIN
+      }
+    }
+
+    logger.success('Connected to database')
+
+    // Enable DBMS_OUTPUT with large buffer for SQL output
+    await connection.execute(`BEGIN DBMS_OUTPUT.ENABLE(10000000); END;`)
+    logger.muted('DBMS_OUTPUT enabled')
+
+    // First, ensure odbvue package exists by running create_odbvue.sql
+    const createOdbvuePath = path.join(rootDir, 'db', 'utils', 'create_odbvue.sql')
+    if (fs.existsSync(createOdbvuePath)) {
+      logger.info('Creating/updating odbvue package...')
+      const createSql = fs.readFileSync(createOdbvuePath, 'utf8')
+      const statements = parseSqlStatements(createSql)
+      for (const stmt of statements) {
+        try {
+          await connection.execute(stmt, {}, { autoCommit: true })
+        } catch (err) {
+          // Log but continue - package might already exist
+          logger.warn(`Warning creating package: ${err instanceof Error ? err.message : err}`)
+        }
+      }
+    }
+
+    // Call odbvue.import_schema with the JSON content
+    logger.info(`Generating SQL for schema: ${schemaUsername}...`)
+    const importSql = `BEGIN odbvue.import_schema(:schema_username, :json_clob); END;`
+    await connection.execute(
+      importSql,
+      {
+        schema_username: schemaUsername,
+        json_clob: { val: jsonContent, type: oracledb.CLOB },
+      },
+      { autoCommit: true },
+    )
+
+    // Drain DBMS_OUTPUT to get the generated SQL
+    const outputLines = await drainDbmsOutput(connection)
+    const sqlOutput = outputLines.join('\n')
+
+    // Resolve output file path
+    const absoluteOutputPath = path.isAbsolute(outputFile)
+      ? outputFile
+      : path.resolve(rootDir, outputFile)
+
+    // Create output directory if it doesn't exist
+    const outputDir = path.dirname(absoluteOutputPath)
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true })
+    }
+
+    // Write SQL to file
+    fs.writeFileSync(absoluteOutputPath, sqlOutput, 'utf8')
+    logger.success(`SQL generated: ${absoluteOutputPath}`)
+  } catch (error) {
+    if (error instanceof Error) {
+      logger.error(`Database error: ${error.message}`)
     } else {
       logger.error(`Unknown error: ${error}`)
     }
@@ -718,6 +1081,7 @@ export async function runFile(
   project: string,
   environment: string,
   filePath: string,
+  outputFile?: string,
 ): Promise<void> {
   const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(rootDir, filePath)
 
@@ -733,7 +1097,7 @@ export async function runFile(
     logger.info(`Consolidating SQL files from folder: ${absolutePath}`)
     const sqlPath = generateSqlFromFolder(absolutePath, folderName)
     logger.info(`Running consolidated SQL: ${sqlPath}`)
-    await runSqlFile(project, environment, sqlPath)
+    await runSqlFile(project, environment, sqlPath, outputFile)
   } else {
     const ext = path.extname(absolutePath).toLowerCase()
 
@@ -742,10 +1106,10 @@ export async function runFile(
       logger.info(`Scaffolding TypeScript module: ${absolutePath}`)
       const sqlPath = await scaffoldModule(absolutePath)
       logger.info(`Running generated SQL: ${sqlPath}`)
-      await runSqlFile(project, environment, sqlPath)
+      await runSqlFile(project, environment, sqlPath, outputFile)
     } else if (ext === '.sql') {
       // SQL file - run directly
-      await runSqlFile(project, environment, absolutePath)
+      await runSqlFile(project, environment, absolutePath, outputFile)
     } else {
       throw new Error(`Unsupported file type: ${ext}. Expected .ts or .sql`)
     }

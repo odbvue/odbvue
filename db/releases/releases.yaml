@@ -1,0 +1,14 @@
+releases:
+  - version: 1.0.0
+    released: 2020-01-15 12:12:00
+    file: ./1.0.0/odbvue-db-1.0.0.zip
+    checksum: abcdef1234567890abcdef1234567890abcdef12
+    contents:
+      - setup.sql
+      - tables/app_users.sql
+
+objects:
+  - name: app_users
+    type: table
+    checksum: 1234567890abcdef1234567890abcdef12345678
+    release: 1.0.0

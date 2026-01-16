@@ -1,0 +1,57 @@
+{
+  "schema": "ODBVUE",
+  "exported": "2026-01-16T08:12:44.563226Z",
+  "tables": [
+    {
+      "name": "APP_USERS",
+      "columns": [
+        {
+          "name": "ID",
+          "type": "NUMBER(19,0)",
+          "default": null,
+          "nullable": "N",
+          "identity": "YES"
+        },
+        {
+          "name": "UUID",
+          "type": "RAW(16)",
+          "default": "SYS_GUID() ",
+          "nullable": "N",
+          "identity": "NO"
+        },
+        {
+          "name": "USERNAME",
+          "type": "VARCHAR2(200 CHAR)",
+          "default": null,
+          "nullable": "N",
+          "identity": "NO"
+        },
+        {
+          "name": "FULLNAME",
+          "type": "VARCHAR2(200 CHAR)",
+          "default": null,
+          "nullable": "N",
+          "identity": "NO"
+        },
+        {
+          "name": "CREATED",
+          "type": "TIMESTAMP(6)",
+          "default": "SYSTIMESTAMP ",
+          "nullable": "N",
+          "identity": "NO"
+        },
+        {
+          "name": "UPDATED",
+          "type": "TIMESTAMP(6)",
+          "default": null,
+          "nullable": "Y",
+          "identity": "NO"
+        }
+      ],
+      "primary_key": ["ID"],
+      "unique": [["UUID"], ["USERNAME"]],
+      "indexes": null,
+      "foreignKeys": null
+    }
+  ]
+}
