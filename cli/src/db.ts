@@ -753,6 +753,113 @@ export async function importSchema(
   logger.success(`SQL generated: ${absoluteOutputPath}`)
 }
 
+/**
+ * Recursively find all JSON files in a directory
+ */
+function findJsonFiles(
+  dirPath: string,
+  basePath: string = dirPath,
+): Array<{ relativePath: string; absolutePath: string }> {
+  const results: Array<{ relativePath: string; absolutePath: string }> = []
+
+  const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+
+  for (const entry of entries) {
+    const fullPath = path.join(dirPath, entry.name)
+
+    if (entry.isDirectory()) {
+      // Recursively scan subdirectories
+      results.push(...findJsonFiles(fullPath, basePath))
+    } else if (entry.name.endsWith('.json')) {
+      results.push({
+        relativePath: path.relative(basePath, fullPath),
+        absolutePath: fullPath,
+      })
+    }
+  }
+
+  return results
+}
+
+/**
+ * Import schema from directory of JSON files
+ * - Recursively reads all *.json files from inputDir and subdirectories
+ * - Generates individual SQL files in outputDir, preserving subdirectory structure
+ */
+export async function importSchemaDir(
+  project: string,
+  environment: string,
+  inputDir: string,
+  outputDir: string,
+): Promise<void> {
+  // Resolve input directory path
+  const absoluteInputDir = path.isAbsolute(inputDir) ? inputDir : path.resolve(rootDir, inputDir)
+
+  if (!fs.existsSync(absoluteInputDir)) {
+    throw new Error(`Input directory not found: ${absoluteInputDir}`)
+  }
+
+  // Resolve output directory path
+  const absoluteOutputDir = path.isAbsolute(outputDir)
+    ? outputDir
+    : path.resolve(rootDir, outputDir)
+
+  // Create output directory if it doesn't exist
+  if (!fs.existsSync(absoluteOutputDir)) {
+    fs.mkdirSync(absoluteOutputDir, { recursive: true })
+  }
+
+  logger.info(`Reading JSON schema files from: ${inputDir}`)
+
+  // Find all JSON files recursively
+  const jsonFiles = findJsonFiles(absoluteInputDir)
+
+  if (jsonFiles.length === 0) {
+    throw new Error(`No JSON files found in: ${absoluteInputDir}`)
+  }
+
+  logger.info(`Found ${jsonFiles.length} JSON file(s)`)
+
+  let successCount = 0
+  let errorCount = 0
+
+  for (const jsonFile of jsonFiles) {
+    // Preserve directory structure: tables/app_users.json -> tables/app_users.sql
+    const outputRelativePath = jsonFile.relativePath.replace('.json', '.sql')
+    const outputFilePath = path.join(absoluteOutputDir, outputRelativePath)
+
+    // Create subdirectory in output if needed
+    const outputSubDir = path.dirname(outputFilePath)
+    if (!fs.existsSync(outputSubDir)) {
+      fs.mkdirSync(outputSubDir, { recursive: true })
+    }
+
+    try {
+      // Read and parse JSON file
+      const jsonContent = fs.readFileSync(jsonFile.absolutePath, 'utf8')
+      const tableSchema = JSON.parse(jsonContent) as SingleTableSchema
+
+      // Generate SQL DDL for this single table
+      const sql = generateSqlForTable(tableSchema)
+
+      // Write SQL to file
+      fs.writeFileSync(outputFilePath, sql, 'utf8')
+      logger.success(`✓ ${jsonFile.relativePath} → ${outputRelativePath}`)
+      successCount++
+    } catch (error) {
+      logger.error(
+        `✗ ${jsonFile.relativePath}: ${error instanceof Error ? error.message : String(error)}`,
+      )
+      errorCount++
+    }
+  }
+
+  logger.log('')
+  logger.info(
+    `Generated ${successCount} SQL file(s)${errorCount > 0 ? `, ${errorCount} error(s)` : ''}`,
+  )
+}
+
 // ============================================================================
 // JSON to SQL Generation
 // ============================================================================
@@ -785,6 +892,9 @@ interface SchemaDefinition {
   tables: SchemaTable[]
 }
 
+/**
+ * Generate SQL DDL for a full schema (legacy multi-table single file)
+ */
 function generateSqlFromSchema(schema: SchemaDefinition): string {
   const lines: string[] = []
   const schemaName = schema.schema
@@ -823,10 +933,8 @@ function generateSqlFromSchema(schema: SchemaDefinition): string {
       }
 
       if (col.default && col.default.trim() !== '') {
-        // For VARCHAR2 and CHAR types, escape quotes for EXECUTE IMMEDIATE string context
         const isStringType = col.type.includes('VARCHAR2') || col.type.includes('CHAR')
         if (isStringType && !col.default.includes('(') && !col.default.includes(')')) {
-          // Double the quotes for EXECUTE IMMEDIATE string context: 'A' becomes ''A''
           colDef += ` DEFAULT ''${col.default.replace(/'/g, "''")}''`
         } else {
           colDef += ` DEFAULT ${col.default}`
@@ -890,7 +998,7 @@ function generateSqlFromSchema(schema: SchemaDefinition): string {
     }
   }
 
-  // Third pass: Create indexes (only if indexes is properly formatted array of arrays)
+  // Third pass: Create indexes
   for (const table of schema.tables) {
     if (!table.indexes || table.indexes.length === 0) continue
 
@@ -924,6 +1032,178 @@ function generateSqlFromSchema(schema: SchemaDefinition): string {
     for (const fk of table.foreignKeys) {
       fkConstraintNum++
       const fkConstraintName = `FK_${table.name}_${fkConstraintNum}`
+
+      lines.push('DECLARE')
+      lines.push('    v_exists NUMBER;')
+      lines.push('BEGIN')
+      lines.push(
+        `    SELECT COUNT(*) INTO v_exists FROM all_constraints WHERE owner = '${schemaName}' AND constraint_name = '${fkConstraintName}';`,
+      )
+      lines.push('    IF v_exists = 0 THEN')
+
+      let fkSql = `        EXECUTE IMMEDIATE 'ALTER TABLE ${schemaName}.${table.name} ADD CONSTRAINT ${fkConstraintName} FOREIGN KEY (${fk.columns.join(', ')}) REFERENCES ${schemaName}.${fk.refTable} (${fk.refColumns.join(', ')})`
+
+      if (fk.onDelete) {
+        if (fk.onDelete === 'cascade') {
+          fkSql += ' ON DELETE CASCADE'
+        } else if (fk.onDelete === 'setNull') {
+          fkSql += ' ON DELETE SET NULL'
+        }
+      }
+
+      fkSql += "';"
+      lines.push(fkSql)
+      lines.push('    END IF;')
+      lines.push('END;')
+      lines.push('/')
+      lines.push('')
+    }
+  }
+
+  return lines.join('\n')
+}
+
+/**
+ * Single table JSON format (for per-file schema)
+ */
+interface SingleTableSchema {
+  schema: string
+  exported: string
+  table: SchemaTable
+}
+
+/**
+ * Generate SQL for a single table from individual JSON file
+ */
+function generateSqlForTable(schema: SingleTableSchema): string {
+  const lines: string[] = []
+  const schemaName = schema.schema
+  const table = schema.table
+
+  // Header
+  lines.push(`-- Table: ${schemaName}.${table.name}`)
+  lines.push(`-- Generated: ${new Date().toISOString().slice(0, 19).replace('T', ' ')}`)
+  lines.push('-- Idempotent DDL - safe to run multiple times')
+  lines.push('')
+
+  let uqConstraintNum = 0
+
+  // Create table
+  lines.push(`-- Create table: ${table.name}`)
+  lines.push('DECLARE')
+  lines.push('    v_exists NUMBER;')
+  lines.push('BEGIN')
+  lines.push(
+    `    SELECT COUNT(*) INTO v_exists FROM all_tables WHERE owner = '${schemaName}' AND table_name = '${table.name}';`,
+  )
+  lines.push('    IF v_exists = 0 THEN')
+  lines.push("        EXECUTE IMMEDIATE '")
+
+  lines.push(`CREATE TABLE ${schemaName}.${table.name} (`)
+
+  // Add columns
+  for (let i = 0; i < table.columns.length; i++) {
+    const col = table.columns[i]
+    const prefix = i === 0 ? '            ' : '           ,'
+    let colDef = `${prefix}${col.name} ${col.type}`
+
+    if (col.identity) {
+      colDef += ' GENERATED BY DEFAULT AS IDENTITY'
+    }
+
+    if (col.default && col.default.trim() !== '') {
+      const isStringType = col.type.includes('VARCHAR2') || col.type.includes('CHAR')
+      if (isStringType && !col.default.includes('(') && !col.default.includes(')')) {
+        colDef += ` DEFAULT ''${col.default.replace(/'/g, "''")}''`
+      } else {
+        colDef += ` DEFAULT ${col.default}`
+      }
+    }
+
+    if (!col.nullable) {
+      colDef += ' NOT NULL'
+    }
+
+    lines.push(colDef)
+  }
+
+  // Add primary key constraint inline
+  if (table.primary_key && table.primary_key.length > 0) {
+    const pkConstraintName = `PK_${table.name}`
+    const pkCols = table.primary_key.join(', ')
+    lines.push(`           ,CONSTRAINT ${pkConstraintName} PRIMARY KEY (${pkCols})`)
+  }
+
+  lines.push("        )';")
+  lines.push('    END IF;')
+  lines.push('END;')
+  lines.push('/')
+  lines.push('')
+
+  // Add unique constraints
+  if (table.unique && table.unique.length > 0) {
+    for (const uniqueCols of table.unique) {
+      if (!uniqueCols || uniqueCols.length === 0) continue
+
+      uqConstraintNum++
+      const uqConstraintName = `UQ_${table.name}_${uqConstraintNum}`
+      const colList = uniqueCols.join(',')
+
+      lines.push('DECLARE')
+      lines.push('    v_exists NUMBER;')
+      lines.push('BEGIN')
+      lines.push('    -- Check if unique constraint on these columns already exists')
+      lines.push('    SELECT COUNT(*) INTO v_exists FROM all_constraints ac')
+      lines.push(`    WHERE ac.owner = '${schemaName}'`)
+      lines.push(`      AND ac.table_name = '${table.name}'`)
+      lines.push("      AND ac.constraint_type IN ('U', 'P')")
+      lines.push(
+        "      AND (SELECT LISTAGG(acc.column_name, ',') WITHIN GROUP (ORDER BY acc.position)",
+      )
+      lines.push(
+        `           FROM all_cons_columns acc WHERE acc.owner = ac.owner AND acc.constraint_name = ac.constraint_name) = '${colList}';`,
+      )
+      lines.push('    IF v_exists = 0 THEN')
+      lines.push(
+        `        EXECUTE IMMEDIATE 'ALTER TABLE ${schemaName}.${table.name} ADD CONSTRAINT ${uqConstraintName} UNIQUE (${uniqueCols.join(', ')})';`,
+      )
+      lines.push('    END IF;')
+      lines.push('END;')
+      lines.push('/')
+      lines.push('')
+    }
+  }
+
+  // Create indexes
+  if (table.indexes && table.indexes.length > 0) {
+    for (let idx = 0; idx < table.indexes.length; idx++) {
+      const indexCols = table.indexes[idx]
+      if (!Array.isArray(indexCols) || indexCols.length === 0) continue
+
+      const idxName = `IDX_${table.name}_${idx + 1}`
+
+      lines.push('DECLARE')
+      lines.push('    v_exists NUMBER;')
+      lines.push('BEGIN')
+      lines.push(
+        `    SELECT COUNT(*) INTO v_exists FROM all_indexes WHERE owner = '${schemaName}' AND index_name = '${idxName}';`,
+      )
+      lines.push('    IF v_exists = 0 THEN')
+      lines.push(
+        `        EXECUTE IMMEDIATE 'CREATE INDEX ${schemaName}.${idxName} ON ${schemaName}.${table.name} (${indexCols.join(', ')})';`,
+      )
+      lines.push('    END IF;')
+      lines.push('END;')
+      lines.push('/')
+      lines.push('')
+    }
+  }
+
+  // Add foreign key constraints
+  if (table.foreignKeys && table.foreignKeys.length > 0) {
+    for (let fkIdx = 0; fkIdx < table.foreignKeys.length; fkIdx++) {
+      const fk = table.foreignKeys[fkIdx]
+      const fkConstraintName = `FK_${table.name}_${fkIdx + 1}`
 
       lines.push('DECLARE')
       lines.push('    v_exists NUMBER;')

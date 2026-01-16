@@ -11,6 +11,22 @@ type TsConfigDiscovery = {
   tsconfigPath?: string
 }
 
+type MultiFileSchemaExport = {
+  schema: string
+  exported: string
+  tables: Array<{
+    filename: string
+    info: {
+      name: string
+      columns: unknown[]
+      primary_key?: string[]
+      unique?: string[][]
+      indexes?: string[][]
+      foreignKeys?: unknown[]
+    }
+  }>
+}
+
 function discoverTsConfig(startDir: string): TsConfigDiscovery {
   let projectRoot = startDir
   let tsconfigPath: string | undefined
@@ -50,7 +66,9 @@ function runTsModuleToJson(indexTsFile: string): string {
     ``,
     `import(fileUrl).then(function(m) {`,
     `  var jsonOutput;`,
-    `  if (m.schema && typeof m.schema.render === 'function') {`,
+    `  if (m.schema && typeof m.schema.renderMultiFile === 'function') {`,
+    `    jsonOutput = m.schema.renderMultiFile();`,
+    `  } else if (m.schema && typeof m.schema.render === 'function') {`,
     `    jsonOutput = m.schema.render();`,
     `  } else if (m.default && typeof m.default === 'function') {`,
     `    var result = m.default();`,
@@ -179,28 +197,6 @@ function findIndexFiles(dirPath: string): string[] {
   return files
 }
 
-/**
- * Derive output filename from input path.
- * Pattern: use the folder name before 'api' if the path ends with 'api',
- * otherwise use the last folder name.
- * Examples:
- *   apps/src/api -> api.json
- *   apps/src/api/packages/crm -> crm.json
- *   modules/crm/api -> crm.json
- */
-function deriveOutputName(inputPath: string): string {
-  const normalized = resolve(inputPath)
-  const parts = normalized.split(/[\\/]/).filter(Boolean)
-
-  // If the last part is 'api', use the part before it
-  if (parts.length >= 2 && parts[parts.length - 1].toLowerCase() === 'api') {
-    return parts[parts.length - 2]
-  }
-
-  // Otherwise use the last part
-  return parts[parts.length - 1] || 'schema'
-}
-
 export async function handleDbScaffold(argv: string[]) {
   if (argv.length < 1) {
     logger.error(chalk.red('Error: Missing arguments. Usage: ov ds <input-path>'))
@@ -210,20 +206,20 @@ export async function handleDbScaffold(argv: string[]) {
     logger.log('')
     logger.log(chalk.cyan('Description:'))
     logger.log(chalk.gray('  Scans input path for index.ts files with schema exports'))
-    logger.log(chalk.gray('  Outputs schema JSON to ./db/schema/<name>.json'))
-    logger.log(chalk.gray('  Output name is derived from input path (folder before "api")'))
+    logger.log(
+      chalk.gray('  Outputs individual JSON files to ./db/schema/tables/<table_name>.json'),
+    )
     logger.log('')
     logger.log(chalk.cyan('Examples:'))
-    logger.log(chalk.gray('  $ ov ds apps/src/api           → db/schema/src.json'))
-    logger.log(chalk.gray('  $ ov ds apps/src/api/packages/crm → db/schema/crm.json'))
+    logger.log(chalk.gray('  $ ov ds apps/src/api           → db/schema/tables/*.json'))
+    logger.log(chalk.gray('  $ ov ds apps/src/api/packages/crm → db/schema/tables/*.json'))
     logger.log('')
     process.exit(1)
   }
 
   const inputPath = argv[0]
-  // Derive output filename from input path structure
-  const outputName = deriveOutputName(inputPath)
-  const outputFile = join(rootDir, 'db', 'schema', `${outputName}.json`)
+  // Output directory for individual table JSON files
+  const outputDir = join(rootDir, 'db', 'schema', 'tables')
 
   // Validate input path
   if (!existsSync(inputPath)) {
@@ -234,7 +230,7 @@ export async function handleDbScaffold(argv: string[]) {
   try {
     logger.info(chalk.cyan('Scanning for schema definitions...'))
     logger.log(`Input:  ${inputPath}`)
-    logger.log(`Output: ${relative(process.cwd(), outputFile)}`)
+    logger.log(`Output: ${relative(process.cwd(), outputDir)}/`)
     logger.log('')
 
     // Find all index files (both .ts and .js)
@@ -257,7 +253,7 @@ export async function handleDbScaffold(argv: string[]) {
     logger.info(chalk.cyan(`Processing ${fileList.length} file(s)...`))
     logger.log('')
 
-    // Process each file - capture either schema.render() or console.log output
+    // Process each file - capture either schema.renderMultiFile() or schema.render() output
     for (const indexFile of fileList) {
       try {
         const absolutePath = resolve(indexFile)
@@ -281,7 +277,9 @@ export async function handleDbScaffold(argv: string[]) {
           // For JavaScript files, use standard import
           const module = await import(fileUrl)
 
-          if (module.schema && typeof module.schema.render === 'function') {
+          if (module.schema && typeof module.schema.renderMultiFile === 'function') {
+            jsonOutput = module.schema.renderMultiFile()
+          } else if (module.schema && typeof module.schema.render === 'function') {
             jsonOutput = module.schema.render()
           } else if (module.default && typeof module.default === 'function') {
             // Try calling default export as function
@@ -305,24 +303,70 @@ export async function handleDbScaffold(argv: string[]) {
         }
 
         // Validate and parse JSON output
-        let parsedJson: unknown
+        let parsedJson: MultiFileSchemaExport
         try {
-          parsedJson = JSON.parse(jsonOutput)
+          parsedJson = JSON.parse(jsonOutput) as MultiFileSchemaExport
         } catch {
           logger.warn(chalk.yellow(`Skipping ${relPath}: Output is not valid JSON`))
           continue
         }
 
-        // Store the parsed schema (we'll write only one file from this input path)
-        // For now, use the first valid schema found
         // Create output directory if needed
-        const outputDir = dirname(outputFile)
         mkdirSync(outputDir, { recursive: true })
 
-        // Write JSON file (pretty-printed)
-        writeFileSync(outputFile, JSON.stringify(parsedJson, null, 2), 'utf-8')
+        // Check if this is multi-file format (has tables array with filename property)
+        if (
+          parsedJson.tables &&
+          Array.isArray(parsedJson.tables) &&
+          parsedJson.tables[0]?.filename
+        ) {
+          // Multi-file format: write individual JSON files for each table
+          const schemaName = parsedJson.schema
+          const exported = parsedJson.exported
 
-        logger.info(chalk.green(`✓ ${relPath} → ${relative(process.cwd(), outputFile)}`))
+          for (const tableEntry of parsedJson.tables) {
+            const tableOutputFile = join(outputDir, `${tableEntry.filename}.json`)
+
+            // Create individual table JSON with schema context
+            const tableJson = {
+              schema: schemaName,
+              exported: exported,
+              table: tableEntry.info,
+            }
+
+            writeFileSync(tableOutputFile, JSON.stringify(tableJson, null, 2), 'utf-8')
+            logger.info(
+              chalk.green(
+                `✓ ${tableEntry.info.name} → ${relative(process.cwd(), tableOutputFile)}`,
+              ),
+            )
+          }
+
+          logger.info(chalk.green(`✓ ${relPath} → ${parsedJson.tables.length} table(s) exported`))
+        } else {
+          // Legacy single-file format: convert to multi-file
+          const schemaName = parsedJson.schema || 'UNKNOWN'
+          const exported = parsedJson.exported || new Date().toISOString()
+          const tables = (parsedJson as unknown as { tables: Array<{ name: string }> }).tables || []
+
+          for (const tableInfo of tables) {
+            const filename = tableInfo.name.toLowerCase()
+            const tableOutputFile = join(outputDir, `${filename}.json`)
+
+            const tableJson = {
+              schema: schemaName,
+              exported: exported,
+              table: tableInfo,
+            }
+
+            writeFileSync(tableOutputFile, JSON.stringify(tableJson, null, 2), 'utf-8')
+            logger.info(
+              chalk.green(`✓ ${tableInfo.name} → ${relative(process.cwd(), tableOutputFile)}`),
+            )
+          }
+
+          logger.info(chalk.green(`✓ ${relPath} → ${tables.length} table(s) exported`))
+        }
       } catch (error) {
         logger.error(
           chalk.red(
