@@ -77,23 +77,20 @@ export async function handleCommitAll() {
       },
       {
         type: 'text',
-        name: 'subject',
-        message: 'Commit subject (imperative mood)',
-        validate: (value) => (value.trim() ? true : 'Subject cannot be empty'),
+        name: 'scope',
+        message: 'Commit scope (e.g., cli, db, apps)',
+        validate: (value) => (value.trim() ? true : 'Scope cannot be empty'),
       },
       {
         type: 'text',
-        name: 'body',
-        message: 'Commit body (optional)',
+        name: 'message',
+        message: 'Commit message (imperative mood)',
+        validate: (value) => (value.trim() ? true : 'Message cannot be empty'),
       },
     ])
 
-    const { type, subject, body } = response
-    let commitMessage = `${type}: ${subject}`
-
-    if (body) {
-      commitMessage += `\n\n${body}`
-    }
+    const { type, scope, message } = response
+    const commitMessage = `${type}(${scope}): ${message}`
 
     logger.info('Staging changes...')
     execSync('git add .', { cwd: rootDir, stdio: 'inherit' })
