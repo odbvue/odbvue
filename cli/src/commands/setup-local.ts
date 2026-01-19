@@ -4,8 +4,6 @@ import {
   chalk,
   getPodmanCommand,
   rootDir,
-  downloadWalletZipFromContainer,
-  waitForContainerHealth,
   expandZipToDirectory,
   detectPreferredTnsAlias,
   normalizePathForSqlcl,
@@ -17,97 +15,20 @@ import {
   mkdirSync,
   execSync,
 } from '../utils.js';
+import {
+  checkPodmanInstalled,
+  checkPodmanRunning,
+  startPodmanMachine,
+  checkPodmanResources,
+  getDatabaseContainers,
+  getRunningDatabaseContainers,
+  downloadWalletZipFromContainer,
+  waitForContainerHealth,
+} from '../utils/podman.js';
 
 // ============================================================================
-// Podman/Docker Helper Functions
+// Password Validation Helper Functions
 // ============================================================================
-
-/**
- * Check if Podman is installed
- */
-const checkPodmanInstalled = (): boolean => {
-  return getPodmanCommand() !== null;
-};
-
-/**
- * Check if Podman daemon/machine is running
- */
-const checkPodmanRunning = (podmanCmd: string): boolean => {
-  try {
-    execSync(`${podmanCmd} info`, { stdio: 'pipe' });
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-/**
- * Start Podman machine
- */
-const startPodmanMachine = (podmanCmd: string): boolean => {
-  try {
-    logger.info('Starting Podman machine...');
-    execSync(`${podmanCmd} machine start`, { stdio: 'inherit' });
-    logger.success('Podman machine started');
-    return true;
-  } catch {
-    logger.error('Failed to start Podman machine');
-    return false;
-  }
-};
-
-/**
- * Check Podman system resources and warn if below recommended
- */
-const checkPodmanResources = (podmanCmd: string): void => {
-  try {
-    const info = execSync(`${podmanCmd} system info --format json`, { stdio: 'pipe' }).toString();
-    const systemInfo = JSON.parse(info);
-
-    const cpus = systemInfo.host?.cpus || 0;
-    const memoryBytes = systemInfo.host?.memFree || 0;
-    const memoryGb = memoryBytes / (1024 * 1024 * 1024);
-
-    if (cpus < 4 || memoryGb < 8) {
-      logger.warn(
-        `Podman resources below recommended: ${cpus} CPU(s), ${memoryGb.toFixed(2)} GB RAM`,
-      );
-      logger.warn('Recommended: 4 CPU(s) and 8 GB RAM');
-    }
-  } catch {
-    // Silently fail if unable to check resources
-  }
-};
-
-/**
- * Get list of all database containers (running and stopped)
- */
-const getDatabaseContainers = (podmanCmd: string): string[] => {
-  try {
-    const output = execSync(`${podmanCmd} ps -a --format "{{.Names}}"`, {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-    return output.split('\n').filter((name) => name);
-  } catch {
-    return [];
-  }
-};
-
-/**
- * Get list of running database containers
- */
-const getRunningDatabaseContainers = (podmanCmd: string): string[] => {
-  try {
-    const output = execSync(`${podmanCmd} ps --format "{{.Names}}"`, {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-    return output.split('\n').filter((name) => name);
-  } catch {
-    return [];
-  }
-};
 
 /**
  * Validate Oracle password meets complexity requirements
@@ -164,22 +85,23 @@ export const setupLocalAction = async (options: { project?: string; environment?
   logger.msg('');
 
   // Step a) Check if Podman is installed
-  if (!checkPodmanInstalled()) {
+  const podmanCmd = getPodmanCommand();
+  if (!checkPodmanInstalled(podmanCmd)) {
     logger.error('Podman is not installed');
     logger.warn('Please install Podman from: https://podman.io/docs/installation');
     process.exit(1);
   }
 
-  const podmanCmd = getPodmanCommand()!;
+  const podmanCmdStr = podmanCmd!;
   logger.success('Podman is installed');
 
   // Step b) Check if Podman is running, attempt to start if not
-  if (!checkPodmanRunning(podmanCmd)) {
+  if (!checkPodmanRunning(podmanCmdStr)) {
     logger.warn('Podman is not running');
     const response = await prompt('Would you like to start Podman machine? (y/N): ');
 
     if (response.toLowerCase() === 'y' || response.toLowerCase() === 'yes') {
-      const started = startPodmanMachine(podmanCmd);
+      const started = startPodmanMachine(podmanCmdStr);
       if (!started) {
         logger.error('Cannot proceed without Podman running');
         process.exit(1);
@@ -193,7 +115,7 @@ export const setupLocalAction = async (options: { project?: string; environment?
   logger.success('Podman is running and ready');
 
   // Check Podman resources
-  checkPodmanResources(podmanCmd);
+  checkPodmanResources(podmanCmdStr);
 
   // Construct container name: <project>-db-<environment>
   const defaultContainerName = `${project}-db-${environment}`;
@@ -201,8 +123,8 @@ export const setupLocalAction = async (options: { project?: string; environment?
   const containerName = containerNameInput.trim() || defaultContainerName;
 
   // Step c) Check if container exists
-  const existingContainers = getDatabaseContainers(podmanCmd);
-  const runningContainers = getRunningDatabaseContainers(podmanCmd);
+  const existingContainers = getDatabaseContainers(podmanCmdStr);
+  const runningContainers = getRunningDatabaseContainers(podmanCmdStr);
 
   const localDbDir = path.resolve(rootDir, 'i13e/local/db');
   if (!existsSync(localDbDir)) {
@@ -243,7 +165,7 @@ export const setupLocalAction = async (options: { project?: string; environment?
       if (response.toLowerCase() !== 'n' && response.toLowerCase() !== 'no') {
         logger.info(`Starting existing container "${containerName}"...`);
         try {
-          execSync(`${podmanCmd} start ${containerName}`, { stdio: 'pipe' });
+          execSync(`${podmanCmdStr} start ${containerName}`, { stdio: 'pipe' });
           logger.success(`Container "${containerName}" started successfully`);
         } catch (error) {
           logger.error(`Failed to start container: ${error}`);
@@ -253,7 +175,7 @@ export const setupLocalAction = async (options: { project?: string; environment?
         // Wait for container to be up and ready
         logger.info('Waiting for database to be up and ready (this may take a few minutes)...');
         try {
-          await waitForContainerHealth(podmanCmd, containerName);
+          await waitForContainerHealth(podmanCmdStr, containerName);
           logger.success('Database is up and ready');
         } catch (error) {
           logger.error(`${error}`);
@@ -270,7 +192,7 @@ export const setupLocalAction = async (options: { project?: string; environment?
     // c2) Create and spin up new container
     logger.info('Creating and starting local DB container...');
     try {
-      execSync(`${podmanCmd} compose up -d --build`, {
+      execSync(`${podmanCmdStr} compose up -d --build`, {
         cwd: localDbDir,
         stdio: 'inherit',
       });
@@ -283,7 +205,7 @@ export const setupLocalAction = async (options: { project?: string; environment?
     // Wait for container to be up and ready
     logger.info('Waiting for database to be up and ready (this may take 3-5 minutes)...');
     try {
-      await waitForContainerHealth(podmanCmd, containerName);
+      await waitForContainerHealth(podmanCmdStr, containerName);
       logger.success('Database is up and ready');
     } catch (error) {
       logger.error(`${error}`);
@@ -300,7 +222,7 @@ export const setupLocalAction = async (options: { project?: string; environment?
 
   logger.info('Downloading wallet from container...');
   try {
-    await downloadWalletZipFromContainer(podmanCmd, containerName, walletZipPath);
+    await downloadWalletZipFromContainer(podmanCmdStr, containerName, walletZipPath);
     logger.success(`Wallet saved: ${walletZipPath}`);
   } catch (error) {
     logger.error(`Failed to download wallet: ${error}`);

@@ -4,8 +4,6 @@ import {
   getPodmanCommand,
   tryExec,
   rootDir,
-  downloadWalletZipFromContainer,
-  waitForContainerHealth,
   expandZipToDirectory,
   detectPreferredTnsAlias,
   normalizePathForSqlcl,
@@ -19,6 +17,7 @@ import {
   execSync,
   homedir,
 } from '../utils.js';
+import { downloadWalletZipFromContainer, waitForContainerHealth } from '../utils/podman.js';
 
 export const registerLocalSetupCommand = (program: Command) => {
   program

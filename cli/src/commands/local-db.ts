@@ -3,12 +3,12 @@ import {
   logger,
   getPodmanCommand,
   rootDir,
-  downloadWalletZipFromContainer,
   path,
   existsSync,
   execSync,
   homedir,
 } from '../utils.js';
+import { downloadWalletZipFromContainer } from '../utils/podman.js';
 
 export const registerLocalDbCommands = (program: Command) => {
   const localDbCmd = program
