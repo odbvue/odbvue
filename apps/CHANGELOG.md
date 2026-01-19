@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.277
+
+### Patch Changes
+
+- 7b12bde: typescript db release prototype
+
 ## 0.0.276
 
 ### Patch Changes
