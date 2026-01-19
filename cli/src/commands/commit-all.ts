@@ -1,5 +1,6 @@
 import { Command } from 'commander';
-import { logger, prompt, rootDir, path, execSync } from '../utils.js';
+import prompts from 'prompts';
+import { logger, rootDir, path, execSync } from '../utils.js';
 
 export const registerCommitAllCommand = (program: Command) => {
   program
@@ -35,28 +36,49 @@ export const registerCommitAllCommand = (program: Command) => {
           process.exit(1);
         }
 
-        const scope = await prompt('Enter scope (e.g., apps, db, i13e, cicd, wiki, chore): ');
+        const commitTypes = [
+          { title: 'feat', value: 'feat', description: 'A new feature' },
+          { title: 'fix', value: 'fix', description: 'A bug fix' },
+          { title: 'chore', value: 'chore', description: 'Other changes' },
+        ];
 
-        if (!scope.trim()) {
-          logger.error('Scope cannot be empty.');
+        const response = await prompts([
+          {
+            type: 'select',
+            name: 'type',
+            message: 'Select commit type',
+            choices: commitTypes,
+            initial: 0,
+          },
+          {
+            type: 'text',
+            name: 'scope',
+            message: 'Commit scope (e.g., apps, db, cli, wiki)',
+            validate: (value) => (value.trim() ? true : 'Scope cannot be empty'),
+          },
+          {
+            type: 'text',
+            name: 'message',
+            message: 'Commit message (imperative mood)',
+            validate: (value) => (value.trim() ? true : 'Message cannot be empty'),
+          },
+        ]);
+
+        if (!response.type || !response.scope || !response.message) {
+          logger.error('Commit cancelled.');
           process.exit(1);
         }
 
-        const message = await prompt('Enter commit message: ');
-
-        if (!message.trim()) {
-          logger.error('Commit message cannot be empty.');
-          process.exit(1);
-        }
+        const fullMessage = `${response.type}(${response.scope.trim()}): ${response.message.trim()}`;
 
         logger.info('Committing all changes...');
         execSync('git add .', { cwd: rootDir, stdio: 'inherit' });
-        execSync(`git commit -m "(${scope.trim()}): ${message.trim()}"`, {
+        execSync(`git commit -m "${fullMessage}"`, {
           cwd: rootDir,
           stdio: 'inherit',
         });
 
-        logger.success(`Changes committed with message: "(${scope.trim()}): ${message.trim()}"`);
+        logger.success(`Changes committed with message: "${fullMessage}"`);
       } catch (error) {
         logger.error(`Failed to commit changes: ${error}`);
         process.exit(1);
