@@ -6,8 +6,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { loadEnvFile, rootDir, cliDir } from './utils.js';
 import {
-  registerLocalDbCommands,
-  registerLocalSetupCommand,
   registerDbInstallLocalCommand,
   registerNewFeatureCommand,
   registerCloseFeatureCommand,
@@ -48,8 +46,6 @@ program
 registerSetupCommand(program);
 registerSetupLocalCommand(program);
 registerSetupCloudCommand(program);
-registerLocalDbCommands(program);
-registerLocalSetupCommand(program);
 registerDbInstallLocalCommand(program);
 registerNewFeatureCommand(program);
 registerCloseFeatureCommand(program);

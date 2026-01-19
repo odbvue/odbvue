@@ -1,5 +1,3 @@
-export { registerLocalDbCommands } from './local-db.js';
-export { registerLocalSetupCommand } from './local-setup.js';
 export { registerDbInstallLocalCommand } from './db-install-local.js';
 export { registerNewFeatureCommand } from './new-feature.js';
 export { registerCloseFeatureCommand } from './close-feature.js';

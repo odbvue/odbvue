@@ -11,14 +11,120 @@ import {
   execSync,
   platform,
 } from '../utils.js';
+import yaml from 'js-yaml';
+
+interface ProjectConfig {
+  project?: string;
+  environment?: string;
+  database?: string;
+}
+
+interface DbEnv {
+  DB_ADMIN_USERNAME?: string;
+  DB_ADMIN_PASSWORD?: string;
+  DB_WALLET_PATH?: string;
+  DB_WALLET_PASSWORD?: string;
+  DB_SCHEMA_USERNAME?: string;
+  DB_SCHEMA_PASSWORD?: string;
+  [key: string]: string | undefined;
+}
+
+/**
+ * Load project configuration from config/config.yaml
+ */
+function loadProjectConfig(): ProjectConfig {
+  const configPath = path.join(rootDir, 'config', 'config.yaml');
+
+  if (!existsSync(configPath)) {
+    throw new Error(`Config file not found: ${configPath}. Run 'ov setup' first.`);
+  }
+
+  const content = readFileSync(configPath, 'utf-8');
+  return (yaml.load(content) as ProjectConfig) || {};
+}
+
+/**
+ * Load environment variables from config/<environment>/.env
+ */
+function loadEnv(environment: string): DbEnv {
+  const envPath = path.join(rootDir, 'config', environment, '.env');
+
+  if (!existsSync(envPath)) {
+    throw new Error(`Environment config not found: ${envPath}. Run 'ov setup-local' first.`);
+  }
+
+  const env: DbEnv = {};
+  const content = readFileSync(envPath, 'utf-8');
+
+  content.split('\n').forEach((line) => {
+    const match = line.match(/^\s*([^#=]+)=(.*)$/);
+    if (match) {
+      const key = match[1].trim();
+      const value = match[2].trim().replace(/^['"]|['"]$/g, '');
+      env[key] = value;
+    }
+  });
+
+  return env;
+}
+
+/**
+ * Build SQLcl connection string from environment config
+ */
+function buildConnectionString(env: DbEnv, environment: string): string {
+  const user = env.DB_SCHEMA_USERNAME || env.DB_ADMIN_USERNAME;
+  const password = env.DB_SCHEMA_PASSWORD || env.DB_ADMIN_PASSWORD;
+
+  if (!user || !password) {
+    throw new Error(
+      `Missing DB credentials in config/${environment}/.env. ` +
+        'Set DB_SCHEMA_USERNAME/DB_SCHEMA_PASSWORD or DB_ADMIN_USERNAME/DB_ADMIN_PASSWORD',
+    );
+  }
+
+  // For local database with wallet
+  if (env.DB_WALLET_PATH) {
+    const configDir = path.join(rootDir, 'config', environment);
+    let walletPath = env.DB_WALLET_PATH;
+
+    // Resolve relative path
+    if (walletPath.startsWith('./') || walletPath.startsWith('../')) {
+      walletPath = path.resolve(configDir, walletPath);
+    }
+
+    // If it's a zip, extract to same location (without .zip)
+    if (walletPath.endsWith('.zip')) {
+      const extractedDir = walletPath.replace('.zip', '');
+      if (!existsSync(extractedDir)) {
+        // Extract wallet
+        const isWindows = platform() === 'win32';
+        if (isWindows) {
+          execSync(
+            `powershell.exe -NoProfile -Command "Expand-Archive -Force -Path \\"${walletPath}\\" -DestinationPath \\"${extractedDir}\\""`,
+            { stdio: 'inherit' },
+          );
+        } else {
+          execSync(`unzip -o -q "${walletPath}" -d "${extractedDir}"`, { stdio: 'inherit' });
+        }
+      }
+      walletPath = extractedDir;
+    }
+
+    // Use cloud wallet connection format
+    return `${user}/${password}@${walletPath}`;
+  }
+
+  // Fallback: simple connection string
+  return `${user}/${password}`;
+}
 
 export const registerSubmitPrCommand = (program: Command) => {
   program
     .command('submit-pr')
     .alias('sp')
     .description('Submit PR with database changes and changeset')
-    .option('-c, --connection <connection>', 'Database connection (uses ODBVUE_DB_CONN if not provided)')
-    .action(async (options: { connection?: string }) => {
+    .option('-e, --environment <environment>', 'Environment name (uses config/config.yaml if not provided)')
+    .action(async (options: { environment?: string }) => {
       try {
         // Check for uncommitted changes
         const status = execSync('git status --porcelain', {
@@ -31,16 +137,30 @@ export const registerSubmitPrCommand = (program: Command) => {
           process.exit(1);
         }
 
-        const connection = options.connection || process.env.ODBVUE_DB_CONN;
+        // Load configuration
+        let environment = options.environment;
 
-        if (!connection) {
-          logger.error('Database connection not provided and ODBVUE_DB_CONN environment variable not set.');
-          logger.info('Usage: ov submit-pr [-c, --connection <connection>]');
-          logger.info('Set ODBVUE_DB_CONN in your .env file or provide -c option');
+        if (!environment) {
+          try {
+            const projectConfig = loadProjectConfig();
+            environment = projectConfig.environment;
+          } catch {
+            // Config file doesn't exist
+          }
+        }
+
+        if (!environment) {
+          logger.error('Environment not specified and config/config.yaml not found.');
+          logger.info("Usage: ov submit-pr [-e, --environment <environment>]");
+          logger.info("Or run 'ov setup' to configure the project first.");
           process.exit(1);
         }
 
-        logger.info(`Staging database changes with connection: ${connection}...`);
+        // Load environment-specific config
+        const env = loadEnv(environment);
+        const connection = buildConnectionString(env, environment);
+
+        logger.info(`Staging database changes for environment: ${environment}...`);
 
         const dbDir = path.resolve(rootDir, 'db');
         const sqlScript = `connect ${connection}\nproject stage\nexit\n`;
