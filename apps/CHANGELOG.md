@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.278
+
+### Patch Changes
+
+- 3671acf: cli sp fix
+
 ## 0.0.277
 
 ### Patch Changes
