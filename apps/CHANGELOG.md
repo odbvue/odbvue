@@ -1,5 +1,11 @@
 # odbvue
 
+## 0.0.276
+
+### Patch Changes
+
+- 4de580d: cli upgrade
+
 ## 0.0.275
 
 ### Patch Changes
