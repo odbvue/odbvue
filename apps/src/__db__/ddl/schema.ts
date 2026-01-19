@@ -208,12 +208,15 @@ export class Schema {
   /**
    * Collect all SQL statements from tables
    * Returns array of statements organized by type
+   * @param schemaName - Optional schema name prefix (e.g., 'ODBVUE')
+   * @param idempotent - If true, generates idempotent PL/SQL blocks
    */
-  toSql(): SqlStatement[] {
+  toSql(schemaName?: string, idempotent: boolean = false): SqlStatement[] {
     const statements: SqlStatement[] = []
+    const schema = schemaName || this.name.toUpperCase()
 
     for (const table of this.tables) {
-      statements.push(...table.toSql())
+      statements.push(...table.toSql(schema, idempotent))
     }
 
     return statements

@@ -52,11 +52,13 @@ export const registerDbScaffoldCommand = (program: Command) => {
       'Generate SQL scripts from module API definitions (scans current directory if no path provided)',
     )
     .option('-o, --output <dir>', 'Output directory (defaults to ./dist relative to module)')
-    .action(async (pathArg: string | undefined, options: { output?: string }) => {
+    .option('--idempotent', 'Generate idempotent PL/SQL blocks')
+    .option('--no-run', 'Skip prompt to run the generated SQL')
+    .action(async (pathArg: string | undefined, options: { output?: string; idempotent?: boolean; run?: boolean }) => {
       try {
         // If no path provided, scan all api/index.ts files for Schema exports
         if (!pathArg) {
-          await scanAndExportSchemas();
+          await scanAndExportSchemas(options.idempotent || false, options.run !== false);
           return;
         }
 
@@ -78,7 +80,7 @@ export const registerDbScaffoldCommand = (program: Command) => {
         process.exit(1);
       }
 
-      async function scanAndExportSchemas(): Promise<void> {
+      async function scanAndExportSchemas(idempotent: boolean, promptRun: boolean): Promise<void> {
         const appsDir = path.resolve(rootDir, 'apps/src');
         const schemaOutputDir = path.resolve(rootDir, 'db/schema');
 
@@ -115,7 +117,9 @@ export const registerDbScaffoldCommand = (program: Command) => {
   const schema = m.default;
   if (schema && typeof schema.toJson === 'function') {
     const schemaName = schema.getSchemaName ? schema.getSchemaName() : 'unknown';
-    const sqlStatements = schema.toSql ? schema.toSql() : [];
+    // Pass schemaName and idempotent flag to toSql() - new signature supports (schemaName, idempotent)
+    const idempotent = ${idempotent};
+    const sqlStatements = schema.toSql ? schema.toSql(schemaName, idempotent) : [];
     console.log(JSON.stringify({ 
       success: true, 
       schemaName: schemaName,
@@ -270,18 +274,23 @@ export const registerDbScaffoldCommand = (program: Command) => {
 
                 logger.success(`Generated ${sqlFileCount} SQL file(s) → ${path.relative(rootDir, releasesDir)}/`);
                 logger.success(`Created master script → ${path.relative(rootDir, masterScriptPath)}`);
+                if (idempotent) {
+                  logger.info('Generated idempotent PL/SQL blocks');
+                }
 
-                // Prompt user to run
-                const answer = await prompt('\nWould you like to run next.sql? (y/n) ');
+                // Prompt user to run (if enabled)
+                if (promptRun) {
+                  const answer = await prompt('\nWould you like to run next.sql? (y/n) ');
 
-                if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
-                  try {
-                    execSync(`ov dr ${masterScriptPath}`, {
-                      cwd: rootDir,
-                      stdio: 'inherit',
-                    });
-                  } catch (error) {
-                    logger.error(`Failed to run script: ${error instanceof Error ? error.message : String(error)}`);
+                  if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
+                    try {
+                      execSync(`ov dr ${masterScriptPath}`, {
+                        cwd: rootDir,
+                        stdio: 'inherit',
+                      });
+                    } catch (error) {
+                      logger.error(`Failed to run script: ${error instanceof Error ? error.message : String(error)}`);
+                    }
                   }
                 }
               }
