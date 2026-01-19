@@ -1,0 +1,12 @@
+schema: ODBVUE
+releases:
+  - version: 0.0.277
+    date: '2026-01-19'
+    files:
+      - comments/comments_app_users.sql
+      - constraints/ck_app_users_status.sql
+      - constraints/uk_app_users_username.sql
+      - indexes/idx_app_users_created.sql
+      - indexes/idx_app_users_status.sql
+      - next.sql
+      - tables/app_users.sql

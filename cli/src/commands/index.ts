@@ -12,3 +12,6 @@ export { registerSetupCommand } from './setup.js';
 export { registerSetupLocalCommand } from './setup-local.js';
 export { registerSetupCloudCommand } from './setup-cloud.js';
 export { registerDbRunCommand } from './db-run.js';
+export { registerDbImportCommand } from './db-import.js';
+export { registerDbDiffCommand } from './db-diff.js';
+export { registerDbReleaseCommand } from './db-release.js';
