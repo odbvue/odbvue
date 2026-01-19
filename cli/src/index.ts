@@ -18,6 +18,9 @@ import {
   registerDevCommand,
   registerCommitAllCommand,
   registerDbScaffoldCommand,
+  registerSetupCommand,
+  registerSetupLocalCommand,
+  registerSetupCloudCommand,
 } from './commands/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -41,6 +44,9 @@ program
   .version(version, '-v, --version');
 
 // Register all commands
+registerSetupCommand(program);
+registerSetupLocalCommand(program);
+registerSetupCloudCommand(program);
 registerLocalDbCommands(program);
 registerLocalSetupCommand(program);
 registerDbInstallLocalCommand(program);

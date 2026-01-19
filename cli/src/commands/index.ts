@@ -10,3 +10,6 @@ export { registerCreateReleaseCommand } from './create-release.js';
 export { registerDevCommand } from './dev.js';
 export { registerCommitAllCommand } from './commit-all.js';
 export { registerDbScaffoldCommand } from './db-scaffold.js';
+export { registerSetupCommand } from './setup.js';
+export { registerSetupLocalCommand } from './setup-local.js';
+export { registerSetupCloudCommand } from './setup-cloud.js';
