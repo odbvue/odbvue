@@ -1,0 +1,1 @@
+ALTER TABLE APP_USERS ADD CONSTRAINT ck_app_users_status CHECK (STATUS IN ('A', 'D', 'N'));

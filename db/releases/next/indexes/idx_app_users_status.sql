@@ -1,0 +1,1 @@
+CREATE INDEX idx_app_users_status ON APP_USERS (STATUS);

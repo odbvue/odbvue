@@ -1,0 +1,118 @@
+{
+  "schema": "ODBVUE",
+  "exported": "2026-01-19T12:31:37.701Z",
+  "tables": [
+    {
+      "name": "APP_USERS",
+      "description": "Table for storing and processing user data",
+      "columns": [
+        {
+          "name": "ID",
+          "description": "Primary key",
+          "type": "NUMBER(19,0)",
+          "default": null,
+          "required": true,
+          "identity": true
+        },
+        {
+          "name": "UUID",
+          "description": "Unique user identifier",
+          "type": "RAW(16)",
+          "default": "SYS_GUID() ",
+          "required": true,
+          "identity": false
+        },
+        {
+          "name": "USERNAME",
+          "description": "Username",
+          "type": "VARCHAR2(200 CHAR)",
+          "default": null,
+          "required": true,
+          "identity": false
+        },
+        {
+          "name": "PASSWORD",
+          "description": "Password",
+          "type": "VARCHAR2(2000 CHAR)",
+          "default": null,
+          "required": true,
+          "identity": false
+        },
+        {
+          "name": "FULLNAME",
+          "description": "Full name",
+          "type": "VARCHAR2(200 CHAR)",
+          "default": null,
+          "required": true,
+          "identity": false
+        },
+        {
+          "name": "STATUS",
+          "description": "Status (A - active; D - disabled; N - uNverified)",
+          "type": "CHAR(1 CHAR)",
+          "default": "A",
+          "required": true,
+          "identity": false
+        },
+        {
+          "name": "CREATED",
+          "description": "Date and time when user was created",
+          "type": "TIMESTAMP(6)",
+          "default": "SYSTIMESTAMP",
+          "required": true,
+          "identity": false
+        },
+        {
+          "name": "ATTEMPTS",
+          "description": "Number of authentication attempts",
+          "type": "NUMBER(19,0)",
+          "default": "0",
+          "required": true,
+          "identity": false
+        },
+        {
+          "name": "ACCESSED",
+          "description": "Date and time when user performed last successful login",
+          "type": "TIMESTAMP(6)",
+          "default": null,
+          "required": false,
+          "identity": false
+        },
+        {
+          "name": "ATTEMPTED",
+          "description": "Timestamp of the last login attempt",
+          "type": "TIMESTAMP(6)",
+          "default": null,
+          "required": false,
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "ID"
+      ],
+      "unique": [
+        [
+          "USERNAME"
+        ]
+      ],
+      "indexes": [
+        [
+          "STATUS"
+        ],
+        [
+          "CREATED"
+        ]
+      ],
+      "checks": [
+        {
+          "column": "STATUS",
+          "values": [
+            "A",
+            "D",
+            "N"
+          ]
+        }
+      ]
+    }
+  ]
+}

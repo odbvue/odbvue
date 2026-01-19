@@ -1,0 +1,11 @@
+COMMENT ON TABLE APP_USERS IS 'Table for storing and processing user data';
+COMMENT ON COLUMN APP_USERS.ID IS 'Primary key';
+COMMENT ON COLUMN APP_USERS.UUID IS 'Unique user identifier';
+COMMENT ON COLUMN APP_USERS.USERNAME IS 'Username';
+COMMENT ON COLUMN APP_USERS.PASSWORD IS 'Password';
+COMMENT ON COLUMN APP_USERS.FULLNAME IS 'Full name';
+COMMENT ON COLUMN APP_USERS.STATUS IS 'Status (A - active; D - disabled; N - uNverified)';
+COMMENT ON COLUMN APP_USERS.CREATED IS 'Date and time when user was created';
+COMMENT ON COLUMN APP_USERS.ATTEMPTS IS 'Number of authentication attempts';
+COMMENT ON COLUMN APP_USERS.ACCESSED IS 'Date and time when user performed last successful login';
+COMMENT ON COLUMN APP_USERS.ATTEMPTED IS 'Timestamp of the last login attempt';

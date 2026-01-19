@@ -7,6 +7,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   unlinkSync,
   writeFileSync,
 } from 'fs';
@@ -169,4 +170,4 @@ export const prompt = (question: string): Promise<string> => {
 };
 
 // Re-export commonly used modules for convenience
-export { chalk, path, existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, homedir, platform, execSync, spawn };
+export { chalk, path, existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync, unlinkSync, homedir, platform, execSync, spawn };

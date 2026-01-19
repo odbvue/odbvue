@@ -1,0 +1,1 @@
+CREATE INDEX idx_app_users_created ON APP_USERS (CREATED);

@@ -149,6 +149,13 @@ declare module 'vue-router/auto-routes' {
       { code: ParamValue<false> },
       | never
     >,
+    '/dev': RouteRecordInfo<
+      '/dev',
+      '/dev',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/login': RouteRecordInfo<
       '/login',
       '/login',
@@ -421,6 +428,12 @@ declare module 'vue-router/auto-routes' {
     'src/modules/crm/pages/surveys/[code].vue': {
       routes:
         | '/crm/surveys/[code]'
+      views:
+        | never
+    }
+    'src/pages/dev.vue': {
+      routes:
+        | '/dev'
       views:
         | never
     }
