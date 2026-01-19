@@ -13,3 +13,4 @@ export { registerDbScaffoldCommand } from './db-scaffold.js';
 export { registerSetupCommand } from './setup.js';
 export { registerSetupLocalCommand } from './setup-local.js';
 export { registerSetupCloudCommand } from './setup-cloud.js';
+export { registerDbRunCommand } from './db-run.js';

@@ -21,6 +21,7 @@ import {
   registerSetupCommand,
   registerSetupLocalCommand,
   registerSetupCloudCommand,
+  registerDbRunCommand,
 } from './commands/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -59,6 +60,7 @@ registerCreateReleaseCommand(program);
 registerDevCommand(program);
 registerCommitAllCommand(program);
 registerDbScaffoldCommand(program);
+registerDbRunCommand(program);
 
 // Parse arguments
 program.parse(process.argv);
