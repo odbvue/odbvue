@@ -1,5 +1,3 @@
-export { registerLocalDbCommands } from './local-db.js';
-export { registerLocalSetupCommand } from './local-setup.js';
 export { registerDbInstallLocalCommand } from './db-install-local.js';
 export { registerNewFeatureCommand } from './new-feature.js';
 export { registerCloseFeatureCommand } from './close-feature.js';
@@ -10,3 +8,7 @@ export { registerCreateReleaseCommand } from './create-release.js';
 export { registerDevCommand } from './dev.js';
 export { registerCommitAllCommand } from './commit-all.js';
 export { registerDbScaffoldCommand } from './db-scaffold.js';
+export { registerSetupCommand } from './setup.js';
+export { registerSetupLocalCommand } from './setup-local.js';
+export { registerSetupCloudCommand } from './setup-cloud.js';
+export { registerDbRunCommand } from './db-run.js';

@@ -50,6 +50,8 @@ export const logger = {
   error: (msg: string) => console.error(chalk.red(`✗ ${msg}`)),
   info: (msg: string) => console.log(chalk.blue(`ℹ ${msg}`)),
   warn: (msg: string) => console.warn(chalk.yellow(`⚠ ${msg}`)),
+  msg: (msg: string) => console.log(msg),
+  muted: (msg: string) => console.log(chalk.gray(msg)),
 };
 
 export const tryExec = (command: string, cwd?: string): boolean => {
@@ -150,111 +152,6 @@ export const expandZipToDirectory = (zipPath: string, destinationDir: string) =>
   }
 
   execSync(`unzip -o -q "${zipPath}" -d "${destinationDir}"`, { stdio: 'inherit' });
-};
-
-export const downloadWalletZipFromContainer = async (
-  podmanCmd: string,
-  containerName: string,
-  outputZipPath: string,
-): Promise<void> => {
-  mkdirSync(path.dirname(outputZipPath), { recursive: true });
-
-  const zipCommand = [
-    'set -euo pipefail',
-    'cd /u01/app/oracle/wallets/tls_wallet',
-    'shopt -s dotglob',
-    'zip -r -X -q - *',
-  ].join(' && ');
-
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(podmanCmd, ['exec', containerName, 'bash', '-lc', zipCommand], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    const output = createWriteStream(outputZipPath);
-    child.stdout?.pipe(output);
-
-    let stderr = '';
-    child.stderr?.on('data', (data: Buffer) => {
-      stderr += data.toString();
-    });
-
-    child.on('error', (error) => reject(error));
-    child.on('exit', (code) => {
-      output.close();
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(stderr || `podman exec exited with code ${code}`));
-      }
-    });
-  });
-};
-
-// Wait for container to be healthy with progress feedback
-export const waitForContainerHealth = async (
-  podmanCmd: string,
-  containerName: string,
-  timeoutMs: number = 600000, // 10 minutes default
-  intervalMs: number = 5000, // 5 seconds between checks
-): Promise<void> => {
-  const startTime = Date.now();
-  const spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-  let frameIndex = 0;
-
-  const getContainerStatus = (): string | null => {
-    try {
-      const result = execSync(
-        `${podmanCmd} inspect --format "{{.State.Health.Status}}" ${containerName}`,
-        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
-      ).trim();
-      return result;
-    } catch {
-      // Container might not exist yet or no health check defined
-      try {
-        const running = execSync(
-          `${podmanCmd} inspect --format "{{.State.Running}}" ${containerName}`,
-          { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
-        ).trim();
-        return running === 'true' ? 'running' : 'not-running';
-      } catch {
-        return null;
-      }
-    }
-  };
-
-  return new Promise((resolve, reject) => {
-    const check = () => {
-      const elapsed = Date.now() - startTime;
-      if (elapsed > timeoutMs) {
-        process.stdout.write('\n');
-        reject(new Error(`Timeout waiting for container ${containerName} to be healthy`));
-        return;
-      }
-
-      const status = getContainerStatus();
-      const elapsedMin = Math.floor(elapsed / 60000);
-      const elapsedSec = Math.floor((elapsed % 60000) / 1000);
-      const timeStr = elapsedMin > 0 ? `${elapsedMin}m ${elapsedSec}s` : `${elapsedSec}s`;
-
-      if (status === 'healthy') {
-        process.stdout.write('\r' + ' '.repeat(80) + '\r'); // Clear line
-        resolve();
-        return;
-      }
-
-      const spinner = spinnerFrames[frameIndex % spinnerFrames.length];
-      frameIndex++;
-      const statusDisplay = status ?? 'waiting';
-      process.stdout.write(
-        `\r${chalk.blue(spinner)} Waiting for database to be ready... (${statusDisplay}, ${timeStr})`,
-      );
-
-      setTimeout(check, intervalMs);
-    };
-
-    check();
-  });
 };
 
 // Prompt utility for user input

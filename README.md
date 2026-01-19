@@ -33,14 +33,11 @@ pnpm install
 pnpm build
 pnpm link -g
 
-# 2) start local DB, generate local config, download wallet
+# 2) setup environment
 cd ..
-ov local-setup
+ov setup
 
-# 3) install/upgrade schema + objects
-ov db-install-local
-
-# 4) start app + wiki dev servers
+# 3) start app + wiki dev servers
 cd apps
 pnpm install
 pnpm exec playwright install 
@@ -55,6 +52,7 @@ Open the URLs shown in the terminal (typically `http://localhost:5173` for the a
 - `apps/` – main Vue 3 + Vite app (also contains the VitePress docs tooling)
 - `db/` – database artifacts (SQL/PLSQL) and deployment helpers
 - `i13e/` – infrastructure examples for local + cloud deployments
+- `config/` – Configuration variables
 - `cli/` – `ov` helper CLI
 - `main/` – static landing page template
 

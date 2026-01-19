@@ -1,0 +1,3 @@
+project: odbvue
+environment: dev
+database: local

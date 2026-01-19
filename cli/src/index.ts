@@ -6,8 +6,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { loadEnvFile, rootDir, cliDir } from './utils.js';
 import {
-  registerLocalDbCommands,
-  registerLocalSetupCommand,
   registerDbInstallLocalCommand,
   registerNewFeatureCommand,
   registerCloseFeatureCommand,
@@ -18,6 +16,10 @@ import {
   registerDevCommand,
   registerCommitAllCommand,
   registerDbScaffoldCommand,
+  registerSetupCommand,
+  registerSetupLocalCommand,
+  registerSetupCloudCommand,
+  registerDbRunCommand,
 } from './commands/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -41,8 +43,9 @@ program
   .version(version, '-v, --version');
 
 // Register all commands
-registerLocalDbCommands(program);
-registerLocalSetupCommand(program);
+registerSetupCommand(program);
+registerSetupLocalCommand(program);
+registerSetupCloudCommand(program);
 registerDbInstallLocalCommand(program);
 registerNewFeatureCommand(program);
 registerCloseFeatureCommand(program);
@@ -53,6 +56,7 @@ registerCreateReleaseCommand(program);
 registerDevCommand(program);
 registerCommitAllCommand(program);
 registerDbScaffoldCommand(program);
+registerDbRunCommand(program);
 
 // Parse arguments
 program.parse(process.argv);
