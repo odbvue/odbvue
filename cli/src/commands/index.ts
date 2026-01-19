@@ -1,0 +1,12 @@
+export { registerLocalDbCommands } from './local-db.js';
+export { registerLocalSetupCommand } from './local-setup.js';
+export { registerDbInstallLocalCommand } from './db-install-local.js';
+export { registerNewFeatureCommand } from './new-feature.js';
+export { registerCloseFeatureCommand } from './close-feature.js';
+export { registerDbExportCommand } from './db-export.js';
+export { registerDbAddCustomCommand } from './db-add-custom.js';
+export { registerSubmitPrCommand } from './submit-pr.js';
+export { registerCreateReleaseCommand } from './create-release.js';
+export { registerDevCommand } from './dev.js';
+export { registerCommitAllCommand } from './commit-all.js';
+export { registerDbScaffoldCommand } from './db-scaffold.js';
