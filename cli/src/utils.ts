@@ -13,12 +13,32 @@ import {
 } from 'fs';
 import chalk from 'chalk';
 import { homedir, platform } from 'os';
+import YAML from 'js-yaml';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Get root directory (parent of cli folder)
 export const rootDir = path.resolve(__dirname, '../../');
 export const cliDir = path.resolve(__dirname, '../');
+
+/**
+ * Get the default environment from config/config.yaml
+ * Falls back to 'dev' if config.yaml doesn't exist or environment is not set
+ */
+export const getDefaultEnvironment = (): string => {
+  const configYamlPath = path.join(rootDir, 'config', 'config.yaml');
+  if (!existsSync(configYamlPath)) {
+    return 'dev';
+  }
+  try {
+    const configContent = readFileSync(configYamlPath, 'utf-8');
+    const config = YAML.load(configContent) as { environment?: string };
+    return config.environment || 'dev';
+  } catch {
+    return 'dev';
+  }
+};
 
 // Load environment variables from .env files
 export const loadEnvFile = (envPath: string) => {

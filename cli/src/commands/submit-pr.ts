@@ -1,7 +1,6 @@
 import { Command } from 'commander';
 import {
   logger,
-  prompt,
   rootDir,
   path,
   existsSync,
@@ -13,6 +12,7 @@ import {
   expandZipToDirectory,
   detectPreferredTnsAlias,
 } from '../utils.js';
+import prompts from 'prompts';
 import yaml from 'js-yaml';
 
 interface ProjectConfig {
@@ -230,9 +230,14 @@ export const registerSubmitPrCommand = (program: Command) => {
         }
 
         logger.warn('Please check if staged database content is OK');
-        const confirmStage = await prompt('Continue? (Y/N): ');
+        const { confirmStage } = await prompts({
+          type: 'confirm',
+          name: 'confirmStage',
+          message: 'Continue?',
+          initial: true,
+        });
 
-        if (confirmStage.toLowerCase() !== 'y') {
+        if (!confirmStage) {
           logger.info('Aborted by user.');
           process.exit(1);
         }

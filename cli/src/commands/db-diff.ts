@@ -9,6 +9,7 @@ import {
   writeFileSync,
   mkdirSync,
   readdirSync,
+  getDefaultEnvironment,
 } from '../utils.js';
 import os from 'os';
 
@@ -841,16 +842,17 @@ export const registerDbDiffCommand = (program: Command) => {
     .description('Compare JSON schema with database and generate migration script')
     .argument('[schemaDir]', 'Directory containing JSON schema files', 'db/schema')
     .argument('[outputDir]', 'Output directory for migration script', 'db/releases/next')
-    .option('-e, --environment <env>', 'Environment name', 'dev')
+    .option('-e, --environment <env>', 'Environment name (default: from config.yaml)')
     .option('--offline', 'Run in offline mode (generate full schema, no DB connection)')
     .action(
       async (
         schemaDir: string,
         outputDir: string,
-        options: { environment: string; offline?: boolean }
+        options: { environment?: string; offline?: boolean }
       ) => {
+        const environment = options.environment || getDefaultEnvironment();
         try {
-          await diffSchema(schemaDir, outputDir, options.environment, options.offline || false);
+          await diffSchema(schemaDir, outputDir, environment, options.offline || false);
         } catch (error) {
           logger.error(`Diff failed: ${error instanceof Error ? error.message : String(error)}`);
           process.exit(1);

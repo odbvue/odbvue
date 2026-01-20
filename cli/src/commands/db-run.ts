@@ -8,6 +8,8 @@ import {
   readFileSync,
   mkdirSync,
   expandZipToDirectory,
+  getDefaultEnvironment,
+  detectPreferredTnsAlias,
 } from '../utils.js';
 import { createWriteStream } from 'fs';
 import os from 'os';
@@ -240,7 +242,18 @@ async function runSqlFile(
   const password = env.DB_ADMIN_PASSWORD;
   const walletPath = getWalletPath(env, environment);
   const walletPassword = env.DB_WALLET_PASSWORD?.trim();
-  const connectString = env.DB_CONNECT_STRING || 'myatp_high';
+
+  // Auto-detect connect string from tnsnames.ora if not explicitly set
+  let connectString = env.DB_CONNECT_STRING;
+  if (!connectString) {
+    const tnsPath = path.join(walletPath, 'tnsnames.ora');
+    if (existsSync(tnsPath)) {
+      const tnsContent = readFileSync(tnsPath, 'utf-8');
+      connectString = detectPreferredTnsAlias(tnsContent) || 'myatp_high';
+    } else {
+      connectString = 'myatp_high';
+    }
+  }
 
   if (!user || !password) {
     throw new Error(
@@ -273,8 +286,22 @@ async function runSqlFile(
       connectionConfig.walletPassword = walletPassword;
     }
 
+    const connectionTimeout = 30000; // 30 second timeout
+    let timeoutId: NodeJS.Timeout | undefined;
+
     try {
-      connection = await oracledb.getConnection(connectionConfig);
+      // Create a timeout promise
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error(`Connection timeout after ${connectionTimeout / 1000}s - check network/firewall or credentials`));
+        }, connectionTimeout);
+      });
+
+      // Race between connection and timeout
+      connection = await Promise.race([
+        oracledb.getConnection(connectionConfig),
+        timeoutPromise,
+      ]);
     } catch (primaryError) {
       // Fallback: try without explicit wallet config
       try {
@@ -283,6 +310,10 @@ async function runSqlFile(
         throw primaryError;
       }
     } finally {
+      // Clear the timeout to prevent process from hanging
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       // Restore original TNS_ADMIN
       if (originalTNS_ADMIN === undefined) {
         delete process.env.TNS_ADMIN;
@@ -398,10 +429,11 @@ export const registerDbRunCommand = (program: Command) => {
     .description('Execute a SQL file against the database')
     .argument('<inputFile>', 'SQL file to execute')
     .argument('[outputFile]', 'Optional output file for DBMS_OUTPUT (prints to console if omitted)')
-    .option('-e, --environment <env>', 'Environment name', 'dev')
-    .action(async (inputFile: string, outputFile: string | undefined, options: { environment: string }) => {
+    .option('-e, --environment <env>', 'Environment name (default: from config.yaml)')
+    .action(async (inputFile: string, outputFile: string | undefined, options: { environment?: string }) => {
+      const environment = options.environment || getDefaultEnvironment();
       try {
-        await runSqlFile(options.environment, inputFile, outputFile);
+        await runSqlFile(environment, inputFile, outputFile);
       } catch (error) {
         process.exit(1);
       }

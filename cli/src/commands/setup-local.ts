@@ -7,14 +7,15 @@ import {
   expandZipToDirectory,
   detectPreferredTnsAlias,
   normalizePathForSqlcl,
-  prompt,
   path,
   existsSync,
   readFileSync,
   writeFileSync,
   mkdirSync,
+  getDefaultEnvironment,
   execSync,
 } from '../utils.js';
+import prompts from 'prompts';
 import {
   checkPodmanInstalled,
   checkPodmanRunning,
@@ -60,8 +61,12 @@ const promptPassword = async (message: string, defaultValue: string): Promise<st
   let validationError: string | null = null;
 
   do {
-    const input = await prompt(`${message} [${defaultValue}]: `);
-    password = input.trim() || defaultValue;
+    const response = await prompts({
+      type: 'text',
+      name: 'value',
+      message: `${message} [${defaultValue}]`,
+    });
+    password = (response.value?.trim() || defaultValue);
     validationError = validatePassword(password);
     if (validationError) {
       logger.warn(validationError);
@@ -77,7 +82,7 @@ const promptPassword = async (message: string, defaultValue: string): Promise<st
 
 export const setupLocalAction = async (options: { project?: string; environment?: string } = {}) => {
   const project = options.project || 'odbvue';
-  const environment = options.environment || 'dev';
+  const environment = options.environment || getDefaultEnvironment();
 
   logger.info(chalk.bold('Local Database Setup'));
   logger.msg('');
@@ -98,9 +103,14 @@ export const setupLocalAction = async (options: { project?: string; environment?
   // Step b) Check if Podman is running, attempt to start if not
   if (!checkPodmanRunning(podmanCmdStr)) {
     logger.warn('Podman is not running');
-    const response = await prompt('Would you like to start Podman machine? (y/N): ');
+    const { startPodman } = await prompts({
+      type: 'confirm',
+      name: 'startPodman',
+      message: 'Would you like to start Podman machine?',
+      initial: false,
+    });
 
-    if (response.toLowerCase() === 'y' || response.toLowerCase() === 'yes') {
+    if (startPodman) {
       const started = startPodmanMachine(podmanCmdStr);
       if (!started) {
         logger.error('Cannot proceed without Podman running');
@@ -119,8 +129,13 @@ export const setupLocalAction = async (options: { project?: string; environment?
 
   // Construct container name: <project>-db-<environment>
   const defaultContainerName = `${project}-db-${environment}`;
-  const containerNameInput = await prompt(`Container name [${defaultContainerName}]: `);
-  const containerName = containerNameInput.trim() || defaultContainerName;
+  const { containerName: containerNameInput } = await prompts({
+    type: 'text',
+    name: 'containerName',
+    message: 'Container name',
+    initial: defaultContainerName,
+  });
+  const containerName = containerNameInput?.trim() || defaultContainerName;
 
   // Step c) Check if container exists
   const existingContainers = getDatabaseContainers(podmanCmdStr);
@@ -141,8 +156,13 @@ export const setupLocalAction = async (options: { project?: string; environment?
   const adminPassword = await promptPassword('ADMIN_PASSWORD', defaultPassword);
   const walletPassword = await promptPassword('WALLET_PASSWORD', defaultPassword);
 
-  const schemaNameInput = await prompt(`SCHEMA_USERNAME [${defaultSchemaName}]: `);
-  const schemaName = schemaNameInput.trim() || defaultSchemaName;
+  const { schemaUsername } = await prompts({
+    type: 'text',
+    name: 'schemaUsername',
+    message: `SCHEMA_USERNAME`,
+    initial: defaultSchemaName,
+  });
+  const schemaName = schemaUsername?.trim() || defaultSchemaName;
   const schemaPassword = await promptPassword('SCHEMA_PASSWORD', defaultPassword);
 
   // Write .env file for local DB
@@ -160,9 +180,14 @@ export const setupLocalAction = async (options: { project?: string; environment?
 
     if (!runningContainers.includes(containerName)) {
       // Container exists but not running - attempt to start
-      const response = await prompt(`The container "${containerName}" is not running. Start it? (Y/n): `);
+      const { startContainer } = await prompts({
+        type: 'confirm',
+        name: 'startContainer',
+        message: `The container "${containerName}" is not running. Start it?`,
+        initial: true,
+      });
 
-      if (response.toLowerCase() !== 'n' && response.toLowerCase() !== 'no') {
+      if (startContainer) {
         logger.info(`Starting existing container "${containerName}"...`);
         try {
           execSync(`${podmanCmdStr} start ${containerName}`, { stdio: 'pipe' });
@@ -289,6 +314,6 @@ export const registerSetupLocalCommand = (program: Command) => {
     .command('setup-local')
     .description('Configure local Oracle Database (Podman container) for development')
     .option('-p, --project <name>', 'Project name', 'odbvue')
-    .option('-e, --environment <name>', 'Environment name', 'dev')
+    .option('-e, --environment <name>', 'Environment name (default: from config.yaml)')
     .action(setupLocalAction);
 };
