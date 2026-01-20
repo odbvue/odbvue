@@ -12,7 +12,6 @@ import {
 import yaml from 'js-yaml';
 import prompts from 'prompts';
 import { setupLocalAction } from './setup-local.js';
-import { setupCloudAction } from './setup-cloud.js';
 
 export const registerSetupCommand = (program: Command) => {
   program
@@ -35,25 +34,15 @@ export const registerSetupCommand = (program: Command) => {
           message: 'Environment',
           initial: 'dev',
         },
-        {
-          type: 'select',
-          name: 'databaseType',
-          message: 'Database type',
-          choices: [
-            { title: 'Local - Oracle Database (Podman container)', value: 'local' },
-            { title: 'Cloud - Oracle Cloud Infrastructure (OCI)', value: 'cloud' },
-          ],
-          initial: 0,
-        },
       ]);
 
       // Handle cancellation
-      if (!response.projectName || !response.environment || !response.databaseType) {
+      if (!response.projectName || !response.environment) {
         logger.warn('Setup cancelled.');
         return;
       }
 
-      const { projectName, environment, databaseType } = response;
+      const { projectName, environment } = response;
 
       // Save configuration to config.yaml
       const configDir = path.resolve(rootDir, 'config');
@@ -78,7 +67,6 @@ export const registerSetupCommand = (program: Command) => {
       // Update config
       config.project = projectName;
       config.environment = environment;
-      config.database = databaseType;
 
       // Write config
       const yamlContent = yaml.dump(config, { indent: 2 });
@@ -87,11 +75,7 @@ export const registerSetupCommand = (program: Command) => {
       logger.success('Configuration saved to config/config.yaml');
       logger.msg('');
 
-      // Run the appropriate setup based on database type
-      if (databaseType === 'local') {
-        await setupLocalAction();
-      } else {
-        await setupCloudAction();
-      }
+      // Run local database setup
+      await setupLocalAction();
     });
 };

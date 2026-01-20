@@ -24,7 +24,7 @@ export const configEnvironmentAction = async () => {
 
   // Read current config
   const configContent = readFileSync(configYamlPath, 'utf-8');
-  const config = YAML.load(configContent) as { project?: string; environment?: string; database?: string };
+  const config = YAML.load(configContent) as { project?: string; environment?: string };
   const currentEnvironment = config.environment || 'dev';
 
   // Get list of environment subfolders

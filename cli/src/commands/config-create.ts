@@ -3,13 +3,6 @@ import { logger, chalk, rootDir, path, existsSync, readFileSync, writeFileSync, 
 import YAML from 'js-yaml';
 import prompts from 'prompts';
 
-const DATABASE_OPTIONS = [
-  { title: 'Local - Oracle Database (Podman container)', value: 'local' },
-  { title: 'Cloud - Oracle Cloud Infrastructure (OCI)', value: 'cloud' },
-] as const;
-
-type DatabaseOption = 'local' | 'cloud';
-
 export const configCreateAction = async () => {
   logger.info(chalk.bold('Create New Environment Configuration'));
   logger.msg('');
@@ -31,10 +24,9 @@ export const configCreateAction = async () => {
   }
 
   // Read current config to get defaults
-  let currentConfig: { project?: string; environment?: string; database?: string } = {
+  let currentConfig: { project?: string; environment?: string } = {
     project: 'odbvue',
     environment: 'dev',
-    database: 'local',
   };
   if (existsSync(configYamlPath)) {
     const configContent = readFileSync(configYamlPath, 'utf-8');
@@ -54,25 +46,17 @@ export const configCreateAction = async () => {
       message: 'Environment name',
       validate: (value) => (value.trim() ? true : 'Environment name is required'),
     },
-    {
-      type: 'select',
-      name: 'database',
-      message: 'Database type',
-      choices: DATABASE_OPTIONS.map((opt) => ({ title: opt.title, value: opt.value })),
-      initial: 0,
-    },
   ]);
 
   // Handle cancellation
-  if (!response.project || !response.environment || !response.database) {
+  if (!response.project || !response.environment) {
     logger.warn('Setup cancelled.');
     return;
   }
 
-  const { project, environment, database } = response as {
+  const { project, environment } = response as {
     project: string;
     environment: string;
-    database: DatabaseOption;
   };
 
   // Check if environment already exists
@@ -115,7 +99,6 @@ export const configCreateAction = async () => {
   const updatedConfig = {
     project,
     environment,
-    database,
   };
   const updatedConfigContent = YAML.dump(updatedConfig);
   writeFileSync(configYamlPath, updatedConfigContent, 'utf-8');
@@ -126,19 +109,9 @@ export const configCreateAction = async () => {
   logger.success('Environment configuration created successfully!');
   logger.msg('');
   logger.muted(`Environment: ${environment}`);
-  logger.muted(`Database type: ${database}`);
   logger.muted(`Config path: ${envDir}`);
   logger.msg('');
 
-  if (database === 'local') {
-    logger.info('Next steps:');
-    logger.muted('  1. Run "ov setup-local" to set up the local database container');
-    logger.muted('  2. Run "ov db-install-local" to install the database schema');
-  } else {
-    logger.info('Next steps:');
-    logger.muted('  1. Update the .env file with your cloud database credentials');
-    logger.muted('  2. Run "ov setup-cloud" to configure the cloud database connection');
-  }
 };
 
 export const registerConfigCreateCommand = (program: Command) => {
