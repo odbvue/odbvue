@@ -1,0 +1,6 @@
+{
+    "$schema": "https://oxfmt.dev/schemas/config-latest.json",
+    "semi": false,
+    "singleQuote": true,
+    "printWidth": 100
+}

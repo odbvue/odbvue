@@ -3,11 +3,7 @@
 </template>
 
 <script setup lang="ts">
-const {
-  loading: loading,
-  data: data,
-  fetch: fetch,
-} = useTableFetch({
+const { loading, data, fetch } = useTableFetch({
   endpoint: 'tra/tasks/',
   responseKey: 'tasks',
   filter: { archived: ['true'] },

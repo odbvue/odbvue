@@ -11,11 +11,7 @@ definePage({
   },
 })
 
-const {
-  loading: loading,
-  data: data,
-  fetch: fetch,
-} = useTableFetch({
+const { loading, data, fetch } = useTableFetch({
   endpoint: 'adm/users/',
   responseKey: 'users',
 })

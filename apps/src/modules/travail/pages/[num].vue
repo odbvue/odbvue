@@ -287,7 +287,7 @@ const taskOptions = computed<OvFormOptions>(() => ({
       label: 'parent',
       value: parentNum.value || '',
       disabled: true,
-      hidden: parentNum.value ? false : true,
+      hidden: !parentNum.value,
     },
     {
       type: 'text',

@@ -1,0 +1,48 @@
+{
+    "$schema": "./node_modules/oxlint/configuration_schema.json",
+    "plugins": [
+        "typescript",
+        "unicorn",
+        "oxc"
+    ],
+    "env": {
+        "browser": true,
+        "es2024": true,
+        "node": true
+    },
+    "globals": {
+        "defineProps": "readonly",
+        "defineEmits": "readonly",
+        "defineExpose": "readonly",
+        "withDefaults": "readonly",
+        "definePage": "readonly"
+    },
+    "categories": {
+        "correctness": "error",
+        "suspicious": "warn",
+        "perf": "warn"
+    },
+    "rules": {
+        "no-unused-vars": "off",
+        "no-undef": "off",
+        "no-await-in-loop": "off",
+        "no-extend-native": "off",
+        "unicorn/no-array-sort": "off",
+        "unicorn/consistent-function-scoping": "off",
+        "unicorn/prefer-add-event-listener": "off",
+        "unicorn/no-useless-fallback-in-spread": "off",
+        "unicorn/prefer-set-has": "off",
+        "unicorn/no-useless-spread": "off",
+        "oxc/no-map-spread": "off",
+        "preserve-caught-error": "off"
+    },
+    "ignorePatterns": [
+        "**/dist/**",
+        "**/dist-ssr/**",
+        "**/coverage/**",
+        "**/cache/**",
+        "**/node_modules/**",
+        "**/*.d.ts",
+        "apps/wiki/.vitepress/cache/**"
+    ]
+}
