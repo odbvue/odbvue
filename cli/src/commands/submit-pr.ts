@@ -253,37 +253,37 @@ export const registerSubmitPrCommand = (program: Command) => {
         execSync('git add db/', { cwd: rootDir, stdio: 'inherit' })
 
         logger.info('Creating changeset...')
-        execSync('pnpm changeset', { cwd: rootDir, stdio: 'inherit' })
+        // Programmatically create changeset file with both packages
+        const changesetId = `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`
+        const changesetDir = path.resolve(rootDir, '.changeset')
+        const changesetFile = path.resolve(changesetDir, `${changesetId}.md`)
+        
+        const summaryResponse = await prompts({
+          type: 'text',
+          name: 'summary',
+          message: 'Changeset summary (what changed)',
+          validate: (value) => (value.trim() ? true : 'Summary cannot be empty'),
+        })
+
+        if (!summaryResponse.summary) {
+          logger.error('Changeset creation cancelled.')
+          process.exit(1)
+        }
+
+        const changesetContent = `---
+"odbvue": patch
+"odbvue-cli": patch
+---
+
+${summaryResponse.summary.trim()}
+`
+        writeFileSync(changesetFile, changesetContent, 'utf-8')
+        logger.success(`Created changeset: ${changesetId}.md`)
 
         logger.info('Committing changes...')
         execSync('git add .', { cwd: rootDir, stdio: 'inherit' })
 
-        // Get the latest changeset file to extract summary
-        let commitMessage = 'changeset: Update version'
-
-        try {
-          const changesetFiles = execSync('ls -t .changeset/*.md 2>/dev/null | head -1', {
-            cwd: rootDir,
-            encoding: 'utf-8',
-            shell: '/bin/bash',
-          })
-            .trim()
-            .split('\n')
-            .filter((f: string) => f)
-
-          if (changesetFiles.length > 0) {
-            const latestFile = path.resolve(rootDir, changesetFiles[0])
-            if (existsSync(latestFile)) {
-              const content = readFileSync(latestFile, 'utf-8')
-              const lines = content.split('\n').filter((line: string) => line.trim())
-              if (lines.length > 0) {
-                commitMessage = `changeset: ${lines[lines.length - 1]}`
-              }
-            }
-          }
-        } catch {
-          // Use default message if extraction fails
-        }
+        const commitMessage = `changeset: ${summaryResponse.summary.trim()}`
 
         execSync(`git commit -m "${commitMessage}"`, { cwd: rootDir, stdio: 'inherit' })
 
