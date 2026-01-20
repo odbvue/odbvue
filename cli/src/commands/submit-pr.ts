@@ -252,10 +252,8 @@ export const registerSubmitPrCommand = (program: Command) => {
         logger.info('Staging database changes...')
         execSync('git add db/', { cwd: rootDir, stdio: 'inherit' })
 
-        const appsDir = path.resolve(rootDir, 'apps')
-
         logger.info('Creating changeset...')
-        execSync('pnpm changeset', { cwd: appsDir, stdio: 'inherit' })
+        execSync('pnpm changeset', { cwd: rootDir, stdio: 'inherit' })
 
         logger.info('Committing changes...')
         execSync('git add .', { cwd: rootDir, stdio: 'inherit' })
@@ -265,7 +263,7 @@ export const registerSubmitPrCommand = (program: Command) => {
 
         try {
           const changesetFiles = execSync('ls -t .changeset/*.md 2>/dev/null | head -1', {
-            cwd: appsDir,
+            cwd: rootDir,
             encoding: 'utf-8',
             shell: '/bin/bash',
           })
@@ -274,7 +272,7 @@ export const registerSubmitPrCommand = (program: Command) => {
             .filter((f: string) => f)
 
           if (changesetFiles.length > 0) {
-            const latestFile = path.resolve(appsDir, changesetFiles[0])
+            const latestFile = path.resolve(rootDir, changesetFiles[0])
             if (existsSync(latestFile)) {
               const content = readFileSync(latestFile, 'utf-8')
               const lines = content.split('\n').filter((line: string) => line.trim())

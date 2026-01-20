@@ -10,9 +10,11 @@
         "lint": "oxlint apps/src apps/e2e cli/src --vue-plugin --vitest-plugin",
         "lint:fix": "oxlint apps/src apps/e2e cli/src --vue-plugin --vitest-plugin --fix",
         "build": "pnpm -r build",
-        "test": "pnpm -r test"
+        "test": "pnpm -r test",
+        "changeset": "changeset"
     },
     "devDependencies": {
+        "@changesets/cli": "^2.29.7",
         "oxfmt": "^0.26.0",
         "oxlint": "^1.41.0"
     }
