@@ -23,6 +23,8 @@ import {
   registerDbImportCommand,
   registerDbDiffCommand,
   registerDbReleaseCommand,
+  registerConfigEnvironmentCommand,
+  registerConfigCreateCommand,
 } from './commands/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -42,7 +44,7 @@ const program = new Command();
 
 program
   .name('ov')
-  .description('OdbVue CLI - Project management utilities')
+  .description('OdbVue CLI')
   .version(version, '-v, --version');
 
 // Register all commands
@@ -63,6 +65,8 @@ registerDbRunCommand(program);
 registerDbImportCommand(program);
 registerDbDiffCommand(program);
 registerDbReleaseCommand(program);
+registerConfigEnvironmentCommand(program);
+registerConfigCreateCommand(program);
 
 // Parse arguments
 program.parse(process.argv);

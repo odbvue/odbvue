@@ -15,3 +15,5 @@ export { registerDbRunCommand } from './db-run.js';
 export { registerDbImportCommand } from './db-import.js';
 export { registerDbDiffCommand } from './db-diff.js';
 export { registerDbReleaseCommand } from './db-release.js';
+export { registerConfigEnvironmentCommand } from './config-environment.js';
+export { registerConfigCreateCommand } from './config-create.js';
