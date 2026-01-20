@@ -11,7 +11,6 @@ import {
   readdirSync,
   getDefaultEnvironment,
 } from '../utils.js'
-import os from 'os'
 
 // Thin mode - no Oracle client install required
 oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT

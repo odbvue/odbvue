@@ -440,7 +440,7 @@ export const registerDbRunCommand = (program: Command) => {
         const environment = options.environment || getDefaultEnvironment()
         try {
           await runSqlFile(environment, inputFile, outputFile)
-        } catch (error) {
+        } catch {
           process.exit(1)
         }
       },

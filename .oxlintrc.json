@@ -23,7 +23,6 @@
         "perf": "warn"
     },
     "rules": {
-        "no-unused-vars": "off",
         "no-undef": "off",
         "no-await-in-loop": "off",
         "no-extend-native": "off",

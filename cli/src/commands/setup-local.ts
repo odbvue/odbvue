@@ -6,12 +6,10 @@ import {
   rootDir,
   expandZipToDirectory,
   detectPreferredTnsAlias,
-  normalizePathForSqlcl,
   path,
   existsSync,
   readFileSync,
   writeFileSync,
-  mkdirSync,
   getDefaultEnvironment,
   execSync,
 } from '../utils.js'
