@@ -13,8 +13,6 @@ import {
 } from 'fs';
 import chalk from 'chalk';
 import { homedir, platform } from 'os';
-import { createInterface } from 'readline';
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -153,20 +151,6 @@ export const expandZipToDirectory = (zipPath: string, destinationDir: string) =>
   }
 
   execSync(`unzip -o -q "${zipPath}" -d "${destinationDir}"`, { stdio: 'inherit' });
-};
-
-// Prompt utility for user input
-export const prompt = (question: string): Promise<string> => {
-  return new Promise((resolve) => {
-    const rl = createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer);
-    });
-  });
 };
 
 // Re-export commonly used modules for convenience

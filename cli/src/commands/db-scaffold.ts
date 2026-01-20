@@ -1,8 +1,8 @@
 import { Command } from 'commander';
 import { tmpdir } from 'os';
+import prompts from 'prompts';
 import {
   logger,
-  prompt,
   rootDir,
   path,
   existsSync,
@@ -280,9 +280,14 @@ export const registerDbScaffoldCommand = (program: Command) => {
 
                 // Prompt user to run (if enabled)
                 if (promptRun) {
-                  const answer = await prompt('\nWould you like to run next.sql? (y/n) ');
+                  const response = await prompts({
+                    type: 'confirm',
+                    name: 'run',
+                    message: 'Would you like to run next.sql?',
+                    initial: false,
+                  });
 
-                  if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
+                  if (response.run) {
                     try {
                       execSync(`ov dr ${masterScriptPath}`, {
                         cwd: rootDir,
@@ -392,9 +397,14 @@ export const registerDbScaffoldCommand = (program: Command) => {
               );
 
               // Prompt user to execute
-              const answer = await prompt('\nWould you like to execute this script? (y/n) ');
+              const response = await prompts({
+                type: 'confirm',
+                name: 'execute',
+                message: 'Would you like to execute this script?',
+                initial: false,
+              });
 
-              if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
+              if (response.execute) {
                 const connection = process.env.ODBVUE_DB_CONN;
                 if (!connection) {
                   logger.error(
