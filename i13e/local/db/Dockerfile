@@ -1,1 +1,0 @@
-FROM container-registry.oracle.com/database/adb-free:latest
