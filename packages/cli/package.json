@@ -1,0 +1,28 @@
+{
+  "name": "@odbvue/cli",
+  "description": "OdbVue CLI",
+  "bin": {
+    "ov": "dist/index.js"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "link": "pnpm link --global",
+    "unlink": "pnpm unlink --global",
+    "format": "oxfmt",
+    "lint": "oxlint",
+    "type-check": "tsc -p tsconfig.json --noEmit",
+    "check": "pnpm format && pnpm lint && pnpm type-check"
+  },
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "commander": "^12.0.0",
+    "prompts": "^2.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/prompts": "^2.4.9"
+  }
+}

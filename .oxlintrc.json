@@ -1,0 +1,44 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "plugins": ["typescript", "unicorn", "oxc", "vitest", "vue"],
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/dist-ssr/**",
+    "**/coverage/**",
+    "**/cache/**",
+    "**/node_modules/**"
+  ],
+  "env": {
+    "browser": true,
+    "es2022": true,
+    "node": true
+  },
+  "rules": {},
+  "overrides": [
+    {
+      "files": ["**/*.{ts,mts,tsx,vue}"],
+      "plugins": ["typescript", "vue"],
+      "rules": {}
+    },
+    {
+      "files": ["**/src/**/__tests__/*"],
+      "plugins": ["vitest"],
+      "env": {
+        "vitest": true
+      },
+      "rules": {}
+    },
+    {
+      "files": ["**/e2e/**/*.{test,spec}.{js,ts,jsx,tsx}"],
+      "rules": {}
+    },
+    {
+      "files": ["**/src/pages/**/*.vue"],
+      "rules": {}
+    }
+  ]
+}

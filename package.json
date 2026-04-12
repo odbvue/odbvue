@@ -1,0 +1,18 @@
+{
+  "name": "odbvue",
+  "version": "1.0.0",
+  "description": "The meta framework for Oracle Database and Vue.js",
+  "author": "Jānis Erlihs",
+  "license": "MIT",
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "prepare": "pnpm build && pnpm -C packages/cli link",
+    "build": "pnpm -r run build",
+    "check": "pnpm -r run check"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.44.0",
+    "oxlint": "^1.59.0",
+    "typescript": "^6.0.2"
+  }
+}
