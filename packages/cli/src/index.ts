@@ -1,17 +1,21 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander'
-import { version } from './utils/index.js'
 import { logger } from './utils/logger.js'
+import { version } from './utils/index.js'
+import { Config } from './utils/config.js'
 
 import { registerSetupCommand } from './commands/setup.js'
 
 const program = new Command()
+const config = new Config()
+const environment = config.getEnvironment()
 
 program.name('ov').description('OdbVue CLI').version(version, '-v, --version')
 
 logger.msg(`OdbVue CLI v${version}`)
-logger.msg('')
+if (environment) logger.msg(`Environment: ${environment}`)
+logger.lf()
 
 registerSetupCommand(program)
 
