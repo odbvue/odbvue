@@ -9,11 +9,13 @@ import { registerSetupCommand } from './commands/setup.js'
 
 const program = new Command()
 const config = new Config()
-const environment = config.getEnvironment()
+const projectName = config.getProjectName()
+const environment = config.getCurrentEnvironment()
 
 program.name('ov').description('OdbVue CLI').version(version, '-v, --version')
 
 logger.msg(`OdbVue CLI v${version}`)
+if (projectName) logger.msg(`Project:     ${projectName}`)
 if (environment) logger.msg(`Environment: ${environment}`)
 logger.lf()
 

@@ -3,53 +3,47 @@ import prompts from 'prompts'
 import { logger } from '../utils/logger.js'
 import { Config } from '../utils/config.js'
 
+const CREATE_NEW = '__create_new'
+const validateNotEmpty = (value: string) => (value.trim() ? true : 'This field is required')
+
+const promptText = (message: string, initial?: string) =>
+  prompts([
+    {
+      type: 'text',
+      name: 'value',
+      message,
+      initial,
+      validate: validateNotEmpty,
+    },
+  ])
+
 export const registerSetupCommand = (program: Command) => {
   program
     .command('setup')
     .description('Initial project setup')
     .action(async () => {
-      logger.info('Select environment...')
+      logger.info('Setting up project...')
 
       const config = new Config()
-      const existingEnvironments = config.listEnvironments()
-      const choices = [
-        ...existingEnvironments.map((env) => ({
-          title: env,
-          value: env,
-        })),
-        {
-          title: '+ Create new',
-          value: '__create_new',
-        },
+
+      const projectName = await promptText('Project name', config.getProjectName() || 'odbvue')
+      config.setProjectName(projectName.value)
+
+      const environments = [
+        ...config.listEnvironments().map((env) => ({ title: env, value: env })),
+        { title: '+ Create new', value: CREATE_NEW },
       ]
 
-      const selected = await prompts([
-        {
-          type: 'select',
-          name: 'environment',
-          message: 'Environment',
-          choices,
-          initial: 0,
-          validate: (value) => (value ? true : 'Environment selection is required'),
-        },
+      const { environment } = await prompts([
+        { type: 'select', name: 'environment', message: 'Environment', choices: environments },
       ])
 
-      let environmentName = selected.environment
+      const environmentName =
+        environment === CREATE_NEW
+          ? (await promptText('Environment name')).value.trim()
+          : environment
 
-      if (environmentName === '__create_new') {
-        const newEnv = await prompts([
-          {
-            type: 'text',
-            name: 'name',
-            message: 'Environment name',
-            validate: (value) => (value.trim() ? true : 'Environment name is required'),
-          },
-        ])
-        environmentName = newEnv.name.trim()
-      }
-
-      config.setEnvironment(environmentName)
-
+      config.setCurrentEnvironment(environmentName)
       logger.lf()
     })
 }

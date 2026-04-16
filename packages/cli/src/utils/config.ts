@@ -1,30 +1,28 @@
 import path from 'path'
-import dotenv from 'dotenv'
 import fs from 'fs'
 
 import { rootDir } from './index.js'
+import { EnvFile } from './envFile.js'
 
 export class Config {
   configDir = path.join(rootDir, 'config')
+  private envFile = new EnvFile(path.join(this.configDir, '.env'))
 
   listEnvironments = (): string[] => {
-    if (!fs.existsSync(this.configDir)) {
-      return []
-    }
+    if (!fs.existsSync(this.configDir)) return []
     const entries = fs.readdirSync(this.configDir, { withFileTypes: true })
     return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name)
   }
 
-  getEnvironment = (): string | undefined => {
-    const envPath = path.join(this.configDir, '.env')
-    if (!fs.existsSync(envPath)) return undefined
-    const env = dotenv.config({ path: envPath }).parsed
-    return env?.ODBVUE_ENVIRONMENT
-  }
+  getProjectName = (): string | undefined => this.envFile.get('ODBVUE_PROJECT_NAME')
+  setProjectName = (name: string) => this.envFile.set('ODBVUE_PROJECT_NAME', name)
 
-  setEnvironment = (env: string) => {
-    const envPath = path.join(this.configDir, '.env')
-    const envContent = `ODBVUE_ENVIRONMENT=${env}`
-    fs.writeFileSync(envPath, envContent)
+  getCurrentEnvironment = (): string | undefined => this.envFile.get('ODBVUE_CURRENTENVIRONMENT')
+  setCurrentEnvironment = (env: string) => {
+    this.envFile.set('ODBVUE_CURRENTENVIRONMENT', env)
+    const envDir = path.join(this.configDir, env)
+    if (!fs.existsSync(envDir)) {
+      fs.mkdirSync(envDir, { recursive: true })
+    }
   }
 }
