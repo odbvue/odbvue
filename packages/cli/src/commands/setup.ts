@@ -3,6 +3,8 @@ import prompts from 'prompts'
 import { logger } from '../utils/logger.js'
 import { Config } from '../utils/config.js'
 
+import { runDbCreate } from './db-create.js'
+
 const CREATE_NEW = '__create_new'
 const validateNotEmpty = (value: string) => (value.trim() ? true : 'This field is required')
 
@@ -45,5 +47,7 @@ export const registerSetupCommand = (program: Command) => {
 
       config.setCurrentEnvironment(environmentName)
       logger.lf()
+
+      await runDbCreate()
     })
 }

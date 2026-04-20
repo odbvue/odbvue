@@ -1,0 +1,8 @@
+name: dev
+resources:
+  - name: odbvue-adb-dev
+    type: adb
+    provider: local
+    options:
+      listenerPort: '1522'
+      ordsPort: '8443'
