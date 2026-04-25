@@ -6,7 +6,6 @@ import { version } from './utils/index.js'
 import { Config } from './utils/config.js'
 
 import { registerSetupCommand } from './commands/setup.js'
-import { registerDbCreateCommand } from './commands/db-create.js'
 
 const program = new Command()
 const config = new Config()
@@ -21,7 +20,6 @@ if (environment) logger.msg(`Environment: ${environment}`)
 logger.lf()
 
 registerSetupCommand(program)
-registerDbCreateCommand(program)
 
 program.parse(process.argv)
 

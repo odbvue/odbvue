@@ -13,7 +13,7 @@ platforms:
 resources:
   - name: odbvue-adb
     type: adb
-    provider: local
+    platform: local
     spec:
       listenerPort: '1522'
       ordsPort: '8443'
