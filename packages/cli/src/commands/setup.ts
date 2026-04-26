@@ -1,8 +1,8 @@
 import { Command } from 'commander'
 
-import { runSetupEnvironment } from './setup-environment.js'
-import { runSetupPlatforms } from './setup-platforms.js'
-import { runSetupAdb } from './setup-adb.js'
+import { runSetupEnvironment } from '../app/setup-environment.js'
+import { runSetupPlatforms } from '../app/setup-platforms.js'
+import { runSetupOracleAdb } from '../app/setup-resources-oracle-adb.js'
 
 export const registerSetupCommand = (program: Command) => {
   program
@@ -12,6 +12,6 @@ export const registerSetupCommand = (program: Command) => {
       await runSetupEnvironment()
       await runSetupPlatforms()
 
-      await runSetupAdb()
+      await runSetupOracleAdb()
     })
 }

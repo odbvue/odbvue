@@ -1,0 +1,16 @@
+name: odbvue-dev
+services:
+  oracle-adb:
+    image: container-registry.oracle.com/database/adb-free:latest
+    name: odbvue-adb
+    ports:
+      - '1522:1522'
+      - '8443:8443'
+    environment:
+      WORKLOAD_TYPE: ATP
+      ADMIN_PASSWORD: ${ODBVUE_ADMIN_PASSWORD}
+      WALLET_PASSWORD: ${ODBVUE_WALLET_PASSWORD}
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse:/dev/fuse

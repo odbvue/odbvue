@@ -2,7 +2,7 @@ platforms:
   - platform: local
   - platform: oci
     spec:
-      profile: ERLIHS
+      profile: DEFAULT
       tenancy: >-
         ocid1.tenancy.oc1..aaaaaaaady5lphy6q426xcstqyoz6w24c4vk34iynobqm6bfu5fu45v7dcjq
       region: eu-frankfurt-1
@@ -13,7 +13,8 @@ platforms:
 resources:
   - name: odbvue-adb
     type: adb
-    platform: local
+    platform: oci
     spec:
-      listenerPort: '1522'
-      ordsPort: '8443'
+      dbWorkload: OLTP
+      isFreeTier: true
+      isMtlsConnectionRequired: true

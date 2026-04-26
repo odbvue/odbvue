@@ -20,6 +20,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@types/oracledb':
+        specifier: ^6.10.3
+        version: 6.10.3
       chalk:
         specifier: ^5.6.2
         version: 5.6.2
@@ -32,9 +35,15 @@ importers:
       oci-common:
         specifier: ^2.116.0
         version: 2.130.0
+      oci-database:
+        specifier: ^2.130.0
+        version: 2.130.0
       oci-identity:
         specifier: ^2.116.0
         version: 2.130.0
+      oracledb:
+        specifier: ^6.10.0
+        version: 6.10.0
       prompts:
         specifier: ^2.4.2
         version: 2.4.2
@@ -297,6 +306,9 @@ packages:
   '@types/opossum@4.1.1':
     resolution: {integrity: sha512-9TMnd8AWRVtnZMqBbbzceQoJdafErgUViogFaQ3eetsbeLtiFFZ695mepNaLtlfJi4uRP3GmHfe3CJ2DZKaxYA==}
 
+  '@types/oracledb@6.10.3':
+    resolution: {integrity: sha512-8SCGQF/VSiXnifVFTajmRNtjHUDTNxkd9SrBrvG2A/80uwLVee5xmv/juH4hnDNTfU9qxfd6HR4Mfmg2nC3RVw==}
+
   '@types/prompts@2.4.9':
     resolution: {integrity: sha512-qTxFi6Buiu8+50/+3DGIWLHM6QuWsEKugJnnP6iv2Mc4ncxE4A/OJkjuVOA+5X0X1S/nq5VJRa8Lu+nwcvbrKA==}
 
@@ -425,6 +437,9 @@ packages:
   oci-common@2.130.0:
     resolution: {integrity: sha512-MkH/0Gn5GzSkG+WIhITWwn4z5QL0lCU3/55s8APfKEy6NOB3V9G+LbCSc3Dn7iGoC9V92D96rJvK02JWnHwhNQ==}
 
+  oci-database@2.130.0:
+    resolution: {integrity: sha512-ii4lQq8JCVUCrqN0wh61AtSF9ygEpH78dWx49aGPvXYvS1nqdWu0fwaWAY/XdZHw1bjlKdAq0BbGUgzex4lPvw==}
+
   oci-identity@2.130.0:
     resolution: {integrity: sha512-t6S6dXYxBPBJz+6xggL4JVpnsFuKtdfLSkfsFSMQf8npkBzk8l+NESfwGH2GDdUrcYn5eIFzQ1/k/ciRzAyJsQ==}
 
@@ -434,6 +449,10 @@ packages:
   opossum@5.0.1:
     resolution: {integrity: sha512-iUDUQmFl3RanaBVLMDTZ6WtXj/Hk84pwJ5JWoJaQd1lXGifdApHhszI3biZvdBDdpTERCmB6x+7+uNvzhzVZIg==}
     engines: {node: '>= 10'}
+
+  oracledb@6.10.0:
+    resolution: {integrity: sha512-kGUumXmrEWbSpBuKJyb9Ip3rXcNgKK6grunI3/cLPzrRvboZ6ZoLi9JQ+z6M/RIG924tY8BLflihL4CKKQAYMA==}
+    engines: {node: '>=14.17'}
 
   oxfmt@0.44.0:
     resolution: {integrity: sha512-lnncqvHewyRvaqdrnntVIrZV2tEddz8lbvPsQzG/zlkfvgZkwy0HP1p/2u1aCDToeg1jb9zBpbJdfkV73Itw+w==}
@@ -643,6 +662,10 @@ snapshots:
     dependencies:
       '@types/node': 20.19.39
 
+  '@types/oracledb@6.10.3':
+    dependencies:
+      '@types/node': 20.19.39
+
   '@types/prompts@2.4.9':
     dependencies:
       '@types/node': 20.19.39
@@ -787,6 +810,13 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
+  oci-database@2.130.0:
+    dependencies:
+      oci-common: 2.130.0
+      oci-workrequests: 2.130.0
+    transitivePeerDependencies:
+      - encoding
+
   oci-identity@2.130.0:
     dependencies:
       oci-common: 2.130.0
@@ -801,6 +831,8 @@ snapshots:
       - encoding
 
   opossum@5.0.1: {}
+
+  oracledb@6.10.0: {}
 
   oxfmt@0.44.0:
     dependencies:

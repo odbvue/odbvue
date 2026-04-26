@@ -1,19 +1,11 @@
 platforms:
-  - platform: local
-  - platform: oci
+  - platform: local-podman
     spec:
-      profile: ERLIHS
-      tenancy: >-
-        ocid1.tenancy.oc1..aaaaaaaady5lphy6q426xcstqyoz6w24c4vk34iynobqm6bfu5fu45v7dcjq
-      region: eu-frankfurt-1
-      compartment:
-        id: >-
-          ocid1.compartment.oc1..aaaaaaaa4t3wqsznauxhkvruyjgtfsb7htvw7qhsykqmlq2wuhdatrh7wzeq
-        name: odbvue-test
-resources:
+      name: odbvue-dev
+services:
   - name: odbvue-adb
-    type: adb
-    provider: local
+    kind: oracle-adb
+    platform: local-podman
     spec:
       listenerPort: '1522'
       ordsPort: '8443'

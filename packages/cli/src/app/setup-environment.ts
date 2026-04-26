@@ -1,25 +1,27 @@
 import prompts from 'prompts'
-import { logger } from '../utils/logger.js'
-import { Config } from '../utils/config.js'
+
+import { logger } from '../shared/logger.js'
+
+import { EnvironmentStore } from '../adapters/environment-store.js'
 
 const CREATE_NEW = '__create_new'
 
 export const runSetupEnvironment = async () => {
-  logger.info('Setting up project...')
+  logger.info('Setting up project environment...')
 
-  const config = new Config()
+  const environmentStore = new EnvironmentStore()
 
   const projectName = await prompts({
     type: 'text',
     name: 'value',
     message: 'Project name',
-    initial: config.getProjectName() || 'odbvue',
+    initial: environmentStore.getCurrent().projectName,
     validate: (value) => (value.trim() ? true : 'This field is required'),
   })
-  config.setProjectName(projectName.value)
+  environmentStore.setCurrent(projectName.value, environmentStore.getCurrent().currentEnv)
 
   const environments = [
-    ...config.listEnvironments().map((env) => ({ title: env, value: env })),
+    ...environmentStore.getAvailable().map((env) => ({ title: env, value: env })),
     { title: '+ Create new', value: CREATE_NEW },
   ]
 
@@ -39,6 +41,6 @@ export const runSetupEnvironment = async () => {
         ).value.trim()
       : environment
 
-  config.setCurrentEnvironment(environmentName)
+  environmentStore.setCurrent(environmentStore.getCurrent().projectName, environmentName)
   logger.lf()
 }
