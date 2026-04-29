@@ -8,9 +8,11 @@ import { EnvironmentStore } from '../adapters/environment-store.js'
 import { ConfigStore } from '../adapters/config-store.js'
 import { PodmanClient } from '../adapters/podman-client.js'
 
-export const runInfraUpOracleAdb = async () => {
-  logger.info('Starting Oracle ADB in local POdman container...')
+export const runInfraUpPodman = async () => {
+  logger.info('Starting Local Podman containers...')
   const { projectName, currentEnv, envDir } = new EnvironmentStore().getCurrent()
+  const projectNameWithEnv = `${projectName}-${currentEnv}`
+  const podman = new PodmanClient()
 
   const config = new ConfigStore()
   let services: Record<string, unknown> = {}
@@ -32,27 +34,26 @@ export const runInfraUpOracleAdb = async () => {
   })
 
   const composeFileContent = {
-    name: `${projectName}-${currentEnv}`,
+    name: projectNameWithEnv,
     services,
   }
 
   const composeFile = new YamlFile(path.resolve(envDir, 'podman-compose.yaml'))
   composeFile.set(composeFileContent)
-  const podman = new PodmanClient()
   await podman.composeUp(envDir)
 
-  const projectNameWithEnv = `${projectName}-${currentEnv}`
   await podman.waitForComposeContainers(projectNameWithEnv)
 
-  const containers = podman.getComposeContainerStatuses(projectNameWithEnv)
-  const adbContainer = containers.find((c) => c.name.includes('adb'))
-  if (!adbContainer) {
-    throw new Error('ADB container not found in compose project')
-  }
+  const containers = podman.getContainerStatuses(projectNameWithEnv)
+  containers
+    .filter((c) => c.name === `${projectName}-adb`)
+    .forEach(async (c) => {
+      const walletDir = path.join(envDir, '.wallets', `${projectName}-adb.zip`)
+      await podman.downloadDbWalletZip(c.name, walletDir)
+    })
 
-  const walletDir = path.join(envDir, '.wallets', `${projectName}.zip`)
-  await podman.downloadDbWalletZip(adbContainer.name, walletDir)
-
-  logger.success('Oracle ADB is ready!')
+  containers.forEach((c) => {
+    logger.success(`${c.name} is ${c.health.toUpperCase()}`)
+  })
   logger.lf()
 }

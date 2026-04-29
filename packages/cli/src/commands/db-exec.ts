@@ -59,7 +59,7 @@ async function drainDbmsOutput(connection: oracledb.Connection): Promise<string[
 
 function getWalletPath(environment: string, projectName: string): string {
   const walletsDir = path.join(configDir, environment, '.wallets')
-  const walletZipPath = path.join(walletsDir, `${projectName}-${environment}.zip`)
+  const walletZipPath = path.join(walletsDir, `${projectName}-adb.zip`)
 
   if (!existsSync(walletZipPath)) {
     throw new Error(

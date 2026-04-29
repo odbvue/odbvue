@@ -1,8 +1,6 @@
 import { Command } from 'commander'
 
-import { logger } from '../shared/logger.js'
-
-import { runInfraUpOracleAdb } from '../app/infra-up-oracle-adb.js'
+import { runInfraUpPodman } from '../app/infra-up-podman.js'
 
 export const registerInfraUpCommand = (program: Command) => {
   program
@@ -10,9 +8,6 @@ export const registerInfraUpCommand = (program: Command) => {
     .alias('iu')
     .description('Infrastructure startup')
     .action(async () => {
-      logger.info('Starting infrastructure...')
-
-      await runInfraUpOracleAdb()
-      logger.info('Infrastructure is ready!')
+      await runInfraUpPodman()
     })
 }

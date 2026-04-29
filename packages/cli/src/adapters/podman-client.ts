@@ -3,7 +3,6 @@ import { spawn } from 'child_process'
 import { mkdirSync, createWriteStream } from 'fs'
 import { platform } from 'os'
 import path from 'path'
-import { logger } from '../shared/logger.js'
 import { fatalError } from '../shared/errors.js'
 
 export interface ContainerStatus {
@@ -125,7 +124,65 @@ export class PodmanClient {
     }
   }
 
-  getComposeContainerStatuses(projectName: string): ContainerStatus[] {
+  async createContainer(containerDir: string) {
+    if (this.podmanCmd === null) return false
+    try {
+      execSync(`${this.podmanCmd} compose up -d --build`, {
+        cwd: containerDir,
+        stdio: 'inherit',
+      })
+
+      return true
+    } catch (error) {
+      fatalError(error)
+    }
+  }
+
+  async startContainer(containerName: string) {
+    if (this.podmanCmd === null) {
+      return false
+    }
+    try {
+      execSync(`${this.podmanCmd} start ${containerName}`, { stdio: 'pipe' })
+    } catch (error) {
+      fatalError(error)
+    }
+
+    try {
+      await this.waitForContainerHealth(containerName)
+    } catch (error) {
+      fatalError(error)
+    }
+    return true
+  }
+
+  stopContainer(containerName: string): boolean {
+    if (this.podmanCmd === null) {
+      return false
+    }
+    try {
+      execSync(`${this.podmanCmd} stop ${containerName}`, { stdio: 'pipe' })
+
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  removeContainer(containerName: string): boolean {
+    if (this.podmanCmd === null) {
+      return false
+    }
+    try {
+      execSync(`${this.podmanCmd} rm ${containerName}`, { stdio: 'pipe' })
+
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  getContainerStatuses(projectName: string): ContainerStatus[] {
     if (this.podmanCmd === null) {
       return []
     }
@@ -146,7 +203,6 @@ export class PodmanClient {
         const state = parts[1] || 'unknown'
         const status = parts[2] || ''
 
-        // Extract health status from status string (e.g., "Up 2 seconds (healthy)" or "Exited")
         const healthMatch = status.match(/\((.*?)\)/)
         const health = healthMatch ? healthMatch[1] : state
 
@@ -157,15 +213,15 @@ export class PodmanClient {
     }
   }
 
-  async waitForComposeContainers(
-    projectName: string,
+  private async waitForReadiness(
+    getState: () => unknown,
+    isReady: (state: unknown) => boolean,
+    displayStatus: (state: unknown, elapsed: number, spinner: string) => void,
+    onReady?: (state: unknown) => void,
+    errorMessage: string = 'Timeout waiting for readiness',
     timeoutMs: number = 600000,
     intervalMs: number = 5000,
   ): Promise<void> {
-    if (this.podmanCmd === null) {
-      throw new Error('Podman is not installed')
-    }
-
     const startTime = Date.now()
     const spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
     let frameIndex = 0
@@ -175,45 +231,22 @@ export class PodmanClient {
         const elapsed = Date.now() - startTime
         if (elapsed > timeoutMs) {
           process.stdout.write('\n')
-          reject(new Error(`Timeout waiting for containers to be ready`))
+          reject(new Error(errorMessage))
           return
         }
 
-        const containers = this.getComposeContainerStatuses(projectName)
+        const state = getState()
 
-        if (containers.length === 0) {
-          const spinner = spinnerFrames[frameIndex % spinnerFrames.length]
-          frameIndex++
-          process.stdout.write(`\r${spinner} Waiting for containers...`)
-          setTimeout(check, intervalMs)
-          return
-        }
-
-        // Check if all containers are healthy/running
-        const allHealthy = containers.every((c) => {
-          const healthLower = c.health.toLowerCase()
-          return healthLower === 'healthy' || healthLower === 'running'
-        })
-
-        const elapsedMin = Math.floor(elapsed / 60000)
-        const elapsedSec = Math.floor((elapsed % 60000) / 1000)
-        const timeStr = elapsedMin > 0 ? `${elapsedMin}m ${elapsedSec}s` : `${elapsedSec}s`
-
-        if (allHealthy) {
-          // Clear and show final status
+        if (isReady(state)) {
           process.stdout.write('\r' + ' '.repeat(150) + '\r')
-          containers.forEach((c) => {
-            logger.info(`✓ ${c.name}: ${c.health.toUpperCase()}`)
-          })
+          onReady?.(state)
           resolve()
           return
         }
 
-        // Display current status of all containers
         const spinner = spinnerFrames[frameIndex % spinnerFrames.length]
         frameIndex++
-        const statusLine = containers.map((c) => `${c.name} ${c.health.toUpperCase()}`).join(' | ')
-        process.stdout.write(`\r${spinner} ${statusLine} (${timeStr})    `)
+        displayStatus(state, elapsed, spinner)
 
         setTimeout(check, intervalMs)
       }
@@ -222,21 +255,94 @@ export class PodmanClient {
     })
   }
 
-  /*
-  getRunningDatabaseContainers(): string[] {
+  async waitForComposeContainers(
+    projectName: string,
+    timeoutMs: number = 1200000,
+    intervalMs: number = 5000,
+  ): Promise<void> {
     if (this.podmanCmd === null) {
-      return []
+      throw new Error('Podman is not installed')
     }
-    try {
-      const output = execSync(`${this.podmanCmd} ps --format "{{.Names}}"`, {
-        encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-      }).trim()
-      return output.split('\n').filter((name) => name)
-    } catch {
-      return []
-    }
+
+    await this.waitForReadiness(
+      () => this.getContainerStatuses(projectName),
+      (state) => {
+        const containers = state as ContainerStatus[]
+        if (containers.length === 0) return false
+        return containers.every((c) => {
+          const healthLower = c.health.toLowerCase()
+          return healthLower === 'healthy' || healthLower === 'running'
+        })
+      },
+      (state, elapsed, spinner) => {
+        const containers = state as ContainerStatus[]
+        if (containers.length === 0) {
+          process.stdout.write(`\r${spinner} Waiting for containers...`)
+          return
+        }
+        const elapsedMin = Math.floor(elapsed / 60000)
+        const elapsedSec = Math.floor((elapsed % 60000) / 1000)
+        const timeStr = elapsedMin > 0 ? `${elapsedMin}m ${elapsedSec}s` : `${elapsedSec}s`
+        const statusLine = containers.map((c) => `${c.name} ${c.health.toUpperCase()}`).join(' | ')
+        process.stdout.write(`\r${spinner} ${statusLine} (${timeStr})    `)
+      },
+      undefined,
+      `Timeout waiting for containers to be ready`,
+      timeoutMs,
+      intervalMs,
+    )
   }
+
+  async waitForContainerHealth(
+    containerName: string,
+    timeoutMs: number = 600000,
+    intervalMs: number = 5000,
+  ): Promise<void> {
+    if (this.podmanCmd === null) {
+      throw new Error('Podman is not installed')
+    }
+
+    const getContainerStatus = (): string | null => {
+      try {
+        const result = execSync(
+          `${this.podmanCmd!} inspect --format "{{.State.Health.Status}}" ${containerName}`,
+          { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
+        ).trim()
+        return result
+      } catch {
+        // Container might not exist yet or no health check defined
+        try {
+          const running = execSync(
+            `${this.podmanCmd!} inspect --format "{{.State.Running}}" ${containerName}`,
+            { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
+          ).trim()
+          return running === 'true' ? 'running' : 'not-running'
+        } catch {
+          return null
+        }
+      }
+    }
+
+    await this.waitForReadiness(
+      getContainerStatus,
+      (status) => status === 'healthy',
+      (status, elapsed, spinner) => {
+        const elapsedMin = Math.floor(elapsed / 60000)
+        const elapsedSec = Math.floor((elapsed % 60000) / 1000)
+        const timeStr = elapsedMin > 0 ? `${elapsedMin}m ${elapsedSec}s` : `${elapsedSec}s`
+        const statusDisplay = (status as string | null) ?? 'waiting'
+        process.stdout.write(
+          `\r${spinner} Waiting for database to be ready... (${statusDisplay}, ${timeStr})`,
+        )
+      },
+      undefined,
+      `Timeout waiting for container ${containerName} to be healthy`,
+      timeoutMs,
+      intervalMs,
+    )
+  }
+
+  /*
 
   containerExists(containerName: string): boolean {
     const containers = this.getDatabaseContainers()
@@ -325,65 +431,6 @@ export class PodmanClient {
   }
   */
 
-  async createContainer(containerDir: string) {
-    if (this.podmanCmd === null) return false
-    try {
-      execSync(`${this.podmanCmd} compose up -d --build`, {
-        cwd: containerDir,
-        stdio: 'inherit',
-      })
-
-      return true
-    } catch (error) {
-      fatalError(error)
-    }
-  }
-
-  async startContainer(containerName: string) {
-    if (this.podmanCmd === null) {
-      return false
-    }
-    try {
-      execSync(`${this.podmanCmd} start ${containerName}`, { stdio: 'pipe' })
-    } catch (error) {
-      fatalError(error)
-    }
-
-    try {
-      await this.waitForContainerHealth(containerName)
-    } catch (error) {
-      fatalError(error)
-    }
-    return true
-  }
-
-  /*
-  stopContainer(containerName: string): boolean {
-    if (this.podmanCmd === null) {
-      return false
-    }
-    try {
-      execSync(`${this.podmanCmd} stop ${containerName}`, { stdio: 'pipe' })
-
-      return true
-    } catch (error) {
-      return false
-    }
-  }
-
-  removeContainer(containerName: string): boolean {
-    if (this.podmanCmd === null) {
-      return false
-    }
-    try {
-      execSync(`${this.podmanCmd} rm ${containerName}`, { stdio: 'pipe' })
-
-      return true
-    } catch (error) {
-      return false
-    }
-  }
-*/
   async downloadDbWalletZip(containerName: string, outputZipPath: string): Promise<void> {
     if (this.podmanCmd === null) {
       throw new Error('Podman is not installed')
@@ -419,73 +466,6 @@ export class PodmanClient {
           reject(new Error(stderr || `podman exec exited with code ${code}`))
         }
       })
-    })
-  }
-
-  async waitForContainerHealth(
-    containerName: string,
-    timeoutMs: number = 600000,
-    intervalMs: number = 5000,
-  ): Promise<void> {
-    if (this.podmanCmd === null) {
-      throw new Error('Podman is not installed')
-    }
-    const startTime = Date.now()
-    const spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
-    let frameIndex = 0
-
-    const getContainerStatus = (): string | null => {
-      try {
-        const result = execSync(
-          `${this.podmanCmd!} inspect --format "{{.State.Health.Status}}" ${containerName}`,
-          { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
-        ).trim()
-        return result
-      } catch {
-        // Container might not exist yet or no health check defined
-        try {
-          const running = execSync(
-            `${this.podmanCmd!} inspect --format "{{.State.Running}}" ${containerName}`,
-            { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
-          ).trim()
-          return running === 'true' ? 'running' : 'not-running'
-        } catch {
-          return null
-        }
-      }
-    }
-
-    return new Promise((resolve, reject) => {
-      const check = () => {
-        const elapsed = Date.now() - startTime
-        if (elapsed > timeoutMs) {
-          process.stdout.write('\n')
-          reject(new Error(`Timeout waiting for container ${containerName} to be healthy`))
-          return
-        }
-
-        const status = getContainerStatus()
-        const elapsedMin = Math.floor(elapsed / 60000)
-        const elapsedSec = Math.floor((elapsed % 60000) / 1000)
-        const timeStr = elapsedMin > 0 ? `${elapsedMin}m ${elapsedSec}s` : `${elapsedSec}s`
-
-        if (status === 'healthy') {
-          process.stdout.write('\r' + ' '.repeat(80) + '\r') // Clear line
-          resolve()
-          return
-        }
-
-        const spinner = spinnerFrames[frameIndex % spinnerFrames.length]
-        frameIndex++
-        const statusDisplay = status ?? 'waiting'
-        process.stdout.write(
-          `\r${spinner} Waiting for database to be ready... (${statusDisplay}, ${timeStr})`,
-        )
-
-        setTimeout(check, intervalMs)
-      }
-
-      check()
     })
   }
 }
