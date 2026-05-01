@@ -9,12 +9,15 @@ import { ConfigStore } from '../adapters/config-store.js'
 import { PodmanClient } from '../adapters/podman-client.js'
 
 export const runInfraUpPodman = async () => {
-  logger.info('Starting Local Podman containers...')
   const { projectName, currentEnv, envDir } = new EnvironmentStore().getCurrent()
   const projectNameWithEnv = `${projectName}-${currentEnv}`
-  const podman = new PodmanClient()
 
   const config = new ConfigStore()
+  if (!config.getConfig().platforms.some((p) => p.platform === 'local-podman')) return
+
+  logger.info('Starting Local Podman containers...')
+  const podman = new PodmanClient()
+
   let services: Record<string, unknown> = {}
   config.getConfig().services.forEach((service) => {
     if (service.kind === 'oracle-adb') {

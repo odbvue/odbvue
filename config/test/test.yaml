@@ -1,5 +1,4 @@
 platforms:
-  - platform: local
   - platform: oci
     spec:
       profile: DEFAULT
@@ -10,11 +9,13 @@ platforms:
         id: >-
           ocid1.compartment.oc1..aaaaaaaa4t3wqsznauxhkvruyjgtfsb7htvw7qhsykqmlq2wuhdatrh7wzeq
         name: odbvue-test
-resources:
-  - name: odbvue-adb
-    type: adb
+services:
+  - service: odbvue-adb
+    kind: oracle-adb
     platform: oci
     spec:
       dbWorkload: OLTP
       isFreeTier: true
+      cpuCoreCount: 1
+      dataStorageSizeInTBs: 1
       isMtlsConnectionRequired: true

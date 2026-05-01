@@ -2,6 +2,7 @@ import path from 'path'
 import fs from 'fs'
 import prompts from 'prompts'
 
+import { homeDir } from '../shared/dirs.js'
 import { fatalError } from '../shared/errors.js'
 
 import { EnvironmentStore } from '../adapters/environment-store.js'
@@ -12,7 +13,14 @@ const CREATE_NEW = '__create_new'
 
 export const runSetupPlatformOci = async () => {
   const { projectName, currentEnv, envDir } = new EnvironmentStore().getCurrent()
-  const ociFilePath = path.join(envDir, '.oci', 'config')
+
+  const ociDirPath = path.join(envDir, '.oci')
+  const homeOciDirPath = path.join(homeDir, '.oci')
+  const ociFilePath = path.join(ociDirPath, 'config')
+
+  if (!fs.existsSync(ociDirPath) && fs.existsSync(homeOciDirPath)) {
+    fs.cpSync(homeOciDirPath, ociDirPath, { recursive: true })
+  }
 
   if (!fs.existsSync(ociFilePath)) {
     fatalError(

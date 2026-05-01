@@ -1,4 +1,6 @@
 import fs from 'fs'
+import path from 'path'
+import { pipeline } from 'stream/promises'
 
 import * as common from 'oci-common'
 import * as identity from 'oci-identity'
@@ -158,7 +160,6 @@ export class OciClient {
   async deleteCompartment(compartmentId: string): Promise<void> {
     try {
       await this.identityClient.deleteCompartment({ compartmentId })
-      logger.success(`Compartment ${compartmentId} deleted.`)
     } catch (err) {
       this.showError(err)
     }
@@ -178,6 +179,131 @@ export class OciClient {
         compartmentId: this.compartment?.id || this.tenancyId,
       })
       return resp.items || []
+    } catch (err) {
+      this.showError(err)
+    }
+  }
+
+  async findAdbInstance(
+    name: string,
+    compartmentId: string,
+  ): Promise<database.models.AutonomousDatabaseSummary | null> {
+    try {
+      const databaseClient = new database.DatabaseClient({
+        authenticationDetailsProvider: this.provider,
+      })
+      const resp = await databaseClient.listAutonomousDatabases({
+        compartmentId,
+        displayName: name,
+      })
+      return (
+        resp.items.find(
+          (db) =>
+            db.lifecycleState !== database.models.AutonomousDatabase.LifecycleState.Terminated &&
+            db.lifecycleState !== database.models.AutonomousDatabase.LifecycleState.Terminating,
+        ) ?? null
+      )
+    } catch (err) {
+      this.showError(err)
+    }
+  }
+
+  isAdbAvailable(instance: database.models.AutonomousDatabaseSummary): boolean {
+    return instance.lifecycleState === database.models.AutonomousDatabase.LifecycleState.Available
+  }
+
+  async createAdbInstance(
+    name: string,
+    password: string,
+    compartmentId: string,
+    spec?: {
+      dbWorkload?: string
+      cpuCoreCount?: number
+      dataStorageSizeInTBs?: number
+      isFreeTier?: boolean
+      isMtlsConnectionRequired?: boolean
+    },
+  ): Promise<string> {
+    try {
+      const databaseClient = new database.DatabaseClient({
+        authenticationDetailsProvider: this.provider,
+      })
+      const resp = await databaseClient.createAutonomousDatabase({
+        createAutonomousDatabaseDetails: {
+          compartmentId,
+          dbName: name.replace(/[^a-zA-Z0-9]/g, ''),
+          displayName: name,
+          cpuCoreCount: spec?.cpuCoreCount || 1,
+          dataStorageSizeInTBs: spec?.dataStorageSizeInTBs || 1,
+          isMtlsConnectionRequired:
+            spec?.isMtlsConnectionRequired !== undefined ? spec.isMtlsConnectionRequired : true,
+          isFreeTier: spec?.isFreeTier !== undefined ? spec.isFreeTier : true,
+          source: 'NEW',
+          adminPassword: password,
+        },
+      })
+      return resp.autonomousDatabase.id!
+    } catch (err) {
+      this.showError(err)
+    }
+  }
+
+  async waitForAdbAvailable(
+    autonomousDatabaseId: string,
+    intervalMs = 15000,
+    timeoutMs = 600000,
+  ): Promise<void> {
+    const databaseClient = new database.DatabaseClient({
+      authenticationDetailsProvider: this.provider,
+    })
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+      const resp = await databaseClient.getAutonomousDatabase({ autonomousDatabaseId })
+      const state = resp.autonomousDatabase.lifecycleState
+      if (state === database.models.AutonomousDatabase.LifecycleState.Available) return
+      if (
+        state === database.models.AutonomousDatabase.LifecycleState.Terminated ||
+        state === database.models.AutonomousDatabase.LifecycleState.Unavailable
+      ) {
+        throw new Error(`Autonomous Database ${autonomousDatabaseId} entered state: ${state}`)
+      }
+      await new Promise((resolve) => setTimeout(resolve, intervalMs))
+    }
+    throw new Error(
+      `Timed out waiting for Autonomous Database ${autonomousDatabaseId} to become available`,
+    )
+  }
+
+  async deleteAdbInstance(autonomousDatabaseId: string): Promise<void> {
+    try {
+      const databaseClient = new database.DatabaseClient({
+        authenticationDetailsProvider: this.provider,
+      })
+      await databaseClient.deleteAutonomousDatabase({ autonomousDatabaseId })
+    } catch (err) {
+      this.showError(err)
+    }
+  }
+
+  async getAdbWallet(
+    autonomousDatabaseId: string,
+    password: string,
+    outputZipPath: string,
+  ): Promise<string> {
+    try {
+      const databaseClient = new database.DatabaseClient({
+        authenticationDetailsProvider: this.provider,
+      })
+      const resp = await databaseClient.generateAutonomousDatabaseWallet({
+        autonomousDatabaseId,
+        generateAutonomousDatabaseWalletDetails: {
+          password: password,
+        },
+      })
+      const outputDir = path.dirname(outputZipPath)
+      fs.mkdirSync(outputDir, { recursive: true })
+      await pipeline(resp.value as NodeJS.ReadableStream, fs.createWriteStream(outputZipPath))
+      return outputZipPath
     } catch (err) {
       this.showError(err)
     }

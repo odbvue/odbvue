@@ -57,6 +57,49 @@ async function drainDbmsOutput(connection: oracledb.Connection): Promise<string[
   return lines
 }
 
+function extractAliasesFromTnsnames(tnsPath: string): string[] {
+  if (!existsSync(tnsPath)) {
+    return []
+  }
+
+  const tnsContent = readFileSync(tnsPath, 'utf-8')
+  const aliases: string[] = []
+
+  // Match lines that start with an alias name followed by '='
+  // Alias names are typically word characters (letters, numbers, underscores)
+  const aliasMatches = tnsContent.matchAll(/^\s*(\w+)\s*=/gm)
+
+  for (const match of aliasMatches) {
+    aliases.push(match[1])
+  }
+
+  return aliases
+}
+
+function getConnectionString(walletPath: string): string {
+  const tnsPath = path.join(walletPath, 'tnsnames.ora')
+  const aliases = extractAliasesFromTnsnames(tnsPath)
+
+  if (aliases.length === 0) {
+    return 'myatp_low'
+  }
+
+  // Prefer alias ending with _medium
+  const mediumAlias = aliases.find((alias) => alias.endsWith('_medium'))
+  if (mediumAlias) {
+    return mediumAlias
+  }
+
+  // Fall back to alias ending with _low
+  const lowAlias = aliases.find((alias) => alias.endsWith('_low'))
+  if (lowAlias) {
+    return lowAlias
+  }
+
+  // Fall back to first available alias
+  return aliases[0]
+}
+
 function getWalletPath(environment: string, projectName: string): string {
   const walletsDir = path.join(configDir, environment, '.wallets')
   const walletZipPath = path.join(walletsDir, `${projectName}-adb.zip`)
@@ -115,7 +158,6 @@ export const registerDbExecCommand = (program: Command) => {
         const user = 'admin' // Default user for ATP
         const password = env.ODBVUE_ADMIN_PASSWORD
         const walletPassword = env.ODBVUE_WALLET_PASSWORD?.trim()
-        const connectString = 'myatp_low' // Default connection alias
 
         if (!password) {
           fatalError(
@@ -125,6 +167,8 @@ export const registerDbExecCommand = (program: Command) => {
 
         // Resolve wallet path - extract from zip if needed
         const walletPath = getWalletPath(currentEnv, projectName)
+
+        const connectString = getConnectionString(walletPath)
 
         logger.info(`Connecting to ${connectString} as ${user}...`)
 

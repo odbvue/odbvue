@@ -129,6 +129,8 @@ export const runSetupOracleAdb = async () => {
       platform: 'oci',
       spec: {
         dbWorkload: 'OLTP',
+        cpuCoreCount: 1,
+        dataStorageSizeInTBs: 1,
         isFreeTier: true,
         isMtlsConnectionRequired: true,
       },
