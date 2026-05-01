@@ -30,6 +30,14 @@ const containerNameValidation = (value: string, containers: string[]) => {
   return true
 }
 
+const containerPortValidation = (value: string, ports: string[]) => {
+  if (!value.trim()) return 'This field is required'
+  const port = Number(value)
+  if (isNaN(port) || port < 1 || port > 65535) return 'Please enter a valid port number (1-65535)'
+  if (ports.includes(value)) return `Port "${value}" is already in use`
+  return true
+}
+
 const ociValidation = async (value: string, adbInstances: string[]) => {
   if (!value.trim()) return 'This field is required'
   if (adbInstances.some((adb) => adb === value))
@@ -61,6 +69,7 @@ export const runSetupOracleAdb = async () => {
   if (deploymentType === 'local-podman') {
     const podmanClient = new PodmanClient()
     const containers = podmanClient.getContainers()
+    const ports = podmanClient.getContainerPorts()
 
     const { dbName, listenerPort, ordsPort } = await prompts([
       {
@@ -75,14 +84,14 @@ export const runSetupOracleAdb = async () => {
         name: 'listenerPort',
         message: 'Listener Port',
         initial: '1522',
-        validate: (value) => (value ? true : 'This field is required'),
+        validate: (value) => containerPortValidation(value, ports),
       },
       {
         type: 'text',
         name: 'ordsPort',
         message: 'ORDS Port',
         initial: '8443',
-        validate: (value) => (value ? true : 'This field is required'),
+        validate: (value) => containerPortValidation(value, ports),
       },
     ])
 

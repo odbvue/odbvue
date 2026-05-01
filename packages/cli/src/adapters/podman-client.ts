@@ -342,18 +342,6 @@ export class PodmanClient {
     )
   }
 
-  /*
-
-  containerExists(containerName: string): boolean {
-    const containers = this.getDatabaseContainers()
-    return containers.includes(containerName)
-  }
-
-  containerRunning(containerName: string): boolean {
-    const runningContainers = this.getRunningDatabaseContainers()
-    return runningContainers.includes(containerName)
-  }
-
   getContainerPorts(): string[] {
     if (this.podmanCmd === null) {
       return []
@@ -391,45 +379,6 @@ export class PodmanClient {
       return []
     }
   }
-
-  getRunningContainerPorts(): string[] {
-    if (this.podmanCmd === null) {
-      return []
-    }
-    try {
-      const output = execSync(`${this.podmanCmd} ps --format "{{.Names}}|{{.Ports}}"`, {
-        encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-      })
-      const lines = output.trim().split('\n')
-      const portsSet = new Set<string>()
-
-      lines.forEach((line) => {
-        if (!line) return
-        const parts = line.split('|')
-        if (parts.length >= 2) {
-          const portsStr = parts[1]?.trim()
-
-          if (portsStr && portsStr !== '<none>') {
-            // Parse port bindings like "127.0.0.1:1521->1521/tcp, 127.0.0.1:5500->5500/tcp"
-            const ports = portsStr
-              .split(',')
-              .map((p) => {
-                const match = p.trim().match(/->(\d+)/)
-                return match ? match[1] : null
-              })
-              .filter((p) => p !== null) as string[]
-
-            ports.forEach((port) => portsSet.add(port))
-          }
-        }
-      })
-      return Array.from(portsSet).toSorted((a, b) => parseInt(a) - parseInt(b))
-    } catch {
-      return []
-    }
-  }
-  */
 
   async downloadDbWalletZip(containerName: string, outputZipPath: string): Promise<void> {
     if (this.podmanCmd === null) {
