@@ -20,7 +20,7 @@ export const runInfraUpPodman = async () => {
     if (service.kind === 'oracle-adb') {
       services['oracle-adb'] = {
         image: 'container-registry.oracle.com/database/adb-free:latest',
-        name: service.name,
+        name: service.service,
         ports: [`${service.spec.listenerPort}:1522`, `${service.spec.ordsPort}:8443`],
         environment: {
           WORKLOAD_TYPE: 'ATP',

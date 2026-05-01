@@ -3,15 +3,9 @@ platforms:
     spec:
       name: odbvue-dev
 services:
-  - name: odbvue-adb
+  - service: odbvue-adb
     kind: oracle-adb
     platform: local-podman
     spec:
       listenerPort: '1522'
       ordsPort: '8443'
-  - name: odbvue-adb-1
-    kind: oracle-adb
-    platform: local-podman
-    spec:
-      listenerPort: '1523'
-      ordsPort: '8444'

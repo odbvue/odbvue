@@ -96,7 +96,7 @@ export const runSetupOracleAdb = async () => {
     ])
 
     config.addService({
-      name: dbName,
+      service: dbName,
       kind: 'oracle-adb',
       platform: 'local-podman',
       spec: {
@@ -124,7 +124,7 @@ export const runSetupOracleAdb = async () => {
     })
 
     config.addService({
-      name: dbName,
+      service: dbName,
       kind: 'oracle-adb',
       platform: 'oci',
       spec: {

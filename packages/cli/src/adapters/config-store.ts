@@ -29,7 +29,7 @@ type Platform =
     }
 
 type Service = {
-  name: string
+  service: string
   kind: 'oracle-adb' | 'oracle-object-storage' | 'compute'
   platform: 'oci' | 'local-podman'
   spec: Record<string, unknown>
@@ -75,6 +75,10 @@ export class ConfigStore {
     return this.config.platforms.map((p) => p.platform)
   }
 
+  getServices = (): string[] => {
+    return this.config.services.map((s) => s.service)
+  }
+
   addPlatform = (platform: Platform) => {
     if (!this.getPlatforms().includes(platform.platform)) {
       this.config.platforms.push(platform)
@@ -87,7 +91,9 @@ export class ConfigStore {
   }
 
   addService = (service: Service) => {
-    const existingServiceIndex = this.config.services.findIndex((s) => s.name === service.name)
+    const existingServiceIndex = this.config.services.findIndex(
+      (s) => s.service === service.service,
+    )
     if (existingServiceIndex === -1) {
       this.config.services.push(service)
     } else {

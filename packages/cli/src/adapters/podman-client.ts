@@ -119,8 +119,8 @@ export class PodmanClient {
       })
 
       return true
-    } catch (error) {
-      fatalError(error)
+    } catch {
+      return false
     }
   }
 
@@ -208,6 +208,45 @@ export class PodmanClient {
 
         return { name, status: state, health }
       })
+    } catch {
+      return []
+    }
+  }
+
+  getContainerPorts(includeAll: boolean = false): string[] {
+    if (this.podmanCmd === null) {
+      return []
+    }
+    try {
+      const psCommand = includeAll ? 'ps -a' : 'ps'
+      const output = execSync(`${this.podmanCmd} ${psCommand} --format "{{.Names}}|{{.Ports}}"`, {
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      })
+      const lines = output.trim().split('\n')
+      const portsSet = new Set<string>()
+
+      lines.forEach((line) => {
+        if (!line) return
+        const parts = line.split('|')
+        if (parts.length >= 2) {
+          const portsStr = parts[1]?.trim()
+
+          if (portsStr && portsStr !== '<none>') {
+            // Parse port bindings like "127.0.0.1:1521->1521/tcp, 127.0.0.1:5500->5500/tcp"
+            const ports = portsStr
+              .split(',')
+              .map((p) => {
+                const match = p.trim().match(/->(\d+)/)
+                return match ? match[1] : null
+              })
+              .filter((p) => p !== null) as string[]
+
+            ports.forEach((port) => portsSet.add(port))
+          }
+        }
+      })
+      return Array.from(portsSet).toSorted((a, b) => parseInt(a) - parseInt(b))
     } catch {
       return []
     }
@@ -340,44 +379,6 @@ export class PodmanClient {
       timeoutMs,
       intervalMs,
     )
-  }
-
-  getContainerPorts(): string[] {
-    if (this.podmanCmd === null) {
-      return []
-    }
-    try {
-      const output = execSync(`${this.podmanCmd} ps -a --format "{{.Names}}|{{.Ports}}"`, {
-        encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-      })
-      const lines = output.trim().split('\n')
-      const portsSet = new Set<string>()
-
-      lines.forEach((line) => {
-        if (!line) return
-        const parts = line.split('|')
-        if (parts.length >= 2) {
-          const portsStr = parts[1]?.trim()
-
-          if (portsStr && portsStr !== '<none>') {
-            // Parse port bindings like "127.0.0.1:1521->1521/tcp, 127.0.0.1:5500->5500/tcp"
-            const ports = portsStr
-              .split(',')
-              .map((p) => {
-                const match = p.trim().match(/->(\d+)/)
-                return match ? match[1] : null
-              })
-              .filter((p) => p !== null) as string[]
-
-            ports.forEach((port) => portsSet.add(port))
-          }
-        }
-      })
-      return Array.from(portsSet).toSorted((a, b) => parseInt(a) - parseInt(b))
-    } catch {
-      return []
-    }
   }
 
   async downloadDbWalletZip(containerName: string, outputZipPath: string): Promise<void> {
