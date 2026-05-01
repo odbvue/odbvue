@@ -7,6 +7,7 @@ import { version } from './shared/version.js'
 import { EnvironmentStore } from './adapters/environment-store.js'
 
 import { registerSetupCommand } from './commands/setup.js'
+import { registerSetEnvCommand } from './commands/set-env.js'
 import { registerImplodeCommand } from './commands/implode.js'
 import { registerInfraUpCommand } from './commands/infra-up.js'
 import { registerInfraDownCommand } from './commands/infra-down.js'
@@ -24,6 +25,7 @@ if (currentEnv) logger.msg(`Environment: ${currentEnv}`)
 logger.lf()
 
 registerSetupCommand(program)
+registerSetEnvCommand(program)
 registerImplodeCommand(program)
 registerInfraUpCommand(program)
 registerInfraDownCommand(program)
