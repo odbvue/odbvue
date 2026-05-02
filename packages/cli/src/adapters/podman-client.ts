@@ -7,8 +7,10 @@ import { fatalError } from '../shared/errors.js'
 
 export interface ContainerStatus {
   name: string
+  state: string
   status: string
-  health: string
+  healthy: boolean
+  ports: string[]
 }
 
 export class PodmanClient {
@@ -182,13 +184,16 @@ export class PodmanClient {
     }
   }
 
-  getContainerStatuses(projectName: string): ContainerStatus[] {
+  getContainerStatuses(projectName?: string): ContainerStatus[] {
     if (this.podmanCmd === null) {
       return []
     }
     try {
+      const filterFlag = projectName
+        ? `--filter label=com.docker.compose.project=${projectName}`
+        : ''
       const output = execSync(
-        `${this.podmanCmd} ps -a --filter label=com.docker.compose.project=${projectName} --format "{{.Names}}\t{{.State}}\t{{.Status}}"`,
+        `${this.podmanCmd} ps -a ${filterFlag} --format "{{.Names}}\t{{.State}}\t{{.Status}}\t{{.Ports}}"`,
         {
           encoding: 'utf-8',
           stdio: ['pipe', 'pipe', 'pipe'],
@@ -202,11 +207,21 @@ export class PodmanClient {
         const name = parts[0] || ''
         const state = parts[1] || 'unknown'
         const status = parts[2] || ''
+        const portsStr = parts[3] || ''
 
         const healthMatch = status.match(/\((.*?)\)/)
-        const health = healthMatch ? healthMatch[1] : state
+        const healthy = healthMatch ? healthMatch[1].toLowerCase().includes('healthy') : false
 
-        return { name, status: state, health }
+        const ports: string[] = []
+        if (portsStr && portsStr !== '<none>') {
+          const portMatches = portsStr.split(',').map((p) => {
+            const match = p.trim().match(/->(\d+)/)
+            return match ? match[1] : null
+          })
+          ports.push(...(portMatches.filter((p) => p !== null) as string[]))
+        }
+
+        return { name, state, status, healthy, ports }
       })
     } catch {
       return []
@@ -308,10 +323,7 @@ export class PodmanClient {
       (state) => {
         const containers = state as ContainerStatus[]
         if (containers.length === 0) return false
-        return containers.every((c) => {
-          const healthLower = c.health.toLowerCase()
-          return healthLower === 'healthy' || healthLower === 'running'
-        })
+        return containers.every((c) => c.healthy)
       },
       (state, elapsed, spinner) => {
         const containers = state as ContainerStatus[]
@@ -322,7 +334,7 @@ export class PodmanClient {
         const elapsedMin = Math.floor(elapsed / 60000)
         const elapsedSec = Math.floor((elapsed % 60000) / 1000)
         const timeStr = elapsedMin > 0 ? `${elapsedMin}m ${elapsedSec}s` : `${elapsedSec}s`
-        const statusLine = containers.map((c) => `${c.name} ${c.health.toUpperCase()}`).join(' | ')
+        const statusLine = containers.map((c) => `${c.name} ${c.state.toUpperCase()}`).join(' | ')
         process.stdout.write(`\r${spinner} ${statusLine} (${timeStr})    `)
       },
       undefined,

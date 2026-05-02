@@ -1,8 +1,8 @@
 import path from 'path'
 
 import { logger } from '../shared/logger.js'
-
 import { YamlFile } from '../shared/yamlFile.js'
+import { unZip } from '../shared/zip.js'
 
 import { EnvironmentStore } from '../adapters/environment-store.js'
 import { ConfigStore } from '../adapters/config-store.js'
@@ -51,12 +51,14 @@ export const runInfraUpPodman = async () => {
   containers
     .filter((c) => c.name === `${projectName}-adb`)
     .forEach(async (c) => {
-      const walletDir = path.join(envDir, '.wallets', `${projectName}-adb.zip`)
-      await podman.downloadDbWalletZip(c.name, walletDir)
+      const walletPath = path.join(envDir, '.wallets', `${projectName}-adb.zip`)
+      await podman.downloadDbWalletZip(c.name, walletPath)
+      const extractDir = path.join(envDir, '.wallets', `${projectName}-adb`)
+      await unZip(walletPath, extractDir)
     })
 
   containers.forEach((c) => {
-    logger.success(`${c.name} is ${c.health.toUpperCase()}`)
+    logger.success(`${c.name} is up and running (${c.state}, ${c.status}) [${c.ports.join(', ')}]`)
   })
   logger.lf()
 }

@@ -12,7 +12,7 @@ import { registerImplodeCommand } from './commands/implode.js'
 import { registerInfraUpCommand } from './commands/infra-up.js'
 import { registerInfraDownCommand } from './commands/infra-down.js'
 import { registerDbExecCommand } from './commands/db-exec.js'
-
+import { registerStatusCommand } from './commands/status.js'
 const program = new Command()
 const environmentStore = new EnvironmentStore()
 const { projectName, currentEnv } = environmentStore.getCurrent()
@@ -26,6 +26,7 @@ logger.lf()
 
 registerSetupCommand(program)
 registerSetEnvCommand(program)
+registerStatusCommand(program)
 registerImplodeCommand(program)
 registerInfraUpCommand(program)
 registerInfraDownCommand(program)
