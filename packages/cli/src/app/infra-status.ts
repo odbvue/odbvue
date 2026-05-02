@@ -10,7 +10,7 @@ import { OciClient } from '../adapters/oci-client.js'
 
 import { runDbExec } from './db-exec.js'
 
-export const runStatus = async () => {
+export const runInfraStatus = async () => {
   const config = new ConfigStore()
   const platforms = config.getConfig().platforms
 

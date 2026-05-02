@@ -7,12 +7,16 @@ import { version } from './shared/version.js'
 import { EnvironmentStore } from './adapters/environment-store.js'
 
 import { registerSetupCommand } from './commands/setup.js'
-import { registerEnvironmentSetCommand } from './commands/environment-set.js'
 import { registerImplodeCommand } from './commands/implode.js'
+
+import { registerEnvironmentSetCommand } from './commands/environment-set.js'
+
 import { registerInfraUpCommand } from './commands/infra-up.js'
 import { registerInfraDownCommand } from './commands/infra-down.js'
+import { registerInfraStatusCommand } from './commands/infra-status.js'
+
 import { registerDbExecCommand } from './commands/db-exec.js'
-import { registerStatusCommand } from './commands/status.js'
+
 const program = new Command()
 const environmentStore = new EnvironmentStore()
 const { projectName, currentEnv } = environmentStore.getCurrent()
@@ -26,7 +30,7 @@ logger.lf()
 
 registerSetupCommand(program)
 registerEnvironmentSetCommand(program)
-registerStatusCommand(program)
+registerInfraStatusCommand(program)
 registerImplodeCommand(program)
 registerInfraUpCommand(program)
 registerInfraDownCommand(program)
