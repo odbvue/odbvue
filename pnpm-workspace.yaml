@@ -2,3 +2,4 @@ packages:
   - "db"
   - "packages/odb"
   - "packages/cli"
+  - "wiki"
