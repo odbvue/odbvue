@@ -13,7 +13,7 @@ hero:
       link: /introduction/vision
     - theme: brand
       text: Guide
-      link: /guide/overview
+      link: /guide/getting-started/overview
 
 features:
   - title: Why?

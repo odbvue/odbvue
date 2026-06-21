@@ -29,7 +29,7 @@ export default defineConfig({
       { text: 'OdbVue', link: 'https://odbvue.com' },
       { text: 'Apps', link: 'https://apps.odbvue.com' },
       { text: 'Introduction', link: '/introduction/vision' },
-      //{ text: 'Guide', link: '/guide/overview' },
+      { text: 'Guide', link: '/guide/getting-started/overview' },
       //{ text: 'Features', link: '/features/overview' },
     ],
 
@@ -44,16 +44,26 @@ export default defineConfig({
           ],
         },
       ],
-      /*
       '/guide': [
         {
           text: 'Getting Started',
           items: [
-            { text: 'Overview', link: '/guide/overview' },
-            { text: 'Prerequisites', link: '/guide/prerequisites' },
-            { text: 'Getting started', link: '/guide/getting-started' },
+            { text: 'Overview', link: '/guide/getting-started/overview' },
+            { text: 'Prerequisites', link: '/guide/getting-started/prerequisites' },
+            { text: 'Getting started', link: '/guide/getting-started/getting-started' },
           ],
         },
+        {
+          text: 'Wiki',
+          items: [
+            { text: 'Setting up VitePress', link: '/guide/wiki/setting-up-vitepress' },
+            { text: 'VitePress configuration', link: '/guide/wiki/vitepress-configuration' },
+            { text: 'Custom Markdown Extensions', link: '/guide/wiki/custom-markdown' },
+          ],
+        },
+      ],
+      /*
+      '/guide': [
         {
           text: 'Apis',
           items: [
