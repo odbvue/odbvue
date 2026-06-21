@@ -4,7 +4,7 @@
 
 VitePress provides a variety of [Site Configuration Options](https://vitepress.dev/reference/site-config).
 
-As per current setup, public assets need to ne placed in `./wiki/` folder to be correctly applied. For example, place logo and favicon in `./wiki/public/` folder and reference in `./apps/.vitepress/config.ts` like this:
+As per current setup, public assets need to be placed in `./wiki/` to be correctly applied. For example, place the logo and favicon in `./wiki/public/` and reference them in `./wiki/.vitepress/config.ts` like this:
 
 ```ts{4,6}
 export default defineConfig({
@@ -21,17 +21,17 @@ export default defineConfig({
 
 ## Navigation structure
 
-It is possible to create quite complex and nested content. Check constructions of `nav` and `sidebar` in `./apps/.vitepress/config.ts` as well as [Theme Configuration Options](https://vitepress.dev/reference/default-theme-config).
+It is possible to create quite complex and nested content. Check the `nav` and `sidebar` configuration in `./wiki/.vitepress/config.ts` as well as [Theme Configuration Options](https://vitepress.dev/reference/default-theme-config).
 
 ## Home page
 
-Home page `./wiki/index.md` can be customized using [FrontMatter](https://vitepress.dev/reference/frontmatter-config).
+Home page `./wiki/pages/index.md` can be customized using [FrontMatter](https://vitepress.dev/reference/frontmatter-config).
 
-Styling can be customize in `./apps/.vitepress/theme/style.css`
+Styling can be customized in `./wiki/.vitepress/theme/style.css`
 
 ## Local search
 
-Local search can be enabled in `/apps/.vitepress/config.ts`
+Local search can be enabled in `/wiki/.vitepress/config.ts`
 
 ```ts{6-8}
 export default defineConfig({

@@ -4,6 +4,7 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "noEmit": false,
+    "declaration": true,
     "types": ["node"]
   },
   "include": ["src/**/*.ts"]

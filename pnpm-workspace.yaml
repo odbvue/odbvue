@@ -1,5 +1,6 @@
 packages:
-  - "db"
+  - "apps/web"
+  - "apps/db"
   - "packages/odb"
-  - "packages/cli"
+  - "cli"
   - "wiki"

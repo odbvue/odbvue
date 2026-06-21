@@ -38,15 +38,15 @@ OdbVue is a full-stack application template combining **Oracle Database** backen
 
 ### Repository Structure
 
-| Folder  | Purpose                                                 |
-| ------- | ------------------------------------------------------- |
-| `apps/` | Vue.js SPA application with Vuetify UI components       |
-| `db/`   | Oracle Database schema, PL/SQL packages, and migrations |
-| `cli/`  | Command-line tools for development workflow             |
-| `main/` | Static landing page template                            |
-| `i13e/` | Infrastructure configurations (local & OCI cloud)       |
+| Folder      | Purpose                                           |
+| ----------- | ------------------------------------------------- |
+| `apps/web/` | Vue.js SPA application with Vuetify UI components |
+| `apps/db/`  | Oracle Database schema and migrations             |
+| `cli/`      | Command-line tools for development workflow       |
+| `main/`     | Static landing page template                      |
+| `i13e/`     | Infrastructure configurations (local & OCI cloud) |
 
-### Frontend Architecture (apps/)
+### Frontend Architecture (apps/web/)
 
 Built with modern Vue 3 ecosystem:
 
@@ -84,7 +84,7 @@ src/
 | `VOvMap`    | Google Maps integration |
 | `VOvTable`  | Data tables             |
 
-### Backend Architecture (db/)
+### Backend Architecture (apps/db/)
 
 Oracle Database with PL/SQL business logic exposed via ORDS:
 

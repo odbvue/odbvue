@@ -19,7 +19,7 @@ pnpm i --save-dev @types/markdown-it
 <<< ../../../.vitepress/markdown-it-video.ts
 :::
 
-2. Include extension in `/apps/.vitepress/config.ts`
+2. Include extension in `/wiki/.vitepress/config.ts`
 
 ```ts{2,8-12}
 import { defineConfig } from "vitepress"

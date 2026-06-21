@@ -49,27 +49,27 @@ pnpm vitepress init
 └  Done! Now run pnpm run wiki:dev and start writing.
 ```
 
-This will create all vitepress configuration in `./apps/.vitpress/`, but the documentation content in a root level `./apps/wiki/`.
+This will create all vitepress configuration in `./wiki/.vitepress/`, with the documentation content under the root-level `./wiki/pages/` folder.
 
-3. Exclude vitepress cache from being put in source control by adding to `./apps/.gitignore`
+3. Exclude vitepress cache from being put in source control by adding to `./wiki/.gitignore`
 
 ```
 .vitepress/cache/
 ```
 
-4. Apply prettier formatting to vitepress by modifying `./apps/package.json`
+4. Apply prettier formatting to vitepress by modifying `./wiki/package.json`
 
 ```
     "format": "prettier --write src/ .vitepress/",
 ```
 
-5. Exclude vitepress cache from linting by modifying `./apps/eslint.config.ts`
+5. Exclude vitepress cache from linting by modifying the relevant lint configuration for `./wiki/`
 
 ```
   globalIgnores(['**/dist/**', '**/dist-ssr/**', '**/coverage/**', '**/cache/**']),
 ```
 
-6. For now disable linting errors in theme customization `./apps/.vitepress/theme/index.ts`
+6. For now disable linting errors in theme customization `./wiki/.vitepress/theme/index.ts`
 
 ```ts{14}
 // https://vitepress.dev/guide/custom-theme
