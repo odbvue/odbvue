@@ -15,7 +15,10 @@ import { registerInfraUpCommand } from './commands/infra-up.js'
 import { registerInfraDownCommand } from './commands/infra-down.js'
 import { registerInfraStatusCommand } from './commands/infra-status.js'
 
+import { registerDbScaffoldCommand } from './commands/db-scaffold.js'
 import { registerDbExecCommand } from './commands/db-exec.js'
+import { registerDbUpCommand } from './commands/db-up.js'
+import { registerDbDownCommand } from './commands/db-down.js'
 
 const program = new Command()
 const environmentStore = new EnvironmentStore()
@@ -29,12 +32,18 @@ if (currentEnv) logger.msg(`Environment: ${currentEnv}`)
 logger.lf()
 
 registerSetupCommand(program)
-registerEnvironmentSetCommand(program)
-registerInfraStatusCommand(program)
 registerImplodeCommand(program)
+
+registerEnvironmentSetCommand(program)
+
 registerInfraUpCommand(program)
 registerInfraDownCommand(program)
+registerInfraStatusCommand(program)
+
 registerDbExecCommand(program)
+registerDbScaffoldCommand(program)
+registerDbUpCommand(program)
+registerDbDownCommand(program)
 
 program.parse(process.argv)
 

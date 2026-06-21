@@ -274,6 +274,17 @@ export class OciClient {
     )
   }
 
+  async startAdbInstance(autonomousDatabaseId: string): Promise<void> {
+    try {
+      const databaseClient = new database.DatabaseClient({
+        authenticationDetailsProvider: this.provider,
+      })
+      await databaseClient.startAutonomousDatabase({ autonomousDatabaseId })
+    } catch (err) {
+      this.showError(err)
+    }
+  }
+
   async deleteAdbInstance(autonomousDatabaseId: string): Promise<void> {
     try {
       const databaseClient = new database.DatabaseClient({

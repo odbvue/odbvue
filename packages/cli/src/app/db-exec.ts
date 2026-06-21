@@ -44,18 +44,24 @@ const dbmsOutput = async (connection: oracledb.Connection): Promise<string[]> =>
   return lines
 }
 
-interface DbExecResponse {
+export type DbExecResponse = {
   dbms_output?: string[]
   rows?: unknown[]
   durationMs?: number
 }
 
-export const runDbExec = async (statement: string, silent: boolean = true) => {
+const runDbExecStatement = async (
+  statements: string | string[],
+  silent: boolean = true,
+  fastFail: boolean = true,
+) => {
+  const totalStartTime = Date.now()
   let response: DbExecResponse = {}
-  const startTime = Date.now()
+  let responses: DbExecResponse[] = []
+  const statementCount = Array.isArray(statements) ? statements.length : 1
 
-  if (!silent) logger.info(`Executing SQL statement...`)
-  if (!silent) logger.muted(`  ${statement.substring(0, 2000)}`)
+  if (!silent)
+    logger.info(statementCount == 1 ? `Executing SQL statement...` : `Executing SQL statements...`)
 
   const { envDir, projectName } = new EnvironmentStore().getCurrent()
   const walletPath = path.join(envDir, '.wallets', `${projectName}-adb.zip`)
@@ -69,8 +75,8 @@ export const runDbExec = async (statement: string, silent: boolean = true) => {
   if (!silent) logger.info(`Using connection string ${connectString} from ${tnsPath}`)
 
   const secrets = new SecretsStore()
-  const password = secrets.get('ODBVUE_ADMIN_PASSWORD')
-  const walletPassword = secrets.get('ODBVUE_WALLET_PASSWORD')
+  const password = secrets.get('ODBVUE_ADB_ADMIN_PASSWORD')
+  const walletPassword = secrets.get('ODBVUE_ADB_WALLET_PASSWORD')
   const envFilePath = path.join(envDir, '.env')
   if (!silent) logger.info(`Using ADMIN password from ${envFilePath}`)
 
@@ -97,28 +103,46 @@ export const runDbExec = async (statement: string, silent: boolean = true) => {
       logger.warn('Could not enable DBMS_OUTPUT')
     }
 
-    const result = await connection.execute(statement)
+    for (const statement of Array.isArray(statements) ? statements : [statements]) {
+      response = {}
+      const startTime = Date.now()
+      if (!silent)
+        logger.muted(`  ${statement.substring(0, 77)}${statement.length > 77 ? '...' : ''}`)
 
-    try {
-      const output = await dbmsOutput(connection)
-      if (output.length > 0) {
-        response.dbms_output = output
-        if (!silent) logger.info('DBMS OUTPUT:')
-        if (!silent)
-          output.forEach((line) => {
-            if (!silent) logger.msg(line)
-          })
+      try {
+        const result = await connection.execute(statement.trim().replace(/;$/, ''))
+        try {
+          const output = await dbmsOutput(connection)
+          if (output.length > 0) {
+            response.dbms_output = output
+            if (!silent) logger.info('DBMS OUTPUT:')
+            if (!silent)
+              output.forEach((line) => {
+                if (!silent) logger.msg(line)
+              })
+          }
+        } catch {
+          logger.warn('Could not retrieve DBMS_OUTPUT')
+        }
+
+        if (!silent) logger.info('Query result:')
+        if (result.rows && result.rows.length > 0) {
+          response.rows = result.rows
+          if (!silent) console.table(result.rows)
+        } else {
+          if (!silent) logger.muted('No rows returned')
+        }
+        await connection.commit()
+      } catch (error) {
+        if (fastFail) {
+          fatalError(`Failed to execute statement: ${error}`)
+        } else {
+          logger.error(`Failed to execute statement: ${error}`)
+        }
+        await connection.rollback()
       }
-    } catch {
-      logger.warn('Could not retrieve DBMS_OUTPUT')
-    }
-
-    if (!silent) logger.info('Query result:')
-    if (result.rows && result.rows.length > 0) {
-      response.rows = result.rows
-      if (!silent) console.table(result.rows)
-    } else {
-      if (!silent) logger.muted('No rows returned')
+      response.durationMs = Date.now() - startTime
+      responses.push(response)
     }
   } catch (error) {
     fatalError(`Failed to connect to database: ${error}`)
@@ -127,9 +151,104 @@ export const runDbExec = async (statement: string, silent: boolean = true) => {
       await connection.close()
     }
   }
-
-  response.durationMs = Date.now() - startTime
-  if (!silent) logger.info(`Execution completed in ${response.durationMs} ms`)
+  if (!silent) logger.info(`Execution completed in ${Date.now() - totalStartTime} ms`)
   if (!silent) logger.lf()
-  return response
+  return responses
+}
+
+const splitSqlStatements = (sql: string): string[] => {
+  const statements: string[] = []
+
+  let current = ''
+  let inSingleQuote = false
+  let inDoubleQuote = false
+  let inLineComment = false
+  let inBlockComment = false
+
+  for (let i = 0; i < sql.length; i++) {
+    const char = sql[i]
+    const next = sql[i + 1]
+
+    if (!inSingleQuote && !inDoubleQuote && !inBlockComment) {
+      if (!inLineComment && char === '-' && next === '-') {
+        inLineComment = true
+      }
+
+      if (inLineComment) {
+        current += char
+
+        if (char === '\n') {
+          inLineComment = false
+        }
+
+        continue
+      }
+    }
+
+    if (!inSingleQuote && !inDoubleQuote && !inLineComment) {
+      if (!inBlockComment && char === '/' && next === '*') {
+        inBlockComment = true
+      }
+
+      if (inBlockComment) {
+        current += char
+
+        if (char === '*' && next === '/') {
+          current += next
+          i++
+          inBlockComment = false
+        }
+
+        continue
+      }
+    }
+
+    if (!inDoubleQuote && char === "'") {
+      inSingleQuote = !inSingleQuote
+      current += char
+      continue
+    }
+
+    if (!inSingleQuote && char === '"') {
+      inDoubleQuote = !inDoubleQuote
+      current += char
+      continue
+    }
+
+    if (char === ';' && !inSingleQuote && !inDoubleQuote && !inLineComment && !inBlockComment) {
+      const trimmed = current.trim()
+
+      if (trimmed) {
+        statements.push(trimmed)
+      }
+
+      current = ''
+      continue
+    }
+
+    current += char
+  }
+
+  const trimmed = current.trim()
+
+  if (trimmed) {
+    statements.push(trimmed)
+  }
+
+  return statements
+}
+
+export const runDbExec = async (
+  statement: string,
+  silent: boolean = true,
+  fastFail: boolean = true,
+) => {
+  if (fs.existsSync(statement)) {
+    const fileContent = fs.readFileSync(statement, 'utf-8')
+    logger.muted(`  ${statement}`)
+    const statements = splitSqlStatements(fileContent)
+    return await runDbExecStatement(statements, silent, fastFail)
+  }
+
+  return await runDbExecStatement(statement, silent, fastFail)
 }

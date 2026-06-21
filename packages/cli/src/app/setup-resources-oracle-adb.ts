@@ -152,11 +152,27 @@ export const runSetupOracleAdb = async () => {
       initial: INITIAL_PASSWORD,
       validate: passwordValidation,
     },
+    {
+      type: 'text',
+      name: 'schemaUsername',
+      message: 'Schema username',
+      initial: `${projectName}`,
+      validate: (value) => (value.trim() ? true : 'This field is required'),
+    },
+    {
+      type: 'password',
+      name: 'schemaPassword',
+      message: 'Schema password',
+      initial: INITIAL_PASSWORD,
+      validate: passwordValidation,
+    },
   ])
 
   const secretsStore = new SecretsStore()
-  secretsStore.set('ODBVUE_ADMIN_PASSWORD', credentials.adminPassword)
-  secretsStore.set('ODBVUE_WALLET_PASSWORD', credentials.walletPassword)
+  secretsStore.set('ODBVUE_ADB_ADMIN_PASSWORD', credentials.adminPassword)
+  secretsStore.set('ODBVUE_ADB_WALLET_PASSWORD', credentials.walletPassword)
+  secretsStore.set('ODBVUE_ADB_SCHEMA_USERNAME', credentials.schemaUsername)
+  secretsStore.set('ODBVUE_ADB_SCHEMA_PASSWORD', credentials.schemaPassword)
 
   logger.lf()
 }

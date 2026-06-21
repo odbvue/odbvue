@@ -24,6 +24,8 @@ export class EnvFile {
     fs.writeFileSync(this.path, content)
   }
 
+  entries = (): Record<string, string> => this.readFile()
+
   get = (key: string): string | undefined => this.readFile()[key]
 
   set = (key: string, value: string) => {

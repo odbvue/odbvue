@@ -8,6 +8,6 @@ export const registerDbExecCommand = (program: Command) => {
     .alias('de')
     .description('Execute a SQL statement in the database')
     .action(async (statement: string) => {
-      await runDbExec(statement, false)
+      await runDbExec(statement, false, true)
     })
 }

@@ -10,6 +10,12 @@ import { OciClient } from '../adapters/oci-client.js'
 
 import { runDbExec } from './db-exec.js'
 
+type DbStatusResponse = {
+  rows?: {
+    status: string
+  }[]
+}
+
 export const runInfraStatus = async () => {
   const config = new ConfigStore()
   const platforms = config.getConfig().platforms
@@ -69,7 +75,7 @@ export const runInfraStatus = async () => {
       logger.muted('Check:')
       const statement = `SELECT 'OK' AS "status" FROM dual`
       const response = await runDbExec(statement, true)
-      const status = (response.rows?.[0] as { status: string })?.['status'] ?? 'UNKNOWN'
+      const status = (response as DbStatusResponse[])[0]?.rows?.[0]?.status ?? 'UNKNOWN'
       logger.muted(`  - status: ${status}`)
       if (status === 'OK') {
         logger.success('Oracle ADB service is reachable')

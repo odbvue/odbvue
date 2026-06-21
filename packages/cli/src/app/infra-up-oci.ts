@@ -36,8 +36,10 @@ export const runInfraUpOci = async () => {
         logger.warn(`${service.service} already exists and is available.`)
       } else {
         logger.warn(
-          `${service.service} already exists (state: ${existing.lifecycleState}). Waiting for it to become available...`,
+          `${service.service} already exists (state: ${existing.lifecycleState}). Starting it...`,
         )
+        await ociClient.startAdbInstance(existing.id!)
+        logger.info(`Waiting for ${service.service} to become available...`)
         await ociClient.waitForAdbAvailable(existing.id!)
         logger.success(`${service.service} is available.`)
       }
@@ -45,7 +47,7 @@ export const runInfraUpOci = async () => {
     } else {
       logger.info(`Deploying ${service.service}...`)
       const secrets = new SecretsStore()
-      const password = secrets.get('ODBVUE_WALLET_PASSWORD') || ''
+      const password = secrets.get('ODBVUE_ADB_WALLET_PASSWORD') || ''
       adbId = await ociClient.createAdbInstance(
         service.service,
         password,
@@ -58,7 +60,7 @@ export const runInfraUpOci = async () => {
     }
 
     const secrets = new SecretsStore()
-    const password = secrets.get('ODBVUE_WALLET_PASSWORD') || ''
+    const password = secrets.get('ODBVUE_ADB_WALLET_PASSWORD') || ''
 
     const walletDir = path.join(envDir, '.wallets', `${service.service}.zip`)
     logger.info(`Downloading wallet for ${service.service} to ${walletDir}...`)

@@ -1,0 +1,178 @@
+import { Column, type ColumnNode, type ColumnOptions, type ColumnType } from './column.js'
+
+export type IndexNode = {
+  kind: 'index'
+  name: string
+  columns: string[]
+  unique?: boolean
+}
+
+export type TableNode = {
+  kind: 'table'
+  name: string
+  columns: ColumnNode[]
+  indexes: IndexNode[]
+}
+
+export type TableSqlOptions = {
+  schema?: string
+}
+
+export class Table {
+  private columns: Column[] = []
+  private indexes: IndexNode[] = []
+
+  constructor(readonly name: string) {}
+
+  column(name: string, type: ColumnType, options: ColumnOptions = {}): Column {
+    const column = new Column(name, type, options)
+    this.columns.push(column)
+    return column
+  }
+
+  string(name: string, length = 255): Column {
+    return this.column(name, 'string', { length })
+  }
+
+  number(name: string): Column {
+    return this.column(name, 'number')
+  }
+
+  guid(name: string): Column {
+    return this.column(name, 'guid')
+  }
+
+  boolean(name: string): Column {
+    return this.column(name, 'boolean')
+  }
+
+  timestamp(name: string): Column {
+    return this.column(name, 'timestamp')
+  }
+
+  clob(name: string): Column {
+    return this.column(name, 'clob')
+  }
+
+  index(name: string, columns: string[]): this {
+    this.indexes.push({
+      kind: 'index',
+      name,
+      columns,
+    })
+
+    return this
+  }
+
+  unique(name: string, columns: string[]): this {
+    this.indexes.push({
+      kind: 'index',
+      name,
+      columns,
+      unique: true,
+    })
+
+    return this
+  }
+
+  toNode(): TableNode {
+    return {
+      kind: 'table',
+      name: this.name,
+      columns: this.columns.map((c) => c.toNode()),
+      indexes: [...this.indexes],
+    }
+  }
+
+  toObject() {
+    return this.toNode()
+  }
+
+  toSQLUp(options: TableSqlOptions = {}): string {
+    return emitOracleCreateTable(this.toNode(), options)
+  }
+
+  toSQLDown(options: TableSqlOptions = {}): string {
+    return emitOracleDropTable(this.name, options.schema)
+  }
+}
+
+function emitOracleCreateTable(table: TableNode, options: TableSqlOptions = {}): string {
+  const columnSql = table.columns.map(emitOracleColumn)
+  const tableName = qualifyName(table.name, options.schema)
+
+  const primaryKeys = table.columns.filter((c) => c.options.primaryKey).map((c) => c.name)
+
+  if (primaryKeys.length > 0) {
+    columnSql.push(`CONSTRAINT pk_${table.name} PRIMARY KEY (${primaryKeys.join(', ')})`)
+  }
+
+  return [
+    `CREATE TABLE ${tableName} (`,
+    `  ${columnSql.join(',\n  ')}`,
+    `);`,
+    ...table.indexes.map((index) => emitOracleIndex(table.name, index, options)),
+  ].join('\n')
+}
+
+function emitOracleDropTable(table: TableNode | string, schema?: string): string {
+  const tableName = typeof table === 'string' ? table : table.name
+  return `DROP TABLE ${qualifyName(tableName, schema)} CASCADE CONSTRAINTS;`
+}
+
+function emitOracleColumn(column: ColumnNode): string {
+  const parts = [column.name, emitOracleType(column)]
+
+  if (column.options.default === 'sys_guid') {
+    parts.push('DEFAULT SYS_GUID()')
+  } else if (column.options.default === 'current_timestamp') {
+    parts.push('DEFAULT CURRENT_TIMESTAMP')
+  } else if (column.options.default) {
+    parts.push(`DEFAULT ${column.options.default}`)
+  }
+
+  if (column.options.nullable === false) {
+    parts.push('NOT NULL')
+  }
+
+  return parts.join(' ')
+}
+
+function emitOracleType(column: ColumnNode): string {
+  switch (column.type) {
+    case 'string':
+      return `VARCHAR2(${column.options.length ?? 255} CHAR)`
+    case 'number':
+      return 'NUMBER'
+    case 'guid':
+      return 'RAW(16)'
+    case 'boolean':
+      return 'NUMBER(1)'
+    case 'date':
+      return 'DATE'
+    case 'timestamp':
+      return 'TIMESTAMP(6)'
+    case 'clob':
+      return 'CLOB'
+  }
+}
+
+function emitOracleIndex(
+  tableName: string,
+  index: IndexNode,
+  options: TableSqlOptions = {},
+): string {
+  const unique = index.unique ? 'UNIQUE ' : ''
+
+  return `CREATE ${unique}INDEX ${qualifyName(index.name, options.schema)} ON ${qualifyName(tableName, options.schema)} (${index.columns.join(', ')});`
+}
+
+function qualifyName(name: string, schema?: string): string {
+  return schema ? `${schema}.${name}` : name
+}
+
+export function odbTable(name: string, build?: (table: Table) => void): Table {
+  const t = new Table(name)
+  build?.(t)
+  return t
+}

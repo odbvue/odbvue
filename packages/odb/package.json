@@ -1,0 +1,25 @@
+{
+  "name": "@odbvue/odb",
+  "description": "OdbVue ADB",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "format": "oxfmt",
+    "lint": "oxlint",
+    "type-check": "tsc -p tsconfig.json --noEmit",
+    "check": "pnpm format && pnpm lint && pnpm type-check"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^24.9.1"
+  }
+}

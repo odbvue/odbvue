@@ -27,8 +27,8 @@ export const runInfraUpPodman = async () => {
         ports: [`${service.spec.listenerPort}:1522`, `${service.spec.ordsPort}:8443`],
         environment: {
           WORKLOAD_TYPE: 'ATP',
-          ADMIN_PASSWORD: '${ODBVUE_ADMIN_PASSWORD}',
-          WALLET_PASSWORD: '${ODBVUE_WALLET_PASSWORD}',
+          ADMIN_PASSWORD: '${ODBVUE_ADB_ADMIN_PASSWORD}',
+          WALLET_PASSWORD: '${ODBVUE_ADB_WALLET_PASSWORD}',
         },
         cap_add: ['SYS_ADMIN'],
         devices: ['/dev/fuse:/dev/fuse'],
