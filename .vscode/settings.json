@@ -1,12 +1,14 @@
 {
     "postman.settings.dotenv-detection-notification-visibility": false,
     "cSpell.words": [
-        "odbvue"
+        "autoimport",
+        "odbvue",
+        "vuetify"
     ],
     "explorer.fileNesting.enabled": true,
     "explorer.fileNesting.patterns": {
         "tsconfig.json": "tsconfig.*.json, env.d.ts, typed-router.d.ts",
-        "vite.config.*": "jsconfig*, vitest.config.*, cypress.config.*, playwright.config.*",
+        "vite.config.*": "jsconfig*, vitest.config.*, cypress.config.*, playwright.config.*, vite-plugin-*",
         "package.json": "package-lock.json, pnpm*, .yarnrc*, yarn*, .eslint*, eslint*, .oxlint*, oxlint*, .oxfmt*, .prettier*, prettier*, .editorconfig"
     }
 }

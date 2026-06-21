@@ -3,8 +3,10 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import VueRouter from 'vue-router/vite'
 import vue from '@vitejs/plugin-vue'
+import Vuetify from 'vite-plugin-vuetify'
 import Markdown from 'unplugin-vue-markdown/vite'
 import vueDevTools from 'vite-plugin-vue-devtools'
+import { AutoImportMdiIcons } from './vite-plugin-autoimport-mdi-icons.ts'
 
 import { readFile } from 'node:fs/promises'
 import matter from 'gray-matter'
@@ -39,7 +41,9 @@ export default defineConfig({
     vue({
       include: [/\.vue$/, /\.md$/],
     }),
+    Vuetify(),
     Markdown({}),
+    AutoImportMdiIcons({}),
     vueDevTools(),
   ],
   resolve: {

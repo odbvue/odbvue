@@ -58,6 +58,7 @@ export default defineConfig({
           items: [
             { text: 'Setting up VueJs', link: '/guide/apps/setting-up-vuejs' },
             { text: 'File based routing', link: '/guide/apps/file-based-routing' },
+            { text: 'UI Component Framework', link: '/guide/apps/ui-component-framework' },
           ],
         },
         {
@@ -108,7 +109,6 @@ export default defineConfig({
         {
           text: 'Apps',
           items: [
-            { text: 'UI Component Framework', link: '/guide/apps/ui-component-framework' },
             { text: 'Internationalization', link: '/guide/apps/i18n' },
             { text: 'State Management', link: '/guide/apps/state-management' },
             { text: 'Auto imports', link: '/guide/apps/auto-imports' },
