@@ -7,7 +7,7 @@
     ],
     "explorer.fileNesting.enabled": true,
     "explorer.fileNesting.patterns": {
-        "tsconfig.json": "tsconfig.*.json, env.d.ts, typed-router.d.ts",
+        "tsconfig.json": "tsconfig.*.json, env.d.ts, typed-router.d.ts, auto-imports.d.ts, components.d.ts",
         "vite.config.*": "jsconfig*, vitest.config.*, cypress.config.*, playwright.config.*, vite-plugin-*",
         "package.json": "package-lock.json, pnpm*, .yarnrc*, yarn*, .eslint*, eslint*, .oxlint*, oxlint*, .oxfmt*, .prettier*, prettier*, .editorconfig"
     }

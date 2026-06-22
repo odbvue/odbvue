@@ -9,6 +9,8 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 import { AutoImportMdiIcons } from './vite-plugin-autoimport-mdi-icons.ts'
 import { i18nDevPlugin } from './vite-plugin-i18n.ts'
+import AutoImport from 'unplugin-auto-import/vite'
+import Components from 'unplugin-vue-components/vite'
 
 import { readFile } from 'node:fs/promises'
 import matter from 'gray-matter'
@@ -57,6 +59,29 @@ export default defineConfig({
       dumpInterval: 300_000,
       i18nDir: 'i18n',
     }),
+    AutoImport({
+      imports: [
+        'vue',
+        'vue-router',
+        'vue-i18n',
+        {
+          from: 'vuetify',
+          imports: [
+            'useDisplay',
+            'useDate',
+            'useDefaults',
+            'useDisplay',
+            'useGoTo',
+            'useLayout',
+            'useLocale',
+            'useRtl',
+            'useTheme',
+          ],
+        },
+      ],
+      dirs: ['./src/composables/**', './src/stores/**'],
+    }),
+    Components({}),
     vueDevTools(),
   ],
   resolve: {

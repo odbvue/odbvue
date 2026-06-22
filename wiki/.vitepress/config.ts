@@ -61,6 +61,7 @@ export default defineConfig({
             { text: 'UI Component Framework', link: '/guide/apps/ui-component-framework' },
             { text: 'Internationalization', link: '/guide/apps/i18n' },
             { text: 'State Management', link: '/guide/apps/state-management' },
+            { text: 'Auto imports', link: '/guide/apps/auto-imports' },
           ],
         },
         {
@@ -111,7 +112,6 @@ export default defineConfig({
         {
           text: 'Apps',
           items: [
-            { text: 'Auto imports', link: '/guide/apps/auto-imports' },
             { text: 'Layouts', link: '/guide/apps/layouts' },
             { text: 'Application Features', link: '/guide/apps/application-features' },
             {

@@ -7,12 +7,10 @@
       <v-btn @click="locale = 'fr'">fr</v-btn>
     </v-card-actions>
   </v-card>
+  <test-component />
 </template>
 
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-import { useAppStore } from '@/stores'
-
 const app = useAppStore()
 const { locale, t } = useI18n()
 </script>
