@@ -10,6 +10,10 @@
   <test-component />
 </template>
 
+<route>
+  { meta: { layout: 'fullscreen' } }
+</route>
+
 <script setup lang="ts">
 const app = useAppStore()
 const { locale, t } = useI18n()

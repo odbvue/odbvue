@@ -1,12 +1,46 @@
 <template>
-  <v-container>
-    <router-link to="/">Home</router-link>
-    |
-    <router-link to="/about">About</router-link>
-    |
-    <router-link to="/sandbox">Sandbox</router-link>
-    <br />
-    <br />
-    <router-view />
-  </v-container>
+  <RouterLink to="/">Home</RouterLink>
+  |
+  <RouterLink to="/about">About</RouterLink>
+  |
+  <RouterLink to="/sandbox">Sandbox</RouterLink>
+
+  <component :is="LayoutComponent">
+    <RouterView />
+  </component>
 </template>
+
+<script setup lang="ts">
+const layoutModules = import.meta.glob('./layouts/*.vue')
+
+function extractName(path: string) {
+  return path
+    .split('/')
+    .pop()
+    ?.replace(/\.\w+$/, '')
+    .replace(/Layout$/i, '')
+    .toLowerCase()
+}
+
+const availableLayouts: Record<string, () => Promise<Record<string, unknown>>> = {}
+for (const path in layoutModules) {
+  const name = extractName(path)
+  if (name) {
+    availableLayouts[name] = layoutModules[path] as () => Promise<Record<string, unknown>>
+  }
+}
+
+const route = useRoute()
+
+const LayoutComponent = computed(() => {
+  const name = (route.meta?.layout as string) || 'default'
+  const key = name.toLowerCase()
+
+  const loader = availableLayouts[key]
+  if (!loader) {
+    throw new Error(`[Layout] Missing layout: ${name}`)
+  }
+
+  return defineAsyncComponent(loader)
+})
+</script>
