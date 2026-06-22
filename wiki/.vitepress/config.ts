@@ -60,6 +60,7 @@ export default defineConfig({
             { text: 'File based routing', link: '/guide/apps/file-based-routing' },
             { text: 'UI Component Framework', link: '/guide/apps/ui-component-framework' },
             { text: 'Internationalization', link: '/guide/apps/i18n' },
+            { text: 'State Management', link: '/guide/apps/state-management' },
           ],
         },
         {
@@ -110,7 +111,6 @@ export default defineConfig({
         {
           text: 'Apps',
           items: [
-            { text: 'State Management', link: '/guide/apps/state-management' },
             { text: 'Auto imports', link: '/guide/apps/auto-imports' },
             { text: 'Layouts', link: '/guide/apps/layouts' },
             { text: 'Application Features', link: '/guide/apps/application-features' },
