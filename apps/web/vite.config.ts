@@ -6,7 +6,9 @@ import vue from '@vitejs/plugin-vue'
 import Vuetify from 'vite-plugin-vuetify'
 import Markdown from 'unplugin-vue-markdown/vite'
 import vueDevTools from 'vite-plugin-vue-devtools'
+import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 import { AutoImportMdiIcons } from './vite-plugin-autoimport-mdi-icons.ts'
+import { i18nDevPlugin } from './vite-plugin-i18n.ts'
 
 import { readFile } from 'node:fs/promises'
 import matter from 'gray-matter'
@@ -44,6 +46,17 @@ export default defineConfig({
     Vuetify(),
     Markdown({}),
     AutoImportMdiIcons({}),
+    VueI18nPlugin({
+      include: [
+        fileURLToPath(new URL('./src/i18n/**', import.meta.url)),
+        fileURLToPath(new URL('./src/pages/**/i18n/**', import.meta.url)),
+      ],
+    }),
+    i18nDevPlugin({
+      locales: ['en', 'fr'],
+      dumpInterval: 300_000,
+      i18nDir: 'i18n',
+    }),
     vueDevTools(),
   ],
   resolve: {

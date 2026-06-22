@@ -19,10 +19,12 @@
     "@mdi/js": "^7.4.47",
     "pinia": "^3.0.4",
     "vue": "^3.5.38",
+    "vue-i18n": "^11.4.6",
     "vue-router": "^5.1.0",
     "vuetify": "^4.1.2"
   },
   "devDependencies": {
+    "@intlify/unplugin-vue-i18n": "^11.2.4",
     "@playwright/test": "^1.61.0",
     "@tsconfig/node24": "^24.0.4",
     "@types/jsdom": "^28.0.3",
