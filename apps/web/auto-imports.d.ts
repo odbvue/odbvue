@@ -18,6 +18,7 @@ declare global {
   const getCurrentWatcher: typeof import('vue').getCurrentWatcher
   const h: typeof import('vue').h
   const inject: typeof import('vue').inject
+  const injectHead: typeof import('@unhead/vue').injectHead
   const isProxy: typeof import('vue').isProxy
   const isReactive: typeof import('vue').isReactive
   const isReadonly: typeof import('vue').isReadonly
@@ -54,6 +55,7 @@ declare global {
   const toRefs: typeof import('vue').toRefs
   const toValue: typeof import('vue').toValue
   const triggerRef: typeof import('vue').triggerRef
+  const undefined: typeof import('vuetify').undefined
   const unref: typeof import('vue').unref
   const useAppStore: typeof import('./src/stores/index').useAppStore
   const useAttrs: typeof import('vue').useAttrs
@@ -63,6 +65,8 @@ declare global {
   const useDefaults: typeof import('vuetify').useDefaults
   const useDisplay: typeof import('vuetify').useDisplay
   const useGoTo: typeof import('vuetify').useGoTo
+  const useHead: typeof import('@unhead/vue').useHead
+  const useHeadSafe: typeof import('@unhead/vue').useHeadSafe
   const useI18n: typeof import('vue-i18n').useI18n
   const useId: typeof import('vue').useId
   const useLayout: typeof import('vuetify').useLayout
@@ -72,6 +76,7 @@ declare global {
   const useRoute: typeof import('vue-router').useRoute
   const useRouter: typeof import('vue-router').useRouter
   const useRtl: typeof import('vuetify').useRtl
+  const useSeoMeta: typeof import('@unhead/vue').useSeoMeta
   const useSettingsStore: typeof import('./src/stores/settings').useSettingsStore
   const useSlots: typeof import('vue').useSlots
   const useTemplateRef: typeof import('vue').useTemplateRef

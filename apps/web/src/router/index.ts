@@ -6,6 +6,12 @@ const router = createRouter({
   routes,
 })
 
+router.beforeEach(async (_to) => {
+  const appTitle = useAppStore().title || 'OdbVue'
+  useHead({ title: appTitle })
+  return true
+})
+
 export default router
 
 if (import.meta.hot) {

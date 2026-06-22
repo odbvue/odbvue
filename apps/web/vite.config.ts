@@ -11,6 +11,7 @@ import { AutoImportMdiIcons } from './vite-plugin-autoimport-mdi-icons.ts'
 import { i18nDevPlugin } from './vite-plugin-i18n.ts'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
+import { unheadVueComposablesImports } from '@unhead/vue'
 
 import { readFile } from 'node:fs/promises'
 import matter from 'gray-matter'
@@ -78,6 +79,7 @@ export default defineConfig({
             'useTheme',
           ],
         },
+        unheadVueComposablesImports,
       ],
       dirs: ['./src/composables/**', './src/stores/**'],
     }),

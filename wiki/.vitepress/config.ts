@@ -66,7 +66,13 @@ export default defineConfig({
             {
               text: 'Application Features',
               collapsed: true,
-              items: [{ text: 'Default Layout', link: '/guide/apps/default-layout' }],
+              items: [
+                { text: 'Default Layout', link: '/guide/apps/application-features/default-layout' },
+                {
+                  text: 'Title and version',
+                  link: '/guide/apps/application-features/title-and-version',
+                },
+              ],
             },
           ],
         },

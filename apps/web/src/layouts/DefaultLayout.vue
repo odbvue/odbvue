@@ -14,7 +14,7 @@
     </v-navigation-drawer>
     <v-app-bar>
       <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
-      <v-toolbar-title>OdbVue</v-toolbar-title>
+      <v-toolbar-title>{{ appStore.title }}</v-toolbar-title>
     </v-app-bar>
     <v-main class="ma-4">
       <slot />
@@ -22,7 +22,7 @@
     <v-footer app>
       <v-row>
         <v-col>
-          <span class="text-caption">v1.0.0</span>
+          <span class="text-caption">v{{ appStore.version }}</span>
         </v-col>
         <v-col class="text-right">
           <v-btn
@@ -45,6 +45,7 @@
 
 <script setup lang="ts">
 const drawer = ref(false)
+const appStore = useAppStore()
 const pages = ref([
   { title: 'Home', icon: '$mdiHome', path: '/' },
   { title: 'About', icon: '$mdiInformation', path: '/about' },

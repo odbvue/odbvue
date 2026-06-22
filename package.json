@@ -1,5 +1,6 @@
 {
   "name": "odbvue",
+  "title": "OdbVue",
   "version": "1.0.0",
   "description": "The meta framework for Oracle Database and Vue.js",
   "author": "Jānis Erlihs",
