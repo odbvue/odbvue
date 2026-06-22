@@ -1,3 +1,28 @@
+# Default Layout
+
+## App
+
+Clean the main `apps\web\src\App.vue` to have just wrapper for layouts
+
+```vue
+<template>
+  <component :is="LayoutComponent">
+    <RouterView />
+  </component>
+</template>
+
+<script setup lang="ts">
+//
+</script>
+```
+
+## Default Layout
+
+Modify default layout to have app layout with navigation drawer, app bar and footer.
+
+::: details `apps\web\src\layouts\DefaultLayout.vue`
+
+```vue
 <template>
   <v-app>
     <v-navigation-drawer v-model="drawer" app>
@@ -51,3 +76,6 @@ const pages = ref([
   { title: 'Sandbox', icon: '$mdiCog', path: '/sandbox' },
 ])
 </script>
+```
+
+:::

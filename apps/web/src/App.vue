@@ -1,10 +1,4 @@
 <template>
-  <RouterLink to="/">Home</RouterLink>
-  |
-  <RouterLink to="/about">About</RouterLink>
-  |
-  <RouterLink to="/sandbox">Sandbox</RouterLink>
-
   <component :is="LayoutComponent">
     <RouterView />
   </component>
