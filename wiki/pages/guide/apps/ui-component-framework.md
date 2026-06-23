@@ -230,6 +230,7 @@ Global component defaults live in `apps/web/src/themes/defaults.ts`:
 export const defaults = {
   VCardActions: {
     VBtn: { variant: 'outlined' },
+    class: 'd-flex flex-wrap justify-end',
   },
 }
 ```
