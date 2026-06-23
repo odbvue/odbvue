@@ -156,7 +156,7 @@ export const useNavigationStore = defineStore('navigation', () => {
   })
 
   const pages: ComputedRef<Page[]> = computed(() => {
-    return allPages.filter((p) => p.level < 2)
+    return allPages.filter((p) => p.level < 2).filter((p) => p.path !== '/:path(.*)')
   })
 
   function setBreadcrumb(breadcrumbTitle: string, href?: string, icon?: string, disabled = true) {

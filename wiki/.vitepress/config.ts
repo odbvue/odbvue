@@ -76,6 +76,7 @@ export default defineConfig({
                 { text: 'Navigation', link: '/guide/apps/application-features/navigation' },
                 { text: 'Home page', link: '/guide/apps/application-features/home-page' },
                 { text: 'UI Feedback', link: '/guide/apps/application-features/ui-feedback' },
+                { text: 'Page not found', link: '/guide/apps/application-features/page-not-found' },
               ],
             },
           ],

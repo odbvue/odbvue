@@ -8,7 +8,6 @@ This section will guide through creating a set of core features and a default la
 
 - dnd
 
-
 ## Page Not Found
 
 Create Page Not Found page
