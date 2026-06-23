@@ -71,6 +71,7 @@ declare global {
   const useGoTo: typeof import('vuetify').useGoTo
   const useHead: typeof import('@unhead/vue').useHead
   const useHeadSafe: typeof import('@unhead/vue').useHeadSafe
+  const useHtml5DragDrop: typeof import('./src/composables/dnd').useHtml5DragDrop
   const useI18n: typeof import('vue-i18n').useI18n
   const useId: typeof import('vue').useId
   const useLayout: typeof import('vuetify').useLayout
@@ -116,6 +117,9 @@ declare global {
     WritableComputedRef,
   } from 'vue'
   import('vue')
+  // @ts-ignore
+  export type { DragDropOptions } from './src/composables/dnd'
+  import('./src/composables/dnd')
   // @ts-ignore
   export type { AlertOptions } from './src/stores/ui'
   import('./src/stores/ui')

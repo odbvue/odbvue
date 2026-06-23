@@ -7,6 +7,7 @@
 import {
 	mdiChevronRight,
 	mdiDotsVertical,
+	mdiDrag,
 	mdiEyePlusOutline,
 	mdiFlask,
 	mdiGithub,
@@ -14,6 +15,7 @@ import {
 	mdiInformation,
 	mdiMenuLeft,
 	mdiMinus,
+	mdiPalette,
 	mdiWeatherNight,
 	mdiWeatherSunny
 } from '@mdi/js'
@@ -21,6 +23,7 @@ import {
 export default {
 	mdiChevronRight,
 	mdiDotsVertical,
+	mdiDrag,
 	mdiEyePlusOutline,
 	mdiFlask,
 	mdiGithub,
@@ -28,6 +31,7 @@ export default {
 	mdiInformation,
 	mdiMenuLeft,
 	mdiMinus,
+	mdiPalette,
 	mdiWeatherNight,
 	mdiWeatherSunny
 }
