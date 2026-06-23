@@ -154,7 +154,7 @@ export const useNavigationStore = defineStore('navigation', () => {
     const crumbs = allPages
       .filter((p) => p.path !== '/:path(.*)')
       .filter((p) => paths.includes(p.path))
-      .sort((a, b) => a.level - b.level)
+      .toSorted((a, b) => a.level - b.level)
       .map((p) => ({ title: p.title, disabled: route.path === p.path, href: p.path, icon: p.icon }))
 
     if (breadcrumb.value) crumbs.push(breadcrumb.value)
@@ -222,7 +222,16 @@ if (import.meta.hot) {
 <template>
   <v-app>
     <v-navigation-drawer v-model="drawer" app>
-      <!-- //.. -->
+      <v-list>
+        <v-list-item
+          v-for="page in app.navigation.pages"
+          :key="page.path"
+          :prepend-icon="page.icon || '$mdiMinus'"
+          :to="page.path"
+        >
+          <v-list-item-title>{{ page.title }}</v-list-item-title>
+        </v-list-item>
+      </v-list>
     </v-navigation-drawer>
     <v-app-bar>
       <!-- //.. -->

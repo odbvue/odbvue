@@ -147,7 +147,7 @@ export const useNavigationStore = defineStore('navigation', () => {
     const crumbs = allPages
       .filter((p) => p.path !== '/:path(.*)')
       .filter((p) => paths.includes(p.path))
-      .sort((a, b) => a.level - b.level)
+      .toSorted((a, b) => a.level - b.level)
       .map((p) => ({ title: p.title, disabled: route.path === p.path, href: p.path, icon: p.icon }))
 
     if (breadcrumb.value) crumbs.push(breadcrumb.value)
