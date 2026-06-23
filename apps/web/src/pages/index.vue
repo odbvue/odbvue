@@ -1,17 +1,36 @@
 <template>
-  <h1>{{ t('home.title') }}</h1>
-  <p>{{ t('home.description') }}</p>
+  <v-row>
+    <v-col
+      cols="12"
+      md="4"
+      v-for="page in app.navigation.pages.filter((page) => page.path !== '/')"
+      :key="page.path"
+    >
+      <v-card
+        hover
+        class="h-100"
+        :style="useCardBackground(page.color || '#ffffff').value"
+        :prepend-icon="page.icon"
+        :title="page.title"
+        :to="page.path"
+        :text="page.description"
+      >
+      </v-card>
+    </v-col>
+  </v-row>
 </template>
 
-<route>
-  {
-    "meta": {
-      "title": "Home"
-    },
-  }
-</route>
-
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-const { t } = useI18n()
+definePage({
+  meta: {
+    title: 'Home',
+    description: 'Welcome to the home page',
+    icon: '$mdiHome',
+    color: '#ABCDEF',
+    visibility: 'always',
+    access: 'always',
+  },
+})
+import { useCardBackground } from '@/composables/ui'
+const app = useAppStore()
 </script>

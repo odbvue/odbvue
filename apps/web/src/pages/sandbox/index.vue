@@ -10,11 +10,19 @@
   <test-component />
 </template>
 
-<route>
-  { meta: { layout: 'fullscreen' } }
-</route>
-
 <script setup lang="ts">
+definePage({
+  meta: {
+    title: 'Sandbox',
+    description: 'A sandbox page to test various UI components and features',
+    icon: '$mdiFlask',
+    color: '#DDEEFF',
+    visibility: 'with-role',
+    access: 'with-role',
+    roles: ['developer'],
+  },
+})
+
 const app = useAppStore()
 const { locale, t } = useI18n()
 </script>
