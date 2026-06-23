@@ -9,6 +9,7 @@ const router = createRouter({
 router.beforeEach(async (_to) => {
   const appTitle = useAppStore().title || 'OdbVue'
   useHead({ title: appTitle })
+  useAppStore().ui.clearAlertForRouteChange()
   return true
 })
 

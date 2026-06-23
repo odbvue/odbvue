@@ -1,4 +1,11 @@
 {
   "sandbox.title": "Sandbox",
-  "sandbox.description": "Un bac à sable pour tester les fonctionnalités i18n dans une application Vue."
+  "sandbox.description": "Un bac à sable pour tester les fonctionnalités i18n dans une application Vue.",
+  "Info message": "Info message",
+  "Success message": "Success message",
+  "Warning message": "Warning message",
+  "Error message": "Error message",
+  "close": "close",
+  "Info message 2 sec": "Info message 2 sec",
+  "Info message clear": "Info message clear"
 }

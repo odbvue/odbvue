@@ -75,6 +75,7 @@ export default defineConfig({
                 { text: 'Settings', link: '/guide/apps/application-features/settings' },
                 { text: 'Navigation', link: '/guide/apps/application-features/navigation' },
                 { text: 'Home page', link: '/guide/apps/application-features/home-page' },
+                { text: 'UI Feedback', link: '/guide/apps/application-features/ui-feedback' },
               ],
             },
           ],

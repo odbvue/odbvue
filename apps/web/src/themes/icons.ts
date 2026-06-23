@@ -6,7 +6,6 @@
 
 import {
 	mdiChevronRight,
-	mdiCog,
 	mdiDotsVertical,
 	mdiEyePlusOutline,
 	mdiFlask,
@@ -21,7 +20,6 @@ import {
 
 export default {
 	mdiChevronRight,
-	mdiCog,
 	mdiDotsVertical,
 	mdiEyePlusOutline,
 	mdiFlask,

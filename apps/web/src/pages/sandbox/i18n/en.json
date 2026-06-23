@@ -1,4 +1,11 @@
 {
   "sandbox.title": "Sandbox",
-  "sandbox.description": "A sandbox for testing i18n features in a Vue application."
+  "sandbox.description": "A sandbox for testing i18n features in a Vue application.",
+  "Info message": "Info message",
+  "Success message": "Success message",
+  "Warning message": "Warning message",
+  "Error message": "Error message",
+  "close": "close",
+  "Info message 2 sec": "Info message 2 sec",
+  "Info message clear": "Info message clear"
 }

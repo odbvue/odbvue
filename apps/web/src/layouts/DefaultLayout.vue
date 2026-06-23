@@ -3,7 +3,7 @@
     <v-navigation-drawer v-model="drawer" app>
       <v-list>
         <v-list-item
-          v-for="page in pages"
+          v-for="page in app.navigation.pages"
           :key="page.path"
           :prepend-icon="page.icon || '$mdiMinus'"
           :to="page.path"
@@ -94,6 +94,13 @@
         @click="app.settings.toggleTheme()"
         data-cy="theme-toggle"
       ></v-btn>
+      <v-progress-linear
+        :active="app.ui.loading"
+        indeterminate
+        absolute
+        location="bottom"
+        height="4"
+      ></v-progress-linear>
     </v-app-bar>
     <v-app-bar>
       <v-breadcrumbs :items="app.navigation.breadcrumbs">
@@ -107,8 +114,32 @@
         </template>
       </v-breadcrumbs>
     </v-app-bar>
+
+    <v-app-bar class="pa-2" v-if="app.ui.info">
+      <v-alert type="info" :text="app.ui.info ? t(app.ui.info) : ''"></v-alert>
+    </v-app-bar>
+    <v-app-bar class="pa-2" v-if="app.ui.success">
+      <v-alert type="success" :text="app.ui.success ? t(app.ui.success) : ''"></v-alert>
+    </v-app-bar>
+    <v-app-bar class="pa-2" v-if="app.ui.warning">
+      <v-alert type="warning" :text="app.ui.warning ? t(app.ui.warning) : ''"></v-alert>
+    </v-app-bar>
+    <v-app-bar class="pa-2" v-if="app.ui.error">
+      <v-alert type="error" :text="app.ui.error ? t(app.ui.error) : ''"></v-alert>
+    </v-app-bar>
+
     <v-main class="ma-4">
       <slot />
+
+      <v-snackbar v-model="app.ui.snackbar">
+        {{ app.ui.snack }}
+        <template v-slot:actions>
+          <v-btn color="pink" variant="text" @click="app.ui.snack = ''">
+            {{ t('close') }}
+          </v-btn>
+        </template>
+      </v-snackbar>
+      <v-overlay v-model="app.ui.loading" contained></v-overlay>
     </v-main>
     <v-footer app>
       <v-row>
@@ -138,10 +169,5 @@
 const drawer = ref(false)
 const app = useAppStore()
 const { mobile } = useDisplay()
-
-const pages = ref([
-  { title: 'Home', icon: '$mdiHome', path: '/' },
-  { title: 'About', icon: '$mdiInformation', path: '/about' },
-  { title: 'Sandbox', icon: '$mdiCog', path: '/sandbox' },
-])
+const { t } = useI18n()
 </script>
