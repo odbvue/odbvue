@@ -72,6 +72,7 @@ export default defineConfig({
                   text: 'Title and version',
                   link: '/guide/apps/application-features/title-and-version',
                 },
+                { text: 'Settings', link: '/guide/apps/application-features/settings' },
               ],
             },
           ],

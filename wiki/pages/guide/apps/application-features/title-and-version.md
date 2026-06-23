@@ -140,7 +140,7 @@ Update `apps\web\src\layouts\DefaultLayout.vue` to render the title and version 
     </v-navigation-drawer>
     <v-app-bar>
       <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
-      <v-toolbar-title>{{ appStore.title }}</v-toolbar-title>
+      <v-toolbar-title>{{ app.title }}</v-toolbar-title>
     </v-app-bar>
     <v-main class="ma-4">
       <slot />
@@ -148,7 +148,7 @@ Update `apps\web\src\layouts\DefaultLayout.vue` to render the title and version 
     <v-footer app>
       <v-row>
         <v-col>
-          <span class="text-caption">v{{ appStore.version }}</span>
+          <span class="text-caption">v{{ app.version }}</span>
         </v-col>
         <!-- //.. -->
       </v-row>
@@ -158,7 +158,7 @@ Update `apps\web\src\layouts\DefaultLayout.vue` to render the title and version 
 
 <script setup lang="ts">
 const drawer = ref(false)
-const appStore = useAppStore()
+const app = useAppStore()
 const pages = ref([
   { title: 'Home', icon: '$mdiHome', path: '/' },
   { title: 'About', icon: '$mdiInformation', path: '/about' },
