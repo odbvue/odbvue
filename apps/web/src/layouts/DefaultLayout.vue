@@ -95,6 +95,18 @@
         data-cy="theme-toggle"
       ></v-btn>
     </v-app-bar>
+    <v-app-bar>
+      <v-breadcrumbs :items="app.navigation.breadcrumbs">
+        <template v-slot:divider>
+          <v-icon icon="$mdiChevronRight"></v-icon>
+        </template>
+        <template v-slot:title="{ item, index }">
+          <v-breadcrumbs-item :to="item.href" :disabled="item.disabled">
+            {{ item.title }}
+          </v-breadcrumbs-item>
+        </template>
+      </v-breadcrumbs>
+    </v-app-bar>
     <v-main class="ma-4">
       <slot />
     </v-main>

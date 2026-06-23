@@ -8,6 +8,9 @@ export {}
 declare global {
   const EffectScope: typeof import('vue').EffectScope
   const computed: typeof import('vue').computed
+  const computedRouteParam: typeof import('./src/stores/navigation').computedRouteParam
+  const computedRouteParams: typeof import('./src/stores/navigation').computedRouteParams
+  const computedRouteQuery: typeof import('./src/stores/navigation').computedRouteQuery
   const createApp: typeof import('vue').createApp
   const customRef: typeof import('vue').customRef
   const defineAsyncComponent: typeof import('vue').defineAsyncComponent
@@ -73,7 +76,9 @@ declare global {
   const useLink: typeof import('vue-router').useLink
   const useLocale: typeof import('vuetify').useLocale
   const useModel: typeof import('vue').useModel
+  const useNavigationStore: typeof import('./src/stores/navigation').useNavigationStore
   const useRoute: typeof import('vue-router').useRoute
+  const useRouteParams: typeof import('./src/stores/navigation').useRouteParams
   const useRouter: typeof import('vue-router').useRouter
   const useRtl: typeof import('vuetify').useRtl
   const useSeoMeta: typeof import('@unhead/vue').useSeoMeta
@@ -89,6 +94,24 @@ declare global {
 // for type re-export
 declare global {
   // @ts-ignore
-  export type { Component, Slot, Slots, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, ShallowRef, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
+  export type {
+    Component,
+    Slot,
+    Slots,
+    ComponentPublicInstance,
+    ComputedRef,
+    DirectiveBinding,
+    ExtractDefaultPropTypes,
+    ExtractPropTypes,
+    ExtractPublicPropTypes,
+    InjectionKey,
+    PropType,
+    Ref,
+    ShallowRef,
+    MaybeRef,
+    MaybeRefOrGetter,
+    VNode,
+    WritableComputedRef,
+  } from 'vue'
   import('vue')
 }
