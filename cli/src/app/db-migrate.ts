@@ -9,7 +9,21 @@ import { runDbExec } from './db-exec.js'
 
 import { generateMigrationsFromCompiledModules } from '@odbvue/odb'
 
+const schemaExists = async (schemaUsername: string): Promise<boolean> => {
+  const result = await runDbExec(
+    `SELECT 1 FROM all_users WHERE username = '${schemaUsername.toUpperCase()}'`,
+    true,
+    false,
+  )
+  const rows = (result?.[0]?.rows as Array<Record<string, unknown>>) ?? []
+  return rows.length > 0
+}
+
 const getAppliedMigrations = async (schemaUsername: string): Promise<Set<string>> => {
+  if (!(await schemaExists(schemaUsername))) {
+    return new Set()
+  }
+
   const result = await runDbExec(
     `SELECT name FROM ${schemaUsername}.app_migrations ORDER BY name`,
     true,
@@ -69,12 +83,17 @@ export const runDbMigrate = async (direction: 'up' | 'down'): Promise<void> => {
         true,
       )
     } else {
-      // best-effort: the initial down drops the entire schema, so this may fail
-      await runDbExec(
-        `DELETE FROM ${schemaUsername}.app_migrations WHERE name = '${migrationName}'`,
-        true,
-        false,
-      )
+      if (await schemaExists(schemaUsername)) {
+        await runDbExec(
+          `DELETE FROM ${schemaUsername}.app_migrations WHERE name = '${migrationName}'`,
+          true,
+          false,
+        )
+      } else {
+        logger.muted(
+          `  Schema ${schemaUsername} no longer exists; skipping migration metadata cleanup`,
+        )
+      }
     }
 
     ran++
