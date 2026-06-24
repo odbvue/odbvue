@@ -18,6 +18,16 @@ export const runInfraUpPodman = async () => {
   logger.info('Starting Local Podman containers...')
   const podman = new PodmanClient()
 
+  if (!podman.isInstalled()) {
+    logger.fatal('Podman is not installed. Please install Podman to continue.')
+  } else logger.muted('Podman is installed...')
+
+  if (!podman.isRunning()) {
+    if (!podman.startMachine()) {
+      logger.fatal('Failed to start Podman.')
+    }
+  } else logger.muted('Podman is running...')
+
   let services: Record<string, unknown> = {}
   config.getConfig().services.forEach((service) => {
     if (service.kind === 'oracle-adb') {

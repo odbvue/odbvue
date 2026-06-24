@@ -3,7 +3,7 @@ import fs from 'fs'
 import prompts from 'prompts'
 
 import { homeDir } from '../shared/dirs.js'
-import { fatalError } from '../shared/errors.js'
+import { logger } from '../shared/logger.js'
 
 import { EnvironmentStore } from '../adapters/environment-store.js'
 import { ConfigStore } from '../adapters/config-store.js'
@@ -23,7 +23,7 @@ export const runSetupPlatformOci = async () => {
   }
 
   if (!fs.existsSync(ociFilePath)) {
-    fatalError(
+    logger.fatal(
       `OCI config file not found at ${ociFilePath}. Please set up your OCI config file and try again.`,
     )
   }
@@ -33,7 +33,7 @@ export const runSetupPlatformOci = async () => {
 
   let profile: string = 'DEFAULT'
   if (ociProfiles.length === 0) {
-    fatalError(
+    logger.fatal(
       `No OCI profiles found in config file at ${ociFilePath}. Please set up your OCI config file and try again.`,
     )
   } else if (ociProfiles.length === 1) {
@@ -95,7 +95,7 @@ export const runSetupPlatformOci = async () => {
   } else {
     const selectedCompartment = compartmentList.find((c) => c.id === compartment)
     if (!selectedCompartment) {
-      fatalError('Selected compartment not found')
+      logger.fatal('Selected compartment not found')
     } else {
       compartmentId = selectedCompartment.id
       compartmentName = selectedCompartment.name

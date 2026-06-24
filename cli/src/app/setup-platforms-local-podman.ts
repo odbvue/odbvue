@@ -1,5 +1,4 @@
 import { logger } from '../shared/logger.js'
-import { fatalError } from '../shared/errors.js'
 
 import { PodmanClient } from '../adapters/podman-client.js'
 import { EnvironmentStore } from '../adapters/environment-store.js'
@@ -11,13 +10,13 @@ export const runSetupPlatformLocalPodman = async () => {
   const { projectName, currentEnv } = new EnvironmentStore().getCurrent()
   const podman = new PodmanClient()
   if (!podman.isInstalled())
-    fatalError(
+    logger.fatal(
       'Podman is not installed. Please install Podman to use local deployment: https://podman.io/docs/installation',
     )
   if (!podman.isRunning()) {
     logger.info('Starting Podman machine...')
     if (!podman.startMachine()) {
-      fatalError('Failed to start Podman machine. Please start it manually and try again.')
+      logger.fatal('Failed to start Podman machine. Please start it manually and try again.')
     }
   }
   const { cpus, memoryGb } = podman.checkResources()

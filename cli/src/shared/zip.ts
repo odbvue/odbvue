@@ -1,11 +1,11 @@
 import fs from 'fs'
 import { execSync } from 'child_process'
 
-import { fatalError } from './errors.js'
+import { logger } from './logger.js'
 
 export const unZip = async (zipPath: string, extractDir: string): Promise<void> => {
   if (!fs.existsSync(zipPath)) {
-    fatalError(`Zip file not found at ${zipPath}`)
+    logger.fatal(`Zip file not found at ${zipPath}`)
   }
 
   if (fs.existsSync(extractDir)) fs.rmSync(extractDir, { recursive: true, force: true })
@@ -21,6 +21,6 @@ export const unZip = async (zipPath: string, extractDir: string): Promise<void> 
       stdio: 'pipe',
     })
   } catch (error) {
-    fatalError(error)
+    logger.fatal(error)
   }
 }

@@ -3,7 +3,8 @@ import { spawn } from 'child_process'
 import { mkdirSync, createWriteStream } from 'fs'
 import { platform } from 'os'
 import path from 'path'
-import { fatalError } from '../shared/errors.js'
+
+import { logger } from '../shared/logger.js'
 
 export interface ContainerStatus {
   name: string
@@ -108,7 +109,7 @@ export class PodmanClient {
 
       return true
     } catch (error) {
-      fatalError(error)
+      logger.fatal(error)
     }
   }
 
@@ -136,7 +137,7 @@ export class PodmanClient {
 
       return true
     } catch (error) {
-      fatalError(error)
+      logger.fatal(error)
     }
   }
 
@@ -147,13 +148,13 @@ export class PodmanClient {
     try {
       execSync(`${this.podmanCmd} start ${containerName}`, { stdio: 'pipe' })
     } catch (error) {
-      fatalError(error)
+      logger.fatal(error)
     }
 
     try {
       await this.waitForContainerHealth(containerName)
     } catch (error) {
-      fatalError(error)
+      logger.fatal(error)
     }
     return true
   }

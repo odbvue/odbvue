@@ -6,7 +6,6 @@ import { SecretsStore } from '../adapters/secrets-store.js'
 import { EnvironmentStore } from '../adapters/environment-store.js'
 
 import { logger } from '../shared/logger.js'
-import { fatalError } from '../shared/errors.js'
 
 oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT
 
@@ -66,7 +65,7 @@ const runDbExecStatement = async (
   const { envDir, projectName } = new EnvironmentStore().getCurrent()
   const walletPath = path.join(envDir, '.wallets', `${projectName}-adb.zip`)
   if (!fs.existsSync(walletPath)) {
-    fatalError(`Wallet zip not found at ${walletPath}`)
+    logger.fatal(`Wallet zip not found at ${walletPath}`)
   }
   if (!silent) logger.info(`Using wallet at ${walletPath}`)
 
@@ -135,7 +134,7 @@ const runDbExecStatement = async (
         await connection.commit()
       } catch (error) {
         if (fastFail) {
-          fatalError(`Failed to execute statement: ${error}`)
+          logger.fatal(`Failed to execute statement: ${error}`)
         } else {
           logger.error(`Failed to execute statement: ${error}`)
         }
@@ -145,7 +144,7 @@ const runDbExecStatement = async (
       responses.push(response)
     }
   } catch (error) {
-    fatalError(`Failed to connect to database: ${error}`)
+    logger.fatal(`Failed to connect to database: ${error}`)
   } finally {
     if (connection) {
       await connection.close()
