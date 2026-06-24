@@ -35,9 +35,9 @@
     ]
   },
   "scripts": {
-    "prepare": "pnpm build && pnpm -C cli link",
     "build": "pnpm -r run build",
-    "check": "pnpm -r run check"
+    "check": "pnpm -r run check",
+    "link:cli": "pnpm -C cli link"
   },
   "devDependencies": {
     "oxfmt": "^0.44.0",

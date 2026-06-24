@@ -80,6 +80,22 @@ export default defineConfig({
                 { text: 'Drag and drop', link: '/guide/apps/application-features/drag-n-drop' },
               ],
             },
+            {
+              text: 'Advanced UI Components',
+              collapsed: true,
+              items: [
+                { text: 'Chart', link: '/guide/apps/advanced-ui-components/chart' },
+                { text: 'Dialog', link: '/guide/apps/advanced-ui-components/dialog' },
+                { text: 'Editor', link: '/guide/apps/advanced-ui-components/editor' },
+                { text: 'Form', link: '/guide/apps/advanced-ui-components/form' },
+                { text: 'Map', link: '/guide/apps/advanced-ui-components/map' },
+                { text: 'Media', link: '/guide/apps/advanced-ui-components/media' },
+                { text: 'Pad', link: '/guide/apps/advanced-ui-components/pad' },
+                { text: 'Share', link: '/guide/apps/advanced-ui-components/share' },
+                { text: 'Table', link: '/guide/apps/advanced-ui-components/table' },
+                { text: 'View', link: '/guide/apps/advanced-ui-components/view' },
+              ],
+            },
           ],
         },
         {

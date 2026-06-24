@@ -1,0 +1,14 @@
+{
+  "name": "name",
+  "email": "email",
+  "phone": "phone",
+  "website": "website",
+  "status": "status",
+  "actions": "actions",
+  "search": "search",
+  "refresh": "refresh",
+  "add": "add",
+  "status-all": "status-all",
+  "previous": "previous",
+  "next": "next"
+}

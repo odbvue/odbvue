@@ -13,6 +13,15 @@ declare module 'vue' {
   export interface GlobalComponents {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
-    TestComponent: typeof import('./src/components/TestComponent.vue')['default']
+    VOvChart: typeof import('./src/components/VOvChart.vue')['default']
+    VOvDialog: typeof import('./src/components/VOvDialog.vue')['default']
+    VOvEditor: typeof import('./src/components/VOvEditor.vue')['default']
+    VOvForm: typeof import('./src/components/VOvForm.vue')['default']
+    VOvMap: typeof import('./src/components/VOvMap.vue')['default']
+    VOvMedia: typeof import('./src/components/VOvMedia.vue')['default']
+    VOvPad: typeof import('./src/components/VOvPad.vue')['default']
+    VOvShare: typeof import('./src/components/VOvShare.vue')['default']
+    VOvTable: typeof import('./src/components/VOvTable.vue')['default']
+    VOvView: typeof import('./src/components/VOvView.vue')['default']
   }
 }

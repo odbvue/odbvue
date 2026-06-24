@@ -64,10 +64,16 @@ for (const path in layoutModules) {
   }
 }
 
-const route = useRoute()
+const route = (() => {
+  try {
+    return useRoute()
+  } catch {
+    return undefined
+  }
+})()
 
 const LayoutComponent = computed(() => {
-  const name = (route.meta?.layout as string) || 'default'
+  const name = (route?.meta?.layout as string) || 'default'
   const key = name.toLowerCase()
 
   const loader = availableLayouts[key]
