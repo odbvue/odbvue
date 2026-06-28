@@ -84,3 +84,40 @@ export class Column {
     return this.toNode()
   }
 }
+
+export function emitColumnDef(column: ColumnNode): string {
+  const parts = [column.name, emitColumnType(column)]
+
+  if (column.options.default === 'sys_guid') {
+    parts.push('DEFAULT SYS_GUID()')
+  } else if (column.options.default === 'current_timestamp') {
+    parts.push('DEFAULT CURRENT_TIMESTAMP')
+  } else if (column.options.default) {
+    parts.push(`DEFAULT ${column.options.default}`)
+  }
+
+  if (column.options.nullable === false) {
+    parts.push('NOT NULL')
+  }
+
+  return parts.join(' ')
+}
+
+export function emitColumnType(column: ColumnNode): string {
+  switch (column.type) {
+    case 'string':
+      return `VARCHAR2(${column.options.length ?? 255} CHAR)`
+    case 'number':
+      return 'NUMBER'
+    case 'guid':
+      return 'RAW(16)'
+    case 'boolean':
+      return 'NUMBER(1)'
+    case 'date':
+      return 'DATE'
+    case 'timestamp':
+      return 'TIMESTAMP(6)'
+    case 'clob':
+      return 'CLOB'
+  }
+}

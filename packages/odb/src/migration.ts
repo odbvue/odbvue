@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { pathToFileURL } from 'url'
 
-import { Column, type ColumnNode, type ColumnOptions, type ColumnType } from './schema/column.js'
+import { Column, emitColumnDef, type ColumnOptions, type ColumnType } from './schema/column.js'
 import { type Schema } from './schema/schema.js'
 import { type Table } from './schema/table.js'
 
@@ -40,7 +40,10 @@ export class MigrationBuilder {
   private _up: () => string | string[] = () => []
   private _down: () => string | string[] = () => []
 
-  constructor(private readonly _name: string) {}
+  constructor(
+    private readonly _name: string,
+    private readonly _version?: string,
+  ) {}
 
   up(fn: () => string | string[]): this {
     this._up = fn
@@ -61,8 +64,8 @@ export class MigrationBuilder {
   }
 }
 
-export function defineMigration(name: string): MigrationBuilder {
-  return new MigrationBuilder(name)
+export function defineMigration(name: string, version?: string): MigrationBuilder {
+  return new MigrationBuilder(name, version)
 }
 
 export function alterTable(table: Table | string, schema?: Schema | string): AlterTableBuilder {
@@ -86,34 +89,6 @@ export function emitMigrationSql(
   const body = Array.isArray(sql) ? sql : [sql]
   sections.push(...body.filter(Boolean))
   return sections.join('\n\n')
-}
-
-function emitColumnDef(column: ColumnNode): string {
-  const parts = [column.name, emitColumnType(column)]
-  if (column.options.default === 'sys_guid') parts.push('DEFAULT SYS_GUID()')
-  else if (column.options.default === 'current_timestamp') parts.push('DEFAULT CURRENT_TIMESTAMP')
-  else if (column.options.default) parts.push(`DEFAULT ${column.options.default}`)
-  if (column.options.nullable === false) parts.push('NOT NULL')
-  return parts.join(' ')
-}
-
-function emitColumnType(column: ColumnNode): string {
-  switch (column.type) {
-    case 'string':
-      return `VARCHAR2(${column.options.length ?? 255} CHAR)`
-    case 'number':
-      return 'NUMBER'
-    case 'guid':
-      return 'RAW(16)'
-    case 'boolean':
-      return 'NUMBER(1)'
-    case 'date':
-      return 'DATE'
-    case 'timestamp':
-      return 'TIMESTAMP(6)'
-    case 'clob':
-      return 'CLOB'
-  }
 }
 
 export async function generateMigrationsFromCompiledModules(

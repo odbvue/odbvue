@@ -4,6 +4,13 @@ import fs from 'fs'
 import { dbDir } from '../shared/dirs.js'
 
 import { logger } from '../shared/logger.js'
+import { version } from '../shared/version.js'
+
+const nextVersionStr = version
+  .split('.')
+  .map((v: string) => Number(v))
+  .map((v: number, i: number) => (i === 2 ? v + 1 : v))
+  .join('.')
 
 export const runDbScaffold = async (name?: string): Promise<void> => {
   const ts = new Date()
@@ -17,7 +24,7 @@ export const runDbScaffold = async (name?: string): Promise<void> => {
   const filePath = path.join(dbDir, 'src', 'migrations', `${namePart}.ts`)
   const template = `import { defineMigration } from '@odbvue/odb'
 
-export const migration = defineMigration('${namePart.replaceAll('-', '_')}')
+export const migration = defineMigration('${namePart.replaceAll('-', '_')}', '${nextVersionStr}')
   .up(() => {
     return ''
   })

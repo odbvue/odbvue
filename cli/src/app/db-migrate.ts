@@ -74,6 +74,7 @@ export const runDbMigrate = async (direction: 'up' | 'down'): Promise<void> => {
     }
 
     logger.info(`  Running ${migrationName}...`)
+
     await runDbExec(entry, false, true)
 
     if (direction === 'up') {

@@ -56,6 +56,7 @@ export class Schema {
         TEMPORARY TABLESPACE ${this._tempTablespace}
         QUOTA UNLIMITED ON ${this._dataTablespace};`,
       `GRANT CREATE SESSION TO ${this.username};`,
+      `ALTER USER ${this.username} ENABLE EDITIONS;`,
       ...this._grants.map((grant) => `GRANT ${grant} TO ${this.username};`),
     ].join('\n')
   }

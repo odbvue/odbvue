@@ -1,4 +1,4 @@
-import { odbSchema, odbTable, defineMigration } from '@odbvue/odb'
+import { odbSchema, odbTable, odbEdition, defineMigration } from '@odbvue/odb'
 
 const schemaName = process.env.ODBVUE_ADB_SCHEMA_USERNAME
 const schemaPassword = process.env.ODBVUE_ADB_SCHEMA_PASSWORD
@@ -22,6 +22,14 @@ const appMigrationsTable = odbTable('app_migrations', (t) => {
   t.unique('uq_app_migrations_name', ['name'])
 })
 
-export const migration = defineMigration('00000000000000_initial')
-  .up(() => [appSchema.toSQLUp(), appMigrationsTable.toSQLUp({ schema: appSchema.username })])
-  .down(() => [appSchema.toSQLDown()])
+const appEdition = new odbEdition('1.0.0', schemaName)
+
+export const migration = defineMigration('00000000000000_initial', '1.0.0')
+  .up(() => [
+    appSchema.toSQLUp(),
+    appMigrationsTable.toSQLUp({ schema: appSchema.username }),
+    appEdition.create(),
+    appEdition.grantUse(),
+    appEdition.setDefault(),
+  ])
+  .down(() => [appSchema.toSQLDown(), appEdition.drop()])
