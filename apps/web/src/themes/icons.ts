@@ -6,6 +6,7 @@
 
 import {
 	mdiAccount,
+	mdiAccountCowboyHat,
 	mdiAlert,
 	mdiCalendar,
 	mdiCamera,
@@ -89,6 +90,7 @@ import {
 
 export default {
 	mdiAccount,
+	mdiAccountCowboyHat,
 	mdiAlert,
 	mdiCalendar,
 	mdiCamera,

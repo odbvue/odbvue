@@ -2,17 +2,22 @@
   <v-container>
     <v-row
       ><v-col cols="12"><h3>Application features</h3></v-col
-      ><v-col cols="12" md="6">
-        <v-card prepend-icon="$mdiPalette" title="UI Feedback" to="/sandbox/sandbox-ui" />
+      ><v-col cols="12" md="6" v-for="feature in features" :key="feature.to">
+        <v-card
+          :prepend-icon="feature.icon"
+          :title="feature.title"
+          :text="feature.text"
+          :to="feature.to"
+          class="pa-4 h-100"
+          hover
+        />
       </v-col>
-      <v-col cols="12" md="6">
-        <v-card prepend-icon="$mdiDrag" title="Drag and Drop" to="/sandbox/sandbox-dnd" /> </v-col
-    ></v-row>
+    </v-row>
   </v-container>
   <v-container>
     <v-row>
       <v-col cols="12"><h3>Available Components</h3></v-col>
-      <v-col cols="12" md="6" lg="4" v-for="comp in compontents" :key="comp.to">
+      <v-col cols="12" md="6" lg="4" v-for="comp in components" :key="comp.to">
         <v-card
           :to="comp.to"
           :style="cardBackgroundComponents"
@@ -40,9 +45,29 @@ definePage({
   },
 })
 
-const cardBackgroundComponents = useCardBackground('#eeeedd')
+const features = ref([
+  {
+    icon: '$mdiPalette',
+    to: '/sandbox/sandbox-ui',
+    title: 'UI Feedback',
+    text: 'A collection of UI feedback components including alerts, notifications, and progress indicators with customizable styles and behaviors',
+  },
+  {
+    icon: '$mdiDrag',
+    to: '/sandbox/sandbox-dnd',
+    title: 'Drag and Drop',
+    text: 'A drag-and-drop component for rearranging items in a list or grid with support for touch devices and customizable drop zones',
+  },
+  {
+    icon: '$mdiAccountCowboyHat',
+    to: '/sandbox/sandbox-http',
+    title: 'HTTP Requests',
+    text: 'A component for testing HTTP requests and responses with support for GET, POST, PUT, DELETE methods and error handling',
+  },
+])
 
-const compontents = ref([
+const cardBackgroundComponents = useCardBackground('#eeeedd')
+const components = ref([
   {
     icon: '$mdiChartLine',
     to: '/sandbox/sandbox-chart',

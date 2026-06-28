@@ -94,6 +94,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/sandbox/sandbox-http': RouteRecordInfo<
+      '/sandbox/sandbox-http',
+      '/sandbox/sandbox-http',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/sandbox/sandbox-map': RouteRecordInfo<
       '/sandbox/sandbox-map',
       '/sandbox/sandbox-map',
@@ -223,6 +230,14 @@ declare module 'vue-router/auto-routes' {
     'src/pages/sandbox/sandbox-form.vue': {
       routes:
         | '/sandbox/sandbox-form'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/sandbox/sandbox-http.vue': {
+      routes:
+        | '/sandbox/sandbox-http'
       views:
         | never
       pathParamNames:
