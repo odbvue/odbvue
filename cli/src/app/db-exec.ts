@@ -109,7 +109,15 @@ const runDbExecStatement = async (
         logger.muted(`  ${statement.substring(0, 77)}${statement.length > 77 ? '...' : ''}`)
 
       try {
-        const result = await connection.execute(statement.trim().replace(/;$/, ''))
+        const sql = statement.trim()
+        // node-oracledb rule: PL/SQL statements (anonymous blocks and PL/SQL DDL)
+        // REQUIRE the trailing ';'. Plain SQL DDL/DML must NOT have one.
+        const isPLSQL =
+          /^(BEGIN|DECLARE|CREATE\s+(OR\s+REPLACE\s+)?(PACKAGE|PROCEDURE|FUNCTION|TRIGGER|TYPE)\b)/i.test(
+            sql,
+          )
+        const execSql = isPLSQL ? sql : sql.replace(/;$/, '')
+        const result = await connection.execute(execSql)
         try {
           const output = await dbmsOutput(connection)
           if (output.length > 0) {
@@ -155,7 +163,11 @@ const runDbExecStatement = async (
   return responses
 }
 
-const splitSqlStatements = (sql: string): string[] => {
+/**
+ * Quote-aware splitter for plain DDL/DML statements delimited by `;`.
+ * Does not handle PL/SQL blocks — use splitSqlStatements for mixed input.
+ */
+const splitBySemicolon = (sql: string): string[] => {
   const statements: string[] = []
 
   let current = ''
@@ -235,6 +247,41 @@ const splitSqlStatements = (sql: string): string[] => {
   }
 
   return statements
+}
+
+/**
+ * Split a SQL script into individual statements ready for execution.
+ *
+ * Strategy:
+ *  1. Split on `/` that appears alone on a line (SQL*Plus PL/SQL block terminator).
+ *     Each such segment is a single PL/SQL block (CREATE OR REPLACE PACKAGE/PROCEDURE/
+ *     FUNCTION, anonymous BEGIN...END) and must be executed atomically.
+ *  2. Any segment that does NOT start with a PL/SQL keyword is treated as plain DDL/DML
+ *     and is further split by `;` using the quote-aware splitter.
+ */
+const splitSqlStatements = (sql: string): string[] => {
+  const results: string[] = []
+
+  // '/' on its own line (optionally with trailing whitespace) is the block terminator
+  const segments = sql.split(/^\/\s*$/m)
+
+  const plsqlBlockRegex =
+    /^\s*(CREATE\s+(OR\s+REPLACE\s+)?(PACKAGE|PROCEDURE|FUNCTION|TRIGGER|TYPE)\b|BEGIN\b)/i
+
+  for (const segment of segments) {
+    const trimmed = segment.trim()
+    if (!trimmed) continue
+
+    if (plsqlBlockRegex.test(trimmed)) {
+      // PL/SQL block: emit as one statement (the execute loop strips the trailing ';')
+      results.push(trimmed)
+    } else {
+      // Plain DDL/DML: split by ';' as before
+      results.push(...splitBySemicolon(trimmed))
+    }
+  }
+
+  return results
 }
 
 export const runDbExec = async (
