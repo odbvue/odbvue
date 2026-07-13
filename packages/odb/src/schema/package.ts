@@ -235,6 +235,31 @@ function deriveOrdsModule(packageName: string): string {
   return name.toLowerCase().replace(/_/g, '-')
 }
 
+function normalizeServicePath(path: string): string {
+  return path.trim().replace(/^\/+|\/+$/g, '')
+}
+
+function normalizeBasePath(path: string): string {
+  const normalized = normalizeServicePath(path)
+  return normalized ? `${normalized}/` : '/'
+}
+
+/** Explicit public ORDS contract for a package procedure. */
+export type OrdsServiceDefinition = {
+  /** HTTP method exposed by ORDS. */
+  method: OrdsHttpMethod
+  /** Route within the module, written as an application-style path such as `/users/:id`. */
+  path: string
+  /** Human-readable endpoint description stored in the ORDS catalogue. */
+  summary?: string
+  /** ORDS module name. Defaults to the package-derived module name. */
+  module?: string
+  /** ORDS module base path. Defaults to `<module>/`. */
+  basePath?: string
+  /** Overrides for automatically mapped ORDS parameter types, keyed by PL/SQL argument name. */
+  paramTypes?: Record<string, OrdsParamType>
+}
+
 /**
  * Fluent builder for the ORDS configuration of a single procedure.
  * Obtained via `proc.ords(build?)` — all settings are optional overrides;
@@ -242,6 +267,7 @@ function deriveOrdsModule(packageName: string): string {
  */
 export class OrdsEndpointBuilder {
   private _module?: string
+  private _basePath?: string
   private _method?: OrdsHttpMethod
   private _pattern?: string
   private _comment?: string
@@ -250,6 +276,12 @@ export class OrdsEndpointBuilder {
   /** Override the module name (default: derived from the package name). */
   module(name: string): this {
     this._module = name
+    return this
+  }
+
+  /** Override the module base path (default: `<module>/`). */
+  basePath(path: string): this {
+    this._basePath = path
     return this
   }
 
@@ -283,8 +315,9 @@ export class OrdsEndpointBuilder {
   build(packageName: string, procedureName: string, params: Param[]): OrdsEndpoint {
     const module = this._module ?? deriveOrdsModule(packageName)
     const endpoint = new OrdsEndpoint(module, packageName, procedureName)
+    if (this._basePath !== undefined) endpoint.basePath(this._basePath)
     if (this._method) endpoint.method(this._method)
-    if (this._pattern) endpoint.pattern(this._pattern)
+    if (this._pattern !== undefined) endpoint.pattern(this._pattern)
     if (this._comment) endpoint.comment(this._comment)
 
     for (const p of params) {
@@ -356,6 +389,34 @@ export class Procedure {
   ords(build?: (e: OrdsEndpointBuilder) => void): this {
     this._ordsBuilder = new OrdsEndpointBuilder()
     build?.(this._ordsBuilder)
+    return this
+  }
+
+  /**
+   * Expose this procedure as an ORDS service using an explicit, reviewable
+   * public contract. Prefer this over `ords()` for application endpoints.
+   *
+   * @example
+   * proc.service({
+   *   method: 'GET',
+   *   path: '/users/:id',
+   *   summary: 'Fetch a single user',
+   * })
+   */
+  service(definition: OrdsServiceDefinition): this {
+    const endpoint = new OrdsEndpointBuilder()
+      .method(definition.method)
+      .pattern(normalizeServicePath(definition.path))
+
+    if (definition.summary) endpoint.comment(definition.summary)
+    if (definition.module) endpoint.module(definition.module)
+    if (definition.basePath) endpoint.basePath(normalizeBasePath(definition.basePath))
+
+    for (const [param, type] of Object.entries(definition.paramTypes ?? {})) {
+      endpoint.paramType(param, type)
+    }
+
+    this._ordsBuilder = endpoint
     return this
   }
 
@@ -488,10 +549,7 @@ export class Package {
     return [emitPackageSpec(node, options), '/', emitPackageBody(node, options), '/'].join('\n')
   }
 
-  /**
-   * Generate ORDS registration SQL for all procedures that have `.ords()` configured.
-   * Returns an empty string if no procedures have ORDS enabled.
-   */
+  /** Generate ORDS registration SQL for all configured procedure services. */
   toOrdsSQL(options: { schema?: string } = {}): string {
     return this._procedures
       .map((p) => p.buildOrdsEndpoint(this.name))
@@ -500,7 +558,7 @@ export class Package {
       .join('\n\n')
   }
 
-  /** Drop ORDS modules for all procedures that have `.ords()` configured. */
+  /** Drop ORDS modules for all configured procedure services. */
   toOrdsDownSQL(options: { schema?: string } = {}): string {
     const endpoints = this._procedures
       .map((p) => p.buildOrdsEndpoint(this.name))

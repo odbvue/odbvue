@@ -188,7 +188,7 @@ export class OrdsEndpoint {
   }
 
   get effectivePattern(): string {
-    if (this._pattern) return this._pattern
+    if (this._pattern !== undefined) return this._pattern
 
     // Strip HTTP method prefix
     let name = this.procedureName.toUpperCase()
@@ -258,7 +258,7 @@ export class OrdsEndpoint {
       `  ords.define_template(`,
       `    p_module_name => '${this.module}',`,
       `    p_pattern     => '${pattern}',`,
-      `    p_comments    => NULL`,
+      `    p_comments    => ${comment}`,
       `  );`,
       `  COMMIT;`,
       '',
@@ -269,7 +269,7 @@ export class OrdsEndpoint {
       `    p_source_type    => ords.source_type_plsql,`,
       `    p_source         => ${source},`,
       `    p_items_per_page => 0,`,
-      `    p_comments       => NULL`,
+      `    p_comments       => ${comment}`,
       `  );`,
       `  COMMIT;`,
       ...this._params.flatMap((p) => {

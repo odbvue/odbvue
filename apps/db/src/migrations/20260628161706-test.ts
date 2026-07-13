@@ -14,7 +14,11 @@ const appPackage = odbPackage('pck_app', (p) => {
       body.set(test, vVersion.toBase64())
     })
 
-    proc.ords()
+    proc.service({
+      method: 'GET',
+      path: '/version',
+      summary: 'Returns the application version',
+    })
   })
 })
 

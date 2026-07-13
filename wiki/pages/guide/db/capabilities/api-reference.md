@@ -36,3 +36,17 @@ proc.body((body) => {
   body.set(result, vText.toBase64())
 })
 ```
+
+## ORDS Services
+
+Expose a package procedure with an explicit HTTP contract:
+
+```ts
+proc.service({
+  method: 'GET',
+  path: '/version',
+  summary: 'Returns the application version',
+})
+```
+
+Optional `module`, `basePath`, and `paramTypes` properties override derived ORDS configuration. The lower-level `proc.ords()` builder remains available for convention-based endpoints.

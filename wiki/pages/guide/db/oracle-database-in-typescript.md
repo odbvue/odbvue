@@ -48,7 +48,11 @@ const appPackage = odbPackage('pck_app', (p) => {
       body.set(version, vVersion)
     })
 
-    proc.ords()
+    proc.service({
+      method: 'GET',
+      path: '/version',
+      summary: 'Returns the application version',
+    })
   })
 })
 
@@ -205,7 +209,7 @@ This is the main way to keep database business logic close to the data while sti
 
 ORDS support is built into the same model.
 
-If a procedure is marked with `.ords()`, `toOrdsSQL()` emits the ORDS registration PL/SQL needed to expose it as a REST endpoint.
+Define the public HTTP contract with `.service()`. Then `toOrdsSQL()` emits the ORDS registration PL/SQL needed to expose the procedure as a REST endpoint.
 
 ```ts
 import { odbPackage } from '@odbvue/odb'
@@ -217,8 +221,13 @@ const usersApi = odbPackage('pck_users', (pkg) => {
     proc.body((body) => {
       body.raw('OPEN r_user FOR SELECT id, email FROM app_users WHERE id = p_user_id')
     })
-    proc.ords((endpoint) => {
-      endpoint.comment('Fetch a single user')
+    proc.service({
+      method: 'GET',
+      path: '/users/:user-id',
+      summary: 'Fetch a single user',
+      paramTypes: {
+        p_user_id: 'INT',
+      },
     })
   })
 })
@@ -226,12 +235,12 @@ const usersApi = odbPackage('pck_users', (pkg) => {
 const sql = usersApi.toOrdsSQL({ schema: 'APP_USER' })
 ```
 
-The builder derives sensible defaults:
+The service contract makes the HTTP method and route visible during code review. The builder still derives infrastructure details:
 
 - package name becomes the ORDS module name
-- `GET_`, `POST_`, `PUT_`, `DELETE_` prefixes map to HTTP methods
 - PL/SQL parameters map to ORDS parameters
-- GET input parameters can become path segments
+
+Use `.ords()` only when convention-derived methods and paths are preferred over an explicit public contract.
 
 Schema-level ORDS enablement is separate:
 
@@ -322,7 +331,7 @@ So "Oracle Database in TypeScript" here does not mean Oracle is replaced by Type
 - Use `odbTable()` and `alterTable()` for DDL.
 - Use `odbQuery()` for DML and read queries.
 - Use `odbPackage()` for business logic that belongs in PL/SQL.
-- Use `.ords()` and `odbOrdsSchema()` when package procedures should become REST endpoints.
+- Use `.service()` and `odbOrdsSchema()` when package procedures should become REST endpoints.
 - Use `defineMigration()` to version all of the above.
 - Use `odbEdition` when the release strategy needs Oracle editions.
 
