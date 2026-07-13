@@ -41,11 +41,13 @@ const schemaName = process.env.ODBVUE_ADB_SCHEMA_USERNAME ?? ''
 
 const appPackage = odbPackage('pck_app', (p) => {
   p.procedure('version', (proc) => {
-    proc.out('version', 'VARCHAR2')
+    const version = proc.out('version', 'VARCHAR2')
+
     proc.body((body) => {
-      body.variable('v_version', 'VARCHAR2', 200).assign("'1.0.1'")
-      body.assign('version', 'v_version')
+      const vVersion = body.varchar2('v_version', 200).value('1.0.1')
+      body.set(version, vVersion)
     })
+
     proc.ords()
   })
 })
@@ -180,10 +182,11 @@ import { odbPackage } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (pkg) => {
   pkg.procedure('version', (proc) => {
-    proc.out('version', 'VARCHAR2')
+    const version = proc.out('version', 'VARCHAR2')
+
     proc.body((body) => {
-      body.variable('v_version', 'VARCHAR2', 200).assign("'1.0.1'")
-      body.assign('version', 'v_version')
+      const vVersion = body.varchar2('v_version', 200).value('1.0.1')
+      body.set(version, vVersion)
     })
   })
 })

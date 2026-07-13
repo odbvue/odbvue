@@ -29,8 +29,10 @@ odbLob.base64ToVarchar2('v_b64')
 ### Example
 
 ```ts
+const result = proc.out('p_result', 'CLOB')
+
 proc.body((body) => {
-  const vText = body.variable('v_text', 'VARCHAR2', 200).assign("'hello'")
-  body.assign('p_result', vText.toBase64())
+  const vText = body.varchar2('v_text', 200).value('hello')
+  body.set(result, vText.toBase64())
 })
 ```

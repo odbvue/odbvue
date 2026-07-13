@@ -7,10 +7,14 @@ import {
   type LocalVarNode,
   type ParamNode,
   type ParameterDirection,
+  type PlsqlReference,
+  type PlsqlRenderable,
   type PlsqlType,
+  type PlsqlValue,
   emitLocalVarDecl,
   emitParamDef,
   emitParamType,
+  renderPlsql,
 } from './attribute.js'
 import { OrdsEndpoint, type OrdsHttpMethod, type OrdsParamType } from '../ords.js'
 
@@ -86,7 +90,7 @@ export class ProcedureBody {
   variable(name: string, type: 'CLOB', length?: number): ClobVar
   variable(name: string, type: 'BLOB', length?: number): BlobVar
   variable(name: string, type: 'VARCHAR2', length?: number): Varchar2Var
-  variable(name: string, type: PlsqlType | string, length?: number): LocalVar
+  variable<T extends PlsqlType | string>(name: string, type: T, length?: number): LocalVar<T>
   variable(name: string, type: PlsqlType | string, length?: number): LocalVar {
     const opts = length !== undefined ? { length } : {}
     const v =
@@ -101,9 +105,44 @@ export class ProcedureBody {
     return v
   }
 
+  /** Declare a VARCHAR2 variable using the type-specific fluent API. */
+  varchar2(name: string, length?: number): Varchar2Var {
+    return this.variable(name, 'VARCHAR2', length)
+  }
+
+  /** Declare a CLOB variable using the type-specific fluent API. */
+  clob(name: string): ClobVar {
+    return this.variable(name, 'CLOB')
+  }
+
+  /** Declare a BLOB variable using the type-specific fluent API. */
+  blob(name: string): BlobVar {
+    return this.variable(name, 'BLOB')
+  }
+
   /** `target := value;` */
-  assign(target: string, value: string): this {
-    this._statements.push({ kind: 'assign', target, value })
+  assign(target: string | PlsqlReference, value: PlsqlRenderable): this {
+    this._statements.push({
+      kind: 'assign',
+      target: typeof target === 'string' ? target : target.toSQL(),
+      value: renderPlsql(value),
+    })
+    return this
+  }
+
+  /**
+   * Assign one typed PL/SQL value to another. Unlike `assign()`, this rejects
+   * incompatible typed references and expressions at compile time.
+   */
+  set<T extends PlsqlType | string>(
+    target: PlsqlReference<T>,
+    value: PlsqlValue<NoInfer<T>>,
+  ): this {
+    this._statements.push({
+      kind: 'assign',
+      target: target.toSQL(),
+      value: value.toSQL(),
+    })
     return this
   }
 
@@ -269,24 +308,28 @@ export class Procedure {
   constructor(readonly name: string) {}
 
   /** Add a parameter (default direction IN). */
-  param(name: string, type: PlsqlType | string, direction: ParameterDirection = 'IN'): Param {
+  param<T extends PlsqlType | string>(
+    name: string,
+    type: T,
+    direction: ParameterDirection = 'IN',
+  ): Param<T> {
     const p = new Param(name, type, direction)
     this._params.push(p)
     return p
   }
 
   /** Shorthand: add an IN parameter. */
-  in(name: string, type: PlsqlType | string): Param {
+  in<T extends PlsqlType | string>(name: string, type: T): Param<T> {
     return this.param(name, type, 'IN')
   }
 
   /** Shorthand: add an OUT parameter. */
-  out(name: string, type: PlsqlType | string): Param {
+  out<T extends PlsqlType | string>(name: string, type: T): Param<T> {
     return this.param(name, type, 'OUT')
   }
 
   /** Shorthand: add an IN OUT parameter. */
-  inOut(name: string, type: PlsqlType | string): Param {
+  inOut<T extends PlsqlType | string>(name: string, type: T): Param<T> {
     return this.param(name, type, 'IN OUT')
   }
 

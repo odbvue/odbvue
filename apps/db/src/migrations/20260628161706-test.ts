@@ -4,16 +4,16 @@ const schemaName = process.env.ODBVUE_ADB_SCHEMA_USERNAME ?? ''
 
 const appPackage = odbPackage('pck_app', (p) => {
   p.procedure('version', (proc) => {
-    proc.out('version', 'VARCHAR2')
-    proc.out('test', 'CLOB')
-    proc.body((body) => {
-      // Option B: typed handle \u2014 methods are type-aware (only CLOB has .toBase64/.toBlob)
-      const vVersion = body.variable('v_version', 'VARCHAR2', 200).assign("'1.0.1'")
-      body.assign('version', 'v_version')
+    const version = proc.out('version', 'VARCHAR2')
+    const test = proc.out('test', 'CLOB')
 
-      // Option A: pure function returning a PL/SQL expression string
-      body.assign('test', odbLob.varchar2ToBase64(vVersion.name))
+    proc.body((body) => {
+      const vVersion = body.varchar2('v_version', 200).value('1.0.1')
+
+      body.set(version, vVersion)
+      body.set(test, vVersion.toBase64())
     })
+
     proc.ords()
   })
 })

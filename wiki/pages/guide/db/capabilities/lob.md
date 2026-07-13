@@ -5,7 +5,7 @@
 Use it in migrations for two things:
 
 - install or drop the database package with `toSQLUp()` and `toSQLDown()`
-- generate PL/SQL expressions such as `clobToBase64()` inside package bodies
+- provide typed conversion methods such as `toBase64()` on local variables
 
 ## Install In A Migration
 
@@ -22,14 +22,15 @@ export const migration = defineMigration('20260628161706_test', '1.0.1')
 ## Use In A Procedure Body
 
 ```ts
-import { odbLob, odbPackage } from '@odbvue/odb'
+import { odbPackage } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (p) => {
   p.procedure('version', (proc) => {
-    proc.out('test', 'CLOB')
+    const test = proc.out('test', 'CLOB')
+
     proc.body((body) => {
-      const vVersion = body.variable('v_version', 'VARCHAR2', 200).assign("'1.0.1'")
-      body.assign('test', odbLob.varchar2ToBase64(vVersion.name))
+      const vVersion = body.varchar2('v_version', 200).value('1.0.1')
+      body.set(test, vVersion.toBase64())
     })
   })
 })
@@ -37,17 +38,23 @@ const appPackage = odbPackage('pck_app', (p) => {
 
 ## Typed Variables
 
-Some local variables expose convenience methods based on their PL/SQL type:
+Capture parameter and variable handles, then use `body.set()` for compile-time type checking.
+Local variables expose convenience methods based on their PL/SQL type:
 
 ```ts
+const textResult = proc.out('text_result', 'CLOB')
+const clobResult = proc.out('clob_result', 'CLOB')
+
 proc.body((body) => {
-  const vText = body.variable('v_text', 'VARCHAR2', 200).assign("'hello'")
+  const vText = body.varchar2('v_text', 200).value('hello')
   const vClob = body.variable('v_clob', 'CLOB').assign('empty_clob()')
 
-  body.assign('out_b64_from_text', vText.toBase64())
-  body.assign('out_b64_from_clob', vClob.toBase64())
+  body.set(textResult, vText.toBase64())
+  body.set(clobResult, vClob.toBase64())
 })
 ```
+
+Use `body.assign()` and the functional `odbLob` helpers only as escape hatches for raw PL/SQL expressions.
 
 Supported typed helpers:
 

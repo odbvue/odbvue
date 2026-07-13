@@ -13,6 +13,37 @@ export type PlsqlType =
 
 export type ParameterDirection = 'IN' | 'OUT' | 'IN OUT'
 
+/** A typed PL/SQL value that can be rendered into generated source. */
+export interface PlsqlValue<T extends PlsqlType | string = PlsqlType | string> {
+  readonly type: T
+  toSQL(): string
+}
+
+/** A named PL/SQL value, such as a procedure parameter or local variable. */
+export interface PlsqlReference<
+  T extends PlsqlType | string = PlsqlType | string,
+> extends PlsqlValue<T> {
+  readonly name: string
+}
+
+/** A typed PL/SQL expression produced by a builder helper. */
+export class PlsqlExpression<T extends PlsqlType | string> implements PlsqlValue<T> {
+  constructor(
+    readonly type: T,
+    private readonly sql: string,
+  ) {}
+
+  toSQL(): string {
+    return this.sql
+  }
+}
+
+export type PlsqlRenderable = string | PlsqlValue
+
+export function renderPlsql(value: PlsqlRenderable): string {
+  return typeof value === 'string' ? value : value.toSQL()
+}
+
 export type ParamOptions = {
   length?: number
   default?: string
@@ -26,13 +57,13 @@ export type ParamNode = {
   options: ParamOptions
 }
 
-export class Param {
+export class Param<T extends PlsqlType | string = PlsqlType | string> implements PlsqlReference<T> {
   private _direction: ParameterDirection
   private options: ParamOptions
 
   constructor(
     readonly name: string,
-    readonly type: PlsqlType | string,
+    readonly type: T,
     direction: ParameterDirection = 'IN',
     options: ParamOptions = {},
   ) {
@@ -53,6 +84,10 @@ export class Param {
   inOut(): this {
     this._direction = 'IN OUT'
     return this
+  }
+
+  toSQL(): string {
+    return this.name
   }
 
   length(n: number): this {
@@ -92,12 +127,14 @@ export type LocalVarNode = {
   options: LocalVarOptions
 }
 
-export class LocalVar {
+export class LocalVar<
+  T extends PlsqlType | string = PlsqlType | string,
+> implements PlsqlReference<T> {
   private options: LocalVarOptions
 
   constructor(
     readonly name: string,
-    readonly type: PlsqlType | string,
+    readonly type: T,
     options: LocalVarOptions = {},
   ) {
     this.options = { ...options }
@@ -108,9 +145,13 @@ export class LocalVar {
     return this
   }
 
-  assign(val: string): this {
-    this.options.value = val
+  assign(val: PlsqlRenderable): this {
+    this.options.value = renderPlsql(val)
     return this
+  }
+
+  toSQL(): string {
+    return this.name
   }
 
   toNode(): LocalVarNode {
@@ -138,32 +179,37 @@ export class LocalVar {
 // cycle. The `pck_api_lob.*` strings are duplicated in `api/lob/lob.ts`
 // (Option A functional helpers) — trivial duplication kept intentionally.
 
-export class ClobVar extends LocalVar {
+export class ClobVar extends LocalVar<'CLOB'> {
   /** `pck_api_lob.clob_to_base64(<this>)` — returns CLOB. */
-  toBase64(): string {
-    return `pck_api_lob.clob_to_base64(${this.name})`
+  toBase64(): PlsqlExpression<'CLOB'> {
+    return new PlsqlExpression('CLOB', `pck_api_lob.clob_to_base64(${this.name})`)
   }
   /** `pck_api_lob.clob_to_blob(<this>)` — returns BLOB. */
-  toBlob(): string {
-    return `pck_api_lob.clob_to_blob(${this.name})`
+  toBlob(): PlsqlExpression<'BLOB'> {
+    return new PlsqlExpression('BLOB', `pck_api_lob.clob_to_blob(${this.name})`)
   }
 }
 
-export class BlobVar extends LocalVar {
+export class BlobVar extends LocalVar<'BLOB'> {
   /** `pck_api_lob.blob_to_base64(<this>)` — returns CLOB. */
-  toBase64(): string {
-    return `pck_api_lob.blob_to_base64(${this.name})`
+  toBase64(): PlsqlExpression<'CLOB'> {
+    return new PlsqlExpression('CLOB', `pck_api_lob.blob_to_base64(${this.name})`)
   }
   /** `pck_api_lob.blob_to_clob(<this>)` — returns CLOB. */
-  toClob(): string {
-    return `pck_api_lob.blob_to_clob(${this.name})`
+  toClob(): PlsqlExpression<'CLOB'> {
+    return new PlsqlExpression('CLOB', `pck_api_lob.blob_to_clob(${this.name})`)
   }
 }
 
-export class Varchar2Var extends LocalVar {
+export class Varchar2Var extends LocalVar<'VARCHAR2'> {
+  /** Assign a safely quoted VARCHAR2 literal as the variable's initial value. */
+  value(value: string): this {
+    return this.assign(`'${value.replace(/'/g, "''")}'`)
+  }
+
   /** `pck_api_lob.varchar2_to_base64(<this>)` — returns CLOB. */
-  toBase64(): string {
-    return `pck_api_lob.varchar2_to_base64(${this.name})`
+  toBase64(): PlsqlExpression<'CLOB'> {
+    return new PlsqlExpression('CLOB', `pck_api_lob.varchar2_to_base64(${this.name})`)
   }
 }
 
