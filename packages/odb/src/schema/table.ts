@@ -117,7 +117,15 @@ function emitOracleCreateTable(table: TableNode, options: TableSqlOptions = {}):
 
 function emitOracleDropTable(table: TableNode | string, schema?: string): string {
   const tableName = typeof table === 'string' ? table : table.name
-  return `DROP TABLE ${qualifyName(tableName, schema)} CASCADE CONSTRAINTS;`
+  const name = qualifyName(tableName, schema)
+  return [
+    `BEGIN`,
+    `  EXECUTE IMMEDIATE 'DROP TABLE ${name} CASCADE CONSTRAINTS';`,
+    `EXCEPTION WHEN OTHERS THEN`,
+    `  IF SQLCODE != -942 THEN RAISE; END IF;`,
+    `END;`,
+    `/`,
+  ].join('\n')
 }
 
 function emitOracleColumn(column: ColumnNode): string {

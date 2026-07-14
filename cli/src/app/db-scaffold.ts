@@ -24,7 +24,12 @@ export const runDbScaffold = async (name?: string): Promise<void> => {
   const filePath = path.join(dbDir, 'src', 'migrations', `${namePart}.ts`)
   const template = `import { defineMigration } from '@odbvue/odb'
 
-export const migration = defineMigration('${namePart.replaceAll('-', '_')}', '${nextVersionStr}')
+const schemaName = process.env.ODBVUE_ADB_SCHEMA_USERNAME ?? ''
+
+export const migration = defineMigration('${namePart.replaceAll('-', '_')}', {
+  schema: schemaName,
+  version: '${nextVersionStr}',
+})
   .up(() => {
     return ''
   })

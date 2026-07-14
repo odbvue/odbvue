@@ -54,7 +54,15 @@ export const odbLob = {
 
   /** Drop `pck_api_lob`. Optional schema qualifies the name. */
   toSQLDown(options: { schema?: string } = {}): string {
-    return `DROP PACKAGE ${qualify(LOB_PKG_NAME, options.schema)};`
+    const name = qualify(LOB_PKG_NAME, options.schema)
+    return [
+      `BEGIN`,
+      `  EXECUTE IMMEDIATE 'DROP PACKAGE ${name}';`,
+      `EXCEPTION WHEN OTHERS THEN`,
+      `  IF SQLCODE != -4043 THEN RAISE; END IF;`,
+      `END;`,
+      `/`,
+    ].join('\n')
   },
 
   /** `pck_api_lob.clob_to_blob(<clob>)` \u2192 BLOB */

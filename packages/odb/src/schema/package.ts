@@ -575,7 +575,15 @@ export class Package {
   }
 
   toSQLDown(options: PackageSqlOptions = {}): string {
-    return `DROP PACKAGE ${qualifyName(this.name, options.schema)};`
+    const name = qualifyName(this.name, options.schema)
+    return [
+      `BEGIN`,
+      `  EXECUTE IMMEDIATE 'DROP PACKAGE ${name}';`,
+      `EXCEPTION WHEN OTHERS THEN`,
+      `  IF SQLCODE != -4043 THEN RAISE; END IF;`,
+      `END;`,
+      `/`,
+    ].join('\n')
   }
 }
 

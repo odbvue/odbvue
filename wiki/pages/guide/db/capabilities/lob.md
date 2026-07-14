@@ -14,9 +14,12 @@ import { defineMigration, odbLob } from '@odbvue/odb'
 
 const schemaName = process.env.ODBVUE_ADB_SCHEMA_USERNAME ?? ''
 
-export const migration = defineMigration('20260628161706_test', '1.0.1')
-  .up(() => [odbLob.toSQLUp({ schema: schemaName })])
-  .down(() => [odbLob.toSQLDown({ schema: schemaName })])
+export const migration = defineMigration('20260628161706_test', {
+  schema: schemaName,
+  version: '1.0.1',
+})
+  .up(({ install }) => install(odbLob))
+  .down(({ uninstall }) => uninstall(odbLob))
 ```
 
 ## Use In A Procedure Body

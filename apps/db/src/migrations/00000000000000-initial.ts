@@ -32,4 +32,9 @@ export const migration = defineMigration('00000000000000_initial', '1.0.0')
     appEdition.grantUse(),
     appEdition.setDefault(),
   ])
-  .down(() => [appSchema.toSQLDown(), appEdition.drop()])
+  .down(() => [
+    appSchema.toSQLDown(),
+    appEdition.setDefaultBase(),
+    appEdition.setBase(),
+    appEdition.drop({ cascade: true }),
+  ])

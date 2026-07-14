@@ -35,7 +35,7 @@ The main pieces are:
 Example migration shape:
 
 ```ts
-import { defineMigration, odbPackage, odbOrdsSchema } from '@odbvue/odb'
+import { defineMigration, odbPackage } from '@odbvue/odb'
 
 const schemaName = process.env.ODBVUE_ADB_SCHEMA_USERNAME ?? ''
 
@@ -56,16 +56,12 @@ const appPackage = odbPackage('pck_app', (p) => {
   })
 })
 
-export const migration = defineMigration('20260628161706_test', '1.0.1')
-  .up(() => [
-    appPackage.toSQLUp({ schema: schemaName }),
-    odbOrdsSchema(schemaName).toSQLUp(),
-    appPackage.toOrdsSQL({ schema: schemaName }),
-  ])
-  .down(() => [
-    appPackage.toOrdsDownSQL({ schema: schemaName }),
-    appPackage.toSQLDown({ schema: schemaName }),
-  ])
+export const migration = defineMigration('20260628161706_test', {
+  schema: schemaName,
+  version: '1.0.1',
+})
+  .up(({ install, expose }) => [install(appPackage), expose(appPackage)])
+  .down(({ uninstall, unexpose }) => [unexpose(appPackage), uninstall(appPackage)])
 ```
 
 That single migration can emit package DDL, ORDS registration PL/SQL, and rollback SQL.
@@ -128,7 +124,7 @@ This is useful for additive migrations where a full `CREATE TABLE` is no longer 
 
 ### Migrations
 
-`defineMigration()` is the unit of deployment. Each migration has a name, an `up()` generator, and a `down()` generator.
+`defineMigration()` is the unit of deployment. Its context applies one schema to every lifecycle operation and derives the Oracle edition name from the schema and semantic version.
 
 ```ts
 import { defineMigration, odbTable } from '@odbvue/odb'
@@ -138,10 +134,17 @@ const users = odbTable('app_users', (t) => {
   t.string('email', 320).notNull()
 })
 
-export const migration = defineMigration('20260704120000_app_users', '1.0.2')
-  .up(() => users.toSQLUp({ schema: 'APP_USER' }))
-  .down(() => users.toSQLDown({ schema: 'APP_USER' }))
+export const migration = defineMigration('20260704120000_app_users', {
+  schema: 'APP_USER',
+  version: '1.0.2',
+})
+  .up(({ install }) => install(users))
+  .down(({ uninstall }) => uninstall(users))
 ```
+
+This migration ensures and selects edition `APP_USER_1_0_2`. Set `edition: 'use'` when the release process creates editions separately, or `edition: 'none'` for non-editioned migrations. Bootstrap migrations that create the schema must manage their initial edition explicitly.
+
+Lifecycle helpers are ordered by phase: installs run before service exposure, while service removal runs before uninstalls. Operations in the same phase retain their declared order so dependencies can be installed and removed safely.
 
 In this repository, migrations live in `apps/db/src/migrations`. The CLI compiles them from JavaScript modules in `apps/db/dist/migrations` and writes generated SQL into `apps/db/dist/sql`.
 
@@ -242,7 +245,7 @@ The service contract makes the HTTP method and route visible during code review.
 
 Use `.ords()` only when convention-derived methods and paths are preferred over an explicit public contract.
 
-Schema-level ORDS enablement is separate:
+The migration context enables schema-level ORDS automatically before the first `expose()` operation. It can still be managed explicitly outside the context:
 
 ```ts
 import { odbOrdsSchema } from '@odbvue/odb'
@@ -252,7 +255,7 @@ const sql = odbOrdsSchema('APP_USER').toSQLUp()
 
 ### Editions
 
-`odbEdition` helps with Oracle edition-based deployment.
+Schema-aware migrations normally derive editions automatically. `odbEdition` remains available for bootstrap and release-level operations such as changing the database default edition.
 
 ```ts
 import { odbEdition } from '@odbvue/odb'

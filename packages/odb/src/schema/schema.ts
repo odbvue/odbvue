@@ -62,7 +62,20 @@ export class Schema {
   }
 
   toSQLDown(): string {
-    return `DROP USER ${this.username} CASCADE;`
+    return [
+      `BEGIN`,
+      `  FOR r IN (`,
+      `    SELECT sid, serial#`,
+      `    FROM v$session`,
+      `    WHERE username = '${this.username}'`,
+      `  ) LOOP`,
+      `    EXECUTE IMMEDIATE`,
+      `      'ALTER SYSTEM KILL SESSION ''' || r.sid || ',' || r.serial# || ''' IMMEDIATE';`,
+      `  END LOOP;`,
+      `END;`,
+      `/`,
+      `DROP USER ${this.username} CASCADE;`,
+    ].join('\n')
   }
 }
 

@@ -4,6 +4,7 @@
         "autoimport",
         "odbvue",
         "Ords",
+        "unexpose",
         "Unhead",
         "vuetify"
     ],

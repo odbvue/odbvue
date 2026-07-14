@@ -256,8 +256,11 @@ const splitBySemicolon = (sql: string): string[] => {
  *  1. Split on `/` that appears alone on a line (SQL*Plus PL/SQL block terminator).
  *     Each such segment is a single PL/SQL block (CREATE OR REPLACE PACKAGE/PROCEDURE/
  *     FUNCTION, anonymous BEGIN...END) and must be executed atomically.
- *  2. Any segment that does NOT start with a PL/SQL keyword is treated as plain DDL/DML
- *     and is further split by `;` using the quote-aware splitter.
+ *  2. A segment can start with plain SQL and then contain a PL/SQL block (for example,
+ *     `ALTER SESSION SET EDITION` followed by a package). Split the plain SQL prefix,
+ *     but preserve the following PL/SQL block as one statement.
+ *  3. Any remaining segment is plain DDL/DML and is split by `;` using the quote-aware
+ *     splitter.
  */
 const splitSqlStatements = (sql: string): string[] => {
   const results: string[] = []
@@ -266,7 +269,9 @@ const splitSqlStatements = (sql: string): string[] => {
   const segments = sql.split(/^\/\s*$/m)
 
   const plsqlBlockRegex =
-    /^\s*(CREATE\s+(OR\s+REPLACE\s+)?(PACKAGE|PROCEDURE|FUNCTION|TRIGGER|TYPE)\b|BEGIN\b)/i
+    /^\s*(CREATE\s+(OR\s+REPLACE\s+)?(PACKAGE|PROCEDURE|FUNCTION|TRIGGER|TYPE)\b|BEGIN\b|DECLARE\b)/i
+  const embeddedPlsqlBlockRegex =
+    /(?:^|\n)\s*(?=CREATE\s+(OR\s+REPLACE\s+)?(PACKAGE|PROCEDURE|FUNCTION|TRIGGER|TYPE)\b|BEGIN\b|DECLARE\b)/i
 
   for (const segment of segments) {
     const trimmed = segment.trim()
@@ -276,8 +281,15 @@ const splitSqlStatements = (sql: string): string[] => {
       // PL/SQL block: emit as one statement (the execute loop strips the trailing ';')
       results.push(trimmed)
     } else {
-      // Plain DDL/DML: split by ';' as before
-      results.push(...splitBySemicolon(trimmed))
+      const embeddedPlsql = embeddedPlsqlBlockRegex.exec(trimmed)
+      if (embeddedPlsql && embeddedPlsql.index > 0) {
+        const plainSql = trimmed.slice(0, embeddedPlsql.index).trim()
+        const plsql = trimmed.slice(embeddedPlsql.index).trim()
+        results.push(...splitBySemicolon(plainSql), plsql)
+      } else {
+        // Plain DDL/DML: split by ';' as before
+        results.push(...splitBySemicolon(trimmed))
+      }
     }
   }
 
