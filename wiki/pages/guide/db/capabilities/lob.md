@@ -16,7 +16,6 @@ const schemaName = process.env.ODBVUE_ADB_SCHEMA_USERNAME ?? ''
 
 export const migration = defineMigration('20260628161706_test', {
   schema: schemaName,
-  version: '1.0.1',
 }).install(odbLob)
 ```
 

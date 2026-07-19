@@ -8,7 +8,7 @@ In OdbVue TypeScript does not only describe queries. It also describes:
 - table DDL
 - PL/SQL packages and procedures
 - ORDS REST endpoints
-- edition-based deployment steps
+- blue/green package deployment
 - migration scripts
 
 This makes TypeScript the authoring language, while Oracle SQL and PL/SQL remain the runtime language.
@@ -28,7 +28,7 @@ In practice, the system is closer to a typed SQL and PL/SQL code generator than 
 
 The main pieces are:
 
-- `packages/odb`: fluent builders for Oracle concepts such as tables, packages, ORDS endpoints, editions, and queries.
+- `packages/odb`: fluent builders for Oracle concepts such as tables, packages, ORDS endpoints, and queries.
 - `apps/db`: migration source files that assemble those builders into deployable database changes.
 - `cli db-*` commands: compile and execute the generated SQL.
 
@@ -58,7 +58,6 @@ const appPackage = odbPackage('pck_app', (p) => {
 
 export const migration = defineMigration('20260628161706_test', {
   schema: schemaName,
-  version: '1.0.1',
 })
   .install(appPackage)
   .expose(appPackage)
@@ -86,9 +85,8 @@ This compiles to statements such as:
 
 - `CREATE USER ...`
 - `GRANT CREATE SESSION ...`
-- `ALTER USER ... ENABLE EDITIONS`
 
-This is infrastructure DDL, not application DML.
+This is infrastructure DDL, not application DML. Everything stays in the default `ORA$BASE` edition — OdbVue does not use Oracle editions.
 
 ### DDL: Tables and Indexes
 
@@ -124,7 +122,7 @@ This is useful for additive migrations where a full `CREATE TABLE` is no longer 
 
 ### Migrations
 
-`defineMigration()` is the unit of deployment. You declare what a release contains with `install()` and `expose()`; the framework derives the reverse `down` direction and the Oracle edition ceremony from the schema and semantic version.
+`defineMigration()` is the unit of deployment. You declare what a release contains with `install()` and `expose()`; the framework derives the reverse `down` direction automatically.
 
 ```ts
 import { defineMigration, odbTable } from '@odbvue/odb'
@@ -136,11 +134,10 @@ const users = odbTable('app_users', (t) => {
 
 export const migration = defineMigration('20260704120000_app_users', {
   schema: 'APP_USER',
-  version: '1.0.2',
 }).install(users)
 ```
 
-This migration derives, creates, and selects edition `APP_USER_1_0_2`, installs the artifacts, and makes the edition the default. The `down` direction is generated as the mirror image: it restores the previous migration's edition as the default, drops the artifacts in reverse order, and drops the new edition. Set `edition: 'none'` for non-editioned migrations. Schema-creating bootstrap migrations need no special handling — the framework grants the edition to the schema after the user is created.
+The `down` direction is generated as the mirror image: it drops the artifacts in reverse order. Tables and other plain DDL are installed and rolled back directly. Packages use blue/green deployment (see below), so a redeploy never blocks live callers and rolls back to the previous version instantly.
 
 - `install(artifact)` — schemas, tables, packages, or pre-built APIs (anything with `toSQLUp` / `toSQLDown`).
 - `expose(artifact)` — publishes ORDS endpoints (anything with `toOrdsSQL` / `toOrdsDownSQL`).
@@ -255,21 +252,19 @@ import { odbOrdsSchema } from '@odbvue/odb'
 const sql = odbOrdsSchema('APP_USER').toSQLUp()
 ```
 
-### Editions
+### Blue/Green Package Deployment
 
-Schema-aware migrations derive and manage editions automatically. `odbEdition` remains available for bootstrap and release-level operations such as changing the database default edition by hand.
+Packages are deployed with a blue/green strategy so live callers (ORDS handlers, jobs, other packages) are never blocked by a recompile, and a release can be rolled back instantly. This is handled automatically — `install()` a package and the framework does the rest. Everything stays in `ORA$BASE`; no Oracle editions are used.
 
-```ts
-import { odbEdition } from '@odbvue/odb'
+How it works:
 
-const edition = new odbEdition('1.0.0', 'APP_USER')
+- Each package is created under a colored physical name, e.g. `PCK_APP_BLUE` / `PCK_APP_GREEN`.
+- A stable synonym (`PCK_APP`) points at the active color. All callers reference the synonym, so they resolve to whichever color is live.
+- On each redeploy the framework compiles the **idle** color (the copy nobody is using), then repoints the synonym. Because the recompiled copy is never in use, there is no library-cache lock contention (`ORA-04021`).
+- The active color per object is tracked in the `app_migrations_objects` registry table.
+- `down` reverts by swapping the synonym back to the previous color, which is still present — an instant rollback with no recompile. The first install's `down` drops the package and synonym outright.
 
-edition.ensureCreated()
-edition.grantUse()
-edition.setDefault()
-```
-
-This allows advanced release flows to prepare edition-aware releases explicitly, but everyday migrations never need it — declaring `install()` / `expose()` is enough.
+Colors alternate deterministically per object across the ordered migration set, so the generated SQL is plain, reviewable DDL.
 
 ## CLI Workflow
 
@@ -336,6 +331,6 @@ So "Oracle Database in TypeScript" here does not mean Oracle is replaced by Type
 - Use `odbPackage()` for business logic that belongs in PL/SQL.
 - Use `.service()` and `odbOrdsSchema()` when package procedures should become REST endpoints.
 - Use `defineMigration()` to version all of the above.
-- Use `odbEdition` when the release strategy needs Oracle editions.
+- Packages deploy blue/green automatically for lock-free redeploys and instant rollback.
 
 Together, these pieces form a TypeScript-authored, Oracle-native delivery workflow.

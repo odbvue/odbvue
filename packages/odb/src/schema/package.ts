@@ -64,6 +64,12 @@ export type PackageNode = {
 export type PackageSqlOptions = {
   schema?: string
   orReplace?: boolean
+  /**
+   * Physical object name to emit instead of the public name. Used by the
+   * blue/green deployment flow to create the package under a colored name
+   * (e.g. `PCK_APP_BLUE`) behind a stable synonym.
+   */
+  physicalName?: string
 }
 
 // ── ProcedureBody ─────────────────────────────────────────────────────────────
@@ -511,7 +517,19 @@ export class Package {
   private _procedures: Procedure[] = []
   private _functions: PlsqlFunction[] = []
 
+  /**
+   * Marks this artifact for blue/green deployment. The migration layer creates
+   * the package under a colored physical name and repoints a stable synonym,
+   * so live callers (ORDS handlers, jobs) are never blocked by a recompile.
+   */
+  readonly isBlueGreen = true as const
+
   constructor(readonly name: string) {}
+
+  /** Public (synonym) name callers use — the stable identity across colors. */
+  get objectName(): string {
+    return this.name
+  }
 
   procedure(name: string, build?: (proc: Procedure) => void): Procedure {
     const p = new Procedure(name)
@@ -575,7 +593,7 @@ export class Package {
   }
 
   toSQLDown(options: PackageSqlOptions = {}): string {
-    const name = qualifyName(this.name, options.schema)
+    const name = qualifyName(options.physicalName ?? this.name, options.schema)
     return [
       `BEGIN`,
       `  EXECUTE IMMEDIATE 'DROP PACKAGE ${name}';`,
@@ -594,7 +612,8 @@ function qualifyName(name: string, schema?: string): string {
 }
 
 function emitPackageSpec(pkg: PackageNode, options: PackageSqlOptions = {}): string {
-  const name = qualifyName(pkg.name, options.schema)
+  const identifier = options.physicalName ?? pkg.name
+  const name = qualifyName(identifier, options.schema)
   const orReplace = options.orReplace !== false ? 'OR REPLACE ' : ''
   const lines: string[] = [`CREATE ${orReplace}PACKAGE ${name} AS`]
 
@@ -609,12 +628,13 @@ function emitPackageSpec(pkg: PackageNode, options: PackageSqlOptions = {}): str
     lines.push(`  FUNCTION ${fn.name}(${params}) RETURN ${ret};`)
   }
 
-  lines.push(`END ${pkg.name};`)
+  lines.push(`END ${identifier};`)
   return lines.join('\n')
 }
 
 function emitPackageBody(pkg: PackageNode, options: PackageSqlOptions = {}): string {
-  const name = qualifyName(pkg.name, options.schema)
+  const identifier = options.physicalName ?? pkg.name
+  const name = qualifyName(identifier, options.schema)
   const orReplace = options.orReplace !== false ? 'OR REPLACE ' : ''
   const lines: string[] = [`CREATE ${orReplace}PACKAGE BODY ${name} AS`]
 
@@ -626,7 +646,7 @@ function emitPackageBody(pkg: PackageNode, options: PackageSqlOptions = {}): str
     lines.push(emitFunctionImpl(fn))
   }
 
-  lines.push(`END ${pkg.name};`)
+  lines.push(`END ${identifier};`)
   return lines.join('\n')
 }
 

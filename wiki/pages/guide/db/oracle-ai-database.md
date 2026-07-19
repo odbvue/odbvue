@@ -60,4 +60,4 @@ Partially true. The same nightmare as galloping through endless .net or java sta
 
 ### It does not version
 
-It surely does. The new SQLcl provides project init and very smooth branching and upgrading strategies. Generated Rest services can be easily versioned. Even further - database objects can be versioned using Oracle Edition Based Redefinition, enabling live migrations.
+It surely does. The new SQLcl provides project init and very smooth branching and upgrading strategies. Generated Rest services can be easily versioned. Even further - packages are deployed blue/green behind stable synonyms, enabling lock-free redeploys and instant rollback without touching live callers.

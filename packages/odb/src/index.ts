@@ -7,6 +7,5 @@ export * from './ords.js'
 
 export * from './query/index.js'
 export * from './migration.js'
-export * from './editions.js'
 
 export * from './api/index.js'

@@ -3,29 +3,58 @@ import path from 'path'
 import { pathToFileURL } from 'url'
 
 import { Column, emitColumnDef, type ColumnOptions, type ColumnType } from './schema/column.js'
-import { odbEdition } from './editions.js'
 import { odbOrdsSchema } from './ords.js'
 import { type Schema } from './schema/schema.js'
 import { type Table } from './schema/table.js'
 
+/** Registry table tracking the active blue/green color per deployed object. */
+export const BLUE_GREEN_REGISTRY_TABLE = 'app_migrations_objects'
+
+export type BlueGreenColor = 'BLUE' | 'GREEN'
+
+/** Per-object deployment decision computed across the ordered migration set. */
+export type BlueGreenPlanEntry = {
+  /** Color this migration deploys the object to (the idle copy). */
+  color: BlueGreenColor
+  /** Color the previous version lives on; used to revert on `down`. */
+  previousColor?: BlueGreenColor
+  /** True when this is the object's first install (no previous color). */
+  first: boolean
+}
+
+export type BlueGreenPlan = Map<string, BlueGreenPlanEntry>
+
+/**
+ * An install artifact deployed via blue/green: created under a colored physical
+ * name behind a stable synonym so live callers are never blocked by a recompile.
+ */
+export interface BlueGreenArtifact extends MigrationSqlArtifact {
+  readonly isBlueGreen: true
+  /** Public (synonym) name that callers reference. */
+  readonly objectName: string
+  toSQLUp(options?: { schema?: string; physicalName?: string }): string
+  toSQLDown(options?: { schema?: string; physicalName?: string }): string
+}
+
+function isBlueGreenArtifact(artifact: unknown): artifact is BlueGreenArtifact {
+  return (
+    typeof artifact === 'object' &&
+    artifact !== null &&
+    (artifact as { isBlueGreen?: unknown }).isBlueGreen === true
+  )
+}
+
 export type MigrationOptions = {
   schema: string
-  version: string
-  /**
-   * `ensure` (default) derives an edition from `schema`/`version`, creates it
-   * when missing, selects it, grants the schema use, and makes it the default.
-   * `none` disables all edition handling.
-   */
-  edition?: 'ensure' | 'none'
 }
 
 export type MigrationDefinition = {
   name: string
   schema: string
-  version: string
-  edition?: string
-  up: () => string[]
-  down: (previousVersion?: string) => string[]
+  /** Public names of blue/green artifacts installed by this migration. */
+  blueGreenObjects: string[]
+  up: (plan?: BlueGreenPlan) => string[]
+  down: (plan?: BlueGreenPlan) => string[]
 }
 
 export type MigrationSqlArtifact = {
@@ -43,6 +72,63 @@ function validateSchema(schema: string): string {
     throw new Error(`Invalid Oracle schema name: ${schema}`)
   }
   return schema.toUpperCase()
+}
+
+/** Colored physical object name, e.g. `PCK_APP` + `BLUE` → `PCK_APP_BLUE`. */
+function physicalName(objectName: string, color: BlueGreenColor): string {
+  return `${objectName.toUpperCase()}_${color}`
+}
+
+/** Repoint the stable synonym at the colored physical object. */
+function synonymSwapSql(schema: string, publicName: string, physical: string): string {
+  return `CREATE OR REPLACE SYNONYM ${schema}.${publicName} FOR ${schema}.${physical};`
+}
+
+/** Drop the synonym, tolerating a missing synonym (ORA-01434 / ORA-01432). */
+function synonymDropSql(schema: string, publicName: string): string {
+  return [
+    `BEGIN`,
+    `  EXECUTE IMMEDIATE 'DROP SYNONYM ${schema}.${publicName}';`,
+    `EXCEPTION WHEN OTHERS THEN`,
+    `  IF SQLCODE NOT IN (-1434, -1432) THEN RAISE; END IF;`,
+    `END;`,
+    `/`,
+  ].join('\n')
+}
+
+/** Upsert the active color for an object into the registry table. */
+function registryMergeSql(
+  schema: string,
+  objectName: string,
+  objectType: string,
+  color: BlueGreenColor,
+  migrationName: string,
+): string {
+  const table = `${schema}.${BLUE_GREEN_REGISTRY_TABLE}`
+  const name = objectName.toUpperCase()
+  return [
+    `MERGE INTO ${table} t`,
+    `USING (SELECT '${name}' AS object_name FROM dual) s`,
+    `ON (t.object_name = s.object_name)`,
+    `WHEN MATCHED THEN UPDATE SET`,
+    `  t.object_type = '${objectType}',`,
+    `  t.active_color = '${color}',`,
+    `  t.migration_name = '${migrationName}',`,
+    `  t.updated = SYSTIMESTAMP`,
+    `WHEN NOT MATCHED THEN`,
+    `  INSERT (object_name, object_type, active_color, migration_name)`,
+    `  VALUES ('${name}', '${objectType}', '${color}', '${migrationName}');`,
+  ].join('\n')
+}
+
+/** Remove an object from the registry (first-install rollback). */
+function registryDeleteSql(schema: string, objectName: string): string {
+  return `DELETE FROM ${schema}.${BLUE_GREEN_REGISTRY_TABLE} WHERE object_name = '${objectName.toUpperCase()}';`
+}
+
+/** Resolve the deployment decision for an object, defaulting to a first BLUE install. */
+function resolvePlanEntry(plan: BlueGreenPlan | undefined, objectName: string): BlueGreenPlanEntry {
+  return plan?.get(objectName) ?? { color: 'BLUE', first: true }
 }
 
 export class AlterTableBuilder {
@@ -98,7 +184,7 @@ export class MigrationBuilder {
     return this
   }
 
-  /** Escape hatch: raw SQL run in `down` after edition setup, before uninstalls. */
+  /** Escape hatch: raw SQL run in `down` before uninstalls. */
   downRaw(sql: string | string[]): this {
     this._downRaw.push(...(Array.isArray(sql) ? sql : [sql]))
     return this
@@ -106,51 +192,72 @@ export class MigrationBuilder {
 
   compile(): MigrationDefinition {
     const schema = validateSchema(this._options.schema)
-    const version = this._options.version
-    const edition =
-      (this._options.edition ?? 'ensure') === 'none' ? undefined : new odbEdition(version, schema)
+    const migrationName = this._name
 
-    const up = (): string[] => {
+    const blueGreenObjects = this._installs.filter(isBlueGreenArtifact).map((a) => a.objectName)
+
+    const up = (plan?: BlueGreenPlan): string[] => {
       const sql: string[] = []
-      if (edition) {
-        sql.push(edition.ensureCreated(), edition.setCurrent())
+      for (const artifact of this._installs) {
+        if (isBlueGreenArtifact(artifact)) {
+          const entry = resolvePlanEntry(plan, artifact.objectName)
+          const physical = physicalName(artifact.objectName, entry.color)
+          sql.push(artifact.toSQLUp({ schema, physicalName: physical }))
+          sql.push(synonymSwapSql(schema, artifact.objectName, physical))
+          sql.push(
+            registryMergeSql(schema, artifact.objectName, 'PACKAGE', entry.color, migrationName),
+          )
+        } else {
+          sql.push(artifact.toSQLUp({ schema }))
+        }
       }
-      sql.push(...this._installs.map((a) => a.toSQLUp({ schema })))
       sql.push(...this._upRaw)
-      if (edition) sql.push(edition.grantUse())
       if (this._exposes.length) {
         sql.push(odbOrdsSchema(schema).toSQLUp())
         sql.push(...this._exposes.map((a) => a.toOrdsSQL({ schema })))
       }
-      if (edition) sql.push(edition.setDefault())
       return sql.filter(Boolean)
     }
 
-    const down = (previousVersion?: string): string[] => {
-      const previous =
-        edition && previousVersion ? new odbEdition(previousVersion, schema) : undefined
+    const down = (plan?: BlueGreenPlan): string[] => {
       const sql: string[] = []
-      if (edition) {
-        sql.push(edition.setCurrent())
-        sql.push(previous ? previous.setDefault() : edition.setDefaultBase())
-      }
       if (this._exposes.length) {
         sql.push(...this._exposes.toReversed().map((a) => a.toOrdsDownSQL({ schema })))
       }
       sql.push(...this._downRaw)
-      sql.push(...this._installs.toReversed().map((a) => a.toSQLDown({ schema })))
-      if (edition) {
-        sql.push(previous ? previous.setCurrent() : edition.setBase())
-        sql.push(edition.drop({ cascade: true }))
+      for (const artifact of this._installs.toReversed()) {
+        if (isBlueGreenArtifact(artifact)) {
+          const entry = resolvePlanEntry(plan, artifact.objectName)
+          const physical = physicalName(artifact.objectName, entry.color)
+          if (entry.first || !entry.previousColor) {
+            sql.push(synonymDropSql(schema, artifact.objectName))
+            sql.push(artifact.toSQLDown({ schema, physicalName: physical }))
+            sql.push(registryDeleteSql(schema, artifact.objectName))
+          } else {
+            const previous = physicalName(artifact.objectName, entry.previousColor)
+            sql.push(synonymSwapSql(schema, artifact.objectName, previous))
+            sql.push(artifact.toSQLDown({ schema, physicalName: physical }))
+            sql.push(
+              registryMergeSql(
+                schema,
+                artifact.objectName,
+                'PACKAGE',
+                entry.previousColor,
+                migrationName,
+              ),
+            )
+          }
+        } else {
+          sql.push(artifact.toSQLDown({ schema }))
+        }
       }
       return sql.filter(Boolean)
     }
 
     return {
-      name: this._name,
+      name: migrationName,
       schema,
-      version,
-      edition: edition?.name,
+      blueGreenObjects,
       up,
       down,
     }
@@ -209,16 +316,31 @@ export async function generateMigrationsFromCompiledModules(
     compiled.push((mod.migration as MigrationBuilder).compile())
   }
 
+  // Deterministic blue/green color per object, alternating on each install in
+  // migration order. The k-th install of an object lands on the idle color
+  // (BLUE for odd k, GREEN for even k); the previous version stays on the
+  // opposite color for instant rollback via a synonym swap.
+  const installCounts = new Map<string, number>()
+
   for (let i = 0; i < compiled.length; i++) {
     const mig = compiled[i]
-    const previousVersion = i > 0 ? compiled[i - 1].version : undefined
+
+    const plan: BlueGreenPlan = new Map()
+    for (const objectName of mig.blueGreenObjects) {
+      const k = (installCounts.get(objectName) ?? 0) + 1
+      installCounts.set(objectName, k)
+      const color: BlueGreenColor = k % 2 === 1 ? 'BLUE' : 'GREEN'
+      const previousColor: BlueGreenColor | undefined =
+        k === 1 ? undefined : color === 'BLUE' ? 'GREEN' : 'BLUE'
+      plan.set(objectName, { color, previousColor, first: k === 1 })
+    }
 
     const upPath = path.join(sqlOutputDir, `${mig.name}_up.sql`)
     const downPath = path.join(sqlOutputDir, `${mig.name}_down.sql`)
     result.push(upPath, downPath)
 
-    fs.writeFileSync(upPath, `${emitMigrationSql(mig.up())}\n`, 'utf8')
-    fs.writeFileSync(downPath, `${emitMigrationSql(mig.down(previousVersion))}\n`, 'utf8')
+    fs.writeFileSync(upPath, `${emitMigrationSql(mig.up(plan))}\n`, 'utf8')
+    fs.writeFileSync(downPath, `${emitMigrationSql(mig.down(plan))}\n`, 'utf8')
   }
 
   return result

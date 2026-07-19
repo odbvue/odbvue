@@ -56,7 +56,6 @@ export class Schema {
         TEMPORARY TABLESPACE ${this._tempTablespace}
         QUOTA UNLIMITED ON ${this._dataTablespace};`,
       `GRANT CREATE SESSION TO ${this.username};`,
-      `ALTER USER ${this.username} ENABLE EDITIONS;`,
       ...this._grants.map((grant) => `GRANT ${grant} TO ${this.username};`),
     ].join('\n')
   }
@@ -67,7 +66,7 @@ export class Schema {
       `  FOR r IN (`,
       `    SELECT sid, serial#`,
       `    FROM v$session`,
-      `    WHERE username = '${this.username}'`,
+      `    WHERE username = UPPER('${this.username}')`,
       `  ) LOOP`,
       `    EXECUTE IMMEDIATE`,
       `      'ALTER SYSTEM KILL SESSION ''' || r.sid || ',' || r.serial# || ''' IMMEDIATE';`,
