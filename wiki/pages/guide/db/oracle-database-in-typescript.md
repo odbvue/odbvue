@@ -60,11 +60,11 @@ export const migration = defineMigration('20260628161706_test', {
   schema: schemaName,
   version: '1.0.1',
 })
-  .up(({ install, expose }) => [install(appPackage), expose(appPackage)])
-  .down(({ uninstall, unexpose }) => [unexpose(appPackage), uninstall(appPackage)])
+  .install(appPackage)
+  .expose(appPackage)
 ```
 
-That single migration can emit package DDL, ORDS registration PL/SQL, and rollback SQL.
+That single migration can emit package DDL, ORDS registration PL/SQL, and the matching rollback SQL, which the framework derives automatically.
 
 ## Core Concepts
 
@@ -124,7 +124,7 @@ This is useful for additive migrations where a full `CREATE TABLE` is no longer 
 
 ### Migrations
 
-`defineMigration()` is the unit of deployment. Its context applies one schema to every lifecycle operation and derives the Oracle edition name from the schema and semantic version.
+`defineMigration()` is the unit of deployment. You declare what a release contains with `install()` and `expose()`; the framework derives the reverse `down` direction and the Oracle edition ceremony from the schema and semantic version.
 
 ```ts
 import { defineMigration, odbTable } from '@odbvue/odb'
@@ -137,14 +137,16 @@ const users = odbTable('app_users', (t) => {
 export const migration = defineMigration('20260704120000_app_users', {
   schema: 'APP_USER',
   version: '1.0.2',
-})
-  .up(({ install }) => install(users))
-  .down(({ uninstall }) => uninstall(users))
+}).install(users)
 ```
 
-This migration ensures and selects edition `APP_USER_1_0_2`. Set `edition: 'use'` when the release process creates editions separately, or `edition: 'none'` for non-editioned migrations. Bootstrap migrations that create the schema must manage their initial edition explicitly.
+This migration derives, creates, and selects edition `APP_USER_1_0_2`, installs the artifacts, and makes the edition the default. The `down` direction is generated as the mirror image: it restores the previous migration's edition as the default, drops the artifacts in reverse order, and drops the new edition. Set `edition: 'none'` for non-editioned migrations. Schema-creating bootstrap migrations need no special handling — the framework grants the edition to the schema after the user is created.
 
-Lifecycle helpers are ordered by phase: installs run before service exposure, while service removal runs before uninstalls. Operations in the same phase retain their declared order so dependencies can be installed and removed safely.
+- `install(artifact)` — schemas, tables, packages, or pre-built APIs (anything with `toSQLUp` / `toSQLDown`).
+- `expose(artifact)` — publishes ORDS endpoints (anything with `toOrdsSQL` / `toOrdsDownSQL`).
+- `upRaw(sql)` / `downRaw(sql)` — escape hatches for custom or irreversible SQL.
+
+Artifacts run in the exact order you declare them in `up`, and in reverse for `down`, so dependencies install and roll back safely without hidden reordering.
 
 In this repository, migrations live in `apps/db/src/migrations`. The CLI compiles them from JavaScript modules in `apps/db/dist/migrations` and writes generated SQL into `apps/db/dist/sql`.
 
@@ -255,21 +257,19 @@ const sql = odbOrdsSchema('APP_USER').toSQLUp()
 
 ### Editions
 
-Schema-aware migrations normally derive editions automatically. `odbEdition` remains available for bootstrap and release-level operations such as changing the database default edition.
+Schema-aware migrations derive and manage editions automatically. `odbEdition` remains available for bootstrap and release-level operations such as changing the database default edition by hand.
 
 ```ts
 import { odbEdition } from '@odbvue/odb'
 
 const edition = new odbEdition('1.0.0', 'APP_USER')
 
-edition.create()
+edition.ensureCreated()
 edition.grantUse()
 edition.setDefault()
 ```
 
-This allows a migration to prepare edition-aware releases instead of treating the database as a single mutable runtime.
-
-The initial migration in this repository already uses this pattern.
+This allows advanced release flows to prepare edition-aware releases explicitly, but everyday migrations never need it — declaring `install()` / `expose()` is enough.
 
 ## CLI Workflow
 

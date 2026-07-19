@@ -1,4 +1,4 @@
-import { defineMigration, odbEdition, odbLob, odbPackage } from '@odbvue/odb'
+import { defineMigration, odbLob, odbPackage } from '@odbvue/odb'
 
 const schemaName = process.env.ODBVUE_ADB_SCHEMA_USERNAME ?? ''
 
@@ -22,24 +22,10 @@ const appPackage = odbPackage('pck_app', (p) => {
   })
 })
 
-const edition = new odbEdition('1.0.1', schemaName)
-const prevEdition = new odbEdition('1.0.0', schemaName)
-
 export const migration = defineMigration('20260628161706_test', {
   schema: schemaName,
   version: '1.0.1',
 })
-  .up(({ install, expose }) => [
-    install(odbLob),
-    install(appPackage),
-    expose(appPackage),
-    edition.setDefault(),
-  ])
-  .down(({ uninstall, unexpose }) => [
-    prevEdition.setDefault(),
-    unexpose(appPackage),
-    uninstall(appPackage),
-    uninstall(odbLob),
-    prevEdition.setCurrent(),
-    edition.drop({ cascade: true }),
-  ])
+  .install(odbLob)
+  .install(appPackage)
+  .expose(appPackage)

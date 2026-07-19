@@ -12,8 +12,29 @@ export class odbEdition {
     this.editionName = `${userName.toUpperCase()}_${versionParts.join('_')}`
   }
 
+  /** Fully derived edition name, e.g. `APP_1_0_0`. */
+  get name(): string {
+    return this.editionName
+  }
+
   create(): string {
     return `CREATE EDITION ${this.editionName};`
+  }
+
+  /** Idempotent `CREATE EDITION`: creates the edition only when it is missing. */
+  ensureCreated(): string {
+    const editionLiteral = this.editionName.replace(/'/g, "''")
+    return [
+      'DECLARE',
+      '  v_count PLS_INTEGER;',
+      'BEGIN',
+      `  SELECT COUNT(*) INTO v_count FROM all_editions WHERE edition_name = '${editionLiteral}';`,
+      '  IF v_count = 0 THEN',
+      `    EXECUTE IMMEDIATE 'CREATE EDITION ${this.editionName}';`,
+      '  END IF;',
+      'END;',
+      '/',
+    ].join('\n')
   }
 
   grantUse(): string {

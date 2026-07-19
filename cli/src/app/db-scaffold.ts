@@ -30,12 +30,6 @@ export const migration = defineMigration('${namePart.replaceAll('-', '_')}', {
   schema: schemaName,
   version: '${nextVersionStr}',
 })
-  .up(() => {
-    return ''
-  })
-  .down(() => {
-    return ''
-  })
 `
   fs.writeFileSync(filePath, template)
   logger.muted(`Migration scaffolded to ${filePath}`)
