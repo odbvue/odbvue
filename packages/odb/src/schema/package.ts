@@ -3,6 +3,7 @@ import {
   ClobVar,
   LocalVar,
   Param,
+  PlsqlExpression,
   Varchar2Var,
   type LocalVarNode,
   type ParamNode,
@@ -77,6 +78,17 @@ export type PackageSqlOptions = {
 export class ProcedureBody {
   private _declarations: LocalVar[] = []
   private _statements: StatementNode[] = []
+  private _returnCounter = 0
+
+  /**
+   * @param _returnType   Return type of the enclosing function, if any. Enables
+   *                      `returnQuery()` to declare a correctly typed result var.
+   * @param _returnLength Optional length qualifier for the return type.
+   */
+  constructor(
+    private readonly _returnType?: PlsqlType | string,
+    private readonly _returnLength?: number,
+  ) {}
 
   /**
    * Declare a local variable. Returns the LocalVar so you can chain
@@ -153,8 +165,11 @@ export class ProcedureBody {
   }
 
   /** `RETURN [value];` */
-  return(value?: string): this {
-    this._statements.push({ kind: 'return', value })
+  return(value?: PlsqlRenderable): this {
+    this._statements.push({
+      kind: 'return',
+      value: value === undefined ? undefined : renderPlsql(value),
+    })
     return this
   }
 
@@ -180,6 +195,43 @@ export class ProcedureBody {
   query(qb: AnyQueryBuilder): this {
     this._statements.push({ kind: 'raw', sql: qb.toSQL() })
     return this
+  }
+
+  /**
+   * Emit `SELECT ... INTO <target> ...;` for a target reference (OUT param or
+   * local variable), wiring the query's INTO clause automatically.
+   *
+   * @example
+   * body.selectInto(pVersion, odbQuery().selectFrom('dual').select('...'))
+   */
+  selectInto(
+    target: PlsqlReference,
+    qb: AnyQueryBuilder & { into(target: string): unknown },
+  ): this {
+    qb.into(target.name)
+    return this.query(qb)
+  }
+
+  /**
+   * Emit `SELECT ... INTO <result>;` followed by `RETURN <result>;` for a
+   * function that returns a single queried value. A result variable typed to
+   * the function's return type is declared automatically — no intermediate
+   * local needed in the caller. Only valid inside a function body.
+   *
+   * @example
+   * fn.body((body) =>
+   *   body.returnQuery(odbQuery().selectFrom(usersTable).select('name').where('id', '=', pId)))
+   */
+  returnQuery(qb: AnyQueryBuilder & { into(target: string): unknown }): this {
+    if (this._returnType === undefined) {
+      throw new Error('returnQuery() can only be used inside a function body')
+    }
+    const name = this._returnCounter === 0 ? 'l_return' : `l_return${this._returnCounter}`
+    this._returnCounter++
+    const result = this.variable(name, this._returnType, this._returnLength)
+    qb.into(name)
+    this.query(qb)
+    return this.return(result)
   }
 
   /**
@@ -490,7 +542,7 @@ export class PlsqlFunction {
    * If omitted the body will emit `RETURN NULL;`.
    */
   body(build: (body: ProcedureBody) => void): this {
-    this._body = new ProcedureBody()
+    this._body = new ProcedureBody(this.returnType, this._returnTypeOptions.length)
     build(this._body)
     return this
   }
@@ -547,6 +599,28 @@ export class Package {
     build?.(f)
     this._functions.push(f)
     return f
+  }
+
+  /**
+   * Build a typed call expression to a member of this package, e.g.
+   * `pck_api_settings.get_value('APP_VERSION')`. The return type is inferred
+   * from the declared function (defaults to VARCHAR2). Callers reference the
+   * package by name and rely on definer rights for schema resolution.
+   *
+   * @example
+   * body.selectInto(pVersion,
+   *   odbQuery().selectFrom('dual').select(settings.call('get_value', odbLiteral('APP_VERSION'))))
+   */
+  call(member: string, ...args: PlsqlRenderable[]): PlsqlExpression<PlsqlType | string> {
+    const fn = this._functions.find((f) => f.name.toUpperCase() === member.toUpperCase())
+    const returnType: PlsqlType | string = fn?.returnType ?? 'VARCHAR2'
+    const rendered = args.map(renderPlsql).join(', ')
+    return new PlsqlExpression(returnType, `${this.name}.${member}(${rendered})`)
+  }
+
+  /** True when any procedure declares an ORDS service/endpoint. */
+  hasOrdsEndpoints(): boolean {
+    return this._procedures.some((p) => p.buildOrdsEndpoint(this.name) !== undefined)
   }
 
   toNode(): PackageNode {

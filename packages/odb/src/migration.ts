@@ -6,6 +6,7 @@ import { Column, emitColumnDef, type ColumnOptions, type ColumnType } from './sc
 import { odbOrdsSchema } from './ords.js'
 import { type Schema } from './schema/schema.js'
 import { type Table } from './schema/table.js'
+import type { AnyQueryBuilder } from './schema/package.js'
 
 /** Registry table tracking the active blue/green color per deployed object. */
 export const BLUE_GREEN_REGISTRY_TABLE = 'app_migrations_objects'
@@ -42,6 +43,30 @@ function isBlueGreenArtifact(artifact: unknown): artifact is BlueGreenArtifact {
     artifact !== null &&
     (artifact as { isBlueGreen?: unknown }).isBlueGreen === true
   )
+}
+
+function isServiceArtifact(artifact: unknown): artifact is MigrationServiceArtifact {
+  return (
+    typeof artifact === 'object' &&
+    artifact !== null &&
+    typeof (artifact as { toOrdsSQL?: unknown }).toOrdsSQL === 'function'
+  )
+}
+
+/**
+ * True when a service artifact actually declares endpoints. Artifacts that can
+ * expose services but currently declare none are not auto-published.
+ */
+function hasServiceEndpoints(artifact: MigrationServiceArtifact): boolean {
+  const maybe = artifact as { hasOrdsEndpoints?: () => boolean }
+  return typeof maybe.hasOrdsEndpoints === 'function' ? maybe.hasOrdsEndpoints() : true
+}
+
+/** Apply the migration schema to a query builder that supports deferred qualification. */
+function applyQuerySchema<T extends AnyQueryBuilder>(query: T, schema: string): T {
+  const maybe = query as { resolveSchema?: (s: string) => unknown }
+  if (typeof maybe.resolveSchema === 'function') maybe.resolveSchema(schema)
+  return query
 }
 
 export type MigrationOptions = {
@@ -160,6 +185,8 @@ export class MigrationBuilder {
   private readonly _exposes: MigrationServiceArtifact[] = []
   private readonly _upRaw: string[] = []
   private readonly _downRaw: string[] = []
+  private readonly _upQueries: AnyQueryBuilder[] = []
+  private readonly _downQueries: AnyQueryBuilder[] = []
 
   constructor(
     private readonly _name: string,
@@ -169,12 +196,21 @@ export class MigrationBuilder {
   /** Install a schema artifact (schema, table, package, pre-built api). */
   install(artifact: MigrationSqlArtifact): this {
     this._installs.push(artifact)
+    // Auto-publish ORDS endpoints declared on installed service artifacts
+    // (e.g. a package whose procedures call `.service(...)`), so authors no
+    // longer need a separate `.expose()` call. Explicit `.expose()` still works
+    // and is deduped.
+    if (isServiceArtifact(artifact) && hasServiceEndpoints(artifact)) {
+      this.expose(artifact)
+    }
     return this
   }
 
   /** Publish the ORDS endpoints declared by a service artifact (e.g. a package). */
   expose(artifact: MigrationServiceArtifact): this {
-    this._exposes.push(artifact)
+    if (!this._exposes.includes(artifact)) {
+      this._exposes.push(artifact)
+    }
     return this
   }
 
@@ -187,6 +223,18 @@ export class MigrationBuilder {
   /** Escape hatch: raw SQL run in `down` before uninstalls. */
   downRaw(sql: string | string[]): this {
     this._downRaw.push(...(Array.isArray(sql) ? sql : [sql]))
+    return this
+  }
+
+  /** Execute a query builder statement during `up`. */
+  upQuery(query: AnyQueryBuilder): this {
+    this._upQueries.push(query)
+    return this
+  }
+
+  /** Execute a query builder statement during `down`. */
+  downQuery(query: AnyQueryBuilder): this {
+    this._downQueries.push(query)
     return this
   }
 
@@ -212,6 +260,7 @@ export class MigrationBuilder {
         }
       }
       sql.push(...this._upRaw)
+      sql.push(...this._upQueries.map((q) => applyQuerySchema(q, schema).toSQL()))
       if (this._exposes.length) {
         sql.push(odbOrdsSchema(schema).toSQLUp())
         sql.push(...this._exposes.map((a) => a.toOrdsSQL({ schema })))
@@ -225,6 +274,7 @@ export class MigrationBuilder {
         sql.push(...this._exposes.toReversed().map((a) => a.toOrdsDownSQL({ schema })))
       }
       sql.push(...this._downRaw)
+      sql.push(...this._downQueries.map((q) => applyQuerySchema(q, schema).toSQL()))
       for (const artifact of this._installs.toReversed()) {
         if (isBlueGreenArtifact(artifact)) {
           const entry = resolvePlanEntry(plan, artifact.objectName)

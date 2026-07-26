@@ -44,6 +44,24 @@ export function renderPlsql(value: PlsqlRenderable): string {
   return typeof value === 'string' ? value : value.toSQL()
 }
 
+/**
+ * Build a typed PL/SQL literal expression. Strings are safely single-quoted
+ * (embedded quotes doubled); numbers render as-is.
+ *
+ * @example
+ * odbLiteral('APP_VERSION') // → 'APP_VERSION' (VARCHAR2)
+ * odbLiteral(42)            // → 42 (NUMBER)
+ */
+export function odbLiteral(value: string): PlsqlExpression<'VARCHAR2'>
+export function odbLiteral(value: number): PlsqlExpression<'NUMBER'>
+export function odbLiteral(
+  value: string | number,
+): PlsqlExpression<'VARCHAR2'> | PlsqlExpression<'NUMBER'> {
+  return typeof value === 'number'
+    ? new PlsqlExpression('NUMBER', String(value))
+    : new PlsqlExpression('VARCHAR2', `'${value.replace(/'/g, "''")}'`)
+}
+
 export type ParamOptions = {
   length?: number
   default?: string
