@@ -116,6 +116,47 @@ proc.body((body) => {
 
 See the [JWT capability page](./jwt) for details.
 
+## Settings
+
+Key/value settings store with AES-256 encryption for secrets. Backed by the odb framework package `odb_settings` and the `odb_settings_store` table.
+
+### Install
+
+```ts
+import { odbSettings } from '@odbvue/odb'
+
+// Fallback key defaults to a built-in dev key; override via ODBVUE_SETTINGS_MASTER_KEY
+odbSettings.toSQLUp({ schema: 'APP_USER' })
+odbSettings.toSQLDown({ schema: 'APP_USER' })
+```
+
+### Expression Helpers
+
+```ts
+odbSettings.read(odbLiteral('API_URL'))
+odbSettings.write(odbLiteral('API_URL'), 'v_url', { name: odbLiteral('Api Url') })
+odbSettings.write(odbLiteral('API_KEY'), 'v_key', { secret: true }) // encrypted at rest
+odbSettings.remove(odbLiteral('API_URL'))
+```
+
+### Seed
+
+Schema-aware migration artifact that upserts settings (install after `odbSettings`):
+
+```ts
+odbSettings.seed({ id: 'APP_VERSION', name: 'Application version', value: '1.0.0' })
+```
+
+### Example
+
+```ts
+const url = proc.out('p_url', 'VARCHAR2')
+
+proc.body((body) => {
+  body.set(url, odbSettings.read(odbLiteral('API_URL')))
+})
+```
+
 ## ORDS Services
 
 Expose a package procedure with an explicit HTTP contract:

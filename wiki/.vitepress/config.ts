@@ -67,6 +67,7 @@ export default defineConfig({
                 { text: 'Lob', link: '/guide/db/capabilities/lob' },
                 { text: 'JWT', link: '/guide/db/capabilities/jwt' },
                 { text: 'Audit', link: '/guide/db/capabilities/audit' },
+                { text: 'Settings', link: '/guide/db/capabilities/settings' },
               ],
             },
             { text: 'Under the hood', link: '/guide/db/under-the-hood' },
