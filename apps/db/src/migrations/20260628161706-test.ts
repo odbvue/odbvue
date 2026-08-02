@@ -1,4 +1,4 @@
-import { defineMigration, odbLiteral, odbLob, odbPackage, odbQuery, odbTable } from '@odbvue/odb'
+import { defineMigration, odbLiteral, odbLob, odbAudit, odbPackage, odbQuery, odbTable } from '@odbvue/odb'
 
 const schemaName = (process.env.ODBVUE_ADB_SCHEMA_USERNAME ?? '').toUpperCase()
 
@@ -36,6 +36,7 @@ const appPackage = odbPackage('pck_app', (p) => {
 
     proc.body((body) =>
       body
+        .auditEvent('version info requested')
         .selectInto(
           version,
           odbQuery()
@@ -57,6 +58,7 @@ export const migration = defineMigration('20260628161706_test', {
   schema: schemaName,
 })
   .install(odbLob)
+  .install(odbAudit)
   .install(appSettingsTable)
   .install(settingsPackage)
   .install(appPackage)

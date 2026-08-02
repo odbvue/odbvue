@@ -186,6 +186,52 @@ export class ProcedureBody {
   }
 
   /**
+   * Emit an `odb_audit` log statement. `message` is a plain text body (quoted
+   * automatically); `attributes` is a JSON object whose keys are OTel attribute
+   * names and whose values are PL/SQL expressions (bare variable, literal, or
+   * nested call). Requires the `odb_audit` framework package to be installed.
+   *
+   * Duplicates the `odb_audit.*` call strings here (rather than importing from
+   * `packages/framework/audit`) to keep the schema layer free of a
+   * schema→packages import cycle.
+   */
+  private audit(severity: string, message: string, attributes?: Record<string, string>): this {
+    const body = `'${message.replace(/'/g, "''")}'`
+    const args = attributes ? `${body}, ${renderAuditAttributes(attributes)}` : body
+    return this.raw(`odb_audit.${severity}(${args})`)
+  }
+
+  /** `odb_audit.debug(<message>[, <attributes>])` */
+  auditDebug(message: string, attributes?: Record<string, string>): this {
+    return this.audit('debug', message, attributes)
+  }
+
+  /** `odb_audit.info(<message>[, <attributes>])` */
+  auditInfo(message: string, attributes?: Record<string, string>): this {
+    return this.audit('info', message, attributes)
+  }
+
+  /** `odb_audit.warn(<message>[, <attributes>])` */
+  auditWarn(message: string, attributes?: Record<string, string>): this {
+    return this.audit('warn', message, attributes)
+  }
+
+  /** `odb_audit.error(<message>[, <attributes>])` */
+  auditError(message: string, attributes?: Record<string, string>): this {
+    return this.audit('error', message, attributes)
+  }
+
+  /** `odb_audit.fatal(<message>[, <attributes>])` */
+  auditFatal(message: string, attributes?: Record<string, string>): this {
+    return this.audit('fatal', message, attributes)
+  }
+
+  /** Record an audit event at INFO severity (alias of `auditInfo`). */
+  auditEvent(message: string, attributes?: Record<string, string>): this {
+    return this.audit('info', message, attributes)
+  }
+
+  /**
    * Execute a query builder statement (INSERT, UPDATE, DELETE, or standalone SELECT).
    * Calls `.toSQL()` on the builder and emits the result as a statement.
    *
@@ -254,6 +300,17 @@ export class ProcedureBody {
 }
 
 // ── Procedure ─────────────────────────────────────────────────────────────────
+
+/**
+ * Build a `JSON_OBJECT(...)` expression from an attributes map for `odb_audit`.
+ * Keys are rendered as text literals; values are treated as PL/SQL expressions.
+ */
+function renderAuditAttributes(attributes: Record<string, string>): string {
+  const pairs = Object.entries(attributes)
+    .map(([key, value]) => `'${key.replace(/'/g, "''")}' VALUE ${value}`)
+    .join(', ')
+  return `JSON_OBJECT(${pairs} RETURNING CLOB)`
+}
 
 /**
  * Maps a PL/SQL type to the nearest ORDS parameter type.

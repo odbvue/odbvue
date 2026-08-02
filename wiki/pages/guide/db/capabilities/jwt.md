@@ -34,10 +34,12 @@ const appPackage = odbPackage('pck_app', (p) => {
     const token = proc.out('token', 'VARCHAR2')
 
     proc.body((body) => {
-      const vPayload = body.varchar2('v_payload', 2000).assign(
-        `JSON_OBJECT('sub' VALUE p_uuid, 'iss' VALUE 'odbvue', ` +
-          `'iat' VALUE odb_jwt.to_epoch(), 'exp' VALUE odb_jwt.to_epoch() + 3600)`,
-      )
+      const vPayload = body
+        .varchar2('v_payload', 2000)
+        .assign(
+          `JSON_OBJECT('sub' VALUE p_uuid, 'iss' VALUE 'odbvue', ` +
+            `'iat' VALUE odb_jwt.to_epoch(), 'exp' VALUE odb_jwt.to_epoch() + 3600)`,
+        )
       body.set(token, odbJwt.encode('v_payload', `'my-secret'`))
     })
   })
@@ -65,17 +67,17 @@ proc.body((body) => {
 
 ## Expression Helpers
 
-| Helper                              | PL/SQL                              | Returns                              |
-| ----------------------------------- | ----------------------------------- | ------------------------------------ |
-| `encode(payload, secret)`           | `odb_jwt.encode`                    | `VARCHAR2` — signed `header.payload.signature` |
-| `verify(token, secret)`             | `odb_jwt.verify`                    | `0`/`1` — valid signature            |
-| `payload(token)`                    | `odb_jwt.payload`                   | `VARCHAR2` — decoded JSON claims (no check) |
-| `claim(token, name)`                | `odb_jwt.claim`                     | `VARCHAR2` — a single claim (no check) |
-| `isExpired(token, leeway?)`         | `odb_jwt.is_expired`                | `0`/`1` — `exp` in the past          |
-| `base64urlEncode(input)`            | `odb_jwt.base64url_encode`          | `VARCHAR2`                           |
-| `base64urlDecode(input)`            | `odb_jwt.base64url_decode`          | `VARCHAR2`                           |
-| `toEpoch(timestamp?)`               | `odb_jwt.to_epoch`                  | `INTEGER` — Unix seconds (defaults to now, UTC) |
-| `fromEpoch(epoch)`                  | `odb_jwt.from_epoch`                | `TIMESTAMP` (UTC)                    |
+| Helper                      | PL/SQL                     | Returns                                         |
+| --------------------------- | -------------------------- | ----------------------------------------------- |
+| `encode(payload, secret)`   | `odb_jwt.encode`           | `VARCHAR2` — signed `header.payload.signature`  |
+| `verify(token, secret)`     | `odb_jwt.verify`           | `0`/`1` — valid signature                       |
+| `payload(token)`            | `odb_jwt.payload`          | `VARCHAR2` — decoded JSON claims (no check)     |
+| `claim(token, name)`        | `odb_jwt.claim`            | `VARCHAR2` — a single claim (no check)          |
+| `isExpired(token, leeway?)` | `odb_jwt.is_expired`       | `0`/`1` — `exp` in the past                     |
+| `base64urlEncode(input)`    | `odb_jwt.base64url_encode` | `VARCHAR2`                                      |
+| `base64urlDecode(input)`    | `odb_jwt.base64url_decode` | `VARCHAR2`                                      |
+| `toEpoch(timestamp?)`       | `odb_jwt.to_epoch`         | `INTEGER` — Unix seconds (defaults to now, UTC) |
+| `fromEpoch(epoch)`          | `odb_jwt.from_epoch`       | `TIMESTAMP` (UTC)                               |
 
 ## Notes
 

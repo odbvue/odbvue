@@ -71,10 +71,46 @@ odbJwt.fromEpoch('v_epoch')
 const token = proc.out('p_token', 'VARCHAR2')
 
 proc.body((body) => {
-  const vPayload = body.varchar2('v_payload', 2000).assign(
-    `JSON_OBJECT('sub' VALUE 'u1', 'exp' VALUE odb_jwt.to_epoch() + 3600)`,
-  )
+  const vPayload = body
+    .varchar2('v_payload', 2000)
+    .assign(`JSON_OBJECT('sub' VALUE 'u1', 'exp' VALUE odb_jwt.to_epoch() + 3600)`)
   body.set(token, odbJwt.encode('v_payload', `'my-secret'`))
+})
+```
+
+## Audit
+
+OpenTelemetry-aligned audit logging (logs only). Backed by the odb framework package `odb_audit` and the `odb_audit_logs` table.
+
+### Install
+
+```ts
+import { odbAudit } from '@odbvue/odb'
+
+odbAudit.toSQLUp({ schema: 'APP_USER' })
+odbAudit.toSQLDown({ schema: 'APP_USER' })
+```
+
+### Expression Helpers
+
+```ts
+odbAudit.log("'INFO'", "'started'")
+odbAudit.log("'INFO'", "'started'", 'v_attributes', 'systimestamp')
+odbAudit.debug("'msg'")
+odbAudit.info("'msg'", 'v_attributes')
+odbAudit.warn("'msg'")
+odbAudit.error("'msg'", 'v_attributes')
+odbAudit.fatal("'msg'")
+odbAudit.severityNumber("'WARN'")
+odbAudit.bulk('v_json_array')
+odbAudit.purge('v_cutoff')
+```
+
+### Example
+
+```ts
+proc.body((body) => {
+  body.auditEvent('user logged in', { 'user.id': 'p_uuid' })
 })
 ```
 

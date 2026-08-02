@@ -66,6 +66,7 @@ export default defineConfig({
                 { text: 'Oracle Packages', link: '/guide/db/capabilities/oracle-packages' },
                 { text: 'Lob', link: '/guide/db/capabilities/lob' },
                 { text: 'JWT', link: '/guide/db/capabilities/jwt' },
+                { text: 'Audit', link: '/guide/db/capabilities/audit' },
               ],
             },
             { text: 'Under the hood', link: '/guide/db/under-the-hood' },

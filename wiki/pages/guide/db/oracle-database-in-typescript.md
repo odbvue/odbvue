@@ -247,7 +247,7 @@ export const migration = defineMigration('20260704120000_lob', {
 
 Once installed, call them from your own package bodies (`odbLob.varchar2ToBase64('v_text')`) or through the typed variable helpers (`ClobVar.toBase64()`). See the LOB capability page for details.
 
-Other framework packages follow the same pattern — for example `odb_jwt` (`odbJwt`) signs and verifies JSON Web Tokens with HS256. See the JWT capability page for details.
+Other framework packages follow the same pattern — for example `odb_jwt` (`odbJwt`) signs and verifies JSON Web Tokens with HS256, and `odb_audit` (`odbAudit`) writes OpenTelemetry-aligned audit logs. See the JWT and Audit capability pages for details.
 
 ### ORDS: REST Endpoints From PL/SQL
 
