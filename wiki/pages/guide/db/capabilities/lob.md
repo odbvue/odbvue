@@ -1,6 +1,6 @@
 # LOB
 
-`odbLob` exposes a pre-installed Oracle package, `pck_api_lob`, for common LOB and Base64 conversions.
+`odbLob` exposes an odb framework package, `odb_lob`, for common LOB and Base64 conversions. It is installed into your schema by a migration (it is not a native Oracle built-in).
 
 Use it in migrations for two things:
 

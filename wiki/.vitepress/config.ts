@@ -62,7 +62,8 @@ export default defineConfig({
               text: 'Capabilities',
               collapsed: true,
               items: [
-                { text: 'API Reference', link: '/guide/db/capabilities/api-reference' },
+                { text: 'Framework Packages', link: '/guide/db/capabilities/api-reference' },
+                { text: 'Oracle Packages', link: '/guide/db/capabilities/oracle-packages' },
                 { text: 'Lob', link: '/guide/db/capabilities/lob' },
               ],
             },

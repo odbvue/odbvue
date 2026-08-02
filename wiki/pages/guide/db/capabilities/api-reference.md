@@ -2,7 +2,7 @@
 
 ## LOB
 
-Package for LOB processing and Base64 conversion. Backed by the Oracle package `pck_api_lob`.
+Package for LOB processing and Base64 conversion. Backed by the odb framework package `odb_lob`.
 
 ### Install
 

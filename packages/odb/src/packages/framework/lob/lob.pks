@@ -1,4 +1,4 @@
-CREATE OR REPLACE PACKAGE pck_api_lob AS -- Package for LOB processing. Credit: https://github.com/paulzip-dev/Base64
+CREATE OR REPLACE PACKAGE odb_lob AS -- Package for LOB processing. Credit: https://github.com/paulzip-dev/Base64
 
     SUBTYPE boolean IS PLS_INTEGER RANGE 0..1;
     FUNCTION clob_to_blob ( -- Function converts CLOB to BLOB

@@ -8,4 +8,4 @@ export * from './ords.js'
 export * from './query/index.js'
 export * from './migration.js'
 
-export * from './api/index.js'
+export * from './packages/index.js'

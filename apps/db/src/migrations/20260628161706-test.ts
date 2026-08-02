@@ -32,20 +32,23 @@ const settingsPackage = odbPackage('pck_api_settings', (p) => {
 const appPackage = odbPackage('pck_app', (p) => {
   p.procedure('me', (proc) => {
     const version = proc.out('version', 'VARCHAR2')
+    const versionBase64 = proc.out('version_base64', 'CLOB')
 
     proc.body((body) =>
-      body.selectInto(
-        version,
-        odbQuery()
-          .selectFrom('dual')
-          .select(settingsPackage.call('get_value', odbLiteral('APP_VERSION'))),
-      ),
+      body
+        .selectInto(
+          version,
+          odbQuery()
+            .selectFrom('dual')
+            .select(settingsPackage.call('get_value', odbLiteral('APP_VERSION'))),
+        )
+        .assign(versionBase64, odbLob.varchar2ToBase64(version.toSQL())),
     )
 
     proc.service({
       method: 'GET',
       path: '/auth/me',
-      summary: 'Returns the current application version',
+      summary: 'Returns the current application version (plus its Base64 encoding)',
     })
   })
 })

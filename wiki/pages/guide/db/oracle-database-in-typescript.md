@@ -207,6 +207,46 @@ This emits both:
 
 This is the main way to keep database business logic close to the data while still authoring it in TypeScript.
 
+### Oracle Built-in Packages
+
+Oracle ships many built-in packages (`UTL_RAW`, `UTL_ENCODE`, `DBMS_LOB`, `DBMS_CRYPTO`, and so on). OdbVue provides typed TypeScript wrappers for the most common ones so you can compose calls inside a package body without hand-writing PL/SQL call strings. These packages already exist in every database, so there is no install step.
+
+```ts
+import { odbDbmsCrypto, odbPackage } from '@odbvue/odb'
+
+const secure = odbPackage('pck_secure', (pkg) => {
+  pkg.func('sha256', 'RAW', (fn) => {
+    const pData = fn.in('p_data', 'RAW')
+    fn.body((body) => {
+      body.return(odbDbmsCrypto.hash(pData, odbDbmsCrypto.HASH_SH256))
+    })
+  })
+})
+```
+
+Each wrapper returns a typed expression whose PL/SQL return type flows into `body.set()`, so type mismatches are caught at compile time. Algorithm constants (`odbDbmsCrypto.HASH_SH256`) and helpers (`odbDbmsCrypto.cipherSuite(...)`) are provided too. `DBMS_LOB` and `DBMS_CRYPTO` procedures — the ones with `OUT` parameters — return the call string for use with `body.raw(...)` instead of an expression.
+
+Available wrappers:
+
+- `odbUtlRaw` — RAW manipulation, bitwise operations, and casts (`UTL_RAW`)
+- `odbUtlEncode` — Base64, quoted-printable, and uuencode (`UTL_ENCODE`)
+- `odbDbmsLob` — LOB length/substr/compare functions and read/write procedures (`DBMS_LOB`)
+- `odbDbmsCrypto` — hashing, MAC, encrypt/decrypt, sign/verify, and random generators (`DBMS_CRYPTO`)
+
+### Framework Packages
+
+OdbVue also ships a small set of reusable PL/SQL packages of its own — _framework packages_ — whose SQL source lives inside `@odbvue/odb`. Unlike the built-in wrappers, these must be created in your schema, so you `install()` them in a migration. They follow the `odb_*` naming convention; for example the LOB/Base64 helper is the `odb_lob` package, exposed in TypeScript as `odbLob`.
+
+```ts
+import { defineMigration, odbLob } from '@odbvue/odb'
+
+export const migration = defineMigration('20260704120000_lob', {
+  schema: 'APP_USER',
+}).install(odbLob)
+```
+
+Once installed, call them from your own package bodies (`odbLob.varchar2ToBase64('v_text')`) or through the typed variable helpers (`ClobVar.toBase64()`). See the LOB capability page for details.
+
 ### ORDS: REST Endpoints From PL/SQL
 
 ORDS support is built into the same model.
@@ -329,6 +369,8 @@ So "Oracle Database in TypeScript" here does not mean Oracle is replaced by Type
 - Use `odbTable()` and `alterTable()` for DDL.
 - Use `odbQuery()` for DML and read queries.
 - Use `odbPackage()` for business logic that belongs in PL/SQL.
+- Use the built-in wrappers (`odbUtlRaw`, `odbUtlEncode`, `odbDbmsLob`, `odbDbmsCrypto`) to call Oracle's own packages from a package body.
+- Use framework packages such as `odbLob` for odb-provided helpers that install into your schema under the `odb_*` naming convention.
 - Use `.service()` and `odbOrdsSchema()` when package procedures should become REST endpoints.
 - Use `defineMigration()` to version all of the above.
 - Packages deploy blue/green automatically for lock-free redeploys and instant rollback.

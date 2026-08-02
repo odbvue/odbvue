@@ -189,33 +189,33 @@ export class LocalVar<
 // ── Typed LocalVar subclasses (Option B: type-aware handles) ────────────────
 //
 // These extend LocalVar with PL/SQL expression helpers whose implementation
-// lives in the pre-installed `pck_api_lob` package. Each helper returns a
+// lives in the pre-installed `odb_lob` package. Each helper returns a
 // PL/SQL expression string that can be passed to `body.assign(target, expr)`.
 //
-// Kept alongside LocalVar (rather than in api/lob/lob.ts) so `ProcedureBody`
-// can dispatch on the type literal without introducing a schema→api import
-// cycle. The `pck_api_lob.*` strings are duplicated in `api/lob/lob.ts`
-// (Option A functional helpers) — trivial duplication kept intentionally.
+// Kept alongside LocalVar (rather than in packages/framework/lob/lob.ts) so
+// `ProcedureBody` can dispatch on the type literal without introducing a
+// schema→packages import cycle. The `odb_lob.*` strings are duplicated in
+// `packages/framework/lob/lob.ts` — trivial duplication kept intentionally.
 
 export class ClobVar extends LocalVar<'CLOB'> {
-  /** `pck_api_lob.clob_to_base64(<this>)` — returns CLOB. */
+  /** `odb_lob.clob_to_base64(<this>)` — returns CLOB. */
   toBase64(): PlsqlExpression<'CLOB'> {
-    return new PlsqlExpression('CLOB', `pck_api_lob.clob_to_base64(${this.name})`)
+    return new PlsqlExpression('CLOB', `odb_lob.clob_to_base64(${this.name})`)
   }
-  /** `pck_api_lob.clob_to_blob(<this>)` — returns BLOB. */
+  /** `odb_lob.clob_to_blob(<this>)` — returns BLOB. */
   toBlob(): PlsqlExpression<'BLOB'> {
-    return new PlsqlExpression('BLOB', `pck_api_lob.clob_to_blob(${this.name})`)
+    return new PlsqlExpression('BLOB', `odb_lob.clob_to_blob(${this.name})`)
   }
 }
 
 export class BlobVar extends LocalVar<'BLOB'> {
-  /** `pck_api_lob.blob_to_base64(<this>)` — returns CLOB. */
+  /** `odb_lob.blob_to_base64(<this>)` — returns CLOB. */
   toBase64(): PlsqlExpression<'CLOB'> {
-    return new PlsqlExpression('CLOB', `pck_api_lob.blob_to_base64(${this.name})`)
+    return new PlsqlExpression('CLOB', `odb_lob.blob_to_base64(${this.name})`)
   }
-  /** `pck_api_lob.blob_to_clob(<this>)` — returns CLOB. */
+  /** `odb_lob.blob_to_clob(<this>)` — returns CLOB. */
   toClob(): PlsqlExpression<'CLOB'> {
-    return new PlsqlExpression('CLOB', `pck_api_lob.blob_to_clob(${this.name})`)
+    return new PlsqlExpression('CLOB', `odb_lob.blob_to_clob(${this.name})`)
   }
 }
 
@@ -225,9 +225,9 @@ export class Varchar2Var extends LocalVar<'VARCHAR2'> {
     return this.assign(`'${value.replace(/'/g, "''")}'`)
   }
 
-  /** `pck_api_lob.varchar2_to_base64(<this>)` — returns CLOB. */
+  /** `odb_lob.varchar2_to_base64(<this>)` — returns CLOB. */
   toBase64(): PlsqlExpression<'CLOB'> {
-    return new PlsqlExpression('CLOB', `pck_api_lob.varchar2_to_base64(${this.name})`)
+    return new PlsqlExpression('CLOB', `odb_lob.varchar2_to_base64(${this.name})`)
   }
 }
 

@@ -16,10 +16,13 @@
     "format": "oxfmt",
     "lint": "oxlint",
     "type-check": "tsc -p tsconfig.json --noEmit",
-    "check": "pnpm format && pnpm lint && pnpm type-check"
+    "test": "vitest",
+    "test:run": "vitest run",
+    "check": "pnpm format && pnpm lint && pnpm type-check && pnpm test:run"
   },
   "dependencies": {},
   "devDependencies": {
-    "@types/node": "^24.9.1"
+    "@types/node": "^24.9.1",
+    "vitest": "^4.1.9"
   }
 }
