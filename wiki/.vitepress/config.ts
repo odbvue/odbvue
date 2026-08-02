@@ -65,6 +65,7 @@ export default defineConfig({
                 { text: 'Framework Packages', link: '/guide/db/capabilities/api-reference' },
                 { text: 'Oracle Packages', link: '/guide/db/capabilities/oracle-packages' },
                 { text: 'Lob', link: '/guide/db/capabilities/lob' },
+                { text: 'JWT', link: '/guide/db/capabilities/jwt' },
               ],
             },
             { text: 'Under the hood', link: '/guide/db/under-the-hood' },

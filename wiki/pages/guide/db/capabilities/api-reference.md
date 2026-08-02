@@ -37,6 +37,49 @@ proc.body((body) => {
 })
 ```
 
+## JWT
+
+Sign and verify JSON Web Tokens (HS256). Backed by the odb framework package `odb_jwt`.
+
+### Install
+
+```ts
+import { odbJwt } from '@odbvue/odb'
+
+odbJwt.toSQLUp({ schema: 'APP_USER' })
+odbJwt.toSQLDown({ schema: 'APP_USER' })
+```
+
+### Expression Helpers
+
+```ts
+odbJwt.encode('v_payload', 'v_secret')
+odbJwt.verify('v_token', 'v_secret')
+odbJwt.payload('v_token')
+odbJwt.claim('v_token', "'sub'")
+odbJwt.isExpired('v_token')
+odbJwt.isExpired('v_token', '30')
+odbJwt.base64urlEncode('v_text')
+odbJwt.base64urlDecode('v_b64')
+odbJwt.toEpoch()
+odbJwt.fromEpoch('v_epoch')
+```
+
+### Example
+
+```ts
+const token = proc.out('p_token', 'VARCHAR2')
+
+proc.body((body) => {
+  const vPayload = body.varchar2('v_payload', 2000).assign(
+    `JSON_OBJECT('sub' VALUE 'u1', 'exp' VALUE odb_jwt.to_epoch() + 3600)`,
+  )
+  body.set(token, odbJwt.encode('v_payload', `'my-secret'`))
+})
+```
+
+See the [JWT capability page](./jwt) for details.
+
 ## ORDS Services
 
 Expose a package procedure with an explicit HTTP contract:
