@@ -4,6 +4,7 @@ export * from './schema/table.js'
 export * from './schema/attribute.js'
 export * from './schema/package.js'
 export * from './schema/contract.js'
+export * from './introspect.js'
 export * from './ords.js'
 
 export * from './query/ast.js'
