@@ -58,6 +58,7 @@ export default defineConfig({
           items: [
             { text: 'Oracle AI Database', link: '/guide/db/oracle-ai-database' },
             { text: 'In TypeScript', link: '/guide/db/oracle-database-in-typescript' },
+            { text: 'TypeScript Toolkit', link: '/guide/db/toolkit' },
             {
               text: 'Capabilities',
               collapsed: true,
