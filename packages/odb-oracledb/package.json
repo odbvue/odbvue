@@ -1,0 +1,32 @@
+{
+  "name": "@odbvue/odb-oracledb",
+  "description": "Oracle execution adapter for ODB",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "format": "oxfmt",
+    "lint": "oxlint",
+    "type-check": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "check": "pnpm format && pnpm lint && pnpm type-check && pnpm test:run"
+  },
+  "dependencies": {
+    "@odbvue/odb": "workspace:*",
+    "oracledb": "^6.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "@types/oracledb": "^6.10.3",
+    "vitest": "^4.1.9"
+  }
+}

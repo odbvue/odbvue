@@ -3,7 +3,7 @@ import path from 'path'
 import { pathToFileURL } from 'url'
 
 import { Column, emitColumnDef, type ColumnOptions, type ColumnType } from './schema/column.js'
-import { odbOrdsSchema } from './ords.js'
+import { odbOrdsSchema, type OrdsEndpoint } from './ords.js'
 import { type Schema } from './schema/schema.js'
 import { type Table } from './schema/table.js'
 import type { AnyQueryBuilder } from './schema/package.js'
@@ -90,6 +90,7 @@ export type MigrationSqlArtifact = {
 export type MigrationServiceArtifact = {
   toOrdsSQL(options?: { schema?: string }): string
   toOrdsDownSQL(options?: { schema?: string }): string
+  ordsEndpoints?(): OrdsEndpoint[]
 }
 
 function validateSchema(schema: string): string {
@@ -212,6 +213,11 @@ export class MigrationBuilder {
       this._exposes.push(artifact)
     }
     return this
+  }
+
+  /** Collect the ORDS endpoints exposed by this migration's service artifacts. */
+  ordsEndpoints(): OrdsEndpoint[] {
+    return this._exposes.flatMap((a) => a.ordsEndpoints?.() ?? [])
   }
 
   /** Escape hatch: raw SQL appended to `up` after installs, before exposes. */

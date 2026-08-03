@@ -2,5 +2,6 @@ packages:
   - "apps/web"
   - "apps/db"
   - "packages/odb"
+  - "packages/odb-oracledb"
   - "cli"
   - "wiki"

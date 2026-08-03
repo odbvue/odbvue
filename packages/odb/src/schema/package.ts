@@ -680,6 +680,13 @@ export class Package {
     return this._procedures.some((p) => p.buildOrdsEndpoint(this.name) !== undefined)
   }
 
+  /** Build the ORDS endpoints declared by this package's procedures. */
+  ordsEndpoints(): OrdsEndpoint[] {
+    return this._procedures
+      .map((p) => p.buildOrdsEndpoint(this.name))
+      .filter((e): e is OrdsEndpoint => e !== undefined)
+  }
+
   toNode(): PackageNode {
     return {
       kind: 'package',

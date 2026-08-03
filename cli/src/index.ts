@@ -19,6 +19,7 @@ import { registerDbScaffoldCommand } from './commands/db-scaffold.js'
 import { registerDbExecCommand } from './commands/db-exec.js'
 import { registerDbUpCommand } from './commands/db-up.js'
 import { registerDbDownCommand } from './commands/db-down.js'
+import { registerDbTypesCommand } from './commands/db-types.js'
 
 const program = new Command()
 const environmentStore = new EnvironmentStore()
@@ -44,6 +45,7 @@ registerDbExecCommand(program)
 registerDbScaffoldCommand(program)
 registerDbUpCommand(program)
 registerDbDownCommand(program)
+registerDbTypesCommand(program)
 
 program.parse(process.argv)
 
