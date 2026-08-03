@@ -6,6 +6,7 @@ export * from './schema/package.js'
 export * from './schema/contract.js'
 export * from './ords.js'
 
+export * from './query/ast.js'
 export * from './query/index.js'
 export * from './migration.js'
 

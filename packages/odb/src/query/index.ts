@@ -1,22 +1,23 @@
 import { Column } from '../schema/column.js'
-export type ComparisonOperator = '=' | '!=' | '<' | '>' | '<=' | '>=' | 'LIKE'
-export type NullOperator = 'IS NULL' | 'IS NOT NULL'
-export type Operator = ComparisonOperator | NullOperator
-
-type WhereCondition = {
-  column: string
-  op: Operator
-  value?: unknown
-}
+import {
+  BindContext,
+  combinePredicates,
+  compileNode,
+  inlineValue,
+  odbExpr,
+  predicate,
+  renderNode,
+  type ComparisonOperator,
+  type CompiledQuery,
+  type ExpressionBuilder,
+  type ExpressionNode,
+  type NullOperator,
+  type Operator,
+} from './ast.js'
 
 type OrderByClause = {
   column: string
   direction: 'asc' | 'desc'
-}
-
-export type CompiledQuery = {
-  sql: string
-  bindings: Record<string, unknown>
 }
 
 /** Any object that carries a SQL identifier, such as a Table or a Column. */
@@ -35,49 +36,19 @@ function exprSql(expr: SqlExpr): string {
   return typeof expr === 'string' ? expr : expr.toSQL()
 }
 
-function inlineValue(v: unknown): string {
-  if (v === null || v === undefined) return 'NULL'
-  if (typeof v === 'number') return String(v)
-  if (typeof v === 'boolean') return v ? '1' : '0'
-  if (v instanceof Date) {
-    const iso = v.toISOString().replace('T', ' ').substring(0, 19)
-    return `TO_TIMESTAMP('${iso}', 'YYYY-MM-DD HH24:MI:SS')`
-  }
-  if (
-    typeof v === 'object' &&
-    v !== null &&
-    'toSQL' in v &&
-    typeof (v as { toSQL(): string }).toSQL === 'function'
-  ) {
-    return (v as { toSQL(): string }).toSQL()
-  }
-  return `'${String(v).replace(/'/g, "''")}'`
-}
-
-function buildWhereInline(conditions: WhereCondition[]): string {
-  return conditions
-    .map((w) => {
-      if (w.op === 'IS NULL' || w.op === 'IS NOT NULL') return `${w.column} ${w.op}`
-      return `${w.column} ${w.op} ${inlineValue(w.value)}`
-    })
-    .join(' AND ')
-}
-
-function buildWhereClause(conditions: WhereCondition[], bindings: Record<string, unknown>): string {
-  const parts = conditions.map((w, i) => {
-    if (w.op === 'IS NULL' || w.op === 'IS NOT NULL') {
-      return `${w.column} ${w.op}`
-    }
-    const key = `w${i}`
-    bindings[key] = w.value
-    return `${w.column} ${w.op} :${key}`
-  })
-  return parts.join(' AND ')
+/** Build a predicate node from a builder callback or a column/op/value triple. */
+function toPredicate(
+  column: string | Column<any, string> | ((eb: ExpressionBuilder) => ExpressionNode),
+  op?: Operator,
+  value?: unknown,
+): ExpressionNode {
+  if (typeof column === 'function') return column(odbExpr)
+  return predicate(column, op as Operator, value)
 }
 
 export class SelectQueryBuilder {
   private _columns: string[] = []
-  private _where: WhereCondition[] = []
+  private _where: ExpressionNode[] = []
   private _orderBy: OrderByClause[] = []
   private _limit?: number
   private _into?: string
@@ -102,6 +73,7 @@ export class SelectQueryBuilder {
     return this
   }
 
+  where(build: (eb: ExpressionBuilder) => ExpressionNode): this
   where<TValue, TName extends string>(
     column: Column<TValue, TName>,
     op: ComparisonOperator,
@@ -112,9 +84,14 @@ export class SelectQueryBuilder {
     op: NullOperator,
     value?: undefined,
   ): this
-  where(column: string | Column<any, string>, op: Operator, value?: unknown): this {
-    const columnName = typeof column === 'string' ? column : column.name
-    this._where.push({ column: columnName, op, value })
+  where(column: string, op: ComparisonOperator, value: unknown): this
+  where(column: string, op: NullOperator): this
+  where(
+    column: string | Column<any, string> | ((eb: ExpressionBuilder) => ExpressionNode),
+    op?: Operator,
+    value?: unknown,
+  ): this {
+    this._where.push(toPredicate(column, op, value))
     return this
   }
 
@@ -144,8 +121,11 @@ export class SelectQueryBuilder {
 
     sql += ` FROM ${this.tableName()}`
 
-    if (this._where.length > 0) {
-      sql += ` WHERE ${buildWhereClause(this._where, bindings)}`
+    const whereNode = combinePredicates(this._where)
+    if (whereNode) {
+      const ctx = new BindContext('w')
+      sql += ` WHERE ${compileNode(whereNode, ctx)}`
+      Object.assign(bindings, ctx.bindings)
     }
 
     if (this._orderBy.length > 0) {
@@ -165,7 +145,8 @@ export class SelectQueryBuilder {
     let sql = `SELECT ${cols}`
     if (this._into) sql += ` INTO ${this._into}`
     sql += ` FROM ${this.tableName()}`
-    if (this._where.length > 0) sql += ` WHERE ${buildWhereInline(this._where)}`
+    const whereNode = combinePredicates(this._where)
+    if (whereNode) sql += ` WHERE ${renderNode(whereNode)}`
     if (this._orderBy.length > 0) {
       const parts = this._orderBy.map((o) => `${o.column} ${o.direction.toUpperCase()}`)
       sql += ` ORDER BY ${parts.join(', ')}`
@@ -220,7 +201,7 @@ export class InsertQueryBuilder {
 
 export class UpdateQueryBuilder {
   private _set: Record<string, unknown> = {}
-  private _where: WhereCondition[] = []
+  private _where: ExpressionNode[] = []
   private _schema?: string
 
   constructor(private readonly _table: string | NamedRef) {}
@@ -240,6 +221,7 @@ export class UpdateQueryBuilder {
     return this
   }
 
+  where(build: (eb: ExpressionBuilder) => ExpressionNode): this
   where<TValue, TName extends string>(
     column: Column<TValue, TName>,
     op: ComparisonOperator,
@@ -250,9 +232,14 @@ export class UpdateQueryBuilder {
     op: NullOperator,
     value?: undefined,
   ): this
-  where(column: string | Column<any, string>, op: Operator, value?: unknown): this {
-    const columnName = typeof column === 'string' ? column : column.name
-    this._where.push({ column: columnName, op, value })
+  where(column: string, op: ComparisonOperator, value: unknown): this
+  where(column: string, op: NullOperator): this
+  where(
+    column: string | Column<any, string> | ((eb: ExpressionBuilder) => ExpressionNode),
+    op?: Operator,
+    value?: unknown,
+  ): this {
+    this._where.push(toPredicate(column, op, value))
     return this
   }
 
@@ -267,8 +254,11 @@ export class UpdateQueryBuilder {
 
     let sql = `UPDATE ${this.tableName()} SET ${setClauses.join(', ')}`
 
-    if (this._where.length > 0) {
-      sql += ` WHERE ${buildWhereClause(this._where, bindings)}`
+    const whereNode = combinePredicates(this._where)
+    if (whereNode) {
+      const ctx = new BindContext('w')
+      sql += ` WHERE ${compileNode(whereNode, ctx)}`
+      Object.assign(bindings, ctx.bindings)
     }
 
     return { sql, bindings }
@@ -277,13 +267,14 @@ export class UpdateQueryBuilder {
   toSQL(): string {
     const setClauses = Object.keys(this._set).map((k) => `${k} = ${inlineValue(this._set[k])}`)
     let sql = `UPDATE ${this.tableName()} SET ${setClauses.join(', ')}`
-    if (this._where.length > 0) sql += ` WHERE ${buildWhereInline(this._where)}`
+    const whereNode = combinePredicates(this._where)
+    if (whereNode) sql += ` WHERE ${renderNode(whereNode)}`
     return sql
   }
 }
 
 export class DeleteQueryBuilder {
-  private _where: WhereCondition[] = []
+  private _where: ExpressionNode[] = []
   private _schema?: string
 
   constructor(private readonly _table: string | NamedRef) {}
@@ -298,6 +289,7 @@ export class DeleteQueryBuilder {
     return this._schema ? `${this._schema}.${this._table.name}` : this._table.name
   }
 
+  where(build: (eb: ExpressionBuilder) => ExpressionNode): this
   where<TValue, TName extends string>(
     column: Column<TValue, TName>,
     op: ComparisonOperator,
@@ -308,9 +300,14 @@ export class DeleteQueryBuilder {
     op: NullOperator,
     value?: undefined,
   ): this
-  where(column: string | Column<any, string>, op: Operator, value?: unknown): this {
-    const columnName = typeof column === 'string' ? column : column.name
-    this._where.push({ column: columnName, op, value })
+  where(column: string, op: ComparisonOperator, value: unknown): this
+  where(column: string, op: NullOperator): this
+  where(
+    column: string | Column<any, string> | ((eb: ExpressionBuilder) => ExpressionNode),
+    op?: Operator,
+    value?: unknown,
+  ): this {
+    this._where.push(toPredicate(column, op, value))
     return this
   }
 
@@ -318,8 +315,11 @@ export class DeleteQueryBuilder {
     const bindings: Record<string, unknown> = {}
     let sql = `DELETE FROM ${this.tableName()}`
 
-    if (this._where.length > 0) {
-      sql += ` WHERE ${buildWhereClause(this._where, bindings)}`
+    const whereNode = combinePredicates(this._where)
+    if (whereNode) {
+      const ctx = new BindContext('w')
+      sql += ` WHERE ${compileNode(whereNode, ctx)}`
+      Object.assign(bindings, ctx.bindings)
     }
 
     return { sql, bindings }
@@ -327,7 +327,8 @@ export class DeleteQueryBuilder {
 
   toSQL(): string {
     let sql = `DELETE FROM ${this.tableName()}`
-    if (this._where.length > 0) sql += ` WHERE ${buildWhereInline(this._where)}`
+    const whereNode = combinePredicates(this._where)
+    if (whereNode) sql += ` WHERE ${renderNode(whereNode)}`
     return sql
   }
 }
