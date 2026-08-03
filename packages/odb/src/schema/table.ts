@@ -1,4 +1,10 @@
-import { Column, type ColumnNode, type ColumnOptions, type ColumnType } from './column.js'
+import {
+  Column,
+  type ColumnNode,
+  type ColumnOptions,
+  type ColumnType,
+  type ColumnValueForType,
+} from './column.js'
 
 export type IndexNode = {
   kind: 'index'
@@ -18,39 +24,56 @@ export type TableSqlOptions = {
   schema?: string
 }
 
-export class Table {
-  private columns: Column[] = []
+export type TableColumnMap = Record<string, Column<any, string>>
+
+export type TableShape<TColumns extends TableColumnMap = Record<string, never>> = Table<TColumns> &
+  TColumns
+
+export class Table<TColumns extends TableColumnMap = Record<string, never>> {
+  private readonly _shape?: TColumns
+  private columns: Column<any, string>[] = []
   private indexes: IndexNode[] = []
 
   constructor(readonly name: string) {}
 
-  column(name: string, type: ColumnType, options: ColumnOptions = {}): Column {
-    const column = new Column(name, type, options)
-    this.columns.push(column)
+  addColumn(column: Column<any, string>): this {
+    if (!this.columns.some((existing) => existing.name === column.name)) {
+      this.columns.push(column)
+    }
+    return this
+  }
+
+  column<TName extends string, TType extends ColumnType = ColumnType>(
+    name: TName,
+    type: TType,
+    options: ColumnOptions = {},
+  ): Column<ColumnValueForType<TType>, TName> {
+    const column = new Column<ColumnValueForType<TType>, TName>(name, type, options)
+    this.addColumn(column)
     return column
   }
 
-  string(name: string, length = 255): Column {
+  string<TName extends string>(name: TName, length = 255): Column<string, TName> {
     return this.column(name, 'string', { length })
   }
 
-  number(name: string): Column {
+  number<TName extends string>(name: TName): Column<number, TName> {
     return this.column(name, 'number')
   }
 
-  guid(name: string): Column {
+  guid<TName extends string>(name: TName): Column<string, TName> {
     return this.column(name, 'guid')
   }
 
-  boolean(name: string): Column {
+  boolean<TName extends string>(name: TName): Column<boolean, TName> {
     return this.column(name, 'boolean')
   }
 
-  timestamp(name: string): Column {
+  timestamp<TName extends string>(name: TName): Column<Date, TName> {
     return this.column(name, 'timestamp')
   }
 
-  clob(name: string): Column {
+  clob<TName extends string>(name: TName): Column<string, TName> {
     return this.column(name, 'clob')
   }
 
@@ -179,8 +202,24 @@ function qualifyName(name: string, schema?: string): string {
   return schema ? `${schema}.${name}` : name
 }
 
-export function odbTable(name: string, build?: (table: Table) => void): Table {
-  const t = new Table(name)
-  build?.(t)
-  return t
+export function odbTable<TColumns extends TableColumnMap>(
+  name: string,
+  build?: (table: Table<any>) => void | TColumns,
+): TableShape<TColumns> {
+  const t = new Table<any>(name)
+  const result = build?.(t)
+
+  if (result && typeof result === 'object') {
+    const tableWithColumns = t as TableShape<TColumns>
+    for (const [key, value] of Object.entries(result)) {
+      if (value instanceof Column) {
+        t.addColumn(value)
+        if (!(key in tableWithColumns)) {
+          ;(tableWithColumns as Record<string, unknown>)[key] = value
+        }
+      }
+    }
+  }
+
+  return t as TableShape<TColumns>
 }

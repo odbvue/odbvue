@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { odbUtlRaw } from '../../src/packages/oracle/utl-raw.js'
-import { odbLiteral } from '../../src/schema/attribute.js'
+import { odbUtlRaw } from '../../../src/packages/oracle/utl-raw.js'
+import { odbLiteral } from '../../../src/schema/attribute.js'
 
 describe('odbUtlRaw', () => {
   describe('casts', () => {

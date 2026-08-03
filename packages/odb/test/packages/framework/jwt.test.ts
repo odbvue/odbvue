@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { odbJwt } from '../../src/packages/framework/jwt/jwt.js'
+import { odbJwt } from '../../../src/packages/framework/jwt/jwt.js'
 
 describe('odbJwt (framework package odb_jwt)', () => {
   describe('install / drop SQL', () => {

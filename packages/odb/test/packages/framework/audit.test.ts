@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { odbAudit } from '../../src/packages/framework/audit/audit.js'
-import { ProcedureBody } from '../../src/schema/package.js'
+import { odbAudit } from '../../../src/packages/framework/audit/audit.js'
+import { ProcedureBody } from '../../../src/schema/package.js'
 
 describe('odbAudit (framework package odb_audit)', () => {
   describe('install / drop SQL', () => {

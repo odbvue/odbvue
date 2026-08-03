@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { odbUtlEncode } from '../../src/packages/oracle/utl-encode.js'
-import { odbLiteral } from '../../src/schema/attribute.js'
+import { odbUtlEncode } from '../../../src/packages/oracle/utl-encode.js'
+import { odbLiteral } from '../../../src/schema/attribute.js'
 
 describe('odbUtlEncode', () => {
   describe('base64', () => {

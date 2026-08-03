@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { odbDbmsCrypto } from '../../src/packages/oracle/dbms-crypto.js'
+import { odbDbmsCrypto } from '../../../src/packages/oracle/dbms-crypto.js'
 
 describe('odbDbmsCrypto', () => {
   describe('hash / mac', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { odbDbmsLob } from '../../src/packages/oracle/dbms-lob.js'
+import { odbDbmsLob } from '../../../src/packages/oracle/dbms-lob.js'
 
 describe('odbDbmsLob', () => {
   describe('functions (expressions)', () => {

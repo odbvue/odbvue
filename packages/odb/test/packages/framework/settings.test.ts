@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { odbSettings } from '../../src/packages/framework/settings/settings.js'
-import { odbLiteral } from '../../src/schema/attribute.js'
+import { odbSettings } from '../../../src/packages/framework/settings/settings.js'
+import { odbLiteral } from '../../../src/schema/attribute.js'
 
 const KEY = 'A'.repeat(64)
 

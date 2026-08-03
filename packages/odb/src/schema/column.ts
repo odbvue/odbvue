@@ -1,5 +1,17 @@
 export type ColumnType = 'string' | 'number' | 'guid' | 'boolean' | 'date' | 'timestamp' | 'clob'
 
+export type ColumnValueTypeMap = {
+  string: string
+  number: number
+  guid: string
+  boolean: boolean
+  date: Date
+  timestamp: Date
+  clob: string
+}
+
+export type ColumnValueForType<TType extends ColumnType> = ColumnValueTypeMap[TType]
+
 export type ColumnOptions = {
   length?: number
   nullable?: boolean
@@ -15,11 +27,12 @@ export type ColumnNode = {
   options: ColumnOptions
 }
 
-export class Column {
+export class Column<TValue = unknown, TName extends string = string> {
   private options: ColumnOptions
+  private readonly _valueType?: TValue
 
   constructor(
-    readonly name: string,
+    readonly name: TName,
     readonly type: ColumnType,
     options: ColumnOptions = {},
   ) {
@@ -69,6 +82,10 @@ export class Column {
   defaultCurrentTimestamp(): this {
     this.options.default = 'current_timestamp'
     return this
+  }
+
+  toSQL(): string {
+    return this.name
   }
 
   toNode(): ColumnNode {

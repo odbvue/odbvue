@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { odbLob } from '../../src/packages/framework/lob/lob.js'
-import { BlobVar, ClobVar, Varchar2Var } from '../../src/schema/attribute.js'
+import { odbLob } from '../../../src/packages/framework/lob/lob.js'
+import { BlobVar, ClobVar, Varchar2Var } from '../../../src/schema/attribute.js'
 
 describe('odbLob (framework package odb_lob)', () => {
   describe('install / drop SQL', () => {

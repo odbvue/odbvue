@@ -1,3 +1,4 @@
+import { Column } from '../schema/column.js'
 export type ComparisonOperator = '=' | '!=' | '<' | '>' | '<=' | '>=' | 'LIKE'
 export type NullOperator = 'IS NULL' | 'IS NOT NULL'
 export type Operator = ComparisonOperator | NullOperator
@@ -101,8 +102,19 @@ export class SelectQueryBuilder {
     return this
   }
 
-  where(column: string, op: Operator, value?: unknown): this {
-    this._where.push({ column, op, value })
+  where<TValue, TName extends string>(
+    column: Column<TValue, TName>,
+    op: ComparisonOperator,
+    value: TValue,
+  ): this
+  where<TName extends string>(
+    column: Column<unknown, TName>,
+    op: NullOperator,
+    value?: undefined,
+  ): this
+  where(column: string | Column<any, string>, op: Operator, value?: unknown): this {
+    const columnName = typeof column === 'string' ? column : column.name
+    this._where.push({ column: columnName, op, value })
     return this
   }
 
@@ -228,8 +240,19 @@ export class UpdateQueryBuilder {
     return this
   }
 
-  where(column: string, op: Operator, value?: unknown): this {
-    this._where.push({ column, op, value })
+  where<TValue, TName extends string>(
+    column: Column<TValue, TName>,
+    op: ComparisonOperator,
+    value: TValue,
+  ): this
+  where<TName extends string>(
+    column: Column<unknown, TName>,
+    op: NullOperator,
+    value?: undefined,
+  ): this
+  where(column: string | Column<any, string>, op: Operator, value?: unknown): this {
+    const columnName = typeof column === 'string' ? column : column.name
+    this._where.push({ column: columnName, op, value })
     return this
   }
 
@@ -275,8 +298,19 @@ export class DeleteQueryBuilder {
     return this._schema ? `${this._schema}.${this._table.name}` : this._table.name
   }
 
-  where(column: string, op: Operator, value?: unknown): this {
-    this._where.push({ column, op, value })
+  where<TValue, TName extends string>(
+    column: Column<TValue, TName>,
+    op: ComparisonOperator,
+    value: TValue,
+  ): this
+  where<TName extends string>(
+    column: Column<unknown, TName>,
+    op: NullOperator,
+    value?: undefined,
+  ): this
+  where(column: string | Column<any, string>, op: Operator, value?: unknown): this {
+    const columnName = typeof column === 'string' ? column : column.name
+    this._where.push({ column: columnName, op, value })
     return this
   }
 
