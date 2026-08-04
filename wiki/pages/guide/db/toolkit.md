@@ -4,16 +4,26 @@ Beyond authoring SQL and PL/SQL, `@odbvue/odb` is a typed toolkit that turns a s
 
 ## Typed schema and query builder
 
-Tables and columns are strongly typed, so queries reject invalid columns and mismatched values at compile time.
+Return an object from `odbTable()` to expose typed columns. The same definition infers selected rows, required inserts, nullable values, defaults, and updates.
 
 ```ts
+import type { Insertable, Selectable, Updateable } from '@odbvue/odb'
+
 const users = odbTable('APP_USERS', (t) => ({
-  id: t.number('id').notNull(),
+  id: t.number('id').notNull().defaultSysGuid(),
   email: t.string('email', 255),
 }))
 
 odbQuery().selectFrom(users).select([users.id]).where(users.id, '=', 123)
+odbQuery().insertInto(users).values({ email: 'ada@example.com' })
+odbQuery().updateTable(users).set({ email: null }).where(users.id, '=', 123)
+
+type User = Selectable<typeof users>
+type NewUser = Insertable<typeof users>
+type UserUpdate = Updateable<typeof users>
 ```
+
+Column-level `.unique()` emits a unique constraint. Indexes also accept column references: `t.index('ix_users_email', [users.email])`.
 
 ## Expression builder
 
@@ -25,7 +35,19 @@ odbQuery().selectFrom(users).select([users.id]).where(users.id, '=', 123)
 
 ## PL/SQL package contracts
 
-`generatePackageContract(pkg)` turns a package's procedures/functions into a TypeScript interface (inputs from `IN`/`IN OUT`, results from `OUT`/`IN OUT`).
+Return named members from `odbPackage()` to call functions as typed PL/SQL expressions. Unknown members, procedures, and invalid argument values are rejected.
+
+```ts
+const settings = odbPackage('PCK_SETTINGS', (p) => ({
+  getValue: p.function('GET_VALUE', 'VARCHAR2', (fn) => {
+    fn.in('P_KEY', 'VARCHAR2')
+  }),
+}))
+
+body.set(result, settings.getValue(odbLiteral('APP_VERSION')))
+```
+
+`generatePackageContract(pkg)` can also emit a TypeScript interface for a package.
 
 ## Introspection
 
@@ -43,21 +65,21 @@ await withConnection(config, async (_conn, db) => {
 
 ## Typed ORDS client
 
-Procedures exposed via `proc.service({ method, path })` become a typed client. Run `ov dt` to generate `apps/web/src/services/ords.generated.ts` from the migrations (no database needed):
+Use `proc.get(path, options)` for a GET service, or `proc.service({ method, path })` for an explicit method. A typed table query passed to `body.openFor()` carries its selected row shape into the generated response.
 
 ```ts
-export interface OrdsOperations {
-  appMe: { request: AppMeRequest; response: AppMeResponse }
-}
-
-export const ordsOperations = {
-  appMe: { method: 'GET', path: 'app/auth/me' },
-} as const satisfies Record<keyof OrdsOperations, OrdsOperationDescriptor>
+const result = proc.out('result', 'SYS_REFCURSOR')
+proc.body((body) =>
+  body.openFor(result, odbQuery().selectFrom(users).select([users.id, users.email])),
+)
+proc.get('/users')
 ```
 
-Consume it from the web `http` composable:
+Run `ov dt` to generate one client per ORDS module under `apps/web/src/services/generated`, plus a namespace index. No database connection is needed.
 
 ```ts
-const op = ordsOperations.appMe
-const { data } = await http.get<OrdsOperations['appMe']['response']>(op.path)
+import { app } from '@/services/generated'
+
+const operation = app.ordsOperations.appMigrations
+const { data } = await http.get<app.AppMigrationsResponse>(operation.path)
 ```
