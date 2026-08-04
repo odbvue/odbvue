@@ -1,4 +1,4 @@
-import { Column } from '../schema/column.js'
+import { Column, type ColumnNode } from '../schema/column.js'
 import { type Table, type Insertable, type Updateable } from '../schema/table.js'
 import {
   BindContext,
@@ -51,6 +51,7 @@ function toPredicate(
 
 export class SelectQueryBuilder<TTable extends Table<any> = Table<any>> {
   private _columns: string[] = []
+  private _selectedColumns: ColumnNode[] | undefined = []
   private _where: ExpressionNode[] = []
   private _orderBy: OrderByClause[] = []
   private _limit?: number
@@ -76,7 +77,22 @@ export class SelectQueryBuilder<TTable extends Table<any> = Table<any>> {
   select(columns: SqlExpr | SqlExpr[]): SelectQueryBuilder<TTable> {
     const cols = Array.isArray(columns) ? columns : [columns]
     this._columns.push(...cols.map(exprSql))
+    if (this._selectedColumns) {
+      if (cols.every((column) => column instanceof Column)) {
+        this._selectedColumns.push(...cols.map((column) => (column as ColumnLike).toNode()))
+      } else {
+        this._selectedColumns = undefined
+      }
+    }
     return this as SelectQueryBuilder<TTable>
+  }
+
+  /** Selected typed columns, when the row shape can be inferred without parsing SQL. */
+  selectedColumns(): ColumnNode[] | undefined {
+    return this._selectedColumns?.map((column) => ({
+      ...column,
+      options: { ...column.options },
+    }))
   }
 
   where(build: (eb: ExpressionBuilder) => ExpressionNode): this

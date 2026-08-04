@@ -17,6 +17,12 @@ export type OrdsParamType =
 
 export type OrdsParamDirection = 'IN' | 'OUT' | 'IN OUT'
 
+export type OrdsResultColumnNode = {
+  name: string
+  type: 'string' | 'number' | 'guid' | 'boolean' | 'date' | 'timestamp' | 'clob'
+  nullable: boolean
+}
+
 // ── AST node types ────────────────────────────────────────────────────────────
 
 export type OrdsParamNode = {
@@ -26,8 +32,9 @@ export type OrdsParamNode = {
   bindVariable: string
   direction: OrdsParamDirection
   paramType: OrdsParamType
-  sourceType: 'HEADER' | 'RESPONSE'
+  sourceType: 'HEADER' | 'RESPONSE' | 'URI'
   comment?: string
+  resultColumns?: OrdsResultColumnNode[]
 }
 
 export type OrdsEndpointNode = {
@@ -59,6 +66,8 @@ export type OrdsEndpointSqlOptions = {
    * of the ADMIN session used by the CLI.
    */
   schema?: string
+  /** Define the owning module before its template. Defaults to true. */
+  defineModule?: boolean
 }
 
 // ── OrdsParam ─────────────────────────────────────────────────────────────────
@@ -69,6 +78,7 @@ export class OrdsParam {
     readonly direction: OrdsParamDirection,
     readonly paramType: OrdsParamType,
     readonly comment?: string,
+    readonly resultColumns?: OrdsResultColumnNode[],
   ) {}
 
   /**
@@ -89,7 +99,7 @@ export class OrdsParam {
     return this.direction === 'OUT' ? 'RESPONSE' : 'HEADER'
   }
 
-  toNode(): OrdsParamNode {
+  toNode(sourceType: OrdsParamNode['sourceType'] = this.sourceType): OrdsParamNode {
     return {
       kind: 'ords_param',
       plsqlArg: this.plsqlArg,
@@ -97,8 +107,9 @@ export class OrdsParam {
       bindVariable: this.bindVariable,
       direction: this.direction,
       paramType: this.paramType,
-      sourceType: this.sourceType,
+      sourceType,
       comment: this.comment,
+      resultColumns: this.resultColumns?.map((column) => ({ ...column })),
     }
   }
 
@@ -167,8 +178,9 @@ export class OrdsEndpoint {
     direction: OrdsParamDirection,
     type: OrdsParamType,
     comment?: string,
+    resultColumns?: OrdsResultColumnNode[],
   ): this {
-    this._params.push(new OrdsParam(plsqlArg, direction, type, comment))
+    this._params.push(new OrdsParam(plsqlArg, direction, type, comment, resultColumns))
     return this
   }
 
@@ -222,6 +234,14 @@ export class OrdsEndpoint {
     return `BEGIN ${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args}); END;`
   }
 
+  private paramSourceType(param: OrdsParam): OrdsParamNode['sourceType'] {
+    if (param.direction === 'OUT') return 'RESPONSE'
+    const pathParams = new Set(
+      [...this.effectivePattern.matchAll(/:([a-zA-Z0-9_-]+)\??/g)].map((match) => match[1]),
+    )
+    return pathParams.has(param.name) ? 'URI' : 'HEADER'
+  }
+
   toNode(): OrdsEndpointNode {
     return {
       kind: 'ords_endpoint',
@@ -232,7 +252,7 @@ export class OrdsEndpoint {
       method: this.effectiveMethod,
       pattern: this.effectivePattern,
       source: this.handlerSource,
-      params: this._params.map((p) => p.toNode()),
+      params: this._params.map((p) => p.toNode(this.paramSourceType(p))),
       comment: this._comment,
     }
   }
@@ -246,15 +266,21 @@ export class OrdsEndpoint {
     const method = this.effectiveMethod
     const comment = sqlStr(this._comment)
     const source = `'${this.handlerSource.replace(/'/g, "''")}'`
+    const moduleSql =
+      options.defineModule === false
+        ? []
+        : [
+            `  ords.define_module(`,
+            `    p_module_name    => '${this.module}',`,
+            `    p_base_path      => '${this.effectiveBasePath}',`,
+            `    p_items_per_page => 0,`,
+            `    p_comments       => ${comment}`,
+            `  );`,
+            `  COMMIT;`,
+            '',
+          ]
     const body = [
-      `  ords.define_module(`,
-      `    p_module_name    => '${this.module}',`,
-      `    p_base_path      => '${this.effectiveBasePath}',`,
-      `    p_items_per_page => 0,`,
-      `    p_comments       => ${comment}`,
-      `  );`,
-      `  COMMIT;`,
-      '',
+      ...moduleSql,
       `  ords.define_template(`,
       `    p_module_name => '${this.module}',`,
       `    p_pattern     => '${pattern}',`,
@@ -282,7 +308,7 @@ export class OrdsEndpoint {
           `    p_method             => '${method}',`,
           `    p_name               => '${p.name}',`,
           `    p_bind_variable_name => '${p.bindVariable}',`,
-          `    p_source_type        => '${p.sourceType}',`,
+          `    p_source_type        => '${this.paramSourceType(p)}',`,
           `    p_param_type         => '${p.paramType}',`,
           `    p_access_method      => '${p.direction}',`,
           `    p_comments           => ${sqlStr(p.comment)}`,

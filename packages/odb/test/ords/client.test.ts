@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { generateOrdsClient } from '../../src/ords-client.js'
+import { generateOrdsClient, generateOrdsClientModules } from '../../src/ords-client.js'
+import { odbQuery } from '../../src/query/index.js'
 import { odbPackage } from '../../src/schema/package.js'
+import { odbTable } from '../../src/schema/table.js'
 import { defineMigration } from '../../src/migration.js'
 
 const appPackage = odbPackage('PCK_APP', (p) => {
@@ -17,10 +19,39 @@ const appPackage = odbPackage('PCK_APP', (p) => {
   })
 })
 
+const users = odbTable('users', (table) => ({
+  id: table.number('id').primaryKey(),
+  userName: table.string('name').notNull(),
+  email: table.string('email'),
+}))
+
+const usersPackage = odbPackage('PCK_USERS', (p) => {
+  p.procedure('get_user', (proc) => {
+    proc.in('p_id', 'NUMBER')
+    const result = proc.out('p_result', 'SYS_REFCURSOR')
+    proc.body((body) =>
+      body.openFor(
+        result,
+        odbQuery().selectFrom(users).select([users.id, users.userName, users.email]),
+      ),
+    )
+    proc.get('/users/:id')
+  })
+})
+
 describe('Package.ordsEndpoints', () => {
   it('returns one endpoint per procedure with a service', () => {
     const endpoints = appPackage.ordsEndpoints()
     expect(endpoints.map((e) => e.procedureName)).toEqual(['me', 'POST_LOGIN'])
+  })
+
+  it('defines a shared ORDS module once while retaining every template', () => {
+    const sql = appPackage.toOrdsSQL()
+
+    expect(sql.match(/ords\.define_module\(/g)).toHaveLength(1)
+    expect(sql.match(/ords\.define_template\(/g)).toHaveLength(2)
+    expect(sql).toContain("p_pattern     => 'auth/me'")
+    expect(sql).toContain("p_pattern     => 'auth/login'")
   })
 })
 
@@ -60,5 +91,33 @@ describe('generateOrdsClient', () => {
     expect(ts).toContain(
       '  appPostLogin: { request: AppPostLoginRequest; response: AppPostLoginResponse }',
     )
+  })
+
+  it('infers a result-set row shape from typed openFor columns', () => {
+    const [endpoint] = usersPackage.ordsEndpoints()
+    const cursorTs = generateOrdsClient([endpoint])
+
+    expect(cursorTs).toContain('export interface UsersGetUserResultItem {')
+    expect(cursorTs).toContain('  id: number')
+    expect(cursorTs).toContain('  name: string')
+    expect(cursorTs).toContain('  email: string | null')
+    expect(cursorTs).toContain('  result: UsersGetUserResultItem[]')
+    expect(cursorTs).toContain("usersGetUser: { method: 'GET', path: 'users/users/:id' }")
+    expect(endpoint.toNode().params.find((param) => param.name === 'id')?.sourceType).toBe('URI')
+  })
+})
+
+describe('generateOrdsClientModules', () => {
+  it('emits one file per module and a namespace barrel', () => {
+    const generated = generateOrdsClientModules([
+      ...appPackage.ordsEndpoints(),
+      ...usersPackage.ordsEndpoints(),
+    ])
+
+    expect([...generated.files.keys()]).toEqual(['app.ts', 'users.ts'])
+    expect(generated.files.get('app.ts')).toContain('appMe')
+    expect(generated.files.get('users.ts')).toContain('usersGetUser')
+    expect(generated.index).toContain("export * as app from './app.js'")
+    expect(generated.index).toContain("export * as users from './users.js'")
   })
 })

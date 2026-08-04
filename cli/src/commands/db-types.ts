@@ -7,7 +7,7 @@ export const registerDbTypesCommand = (program: Command) => {
     .command('db-types')
     .alias('dt')
     .description('Generate TypeScript types for ORDS services from migrations')
-    .option('-o, --output <path>', 'Output file path for the generated ORDS client')
+    .option('-o, --output <path>', 'Output directory for generated ORDS module clients')
     .action(async (options: { output?: string }) => {
       await runDbTypes(options.output)
     })

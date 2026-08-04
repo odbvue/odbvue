@@ -15,10 +15,10 @@ const appSchema = odbSchema(schemaName, schemaPassword, (s) => {
   s.grant('EXECUTE ON DBMS_CRYPTO')
 })
 
-const appMigrationsTable = odbTable('app_migrations', (t) => {
+export const appMigrationsTable = odbTable('app_migrations', (t) => {
   const columns = {
     created: t.timestamp('created').defaultCurrentTimestamp().notNull(),
-    name: t.string('name', 200).notNull(),
+    migrationName: t.string('name', 200).notNull(),
   }
 
   t.unique('uq_app_migrations_name', ['name'])

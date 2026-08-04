@@ -17,12 +17,21 @@ import {
   emitParamType,
   renderPlsql,
 } from './attribute.js'
-import { OrdsEndpoint, type OrdsHttpMethod, type OrdsParamType } from '../ords.js'
+import {
+  OrdsEndpoint,
+  type OrdsHttpMethod,
+  type OrdsParamType,
+  type OrdsResultColumnNode,
+} from '../ords.js'
+import type { ColumnNode } from './column.js'
 
 // ── Query builder integration ─────────────────────────────────────────────────
 
-/** Any query builder that can emit a SQL string (SelectQueryBuilder, InsertQueryBuilder, etc.) */
-export type AnyQueryBuilder = { toSQL(): string }
+/** Any query builder that can emit SQL and optionally expose a typed selected row. */
+export type AnyQueryBuilder = {
+  toSQL(): string
+  selectedColumns?(): ColumnNode[] | undefined
+}
 
 // ── Statement types ──────────────────────────────────────────────────────────
 
@@ -92,6 +101,7 @@ export class ProcedureBody {
   private _declarations: LocalVar[] = []
   private _statements: StatementNode[] = []
   private _returnCounter = 0
+  private _cursorResultColumns = new Map<string, OrdsResultColumnNode[]>()
 
   /**
    * @param _returnType   Return type of the enclosing function, if any. Enables
@@ -299,9 +309,26 @@ export class ProcedureBody {
    * @example
    * body.openFor('p_cursor', select('employees').columns(['id', 'name']))
    */
-  openFor(cursor: string, qb: AnyQueryBuilder): this {
-    this._statements.push({ kind: 'raw', sql: `OPEN ${cursor} FOR ${qb.toSQL()}` })
+  openFor(cursor: string | PlsqlReference, qb: AnyQueryBuilder): this {
+    const cursorName = typeof cursor === 'string' ? cursor : cursor.name
+    const columns = qb.selectedColumns?.()
+    if (columns) {
+      this._cursorResultColumns.set(
+        cursorName.toUpperCase(),
+        columns.map((column) => ({
+          name: column.name,
+          type: column.type,
+          nullable: column.options.nullable !== false,
+        })),
+      )
+    }
+    this._statements.push({ kind: 'raw', sql: `OPEN ${cursorName} FOR ${qb.toSQL()}` })
     return this
+  }
+
+  /** @internal Row metadata retained for a typed SYS_REFCURSOR query. */
+  cursorResultColumns(cursor: string): OrdsResultColumnNode[] | undefined {
+    return this._cursorResultColumns.get(cursor.toUpperCase())
   }
 
   toNode(): ProcedureBodyNode {
@@ -440,7 +467,12 @@ export class OrdsEndpointBuilder {
   }
 
   /** @internal Called by Package when building ORDS SQL. */
-  build(packageName: string, procedureName: string, params: Param[]): OrdsEndpoint {
+  build(
+    packageName: string,
+    procedureName: string,
+    params: Param[],
+    procedureBody?: ProcedureBody,
+  ): OrdsEndpoint {
     const module = this._module ?? deriveOrdsModule(packageName)
     const endpoint = new OrdsEndpoint(module, packageName, procedureName)
     if (this._basePath !== undefined) endpoint.basePath(this._basePath)
@@ -452,7 +484,13 @@ export class OrdsEndpointBuilder {
       const node = p.toNode()
       const ordsType =
         this._typeOverrides.get(node.name.toUpperCase()) ?? plsqlToOrdsType(node.type)
-      endpoint.param(node.name, node.direction as 'IN' | 'OUT' | 'IN OUT', ordsType)
+      endpoint.param(
+        node.name,
+        node.direction as 'IN' | 'OUT' | 'IN OUT',
+        ordsType,
+        undefined,
+        ordsType === 'RESULTSET' ? procedureBody?.cursorResultColumns(node.name) : undefined,
+      )
     }
 
     return endpoint
@@ -548,9 +586,14 @@ export class Procedure {
     return this
   }
 
+  /** Expose this procedure as a GET service with its contract inferred. */
+  get(path: string, options: Omit<OrdsServiceDefinition, 'method' | 'path'> = {}): this {
+    return this.service({ ...options, method: 'GET', path })
+  }
+
   /** @internal Called by Package.toOrdsSQL() */
   buildOrdsEndpoint(packageName: string): OrdsEndpoint | undefined {
-    return this._ordsBuilder?.build(packageName, this.name, this._params)
+    return this._ordsBuilder?.build(packageName, this.name, this._params, this._body)
   }
 
   toNode(): ProcedureNode {
@@ -793,10 +836,16 @@ export class PackageImpl<
 
   /** Generate ORDS registration SQL for all configured procedure services. */
   toOrdsSQL(options: { schema?: string } = {}): string {
-    return this._procedures
+    const endpoints = this._procedures
       .map((p) => p.buildOrdsEndpoint(this.name))
       .filter((e): e is OrdsEndpoint => e !== undefined)
-      .map((e) => e.toSQLUp(options))
+    const definedModules = new Set<string>()
+    return endpoints
+      .map((endpoint) => {
+        const defineModule = !definedModules.has(endpoint.module)
+        definedModules.add(endpoint.module)
+        return endpoint.toSQLUp({ ...options, defineModule })
+      })
       .join('\n\n')
   }
 

@@ -14,10 +14,23 @@ export interface AppMeResponse {
   versionBase64: string
 }
 
+export interface AppMigrationsResultItem {
+  created: string
+  name: string
+}
+
+export type AppMigrationsRequest = Record<string, never>
+
+export interface AppMigrationsResponse {
+  result: AppMigrationsResultItem[]
+}
+
 export interface OrdsOperations {
   appMe: { request: AppMeRequest; response: AppMeResponse }
+  appMigrations: { request: AppMigrationsRequest; response: AppMigrationsResponse }
 }
 
 export const ordsOperations = {
   appMe: { method: 'GET', path: 'app/auth/me' },
+  appMigrations: { method: 'GET', path: 'app/migrations' },
 } as const satisfies Record<keyof OrdsOperations, OrdsOperationDescriptor>

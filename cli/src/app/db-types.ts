@@ -2,21 +2,24 @@ import fs from 'fs'
 import path from 'path'
 import { pathToFileURL } from 'url'
 
-import { generateOrdsClient, type MigrationBuilder, type OrdsEndpoint } from '@odbvue/odb'
+import { generateOrdsClientModules, type MigrationBuilder, type OrdsEndpoint } from '@odbvue/odb'
 
 import { SecretsStore } from '../adapters/secrets-store.js'
 
 import { dbDir, webDir } from '../shared/dirs.js'
 import { logger } from '../shared/logger.js'
 
-const DEFAULT_OUTPUT = path.join(webDir, 'src', 'services', 'ords.generated.ts')
+const DEFAULT_OUTPUT_DIRECTORY = path.join(webDir, 'src', 'services', 'generated')
+const LEGACY_OUTPUT = path.join(webDir, 'src', 'services', 'ords.generated.ts')
 
 /**
  * Generate typed ORDS service contracts from the compiled migration modules.
  * Definition-first: reads `.migration.ordsEndpoints()` from each compiled
  * migration in `apps/db/dist/migrations` — no database connection required.
  */
-export const runDbTypes = async (outputPath: string = DEFAULT_OUTPUT): Promise<void> => {
+export const runDbTypes = async (
+  outputDirectory: string = DEFAULT_OUTPUT_DIRECTORY,
+): Promise<void> => {
   logger.info('Generating ORDS service types...')
 
   // Migration modules read schema credentials from the environment at import time.
@@ -47,10 +50,24 @@ export const runDbTypes = async (outputPath: string = DEFAULT_OUTPUT): Promise<v
     logger.warn('No ORDS endpoints found in migrations')
   }
 
-  const source = generateOrdsClient(endpoints)
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true })
-  fs.writeFileSync(outputPath, source, 'utf8')
+  const generated = generateOrdsClientModules(endpoints)
+  fs.mkdirSync(outputDirectory, { recursive: true })
+  for (const entry of fs.readdirSync(outputDirectory)) {
+    if (entry.endsWith('.ts')) {
+      fs.rmSync(path.join(outputDirectory, entry), { force: true })
+    }
+  }
+  for (const [fileName, source] of generated.files) {
+    fs.writeFileSync(path.join(outputDirectory, fileName), source, 'utf8')
+  }
+  fs.writeFileSync(path.join(outputDirectory, 'index.ts'), generated.index, 'utf8')
 
-  logger.info(`Wrote ${endpoints.length} ORDS operation(s) to ${outputPath}`)
+  if (path.resolve(outputDirectory) === path.resolve(DEFAULT_OUTPUT_DIRECTORY)) {
+    fs.rmSync(LEGACY_OUTPUT, { force: true })
+  }
+
+  logger.info(
+    `Wrote ${endpoints.length} ORDS operation(s) across ${generated.files.size} module(s) to ${outputDirectory}`,
+  )
   logger.lf()
 }

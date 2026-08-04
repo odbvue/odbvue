@@ -7,6 +7,7 @@ import {
   odbPackage,
   odbQuery,
 } from '@odbvue/odb'
+import { appMigrationsTable } from './00000000000000-initial.js'
 
 const schemaName = (process.env.ODBVUE_ADB_SCHEMA_USERNAME ?? '').toUpperCase()
 
@@ -27,10 +28,25 @@ const appPackage = odbPackage('pck_app', (p) => {
         .assign(versionBase64, odbLob.varchar2ToBase64(version.toSQL())),
     )
 
-    proc.service({
-      method: 'GET',
-      path: '/auth/me',
+    proc.get('/auth/me', {
       summary: 'Returns the current application version (plus its Base64 encoding)',
+    })
+  })
+
+  p.procedure('migrations', (proc) => {
+    const result = proc.out('result', 'SYS_REFCURSOR')
+
+    proc.body((body) =>
+      body.openFor(
+        result,
+        odbQuery()
+          .selectFrom(appMigrationsTable)
+          .select([appMigrationsTable.created, appMigrationsTable.migrationName]),
+      ),
+    )
+
+    proc.get('/migrations', {
+      summary: 'Returns all applied database migrations',
     })
   })
 })
