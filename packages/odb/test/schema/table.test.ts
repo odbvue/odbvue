@@ -29,6 +29,32 @@ describe('odbTable', () => {
     expect(table.toSQLUp()).toContain('CREATE UNIQUE INDEX uq_app_table_name')
   })
 
+  it('emits a unique constraint for column-level unique metadata', () => {
+    const table = odbTable('APP_USERS', (t) => ({
+      email: t.string('EMAIL').unique(),
+    }))
+
+    expect(table.toSQLUp()).toContain('EMAIL VARCHAR2(255 CHAR) UNIQUE')
+  })
+
+  it('accepts column instances when defining indexes', () => {
+    const users = odbTable('APP_USERS', (t) => ({
+      email: t.string('EMAIL').notNull(),
+      tenantId: t.string('TENANT_ID').notNull(),
+    }))
+
+    const table = odbTable('APP_USERS', (t) => {
+      t.index('idx_app_users_email_tenant', [users.email, users.tenantId])
+      return {
+        email: users.email,
+        tenantId: users.tenantId,
+      }
+    })
+
+    expect(table.toSQLUp()).toContain('CREATE INDEX idx_app_users_email_tenant')
+    expect(table.toSQLUp()).toContain('ON APP_USERS (EMAIL, TENANT_ID)')
+  })
+
   it('infers column value types from the schema', () => {
     const users = odbTable('APP_USERS', (t) => ({
       id: t.number('id').notNull(),

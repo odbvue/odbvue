@@ -25,6 +25,7 @@ export type TableSqlOptions = {
 }
 
 export type TableColumnMap = Record<string, Column<any, string, any, any, any>>
+export type TableIndexColumn = string | Column<any, string, any, any, any>
 
 export type TableShape<TColumns extends TableColumnMap = Record<string, never>> = Table<TColumns> &
   TColumns
@@ -145,21 +146,21 @@ export class Table<TColumns extends TableColumnMap = Record<string, never>> {
     return this.column(name, 'clob')
   }
 
-  index(name: string, columns: string[]): this {
+  index(name: string, columns: TableIndexColumn[]): this {
     this.indexes.push({
       kind: 'index',
       name,
-      columns,
+      columns: columns.map(resolveIndexColumnName),
     })
 
     return this
   }
 
-  unique(name: string, columns: string[]): this {
+  unique(name: string, columns: TableIndexColumn[]): this {
     this.indexes.push({
       kind: 'index',
       name,
-      columns,
+      columns: columns.map(resolveIndexColumnName),
       unique: true,
     })
 
@@ -234,6 +235,10 @@ function emitOracleColumn(column: ColumnNode): string {
     parts.push('NOT NULL')
   }
 
+  if (column.options.unique) {
+    parts.push('UNIQUE')
+  }
+
   return parts.join(' ')
 }
 
@@ -264,6 +269,10 @@ function emitOracleIndex(
   const unique = index.unique ? 'UNIQUE ' : ''
 
   return `CREATE ${unique}INDEX ${qualifyName(index.name, options.schema)} ON ${qualifyName(tableName, options.schema)} (${index.columns.join(', ')});`
+}
+
+function resolveIndexColumnName(column: TableIndexColumn): string {
+  return typeof column === 'string' ? column : column.name
 }
 
 function qualifyName(name: string, schema?: string): string {

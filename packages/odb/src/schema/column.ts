@@ -123,6 +123,10 @@ export function emitColumnDef(column: ColumnNode): string {
     parts.push('NOT NULL')
   }
 
+  if (column.options.unique) {
+    parts.push('UNIQUE')
+  }
+
   return parts.join(' ')
 }
 
