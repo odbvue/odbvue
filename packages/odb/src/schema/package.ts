@@ -73,6 +73,19 @@ export type PackageSqlOptions = {
   physicalName?: string
 }
 
+type PackageMemberDefinition = PlsqlFunction<any> | Procedure
+
+type PackageMemberReturnValue<TMember extends PackageMemberDefinition> =
+  TMember extends PlsqlFunction<infer TReturnType> ? PlsqlExpression<TReturnType> : void
+
+type PackageMemberInvoker<TMember extends PackageMemberDefinition> = (
+  ...args: PlsqlRenderable[]
+) => PackageMemberReturnValue<TMember>
+
+type PackageShape<TMembers extends Record<string, PackageMemberDefinition>> = {
+  [TKey in keyof TMembers]: PackageMemberInvoker<TMembers[TKey]>
+}
+
 // ── ProcedureBody ─────────────────────────────────────────────────────────────
 
 export class ProcedureBody {
@@ -556,14 +569,14 @@ export class Procedure {
 
 // ── Function ──────────────────────────────────────────────────────────────────
 
-export class PlsqlFunction {
+export class PlsqlFunction<TReturnType extends PlsqlType | string = PlsqlType | string> {
   private _params: Param[] = []
   private _body?: ProcedureBody
   private _returnTypeOptions: { length?: number } = {}
 
   constructor(
     readonly name: string,
-    readonly returnType: PlsqlType | string,
+    readonly returnType: TReturnType,
   ) {}
 
   /** Set the length qualifier on the return type (e.g. for VARCHAR2). */
@@ -622,9 +635,43 @@ export class PlsqlFunction {
 
 // ── Package ───────────────────────────────────────────────────────────────────
 
-export class Package {
+export type Package<
+  TMembers extends Record<string, PackageMemberDefinition> = Record<string, never>,
+> = PackageShape<TMembers> & {
+  readonly name: string
+  readonly objectName: string
+  readonly isBlueGreen: true
+  procedure(name: string, build?: (proc: Procedure) => void): Procedure
+  function<TReturnType extends PlsqlType | string = PlsqlType | string>(
+    name: string,
+    returnType: TReturnType,
+    build?: (fn: PlsqlFunction<TReturnType>) => void,
+  ): PlsqlFunction<TReturnType>
+  func<TReturnType extends PlsqlType | string = PlsqlType | string>(
+    name: string,
+    returnType: TReturnType,
+    build?: (fn: PlsqlFunction<TReturnType>) => void,
+  ): PlsqlFunction<TReturnType>
+  call<TMemberName extends keyof TMembers>(
+    member: TMemberName,
+    ...args: PlsqlRenderable[]
+  ): PackageMemberReturnValue<TMembers[TMemberName]>
+  toNode(): PackageNode
+  toObject(): PackageNode
+  toSQLUp(options?: PackageSqlOptions): string
+  toSQLDown(options?: PackageSqlOptions): string
+  toOrdsSQL(options?: { schema?: string }): string
+  toOrdsDownSQL(options?: { schema?: string }): string
+  ordsEndpoints(): OrdsEndpoint[]
+  hasOrdsEndpoints(): boolean
+}
+
+export class PackageImpl<
+  TMembers extends Record<string, PackageMemberDefinition> = Record<string, never>,
+> {
   private _procedures: Procedure[] = []
-  private _functions: PlsqlFunction[] = []
+  private _functions: PlsqlFunction<any>[] = []
+  private _memberLookup: Record<string, PackageMemberDefinition> = {}
 
   /**
    * Marks this artifact for blue/green deployment. The migration layer creates
@@ -640,6 +687,37 @@ export class Package {
     return this.name
   }
 
+  private registerInvoker(alias: string, member: PackageMemberDefinition): void {
+    this._memberLookup[alias] = member
+    this._memberLookup[alias.toUpperCase()] = member
+    Object.defineProperty(this, alias, {
+      value: (...args: PlsqlRenderable[]) => this.invoke(alias, ...args),
+      configurable: true,
+      enumerable: true,
+      writable: false,
+    })
+  }
+
+  private invoke(
+    alias: string,
+    ...args: PlsqlRenderable[]
+  ): PackageMemberReturnValue<PackageMemberDefinition> {
+    const member = this._memberLookup[alias] ?? this._memberLookup[alias.toUpperCase()]
+    if (!member) {
+      throw new Error(`Unknown package member: ${alias}`)
+    }
+
+    if (member instanceof PlsqlFunction) {
+      const rendered = args.map(renderPlsql).join(', ')
+      return new PlsqlExpression(
+        member.returnType,
+        `${this.name}.${member.name}(${rendered})`,
+      ) as PackageMemberReturnValue<PackageMemberDefinition>
+    }
+
+    return undefined as PackageMemberReturnValue<PackageMemberDefinition>
+  }
+
   procedure(name: string, build?: (proc: Procedure) => void): Procedure {
     const p = new Procedure(name)
     build?.(p)
@@ -647,15 +725,23 @@ export class Package {
     return p
   }
 
-  func(
+  function<TReturnType extends PlsqlType | string = PlsqlType | string>(
     name: string,
-    returnType: PlsqlType | string,
-    build?: (fn: PlsqlFunction) => void,
-  ): PlsqlFunction {
+    returnType: TReturnType,
+    build?: (fn: PlsqlFunction<TReturnType>) => void,
+  ): PlsqlFunction<TReturnType> {
     const f = new PlsqlFunction(name, returnType)
     build?.(f)
     this._functions.push(f)
     return f
+  }
+
+  func<TReturnType extends PlsqlType | string = PlsqlType | string>(
+    name: string,
+    returnType: TReturnType,
+    build?: (fn: PlsqlFunction<TReturnType>) => void,
+  ): PlsqlFunction<TReturnType> {
+    return this.function(name, returnType, build)
   }
 
   /**
@@ -668,11 +754,11 @@ export class Package {
    * body.selectInto(pVersion,
    *   odbQuery().selectFrom('dual').select(settings.call('get_value', odbLiteral('APP_VERSION'))))
    */
-  call(member: string, ...args: PlsqlRenderable[]): PlsqlExpression<PlsqlType | string> {
-    const fn = this._functions.find((f) => f.name.toUpperCase() === member.toUpperCase())
-    const returnType: PlsqlType | string = fn?.returnType ?? 'VARCHAR2'
-    const rendered = args.map(renderPlsql).join(', ')
-    return new PlsqlExpression(returnType, `${this.name}.${member}(${rendered})`)
+  call<TMemberName extends keyof TMembers>(
+    member: TMemberName,
+    ...args: PlsqlRenderable[]
+  ): PackageMemberReturnValue<TMembers[TMemberName]> {
+    return this.invoke(member as string, ...args) as PackageMemberReturnValue<TMembers[TMemberName]>
   }
 
   /** True when any procedure declares an ORDS service/endpoint. */
@@ -860,10 +946,20 @@ function emitStatement(stmt: StatementNode): string {
 
 // ── Factory ───────────────────────────────────────────────────────────────────
 
-export function odbPackage(name: string, build?: (pkg: Package) => void): Package {
-  const pkg = new Package(name)
-  build?.(pkg)
-  return pkg
+export function odbPackage<TMembers extends Record<string, PackageMemberDefinition>>(
+  name: string,
+  build?: (pkg: PackageImpl<any>) => TMembers | void,
+): Package<TMembers> {
+  const pkg = new PackageImpl<TMembers>(name)
+  const result = build?.(pkg)
+
+  if (result && typeof result === 'object') {
+    for (const [key, member] of Object.entries(result)) {
+      pkg['registerInvoker'](key, member as PackageMemberDefinition)
+    }
+  }
+
+  return pkg as unknown as Package<TMembers>
 }
 
 export function odbProcedure(name: string, build?: (proc: Procedure) => void): Procedure {
@@ -872,11 +968,11 @@ export function odbProcedure(name: string, build?: (proc: Procedure) => void): P
   return p
 }
 
-export function odbFunction(
+export function odbFunction<TReturnType extends PlsqlType | string = PlsqlType | string>(
   name: string,
-  returnType: PlsqlType | string,
-  build?: (fn: PlsqlFunction) => void,
-): PlsqlFunction {
+  returnType: TReturnType,
+  build?: (fn: PlsqlFunction<TReturnType>) => void,
+): PlsqlFunction<TReturnType> {
   const f = new PlsqlFunction(name, returnType)
   build?.(f)
   return f

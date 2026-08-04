@@ -41,7 +41,11 @@ export class PlsqlExpression<T extends PlsqlType | string> implements PlsqlValue
 export type PlsqlRenderable = string | PlsqlValue
 
 export function renderPlsql(value: PlsqlRenderable): string {
-  return typeof value === 'string' ? value : value.toSQL()
+  if (typeof value === 'string') return value
+  if (value && typeof value === 'object' && 'toSQL' in value && typeof value.toSQL === 'function') {
+    return value.toSQL()
+  }
+  return String(value)
 }
 
 /**
