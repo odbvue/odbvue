@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import { odbQuery } from '../../src/query/index.js'
-import { odbTable } from '../../src/schema/table.js'
+import {
+  type Insertable,
+  type Selectable,
+  type Updateable,
+  odbTable,
+} from '../../src/schema/table.js'
 
 describe('odbQuery', () => {
   it('supports typed table schemas and column references', () => {
@@ -32,5 +37,52 @@ describe('odbQuery', () => {
 
     // @ts-expect-error number columns require number values
     odbQuery().selectFrom(users).where(users.id, '=', 'bad')
+  })
+
+  it('infers select row shapes and typed insert/update payloads', () => {
+    const users = odbTable('APP_USERS', (t) => ({
+      id: t.number('id').notNull().defaultSysGuid(),
+      username: t.string('username', 100).notNull(),
+      email: t.string('email'),
+    }))
+
+    const selectQuery = odbQuery().selectFrom(users).select([users.id, users.username])
+    const orderedQuery = odbQuery().selectFrom(users).orderBy(users.username)
+
+    expect(selectQuery.toSQL()).toBe('SELECT id, username FROM APP_USERS')
+    expect(orderedQuery.toSQL()).toBe('SELECT * FROM APP_USERS ORDER BY username ASC')
+
+    expectTypeOf<Selectable<typeof users>>().toEqualTypeOf<{
+      id: number
+      username: string
+      email: string | null
+    }>()
+
+    expectTypeOf<Insertable<typeof users>>().toEqualTypeOf<{
+      id?: number
+      username: string
+      email?: string | null
+    }>()
+
+    expectTypeOf<Updateable<typeof users>>().toEqualTypeOf<{
+      id?: number
+      username?: string
+      email?: string | null
+    }>()
+
+    odbQuery().insertInto(users).values({
+      username: 'Ada',
+      email: 'ada@example.com',
+    })
+
+    // @ts-expect-error invalid insert value types are rejected
+    odbQuery().insertInto(users).values({
+      id: 'bad',
+      username: 'Ada',
+      nope: true,
+    })
+
+    // @ts-expect-error invalid update value types are rejected
+    odbQuery().updateTable(users).set({ username: 42 })
   })
 })

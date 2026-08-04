@@ -27,7 +27,13 @@ export type ColumnNode = {
   options: ColumnOptions
 }
 
-export class Column<TValue = unknown, TName extends string = string> {
+export class Column<
+  TValue = unknown,
+  TName extends string = string,
+  TNullable extends boolean = true,
+  TDefault extends boolean = false,
+  TGenerated extends boolean = false,
+> {
   private options: ColumnOptions
   private readonly _valueType?: TValue
 
@@ -42,20 +48,20 @@ export class Column<TValue = unknown, TName extends string = string> {
     }
   }
 
-  notNull(): this {
+  notNull(): Column<TValue, TName, false, TDefault, TGenerated> {
     this.options.nullable = false
-    return this
+    return this as Column<TValue, TName, false, TDefault, TGenerated>
   }
 
-  nullable(): this {
+  nullable(): Column<TValue, TName, true, TDefault, TGenerated> {
     this.options.nullable = true
-    return this
+    return this as Column<TValue, TName, true, TDefault, TGenerated>
   }
 
-  primaryKey(): this {
+  primaryKey(): Column<TValue, TName, false, TDefault, TGenerated> {
     this.options.primaryKey = true
     this.options.nullable = false
-    return this
+    return this as Column<TValue, TName, false, TDefault, TGenerated>
   }
 
   unique(): this {
@@ -68,20 +74,20 @@ export class Column<TValue = unknown, TName extends string = string> {
     return this
   }
 
-  default(value: ColumnOptions['default']): this {
+  default(value: ColumnOptions['default']): Column<TValue, TName, TNullable, true, TGenerated> {
     this.options.default = value
-    return this
+    return this as Column<TValue, TName, TNullable, true, TGenerated>
   }
 
-  defaultSysGuid(): this {
+  defaultSysGuid(): Column<TValue, TName, false, true, TGenerated> {
     this.options.default = 'sys_guid'
     this.options.nullable = false
-    return this
+    return this as Column<TValue, TName, false, true, TGenerated>
   }
 
-  defaultCurrentTimestamp(): this {
+  defaultCurrentTimestamp(): Column<TValue, TName, TNullable, true, TGenerated> {
     this.options.default = 'current_timestamp'
-    return this
+    return this as Column<TValue, TName, TNullable, true, TGenerated>
   }
 
   toSQL(): string {

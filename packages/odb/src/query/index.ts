@@ -1,4 +1,5 @@
 import { Column } from '../schema/column.js'
+import { type Table, type Insertable, type Updateable } from '../schema/table.js'
 import {
   BindContext,
   combinePredicates,
@@ -19,6 +20,8 @@ type OrderByClause = {
   column: string
   direction: 'asc' | 'desc'
 }
+
+type ColumnLike = Column<any, string, any, any, any>
 
 /** Any object that carries a SQL identifier, such as a Table or a Column. */
 export type NamedRef = { readonly name: string }
@@ -46,7 +49,7 @@ function toPredicate(
   return predicate(column, op as Operator, value)
 }
 
-export class SelectQueryBuilder {
+export class SelectQueryBuilder<TTable extends Table<any> = Table<any>> {
   private _columns: string[] = []
   private _where: ExpressionNode[] = []
   private _orderBy: OrderByClause[] = []
@@ -67,10 +70,13 @@ export class SelectQueryBuilder {
     return this._schema ? `${this._schema}.${this._table.name}` : this._table.name
   }
 
-  select(columns: SqlExpr | SqlExpr[]): this {
+  select<TColumn extends ColumnLike>(column: TColumn): SelectQueryBuilder<TTable>
+  select<TColumns extends readonly ColumnLike[]>(columns: [...TColumns]): SelectQueryBuilder<TTable>
+  select(columns: SqlExpr | SqlExpr[]): SelectQueryBuilder<TTable>
+  select(columns: SqlExpr | SqlExpr[]): SelectQueryBuilder<TTable> {
     const cols = Array.isArray(columns) ? columns : [columns]
     this._columns.push(...cols.map(exprSql))
-    return this
+    return this as SelectQueryBuilder<TTable>
   }
 
   where(build: (eb: ExpressionBuilder) => ExpressionNode): this
@@ -95,8 +101,10 @@ export class SelectQueryBuilder {
     return this
   }
 
-  orderBy(column: string, direction: 'asc' | 'desc' = 'asc'): this {
-    this._orderBy.push({ column, direction })
+  orderBy(column: ColumnLike, direction: 'asc' | 'desc'): this
+  orderBy(column: string, direction: 'asc' | 'desc'): this
+  orderBy(column: string | ColumnLike, direction: 'asc' | 'desc' = 'asc'): this {
+    this._orderBy.push({ column: typeof column === 'string' ? column : column.name, direction })
     return this
   }
 
@@ -156,7 +164,7 @@ export class SelectQueryBuilder {
   }
 }
 
-export class InsertQueryBuilder {
+export class InsertQueryBuilder<TTable extends Table<any> = Table<any>> {
   private _values: Record<string, unknown> = {}
   private _schema?: string
 
@@ -172,7 +180,7 @@ export class InsertQueryBuilder {
     return this._schema ? `${this._schema}.${this._table.name}` : this._table.name
   }
 
-  values(row: Record<string, unknown>): this {
+  values(row: Insertable<TTable>): this {
     this._values = { ...row }
     return this
   }
@@ -199,7 +207,7 @@ export class InsertQueryBuilder {
   }
 }
 
-export class UpdateQueryBuilder {
+export class UpdateQueryBuilder<TTable extends Table<any> = Table<any>> {
   private _set: Record<string, unknown> = {}
   private _where: ExpressionNode[] = []
   private _schema?: string
@@ -216,7 +224,7 @@ export class UpdateQueryBuilder {
     return this._schema ? `${this._schema}.${this._table.name}` : this._table.name
   }
 
-  set(values: Record<string, unknown>): this {
+  set(values: Updateable<TTable>): this {
     this._set = { ...values }
     return this
   }
@@ -334,16 +342,22 @@ export class DeleteQueryBuilder {
 }
 
 export class OdbQuery {
-  selectFrom(table: string | NamedRef): SelectQueryBuilder {
-    return new SelectQueryBuilder(table)
+  selectFrom<TTable extends Table<any>>(table: TTable): SelectQueryBuilder<TTable>
+  selectFrom(table: string | NamedRef): SelectQueryBuilder
+  selectFrom(table: string | NamedRef | Table<any>): SelectQueryBuilder<any> {
+    return new SelectQueryBuilder(table as string | NamedRef)
   }
 
-  insertInto(table: string | NamedRef): InsertQueryBuilder {
-    return new InsertQueryBuilder(table)
+  insertInto<TTable extends Table<any>>(table: TTable): InsertQueryBuilder<TTable>
+  insertInto(table: string | NamedRef): InsertQueryBuilder
+  insertInto(table: string | NamedRef | Table<any>): InsertQueryBuilder<any> {
+    return new InsertQueryBuilder(table as string | NamedRef)
   }
 
-  updateTable(table: string | NamedRef): UpdateQueryBuilder {
-    return new UpdateQueryBuilder(table)
+  updateTable<TTable extends Table<any>>(table: TTable): UpdateQueryBuilder<TTable>
+  updateTable(table: string | NamedRef): UpdateQueryBuilder
+  updateTable(table: string | NamedRef | Table<any>): UpdateQueryBuilder<any> {
+    return new UpdateQueryBuilder(table as string | NamedRef)
   }
 
   deleteFrom(table: string | NamedRef): DeleteQueryBuilder {
