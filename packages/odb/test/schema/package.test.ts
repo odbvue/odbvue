@@ -29,6 +29,21 @@ describe('odbPackage member typing', () => {
     settings.getValue(123)
   })
 
+  it('rejects procedure members passed to call()', () => {
+    const settings = odbPackage('PCK_SETTINGS', (p) => ({
+      getValue: p.function('GET_VALUE', 'VARCHAR2', (fn) => {
+        fn.in('P_KEY', 'VARCHAR2')
+      }),
+      setValue: p.procedure('SET_VALUE', (proc) => {
+        proc.in('P_KEY', 'VARCHAR2')
+      }),
+    }))
+
+    expect(() => settings.call('setValue' as never, odbLiteral('APP_VERSION'))).toThrow(
+      'Package member setValue is not a function',
+    )
+  })
+
   it('is compatible with migration artifact interfaces', () => {
     const settings = odbPackage('PCK_SETTINGS', (p) => ({
       getValue: p.function('GET_VALUE', 'VARCHAR2', (fn) => {

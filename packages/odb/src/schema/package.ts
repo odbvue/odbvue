@@ -707,15 +707,15 @@ export class PackageImpl<
       throw new Error(`Unknown package member: ${alias}`)
     }
 
-    if (member instanceof PlsqlFunction) {
-      const rendered = args.map(renderPlsql).join(', ')
-      return new PlsqlExpression(
-        member.returnType,
-        `${this.name}.${member.name}(${rendered})`,
-      ) as PackageMemberReturnValue<PackageMemberDefinition>
+    if (!(member instanceof PlsqlFunction)) {
+      throw new Error(`Package member ${alias} is not a function`)
     }
 
-    return undefined as PackageMemberReturnValue<PackageMemberDefinition>
+    const rendered = args.map(renderPlsql).join(', ')
+    return new PlsqlExpression(
+      member.returnType,
+      `${this.name}.${member.name}(${rendered})`,
+    ) as PackageMemberReturnValue<PackageMemberDefinition>
   }
 
   procedure(name: string, build?: (proc: Procedure) => void): Procedure {
