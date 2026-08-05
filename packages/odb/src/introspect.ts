@@ -2,6 +2,16 @@ import type { CompiledQuery } from './query/ast.js'
 import type { ColumnType } from './schema/column.js'
 import type { ParamNode, ParameterDirection, PlsqlType } from './schema/attribute.js'
 import type { FunctionNode, PackageNode, ProcedureNode } from './schema/package.js'
+import {
+  columnBuilderMethod,
+  columnTypeSupportsLength,
+  emitTypeScriptType,
+  normalizeOracleIdentifier,
+  odbTypeFromOracle,
+  oracleIdentifierEquals,
+  toCamelCase,
+  toPascalCase,
+} from './model.js'
 
 // ── Raw data-dictionary row shapes ────────────────────────────────────────────
 
@@ -36,7 +46,7 @@ export function introspectColumnsQuery(owner: string): CompiledQuery {
     'WHERE owner = :owner',
     'ORDER BY table_name, column_id',
   ].join('\n')
-  return { sql, bindings: { owner: owner.toUpperCase() } }
+  return { sql, bindings: { owner: normalizeOracleIdentifier(owner) } }
 }
 
 /** Query `ALL_ARGUMENTS` for every package subprogram argument owned by `owner`. */
@@ -47,29 +57,19 @@ export function introspectArgumentsQuery(owner: string): CompiledQuery {
     'WHERE owner = :owner AND package_name IS NOT NULL',
     'ORDER BY package_name, object_name, position',
   ].join('\n')
-  return { sql, bindings: { owner: owner.toUpperCase() } }
+  return { sql, bindings: { owner: normalizeOracleIdentifier(owner) } }
 }
 
 // ── Type mapping ──────────────────────────────────────────────────────────────
 
 /** Map an Oracle data-dictionary type to the nearest ODB column type. */
 export function oracleTypeToColumnType(dataType: string, length?: number): ColumnType {
-  const type = dataType.toUpperCase()
-  if (type.startsWith('TIMESTAMP')) return 'timestamp'
-  if (type === 'DATE') return 'date'
-  if (type === 'CLOB' || type === 'NCLOB') return 'clob'
-  if (type === 'RAW') return length === 16 ? 'guid' : 'string'
-  if (type === 'NUMBER' || type === 'FLOAT' || type === 'INTEGER') return 'number'
-  if (type.startsWith('VARCHAR') || type.startsWith('NVARCHAR') || type.startsWith('CHAR')) {
-    return 'string'
-  }
-  if (type.startsWith('NCHAR')) return 'string'
-  return 'string'
+  return odbTypeFromOracle(dataType, length)
 }
 
 /** Normalize an `ALL_ARGUMENTS` data type to a known PL/SQL type where possible. */
 function normalizePlsqlType(dataType: string): PlsqlType | string {
-  const type = dataType.toUpperCase()
+  const type = normalizeOracleIdentifier(dataType)
   if (type === 'REF CURSOR') return 'SYS_REFCURSOR'
   if (type === 'PL/SQL BOOLEAN') return 'BOOLEAN'
   return type
@@ -96,7 +96,7 @@ export type IntrospectedTable = {
 
 /** Whether a column type carries a meaningful length qualifier for codegen. */
 function hasLength(type: ColumnType): boolean {
-  return type === 'string'
+  return columnTypeSupportsLength(type)
 }
 
 /** Group `ALL_TAB_COLUMNS` rows into introspected tables, preserving column order. */
@@ -144,7 +144,7 @@ export function packageFromArguments(
 ): PackageNode {
   const bySubprogram = new Map<string, IntrospectedArgumentRow[]>()
   for (const row of rows) {
-    if (row.PACKAGE_NAME.toUpperCase() !== packageName.toUpperCase()) continue
+    if (!oracleIdentifierEquals(row.PACKAGE_NAME, packageName)) continue
     const list = bySubprogram.get(row.OBJECT_NAME) ?? []
     list.push(row)
     bySubprogram.set(row.OBJECT_NAME, list)
@@ -177,33 +177,8 @@ export function packageFromArguments(
 
 // ── Code generation ───────────────────────────────────────────────────────────
 
-function toPascalCase(name: string): string {
-  return name
-    .split(/[_\s]+/)
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join('')
-}
-
-function toCamelCase(name: string): string {
-  const pascal = toPascalCase(name)
-  return pascal.charAt(0).toLowerCase() + pascal.slice(1)
-}
-
 function columnTypeToTs(type: ColumnType): string {
-  switch (type) {
-    case 'number':
-      return 'number'
-    case 'boolean':
-      return 'boolean'
-    case 'date':
-    case 'timestamp':
-      return 'Date'
-    case 'string':
-    case 'guid':
-    case 'clob':
-      return 'string'
-  }
+  return emitTypeScriptType(type)
 }
 
 /** Generate a TypeScript row interface for an introspected table. */
@@ -222,24 +197,11 @@ export function generateRowInterface(
 
 /** Render the `t.<method>('NAME'[, length])` builder call for a column. */
 function columnBuilderCall(column: IntrospectedTableColumn): string {
-  switch (column.type) {
-    case 'string':
-      return column.length !== undefined
-        ? `t.string('${column.name}', ${column.length})`
-        : `t.string('${column.name}')`
-    case 'number':
-      return `t.number('${column.name}')`
-    case 'guid':
-      return `t.guid('${column.name}')`
-    case 'boolean':
-      return `t.boolean('${column.name}')`
-    case 'timestamp':
-      return `t.timestamp('${column.name}')`
-    case 'clob':
-      return `t.clob('${column.name}')`
-    case 'date':
-      return `t.column('${column.name}', 'date')`
-  }
+  const method = columnBuilderMethod(column.type)
+  if (method === 'column') return `t.column('${column.name}', '${column.type}')`
+  const length =
+    columnTypeSupportsLength(column.type) && column.length !== undefined ? `, ${column.length}` : ''
+  return `t.${method}('${column.name}'${length})`
 }
 
 /** Generate an `odbTable(...)` definition scaffold for an introspected table. */

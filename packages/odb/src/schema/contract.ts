@@ -1,5 +1,12 @@
 import type { ParamNode, PlsqlType } from './attribute.js'
 import type { FunctionNode, PackageNode, ProcedureNode } from './package.js'
+import {
+  emitTypeScriptType,
+  odbTypeFromPlsql,
+  oracleParameterName,
+  toCamelCase,
+  toPascalCase,
+} from '../model.js'
 
 /** A value convertible to a PackageNode: a Package instance or a plain node. */
 type PackageLike = PackageNode | { toNode(): PackageNode }
@@ -13,45 +20,11 @@ export type ContractOptions = {
 
 /** Map a PL/SQL type to the nearest TypeScript type. */
 export function plsqlToTsType(type: PlsqlType | string): string {
-  switch (type as PlsqlType) {
-    case 'VARCHAR2':
-    case 'CLOB':
-      return 'string'
-    case 'NUMBER':
-    case 'PLS_INTEGER':
-    case 'INTEGER':
-    case 'BINARY_INTEGER':
-      return 'number'
-    case 'BOOLEAN':
-      return 'boolean'
-    case 'DATE':
-    case 'TIMESTAMP':
-      return 'Date'
-    case 'BLOB':
-      return 'Buffer'
-    case 'SYS_REFCURSOR':
-      return 'unknown[]'
-    default:
-      return 'unknown'
-  }
-}
-
-function toPascalCase(name: string): string {
-  return name
-    .split(/[_\s]+/)
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join('')
-}
-
-function toCamelCase(name: string): string {
-  const pascal = toPascalCase(name)
-  return pascal.charAt(0).toLowerCase() + pascal.slice(1)
+  return emitTypeScriptType(odbTypeFromPlsql(type))
 }
 
 function paramFieldName(plsqlArg: string, stripPrefix: boolean): string {
-  const raw = stripPrefix && /^[PR]_/i.test(plsqlArg) ? plsqlArg.slice(2) : plsqlArg
-  return toCamelCase(raw)
+  return oracleParameterName(plsqlArg, { stripPrefix })
 }
 
 function objectType(fields: { name: string; type: string }[]): string {

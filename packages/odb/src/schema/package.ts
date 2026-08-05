@@ -23,6 +23,7 @@ import {
   type OrdsParamType,
   type OrdsResultColumnNode,
 } from '../ords.js'
+import { ordsTypeFromPlsql } from '../model.js'
 import type { ColumnNode } from './column.js'
 
 // ── Query builder integration ─────────────────────────────────────────────────
@@ -357,21 +358,7 @@ function renderAuditAttributes(attributes: Record<string, string>): string {
  * https://docs.oracle.com/en/database/oracle/oracle-rest-data-services/18.3/aelig/ords-database-type-mappings.html
  */
 function plsqlToOrdsType(type: PlsqlType | string): OrdsParamType {
-  switch (type as PlsqlType) {
-    case 'SYS_REFCURSOR':
-      return 'RESULTSET'
-    case 'PLS_INTEGER':
-    case 'INTEGER':
-    case 'BINARY_INTEGER':
-      return 'INT'
-    case 'DATE':
-    case 'TIMESTAMP':
-      return 'TIMESTAMP'
-    case 'BOOLEAN':
-      return 'BOOLEAN'
-    default:
-      return 'STRING'
-  }
+  return ordsTypeFromPlsql(type)
 }
 
 /**

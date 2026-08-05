@@ -1,16 +1,15 @@
-export type ColumnType = 'string' | 'number' | 'guid' | 'boolean' | 'date' | 'timestamp' | 'clob'
+import {
+  emitOracleType,
+  type OdbColumnType,
+  type OdbValueForType,
+  type OdbValueTypeMap,
+} from '../model.js'
 
-export type ColumnValueTypeMap = {
-  string: string
-  number: number
-  guid: string
-  boolean: boolean
-  date: Date
-  timestamp: Date
-  clob: string
-}
+export type ColumnType = OdbColumnType
 
-export type ColumnValueForType<TType extends ColumnType> = ColumnValueTypeMap[TType]
+export type ColumnValueTypeMap = Pick<OdbValueTypeMap, ColumnType>
+
+export type ColumnValueForType<TType extends ColumnType> = OdbValueForType<TType>
 
 export type ColumnOptions = {
   length?: number
@@ -140,20 +139,5 @@ export function emitColumnDef(column: ColumnNode): string {
 }
 
 export function emitColumnType(column: ColumnNode): string {
-  switch (column.type) {
-    case 'string':
-      return `VARCHAR2(${column.options.length ?? 255} CHAR)`
-    case 'number':
-      return 'NUMBER'
-    case 'guid':
-      return 'RAW(16)'
-    case 'boolean':
-      return 'NUMBER(1)'
-    case 'date':
-      return 'DATE'
-    case 'timestamp':
-      return 'TIMESTAMP(6)'
-    case 'clob':
-      return 'CLOB'
-  }
+  return emitOracleType(column.type, column.options)
 }

@@ -5,6 +5,7 @@ import {
   type ColumnType,
   type ColumnValueForType,
 } from './column.js'
+import { emitOracleType } from '../model.js'
 
 export type IndexNode = {
   kind: 'index'
@@ -261,7 +262,7 @@ function emitOracleDropTable(table: TableNode | string, schema?: string): string
 }
 
 function emitOracleColumn(column: ColumnNode): string {
-  const parts = [column.name, emitOracleType(column)]
+  const parts = [column.name, emitOracleType(column.type, column.options)]
 
   if (column.options.default === 'sys_guid') {
     parts.push('DEFAULT SYS_GUID()')
@@ -280,25 +281,6 @@ function emitOracleColumn(column: ColumnNode): string {
   }
 
   return parts.join(' ')
-}
-
-function emitOracleType(column: ColumnNode): string {
-  switch (column.type) {
-    case 'string':
-      return `VARCHAR2(${column.options.length ?? 255} CHAR)`
-    case 'number':
-      return 'NUMBER'
-    case 'guid':
-      return 'RAW(16)'
-    case 'boolean':
-      return 'NUMBER(1)'
-    case 'date':
-      return 'DATE'
-    case 'timestamp':
-      return 'TIMESTAMP(6)'
-    case 'clob':
-      return 'CLOB'
-  }
 }
 
 function emitOracleIndex(

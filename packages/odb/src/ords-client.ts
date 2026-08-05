@@ -4,6 +4,7 @@ import {
   type OrdsParamNode,
   type OrdsParamType,
 } from './ords.js'
+import { emitTypeScriptType, odbTypeFromOrds, toCamelCase, toPascalCase } from './model.js'
 
 /** A value convertible to an ORDS endpoint node: an OrdsEndpoint or a plain node. */
 type EndpointLike = OrdsEndpointNode | OrdsEndpoint
@@ -24,34 +25,7 @@ function toNode(endpoint: EndpointLike): OrdsEndpointNode {
 
 /** Map an ORDS parameter type to the nearest TypeScript type for a JSON client. */
 export function ordsTypeToTsType(type: OrdsParamType): string {
-  switch (type) {
-    case 'INT':
-    case 'DOUBLE':
-    case 'LONG':
-      return 'number'
-    case 'BOOLEAN':
-      return 'boolean'
-    case 'RESULTSET':
-      return 'unknown[]'
-    case 'STRING':
-    case 'TIMESTAMP':
-      return 'string'
-  }
-}
-
-function words(name: string): string[] {
-  return name.split(/[-_\s]+/).filter(Boolean)
-}
-
-function toPascalCase(name: string): string {
-  return words(name)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join('')
-}
-
-function toCamelCase(name: string): string {
-  const pascal = toPascalCase(name)
-  return pascal.charAt(0).toLowerCase() + pascal.slice(1)
+  return emitTypeScriptType(odbTypeFromOrds(type), 'json')
 }
 
 /** Full ORDS route for an endpoint: module base path joined with the template pattern. */
@@ -75,22 +49,7 @@ function moduleFileName(module: string): string {
 type Field = { name: string; type: string }
 
 function resultColumnType(column: NonNullable<OrdsParamNode['resultColumns']>[number]): string {
-  let type: string
-  switch (column.type) {
-    case 'number':
-      type = 'number'
-      break
-    case 'boolean':
-      type = 'boolean'
-      break
-    case 'string':
-    case 'guid':
-    case 'date':
-    case 'timestamp':
-    case 'clob':
-      type = 'string'
-      break
-  }
+  const type = emitTypeScriptType(column.type, 'json')
   return column.nullable ? `${type} | null` : type
 }
 

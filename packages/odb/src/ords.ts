@@ -1,25 +1,21 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+import { oracleParameterName, toKebabCase, type OdbOrdsType } from './model.js'
+import type { ColumnType } from './schema/column.js'
+
 export type OrdsHttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
 /**
  * Native ORDS parameter type.
  * https://docs.oracle.com/en/database/oracle/oracle-rest-data-services/18.3/aelig/ords-database-type-mappings.html
  */
-export type OrdsParamType =
-  | 'STRING'
-  | 'INT'
-  | 'DOUBLE'
-  | 'BOOLEAN'
-  | 'LONG'
-  | 'TIMESTAMP'
-  | 'RESULTSET'
+export type OrdsParamType = OdbOrdsType
 
 export type OrdsParamDirection = 'IN' | 'OUT' | 'IN OUT'
 
 export type OrdsResultColumnNode = {
   name: string
-  type: 'string' | 'number' | 'guid' | 'boolean' | 'date' | 'timestamp' | 'clob'
+  type: ColumnType
   nullable: boolean
 }
 
@@ -87,8 +83,7 @@ export class OrdsParam {
    * e.g. P_USER_NAME → user-name
    */
   get name(): string {
-    const raw = /^[PR]_/i.test(this.plsqlArg) ? this.plsqlArg.slice(2) : this.plsqlArg
-    return raw.toLowerCase().replace(/_/g, '-')
+    return oracleParameterName(this.plsqlArg, { style: 'kebab' })
   }
 
   get bindVariable(): string {
@@ -210,7 +205,7 @@ export class OrdsEndpoint {
         break
       }
     }
-    const base = name.toLowerCase().replace(/_/g, '-')
+    const base = toKebabCase(name)
 
     // For GET, append IN params as path segments (prc_ordsify convention)
     if (this.effectiveMethod === 'GET') {
