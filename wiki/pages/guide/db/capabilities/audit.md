@@ -29,7 +29,7 @@ Each `debug` / `info` / `warn` / `error` / `fatal` call inserts one record in an
 import { odbPackage } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (p) => {
-  p.procedure('login', (proc) => {
+  p.proc('login', (proc) => {
     const uuid = proc.in('uuid', 'VARCHAR2')
 
     proc.body((body) => {

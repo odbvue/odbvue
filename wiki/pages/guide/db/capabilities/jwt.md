@@ -29,7 +29,7 @@ Build the claims payload with `JSON_OBJECT`, then pass it to `odb_jwt.encode`:
 import { odbPackage } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (p) => {
-  p.procedure('login', (proc) => {
+  p.proc('login', (proc) => {
     const uuid = proc.in('uuid', 'VARCHAR2')
     const token = proc.out('token', 'VARCHAR2')
 

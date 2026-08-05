@@ -40,7 +40,7 @@ import { defineMigration, odbPackage } from '@odbvue/odb'
 const schemaName = process.env.ODBVUE_ADB_SCHEMA_USERNAME ?? ''
 
 const appPackage = odbPackage('pck_app', (p) => {
-  p.procedure('version', (proc) => {
+  p.proc('version', (proc) => {
     const version = proc.out('version', 'VARCHAR2')
 
     proc.body((body) => {
@@ -187,7 +187,7 @@ This is DML and read-query generation, not schema generation.
 import { odbPackage } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (pkg) => {
-  pkg.procedure('version', (proc) => {
+  pkg.proc('version', (proc) => {
     const version = proc.out('version', 'VARCHAR2')
 
     proc.body((body) => {
@@ -259,7 +259,7 @@ Define the public HTTP contract with `.service()`. Then `toOrdsSQL()` emits the 
 import { odbPackage } from '@odbvue/odb'
 
 const usersApi = odbPackage('pck_users', (pkg) => {
-  pkg.procedure('get_user', (proc) => {
+  pkg.proc('get_user', (proc) => {
     proc.in('p_user_id', 'NUMBER')
     proc.out('r_user', 'SYS_REFCURSOR')
     proc.body((body) => {
@@ -284,7 +284,7 @@ The service contract makes the HTTP method and route visible during code review.
 - package name becomes the ORDS module name
 - PL/SQL parameters map to ORDS parameters
 
-Use `.ords()` only when convention-derived methods and paths are preferred over an explicit public contract.
+Service metadata belongs in `.service({ method, path })`, making the application contract explicit and reusable by ORDS, client, and OpenAPI generators.
 
 The migration context enables schema-level ORDS automatically before the first `expose()` operation. It can still be managed explicitly outside the context:
 

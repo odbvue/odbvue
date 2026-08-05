@@ -25,7 +25,7 @@ export const migration = defineMigration('20260628161706_test', {
 import { odbPackage } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (p) => {
-  p.procedure('version', (proc) => {
+  p.proc('version', (proc) => {
     const test = proc.out('test', 'CLOB')
 
     proc.body((body) => {

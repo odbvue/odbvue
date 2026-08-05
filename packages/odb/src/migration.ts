@@ -7,6 +7,7 @@ import { odbOrdsSchema, type OrdsEndpoint } from './ords.js'
 import { type Schema } from './schema/schema.js'
 import { type Table } from './schema/table.js'
 import type { AnyQueryBuilder } from './schema/package.js'
+import type { OdbApplication } from './schema/package.js'
 
 /** Registry table tracking the active blue/green color per deployed object. */
 export const BLUE_GREEN_REGISTRY_TABLE = 'app_migrations_objects'
@@ -91,6 +92,7 @@ export type MigrationServiceArtifact = {
   toOrdsSQL(options?: { schema?: string }): string
   toOrdsDownSQL(options?: { schema?: string }): string
   ordsEndpoints?(): OrdsEndpoint[]
+  application?(): OdbApplication
 }
 
 function validateSchema(schema: string): string {
@@ -218,6 +220,14 @@ export class MigrationBuilder {
   /** Collect the ORDS endpoints exposed by this migration's service artifacts. */
   ordsEndpoints(): OrdsEndpoint[] {
     return this._exposes.flatMap((a) => a.ordsEndpoints?.() ?? [])
+  }
+
+  /** Collect canonical application contracts installed by this migration. */
+  applications(): OdbApplication[] {
+    return this._exposes.flatMap((artifact) => {
+      const application = artifact.application?.()
+      return application ? [application] : []
+    })
   }
 
   /** Escape hatch: raw SQL appended to `up` after installs, before exposes. */

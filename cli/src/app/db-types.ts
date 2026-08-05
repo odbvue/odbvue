@@ -2,7 +2,11 @@ import fs from 'fs'
 import path from 'path'
 import { pathToFileURL } from 'url'
 
-import { generateOrdsClientModules, type MigrationBuilder, type OrdsEndpoint } from '@odbvue/odb'
+import {
+  generateApplicationClientModules,
+  type MigrationBuilder,
+  type OdbApplication,
+} from '@odbvue/odb'
 
 import { SecretsStore } from '../adapters/secrets-store.js'
 
@@ -14,7 +18,7 @@ const LEGACY_OUTPUT = path.join(webDir, 'src', 'services', 'ords.generated.ts')
 
 /**
  * Generate typed ORDS service contracts from the compiled migration modules.
- * Definition-first: reads `.migration.ordsEndpoints()` from each compiled
+ * Definition-first: reads `.migration.applications()` from each compiled
  * migration in `apps/db/dist/migrations` — no database connection required.
  */
 export const runDbTypes = async (
@@ -36,21 +40,26 @@ export const runDbTypes = async (
     .filter((e) => e.endsWith('.js'))
     .toSorted()
 
-  const endpoints: OrdsEndpoint[] = []
+  const applications: OdbApplication[] = []
   for (const entry of entries) {
     const modulePath = path.join(migrationsDir, entry)
     const mod = await import(pathToFileURL(modulePath).href)
     const migration = mod.migration as MigrationBuilder | undefined
-    if (typeof migration?.ordsEndpoints === 'function') {
-      endpoints.push(...migration.ordsEndpoints())
+    if (typeof migration?.applications === 'function') {
+      applications.push(...migration.applications())
     }
   }
 
-  if (endpoints.length === 0) {
-    logger.warn('No ORDS endpoints found in migrations')
+  if (applications.length === 0) {
+    logger.warn('No ODB applications found in migrations')
   }
 
-  const generated = generateOrdsClientModules(endpoints)
+  const generated = generateApplicationClientModules(applications)
+  const operationCount = applications.reduce(
+    (count, application) =>
+      count + application.procedures.filter((procedure) => procedure.service).length,
+    0,
+  )
   fs.mkdirSync(outputDirectory, { recursive: true })
   for (const entry of fs.readdirSync(outputDirectory)) {
     if (entry.endsWith('.ts')) {
@@ -67,7 +76,7 @@ export const runDbTypes = async (
   }
 
   logger.info(
-    `Wrote ${endpoints.length} ORDS operation(s) across ${generated.files.size} module(s) to ${outputDirectory}`,
+    `Wrote ${operationCount} operation(s) across ${generated.files.size} module(s) to ${outputDirectory}`,
   )
   logger.lf()
 }

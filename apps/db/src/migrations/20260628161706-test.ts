@@ -12,7 +12,7 @@ import { appMigrationsTable } from './00000000000000-initial.js'
 const schemaName = (process.env.ODBVUE_ADB_SCHEMA_USERNAME ?? '').toUpperCase()
 
 const appPackage = odbPackage('pck_app', (p) => {
-  p.procedure('me', (proc) => {
+  p.proc('me', (proc) => {
     const version = proc.out('version', 'VARCHAR2')
     const versionBase64 = proc.out('version_base64', 'CLOB')
 
@@ -28,12 +28,14 @@ const appPackage = odbPackage('pck_app', (p) => {
         .assign(versionBase64, odbLob.varchar2ToBase64(version.toSQL())),
     )
 
-    proc.get('/auth/me', {
+    proc.service({
+      method: 'GET',
+      path: '/auth/me',
       summary: 'Returns the current application version (plus its Base64 encoding)',
     })
   })
 
-  p.procedure('migrations', (proc) => {
+  p.proc('migrations', (proc) => {
     const result = proc.out('result', 'SYS_REFCURSOR')
 
     proc.body((body) =>
@@ -45,7 +47,9 @@ const appPackage = odbPackage('pck_app', (p) => {
       ),
     )
 
-    proc.get('/migrations', {
+    proc.service({
+      method: 'GET',
+      path: '/migrations',
       summary: 'Returns all applied database migrations',
     })
   })

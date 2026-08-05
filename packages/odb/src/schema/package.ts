@@ -47,6 +47,16 @@ export type StatementNode =
 export type ProcedureBodyNode = {
   declarations: LocalVarNode[]
   statements: StatementNode[]
+  resultSets?: Record<string, OrdsResultColumnNode[]>
+}
+
+export type ServiceNode = {
+  method?: OrdsHttpMethod
+  path?: string
+  summary?: string
+  module?: string
+  basePath?: string
+  paramTypes?: Record<string, OrdsParamType>
 }
 
 export type ProcedureNode = {
@@ -54,6 +64,7 @@ export type ProcedureNode = {
   name: string
   params: ParamNode[]
   body?: ProcedureBodyNode
+  service?: ServiceNode
 }
 
 export type FunctionNode = {
@@ -65,11 +76,20 @@ export type FunctionNode = {
   body?: ProcedureBodyNode
 }
 
-export type PackageNode = {
+export type OdbApplication = {
   kind: 'package'
   name: string
   procedures: ProcedureNode[]
   functions: FunctionNode[]
+}
+
+/** @deprecated Use OdbApplication. */
+export type PackageNode = OdbApplication
+
+export type ApplicationLike = OdbApplication | { toNode(): OdbApplication }
+
+export function applicationNode(application: ApplicationLike): OdbApplication {
+  return 'toNode' in application ? application.toNode() : application
 }
 
 export type PackageSqlOptions = {
@@ -336,6 +356,15 @@ export class ProcedureBody {
     return {
       declarations: this._declarations.map((v) => v.toNode()),
       statements: [...this._statements],
+      resultSets:
+        this._cursorResultColumns.size > 0
+          ? Object.fromEntries(
+              [...this._cursorResultColumns].map(([name, columns]) => [
+                name,
+                columns.map((column) => ({ ...column })),
+              ]),
+            )
+          : undefined,
     }
   }
 }
@@ -453,6 +482,19 @@ export class OrdsEndpointBuilder {
     return this
   }
 
+  /** @internal Convert the legacy fluent endpoint builder into service metadata. */
+  toServiceNode(): ServiceNode {
+    return {
+      method: this._method,
+      path: this._pattern,
+      summary: this._comment,
+      module: this._module,
+      basePath: this._basePath,
+      paramTypes:
+        this._typeOverrides.size > 0 ? Object.fromEntries(this._typeOverrides) : undefined,
+    }
+  }
+
   /** @internal Called by Package when building ORDS SQL. */
   build(
     packageName: string,
@@ -460,28 +502,55 @@ export class OrdsEndpointBuilder {
     params: Param[],
     procedureBody?: ProcedureBody,
   ): OrdsEndpoint {
-    const module = this._module ?? deriveOrdsModule(packageName)
-    const endpoint = new OrdsEndpoint(module, packageName, procedureName)
-    if (this._basePath !== undefined) endpoint.basePath(this._basePath)
-    if (this._method) endpoint.method(this._method)
-    if (this._pattern !== undefined) endpoint.pattern(this._pattern)
-    if (this._comment) endpoint.comment(this._comment)
-
-    for (const p of params) {
-      const node = p.toNode()
-      const ordsType =
-        this._typeOverrides.get(node.name.toUpperCase()) ?? plsqlToOrdsType(node.type)
-      endpoint.param(
-        node.name,
-        node.direction as 'IN' | 'OUT' | 'IN OUT',
-        ordsType,
-        undefined,
-        ordsType === 'RESULTSET' ? procedureBody?.cursorResultColumns(node.name) : undefined,
-      )
-    }
-
-    return endpoint
+    return buildOrdsEndpoint(packageName, {
+      kind: 'procedure',
+      name: procedureName,
+      params: params.map((param) => param.toNode()),
+      body: procedureBody?.toNode(),
+      service: this.toServiceNode(),
+    })!
   }
+}
+
+function buildOrdsEndpoint(
+  packageName: string,
+  procedure: ProcedureNode,
+): OrdsEndpoint | undefined {
+  const service = procedure.service
+  if (!service) return undefined
+
+  const module = service.module ?? deriveOrdsModule(packageName)
+  const endpoint = new OrdsEndpoint(module, packageName, procedure.name)
+  if (service.basePath !== undefined) endpoint.basePath(service.basePath)
+  if (service.method) endpoint.method(service.method)
+  if (service.path !== undefined) endpoint.pattern(service.path)
+  if (service.summary) endpoint.comment(service.summary)
+
+  const typeOverrides = new Map(
+    Object.entries(service.paramTypes ?? {}).map(([name, type]) => [name.toUpperCase(), type]),
+  )
+  for (const param of procedure.params) {
+    const ordsType = typeOverrides.get(param.name.toUpperCase()) ?? plsqlToOrdsType(param.type)
+    endpoint.param(
+      param.name,
+      param.direction,
+      ordsType,
+      undefined,
+      ordsType === 'RESULTSET'
+        ? procedure.body?.resultSets?.[param.name.toUpperCase()]?.map((column) => ({ ...column }))
+        : undefined,
+    )
+  }
+
+  return endpoint
+}
+
+/** Derive ORDS endpoints from the canonical application contract. */
+export function applicationEndpoints(application: ApplicationLike): OrdsEndpoint[] {
+  const node = applicationNode(application)
+  return node.procedures
+    .map((procedure) => buildOrdsEndpoint(node.name, procedure))
+    .filter((endpoint): endpoint is OrdsEndpoint => endpoint !== undefined)
 }
 
 // ── Procedure ─────────────────────────────────────────────────────────────────
@@ -489,7 +558,7 @@ export class OrdsEndpointBuilder {
 export class Procedure {
   private _params: Param[] = []
   private _body?: ProcedureBody
-  private _ordsBuilder?: OrdsEndpointBuilder
+  private _service?: ServiceNode
 
   constructor(readonly name: string) {}
 
@@ -530,6 +599,7 @@ export class Procedure {
   }
 
   /**
+   * @deprecated Use service() so service metadata is explicit in the application contract.
    * Mark this procedure as an ORDS endpoint. All settings are optional —
    * the module is derived from the package name, the HTTP method from the
    * procedure name prefix (GET_/POST_/PUT_/DELETE_), and parameter types
@@ -540,8 +610,9 @@ export class Procedure {
    * proc.ords(e => e.comment('...'))     // with overrides
    */
   ords(build?: (e: OrdsEndpointBuilder) => void): this {
-    this._ordsBuilder = new OrdsEndpointBuilder()
-    build?.(this._ordsBuilder)
+    const endpoint = new OrdsEndpointBuilder()
+    build?.(endpoint)
+    this._service = endpoint.toServiceNode()
     return this
   }
 
@@ -557,30 +628,23 @@ export class Procedure {
    * })
    */
   service(definition: OrdsServiceDefinition): this {
-    const endpoint = new OrdsEndpointBuilder()
-      .method(definition.method)
-      .pattern(normalizeServicePath(definition.path))
-
-    if (definition.summary) endpoint.comment(definition.summary)
-    if (definition.module) endpoint.module(definition.module)
-    if (definition.basePath) endpoint.basePath(normalizeBasePath(definition.basePath))
-
-    for (const [param, type] of Object.entries(definition.paramTypes ?? {})) {
-      endpoint.paramType(param, type)
+    this._service = {
+      ...definition,
+      path: normalizeServicePath(definition.path),
+      basePath: definition.basePath ? normalizeBasePath(definition.basePath) : undefined,
+      paramTypes: definition.paramTypes ? { ...definition.paramTypes } : undefined,
     }
-
-    this._ordsBuilder = endpoint
     return this
   }
 
-  /** Expose this procedure as a GET service with its contract inferred. */
+  /** @deprecated Use service({ method: 'GET', path }). */
   get(path: string, options: Omit<OrdsServiceDefinition, 'method' | 'path'> = {}): this {
     return this.service({ ...options, method: 'GET', path })
   }
 
   /** @internal Called by Package.toOrdsSQL() */
   buildOrdsEndpoint(packageName: string): OrdsEndpoint | undefined {
-    return this._ordsBuilder?.build(packageName, this.name, this._params, this._body)
+    return buildOrdsEndpoint(packageName, this.toNode())
   }
 
   toNode(): ProcedureNode {
@@ -589,6 +653,12 @@ export class Procedure {
       name: this.name,
       params: this._params.map((p) => p.toNode()),
       body: this._body?.toNode(),
+      service: this._service
+        ? {
+            ...this._service,
+            paramTypes: this._service.paramTypes ? { ...this._service.paramTypes } : undefined,
+          }
+        : undefined,
     }
   }
 
@@ -671,13 +741,16 @@ export type Package<
   readonly name: string
   readonly objectName: string
   readonly isBlueGreen: true
-  procedure(name: string, build?: (proc: Procedure) => void): Procedure
-  function<TReturnType extends PlsqlType | string = PlsqlType | string>(
+  proc(name: string, build?: (proc: Procedure) => void): Procedure
+  func<TReturnType extends PlsqlType | string = PlsqlType | string>(
     name: string,
     returnType: TReturnType,
     build?: (fn: PlsqlFunction<TReturnType>) => void,
   ): PlsqlFunction<TReturnType>
-  func<TReturnType extends PlsqlType | string = PlsqlType | string>(
+  /** @deprecated Use proc(). */
+  procedure(name: string, build?: (proc: Procedure) => void): Procedure
+  /** @deprecated Use func(). */
+  function<TReturnType extends PlsqlType | string = PlsqlType | string>(
     name: string,
     returnType: TReturnType,
     build?: (fn: PlsqlFunction<TReturnType>) => void,
@@ -687,6 +760,7 @@ export type Package<
     ...args: PlsqlRenderable[]
   ): PackageMemberReturnValue<TMembers[TMemberName]>
   toNode(): PackageNode
+  application(): OdbApplication
   toObject(): PackageNode
   toSQLUp(options?: PackageSqlOptions): string
   toSQLDown(options?: PackageSqlOptions): string
@@ -748,14 +822,14 @@ export class PackageImpl<
     ) as PackageMemberReturnValue<PackageMemberDefinition>
   }
 
-  procedure(name: string, build?: (proc: Procedure) => void): Procedure {
+  proc(name: string, build?: (proc: Procedure) => void): Procedure {
     const p = new Procedure(name)
     build?.(p)
     this._procedures.push(p)
     return p
   }
 
-  function<TReturnType extends PlsqlType | string = PlsqlType | string>(
+  func<TReturnType extends PlsqlType | string = PlsqlType | string>(
     name: string,
     returnType: TReturnType,
     build?: (fn: PlsqlFunction<TReturnType>) => void,
@@ -766,12 +840,18 @@ export class PackageImpl<
     return f
   }
 
-  func<TReturnType extends PlsqlType | string = PlsqlType | string>(
+  /** @deprecated Use proc(). */
+  procedure(name: string, build?: (proc: Procedure) => void): Procedure {
+    return this.proc(name, build)
+  }
+
+  /** @deprecated Use func(). */
+  function<TReturnType extends PlsqlType | string = PlsqlType | string>(
     name: string,
     returnType: TReturnType,
     build?: (fn: PlsqlFunction<TReturnType>) => void,
   ): PlsqlFunction<TReturnType> {
-    return this.function(name, returnType, build)
+    return this.func(name, returnType, build)
   }
 
   /**
@@ -793,14 +873,12 @@ export class PackageImpl<
 
   /** True when any procedure declares an ORDS service/endpoint. */
   hasOrdsEndpoints(): boolean {
-    return this._procedures.some((p) => p.buildOrdsEndpoint(this.name) !== undefined)
+    return applicationEndpoints(this).length > 0
   }
 
-  /** Build the ORDS endpoints declared by this package's procedures. */
+  /** @deprecated Use application() with application generators. */
   ordsEndpoints(): OrdsEndpoint[] {
-    return this._procedures
-      .map((p) => p.buildOrdsEndpoint(this.name))
-      .filter((e): e is OrdsEndpoint => e !== undefined)
+    return applicationEndpoints(this)
   }
 
   toNode(): PackageNode {
@@ -812,35 +890,26 @@ export class PackageImpl<
     }
   }
 
+  application(): OdbApplication {
+    return this.toNode()
+  }
+
   toObject() {
     return this.toNode()
   }
 
   toSQLUp(options: PackageSqlOptions = {}): string {
-    const node = this.toNode()
-    return [emitPackageSpec(node, options), '/', emitPackageBody(node, options), '/'].join('\n')
+    return emitApplicationSql(this, options)
   }
 
   /** Generate ORDS registration SQL for all configured procedure services. */
   toOrdsSQL(options: { schema?: string } = {}): string {
-    const endpoints = this._procedures
-      .map((p) => p.buildOrdsEndpoint(this.name))
-      .filter((e): e is OrdsEndpoint => e !== undefined)
-    const definedModules = new Set<string>()
-    return endpoints
-      .map((endpoint) => {
-        const defineModule = !definedModules.has(endpoint.module)
-        definedModules.add(endpoint.module)
-        return endpoint.toSQLUp({ ...options, defineModule })
-      })
-      .join('\n\n')
+    return emitApplicationOrdsSql(this, options)
   }
 
   /** Drop ORDS modules for all configured procedure services. */
   toOrdsDownSQL(options: { schema?: string } = {}): string {
-    const endpoints = this._procedures
-      .map((p) => p.buildOrdsEndpoint(this.name))
-      .filter((e): e is OrdsEndpoint => e !== undefined)
+    const endpoints = applicationEndpoints(this)
     const seenModules = new Set<string>()
     return endpoints
       .filter((e) => {
@@ -863,6 +932,30 @@ export class PackageImpl<
       `/`,
     ].join('\n')
   }
+}
+
+/** Emit package specification and body SQL from a plain application contract. */
+export function emitApplicationSql(
+  application: ApplicationLike,
+  options: PackageSqlOptions = {},
+): string {
+  const node = applicationNode(application)
+  return [emitPackageSpec(node, options), '/', emitPackageBody(node, options), '/'].join('\n')
+}
+
+/** Emit ORDS registration SQL from service metadata in an application contract. */
+export function emitApplicationOrdsSql(
+  application: ApplicationLike,
+  options: { schema?: string } = {},
+): string {
+  const definedModules = new Set<string>()
+  return applicationEndpoints(application)
+    .map((endpoint) => {
+      const defineModule = !definedModules.has(endpoint.module)
+      definedModules.add(endpoint.module)
+      return endpoint.toSQLUp({ ...options, defineModule })
+    })
+    .join('\n\n')
 }
 
 // ── SQL emission ──────────────────────────────────────────────────────────────
@@ -998,12 +1091,14 @@ export function odbPackage<TMembers extends Record<string, PackageMemberDefiniti
   return pkg as unknown as Package<TMembers>
 }
 
+/** @deprecated Define procedures inside odbPackage() with p.proc(). */
 export function odbProcedure(name: string, build?: (proc: Procedure) => void): Procedure {
   const p = new Procedure(name)
   build?.(p)
   return p
 }
 
+/** @deprecated Define functions inside odbPackage() with p.func(). */
 export function odbFunction<TReturnType extends PlsqlType | string = PlsqlType | string>(
   name: string,
   returnType: TReturnType,

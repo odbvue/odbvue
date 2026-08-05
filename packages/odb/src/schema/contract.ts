@@ -1,5 +1,10 @@
 import type { ParamNode, PlsqlType } from './attribute.js'
-import type { FunctionNode, PackageNode, ProcedureNode } from './package.js'
+import {
+  applicationNode,
+  type ApplicationLike,
+  type FunctionNode,
+  type ProcedureNode,
+} from './package.js'
 import {
   emitTypeScriptType,
   odbTypeFromPlsql,
@@ -7,9 +12,6 @@ import {
   toCamelCase,
   toPascalCase,
 } from '../model.js'
-
-/** A value convertible to a PackageNode: a Package instance or a plain node. */
-type PackageLike = PackageNode | { toNode(): PackageNode }
 
 export type ContractOptions = {
   /** Override the generated interface name (default: PascalCase of the package name). */
@@ -31,10 +33,6 @@ function objectType(fields: { name: string; type: string }[]): string {
   if (fields.length === 0) return '{}'
   const body = fields.map((f) => `${f.name}: ${f.type}`).join('; ')
   return `{ ${body} }`
-}
-
-function toNode(pkg: PackageLike): PackageNode {
-  return 'toNode' in pkg ? pkg.toNode() : pkg
 }
 
 function inputFields(params: ParamNode[], stripPrefix: boolean): { name: string; type: string }[] {
@@ -73,8 +71,11 @@ function functionMethod(fn: FunctionNode, stripPrefix: boolean): string {
  * whose result is derived from OUT/IN OUT parameters; functions map to methods
  * returning their PL/SQL return type.
  */
-export function generatePackageContract(pkg: PackageLike, options: ContractOptions = {}): string {
-  const node = toNode(pkg)
+export function generatePackageContract(
+  pkg: ApplicationLike,
+  options: ContractOptions = {},
+): string {
+  const node = applicationNode(pkg)
   const stripPrefix = options.stripParamPrefix ?? true
   const interfaceName = options.interfaceName ?? toPascalCase(node.name)
 

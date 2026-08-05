@@ -169,4 +169,4 @@ proc.service({
 })
 ```
 
-Optional `module`, `basePath`, and `paramTypes` properties override derived ORDS configuration. The lower-level `proc.ords()` builder remains available for convention-based endpoints.
+Optional `module`, `basePath`, and `paramTypes` properties override derived ORDS configuration. `proc.service()` stores this metadata directly in the application contract used by ORDS, client, and OpenAPI generators.

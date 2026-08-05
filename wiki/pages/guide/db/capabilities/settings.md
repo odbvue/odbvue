@@ -50,7 +50,7 @@ odbSettings.seed(
 import { odbLiteral, odbPackage } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (p) => {
-  p.procedure('configure', (proc) => {
+  p.proc('configure', (proc) => {
     const apiKey = proc.in('api_key', 'VARCHAR2')
 
     proc.body((body) => {

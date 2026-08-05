@@ -33,13 +33,13 @@ Column-level `.unique()` emits a unique constraint. Indexes also accept column r
 .where((eb) => eb.or([eb(users.id, '=', 1), eb(users.email, 'IS NULL')]))
 ```
 
-## PL/SQL package contracts
+## Application contract
 
-Return named members from `odbPackage()` to call functions as typed PL/SQL expressions. Unknown members, procedures, and invalid argument values are rejected.
+`odbPackage()` is the application model. Procedures retain their inputs, outputs, implementation, and service metadata in one serializable contract. PL/SQL, ORDS, TypeScript clients, and OpenAPI are generated from that model.
 
 ```ts
 const settings = odbPackage('PCK_SETTINGS', (p) => ({
-  getValue: p.function('GET_VALUE', 'VARCHAR2', (fn) => {
+  getValue: p.func('GET_VALUE', 'VARCHAR2', (fn) => {
     fn.in('P_KEY', 'VARCHAR2')
   }),
 }))
@@ -47,7 +47,7 @@ const settings = odbPackage('PCK_SETTINGS', (p) => ({
 body.set(result, settings.getValue(odbLiteral('APP_VERSION')))
 ```
 
-`generatePackageContract(pkg)` can also emit a TypeScript interface for a package.
+Use `generateApplication(pkg)` to emit its TypeScript contract, ORDS client, and OpenAPI document together.
 
 ## Introspection
 
@@ -65,14 +65,14 @@ await withConnection(config, async (_conn, db) => {
 
 ## Typed ORDS client
 
-Use `proc.get(path, options)` for a GET service, or `proc.service({ method, path })` for an explicit method. A typed table query passed to `body.openFor()` carries its selected row shape into the generated response.
+Use `p.proc()`, `proc.body()`, and `proc.service()` to define a service. A typed table query passed to `body.openFor()` carries its selected row shape into the generated response.
 
 ```ts
 const result = proc.out('result', 'SYS_REFCURSOR')
 proc.body((body) =>
   body.openFor(result, odbQuery().selectFrom(users).select([users.id, users.email])),
 )
-proc.get('/users')
+proc.service({ method: 'GET', path: '/users' })
 ```
 
 Run `ov dt` to generate one client per ORDS module under `apps/web/src/services/generated`, plus a namespace index. No database connection is needed.

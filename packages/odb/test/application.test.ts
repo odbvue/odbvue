@@ -1,0 +1,81 @@
+import { describe, expect, it } from 'vitest'
+import {
+  generateApplication,
+  generateApplicationClient,
+  generateApplicationOpenApi,
+} from '../src/application.js'
+import { odbQuery } from '../src/query/index.js'
+import { odbPackage, type OdbApplication } from '../src/schema/package.js'
+import { odbTable } from '../src/schema/table.js'
+
+const users = odbTable('APP_USERS', (table) => ({
+  id: table.number('ID').primaryKey(),
+  email: table.string('EMAIL'),
+}))
+
+const application = odbPackage('PCK_USERS', (p) => {
+  p.proc('GET_USER', (proc) => {
+    proc.in('P_ID', 'NUMBER')
+    const result = proc.out('R_RESULT', 'SYS_REFCURSOR')
+    proc.body((body) =>
+      body.openFor(result, odbQuery().selectFrom(users).select([users.id, users.email])),
+    )
+    proc.service({ method: 'GET', path: '/users/:id', summary: 'Fetch a user' })
+  })
+
+  p.func('COUNT_USERS', 'NUMBER', (fn) => {
+    fn.body((body) => body.return(0))
+  })
+})
+
+describe('ODB application contract', () => {
+  it('retains implementation and service metadata in one serializable model', () => {
+    const model = JSON.parse(JSON.stringify(application.application())) as OdbApplication
+    const procedure = model.procedures[0]
+
+    expect(procedure.service).toEqual({
+      method: 'GET',
+      path: 'users/:id',
+      summary: 'Fetch a user',
+    })
+    expect(procedure.body?.statements[0]).toEqual({
+      kind: 'raw',
+      sql: 'OPEN R_RESULT FOR SELECT ID, EMAIL FROM APP_USERS',
+    })
+    expect(procedure.body?.resultSets?.R_RESULT).toEqual([
+      { name: 'ID', type: 'number', nullable: false },
+      { name: 'EMAIL', type: 'string', nullable: true },
+    ])
+  })
+
+  it('generates the contract and client directly from a plain application model', () => {
+    const model = JSON.parse(JSON.stringify(application.application())) as OdbApplication
+    const generated = generateApplication(model)
+
+    expect(generated.plsql).toContain('CREATE OR REPLACE PACKAGE PCK_USERS AS')
+    expect(generated.ords).toContain('ords.define_module(')
+    expect(generated.contract).toContain('getUser(input: { id: number })')
+    expect(generated.contract).toContain('countUsers(): Promise<number>')
+    expect(generated.client).toContain('UsersGetUserResultItem[]')
+    expect(generated.client).toContain("usersGetUser: { method: 'GET', path: 'users/users/:id' }")
+  })
+
+  it('generates OpenAPI from procedure service metadata', () => {
+    const document = generateApplicationOpenApi(application, {
+      title: 'Users API',
+      version: '2.0.0',
+    }) as {
+      openapi: string
+      info: { title: string; version: string }
+      paths: Record<string, Record<string, unknown>>
+    }
+
+    expect(document.openapi).toBe('3.1.0')
+    expect(document.info).toEqual({ title: 'Users API', version: '2.0.0' })
+    expect(document.paths['/users/users/{id}']).toHaveProperty('get')
+  })
+
+  it('offers focused client generation without endpoint extraction', () => {
+    expect(generateApplicationClient(application)).toContain('UsersGetUserResponse')
+  })
+})
