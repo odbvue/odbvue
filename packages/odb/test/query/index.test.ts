@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { odbQuery } from '../../src/query/index.js'
+import { type SelectQuery, odbQuery } from '../../src/query/index.js'
+import { type Column } from '../../src/schema/column.js'
 import {
   type Insertable,
   type Selectable,
@@ -58,7 +59,14 @@ describe('odbQuery', () => {
       email: string | null
     }>()
 
-    expectTypeOf<Insertable<typeof users>>().toEqualTypeOf<{
+    expectTypeOf(selectQuery).toExtend<
+      SelectQuery<{
+        id: number
+        username: string
+      }>
+    >()
+
+    expectTypeOf<Insertable<typeof users>>().toExtend<{
       id?: number
       username: string
       email?: string | null
@@ -75,8 +83,8 @@ describe('odbQuery', () => {
       email: 'ada@example.com',
     })
 
-    // @ts-expect-error invalid insert value types are rejected
     odbQuery().insertInto(users).values({
+      // @ts-expect-error invalid insert value types are rejected
       id: 'bad',
       username: 'Ada',
       nope: true,
@@ -84,5 +92,25 @@ describe('odbQuery', () => {
 
     // @ts-expect-error invalid update value types are rejected
     odbQuery().updateTable(users).set({ username: 42 })
+  })
+
+  it('tracks generated and primary-key column metadata', () => {
+    const users = odbTable('APP_USERS', (t) => ({
+      id: t.number('id').primaryKey().generated(),
+      email: t.string('email'),
+    }))
+
+    expectTypeOf(users.id).toEqualTypeOf<Column<number, 'id', false, false, true, true>>()
+    expectTypeOf<Insertable<typeof users>>().toExtend<{
+      email?: string | null
+    }>()
+
+    odbQuery().insertInto(users).values({ email: 'ada@example.com' })
+
+    // @ts-expect-error generated columns cannot be inserted
+    odbQuery().insertInto(users).values({ id: 1, email: 'ada@example.com' })
+
+    // @ts-expect-error generated columns cannot be updated
+    odbQuery().updateTable(users).set({ id: 1 })
   })
 })

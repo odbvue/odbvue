@@ -24,88 +24,128 @@ export type TableSqlOptions = {
   schema?: string
 }
 
-export type TableColumnMap = Record<string, Column<any, string, any, any, any>>
-export type TableIndexColumn = string | Column<any, string, any, any, any>
+export type TableColumnMap = Record<string, Column<any, string, any, any, any, any>>
+export type TableIndexColumn = string | Column<any, string, any, any, any, any>
 
 export type TableShape<TColumns extends TableColumnMap = Record<string, never>> = Table<TColumns> &
   TColumns
 
-export type ColumnName<TColumn extends Column<any, string, any, any, any>> =
-  TColumn extends Column<any, infer TName, any, any, any> ? TName : never
+export type ColumnName<TColumn extends Column<any, string, any, any, any, any>> =
+  TColumn extends Column<any, infer TName, any, any, any, any> ? TName : never
 
-export type SelectableColumnValue<TColumn extends Column<any, string, any, any, any>> =
-  TColumn extends Column<infer TValue, any, infer TNullable, any, any>
+export type SelectableColumnValue<TColumn extends Column<any, string, any, any, any, any>> =
+  TColumn extends Column<infer TValue, any, infer TNullable, any, any, any>
     ? TNullable extends true
       ? TValue | null
       : TValue
     : never
 
 export type ColumnKeyOf<TTable extends Table<any>> = {
-  [TKey in keyof TTable]: TTable[TKey] extends Column<any, string, any, any, any>
+  [TKey in keyof TTable]: TTable[TKey] extends Column<any, string, any, any, any, any>
     ? TKey & string
     : never
 }[keyof TTable]
 
 export type Selectable<TTable extends Table<any>> = {
-  [TKey in ColumnKeyOf<TTable> as TKey]: TTable[TKey] extends Column<any, string, any, any, any>
+  [TKey in ColumnKeyOf<TTable> as TKey]: TTable[TKey] extends Column<
+    any,
+    string,
+    any,
+    any,
+    any,
+    any
+  >
     ? SelectableColumnValue<TTable[TKey]>
     : never
 }
 
-export type ColumnHasDefault<TColumn extends Column<any, string, any, any, any>> =
-  TColumn extends Column<any, any, any, infer TDefault, any>
+export type ColumnHasDefault<TColumn extends Column<any, string, any, any, any, any>> =
+  TColumn extends Column<any, any, any, infer TDefault, any, any>
     ? TDefault extends true
       ? true
       : false
     : false
 
-export type InsertableValue<TColumn extends Column<any, string, any, any, any>> =
-  TColumn extends Column<infer TValue, any, infer TNullable, any, any>
+export type ColumnIsGenerated<TColumn extends Column<any, string, any, any, any, any>> =
+  TColumn extends Column<any, any, any, any, infer TGenerated, any>
+    ? TGenerated extends true
+      ? true
+      : false
+    : false
+
+export type InsertableValue<TColumn extends Column<any, string, any, any, any, any>> =
+  TColumn extends Column<infer TValue, any, infer TNullable, any, any, any>
     ? TNullable extends true
       ? TValue | null
       : TValue
     : never
 
 export type RequiredInsertableKeys<TTable extends Table<any>> = {
-  [TKey in ColumnKeyOf<TTable>]: TTable[TKey] extends Column<any, string, any, any, any>
-    ? ColumnHasDefault<TTable[TKey]> extends true
+  [TKey in ColumnKeyOf<TTable>]: TTable[TKey] extends Column<any, string, any, any, any, any>
+    ? ColumnIsGenerated<TTable[TKey]> extends true
       ? never
-      : TKey
+      : ColumnHasDefault<TTable[TKey]> extends true
+        ? never
+        : TKey
     : never
 }[ColumnKeyOf<TTable>]
 
 export type OptionalInsertableKeys<TTable extends Table<any>> = {
-  [TKey in ColumnKeyOf<TTable>]: TTable[TKey] extends Column<any, string, any, any, any>
-    ? ColumnHasDefault<TTable[TKey]> extends true
-      ? TKey
-      : never
+  [TKey in ColumnKeyOf<TTable>]: TTable[TKey] extends Column<any, string, any, any, any, any>
+    ? ColumnIsGenerated<TTable[TKey]> extends true
+      ? never
+      : ColumnHasDefault<TTable[TKey]> extends true
+        ? TKey
+        : never
     : never
 }[ColumnKeyOf<TTable>]
 
-export type Insertable<TTable extends Table<any>> = {
-  [TKey in RequiredInsertableKeys<TTable>]: TTable[TKey] extends Column<any, string, any, any, any>
-    ? InsertableValue<TTable[TKey]>
-    : never
-} & Partial<{
-  [TKey in OptionalInsertableKeys<TTable>]: TTable[TKey] extends Column<any, string, any, any, any>
-    ? InsertableValue<TTable[TKey]>
-    : never
-}>
+type Simplify<T> = { [TKey in keyof T]: T[TKey] }
+
+export type Insertable<TTable extends Table<any>> = Simplify<
+  {
+    [TKey in RequiredInsertableKeys<TTable>]: TTable[TKey] extends Column<
+      any,
+      string,
+      any,
+      any,
+      any,
+      any
+    >
+      ? InsertableValue<TTable[TKey]>
+      : never
+  } & Partial<{
+    [TKey in OptionalInsertableKeys<TTable>]: TTable[TKey] extends Column<
+      any,
+      string,
+      any,
+      any,
+      any,
+      any
+    >
+      ? InsertableValue<TTable[TKey]>
+      : never
+  }>
+>
 
 export type Updateable<TTable extends Table<any>> = Partial<{
-  [TKey in ColumnKeyOf<TTable> as TKey]: TTable[TKey] extends Column<any, string, any, any, any>
+  [TKey in ColumnKeyOf<TTable> as TTable[TKey] extends Column<any, string, any, any, any, any>
+    ? ColumnIsGenerated<TTable[TKey]> extends true
+      ? never
+      : TKey
+    : never]: TTable[TKey] extends Column<any, string, any, any, any, any>
     ? InsertableValue<TTable[TKey]>
     : never
 }>
 
 export class Table<TColumns extends TableColumnMap = Record<string, never>> {
   private readonly _shape?: TColumns
-  private columns: Column<any, string, any, any, any>[] = []
+  private columns: Column<any, string, any, any, any, any>[] = []
   private indexes: IndexNode[] = []
 
   constructor(readonly name: string) {}
 
-  addColumn(column: Column<any, string, any, any, any>): this {
+  addColumn(column: Column<any, string, any, any, any, any>): this {
     if (!this.columns.some((existing) => existing.name === column.name)) {
       this.columns.push(column)
     }

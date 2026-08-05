@@ -1,5 +1,12 @@
 import { Column, type ColumnNode } from '../schema/column.js'
-import { type Table, type Insertable, type Updateable } from '../schema/table.js'
+import {
+  type ColumnKeyOf,
+  type Insertable,
+  type Selectable,
+  type SelectableColumnValue,
+  type Table,
+  type Updateable,
+} from '../schema/table.js'
 import {
   BindContext,
   combinePredicates,
@@ -21,7 +28,13 @@ type OrderByClause = {
   direction: 'asc' | 'desc'
 }
 
-type ColumnLike = Column<any, string, any, any, any>
+type ColumnLike = Column<any, string, any, any, any, any>
+
+type SelectedRow<TTable extends Table<any>, TColumns extends readonly ColumnLike[]> = {
+  [TKey in ColumnKeyOf<TTable> as TTable[TKey] extends TColumns[number]
+    ? TKey
+    : never]: TTable[TKey] extends ColumnLike ? SelectableColumnValue<TTable[TKey]> : never
+}
 
 /** Any object that carries a SQL identifier, such as a Table or a Column. */
 export type NamedRef = { readonly name: string }
@@ -49,7 +62,11 @@ function toPredicate(
   return predicate(column, op as Operator, value)
 }
 
-export class SelectQueryBuilder<TTable extends Table<any> = Table<any>> {
+export class SelectQueryBuilder<
+  TTable extends Table<any> = Table<any>,
+  TResult = Selectable<TTable>,
+> {
+  private readonly _resultType?: TResult
   private _columns: string[] = []
   private _selectedColumns: ColumnNode[] | undefined = []
   private _where: ExpressionNode[] = []
@@ -71,10 +88,14 @@ export class SelectQueryBuilder<TTable extends Table<any> = Table<any>> {
     return this._schema ? `${this._schema}.${this._table.name}` : this._table.name
   }
 
-  select<TColumn extends ColumnLike>(column: TColumn): SelectQueryBuilder<TTable>
-  select<TColumns extends readonly ColumnLike[]>(columns: [...TColumns]): SelectQueryBuilder<TTable>
-  select(columns: SqlExpr | SqlExpr[]): SelectQueryBuilder<TTable>
-  select(columns: SqlExpr | SqlExpr[]): SelectQueryBuilder<TTable> {
+  select<TColumn extends ColumnLike>(
+    column: TColumn,
+  ): SelectQueryBuilder<TTable, SelectedRow<TTable, [TColumn]>>
+  select<TColumns extends readonly ColumnLike[]>(
+    columns: [...TColumns],
+  ): SelectQueryBuilder<TTable, SelectedRow<TTable, TColumns>>
+  select(columns: SqlExpr | SqlExpr[]): SelectQueryBuilder<TTable, unknown>
+  select(columns: SqlExpr | SqlExpr[]): SelectQueryBuilder<TTable, unknown> {
     const cols = Array.isArray(columns) ? columns : [columns]
     this._columns.push(...cols.map(exprSql))
     if (this._selectedColumns) {
@@ -84,7 +105,7 @@ export class SelectQueryBuilder<TTable extends Table<any> = Table<any>> {
         this._selectedColumns = undefined
       }
     }
-    return this as SelectQueryBuilder<TTable>
+    return this as SelectQueryBuilder<TTable, unknown>
   }
 
   /** Selected typed columns, when the row shape can be inferred without parsing SQL. */
@@ -117,8 +138,8 @@ export class SelectQueryBuilder<TTable extends Table<any> = Table<any>> {
     return this
   }
 
-  orderBy(column: ColumnLike, direction: 'asc' | 'desc'): this
-  orderBy(column: string, direction: 'asc' | 'desc'): this
+  orderBy(column: ColumnLike, direction?: 'asc' | 'desc'): this
+  orderBy(column: string, direction?: 'asc' | 'desc'): this
   orderBy(column: string | ColumnLike, direction: 'asc' | 'desc' = 'asc'): this {
     this._orderBy.push({ column: typeof column === 'string' ? column : column.name, direction })
     return this
@@ -179,6 +200,8 @@ export class SelectQueryBuilder<TTable extends Table<any> = Table<any>> {
     return sql
   }
 }
+
+export type SelectQuery<TResult> = SelectQueryBuilder<Table<any>, TResult>
 
 export class InsertQueryBuilder<TTable extends Table<any> = Table<any>> {
   private _values: Record<string, unknown> = {}
