@@ -122,7 +122,7 @@ This is useful for additive migrations where a full `CREATE TABLE` is no longer 
 
 ### Migrations
 
-`defineMigration()` is the unit of deployment. You declare what a release contains with `install()` and `expose()`; the framework derives the reverse `down` direction automatically.
+`defineMigration()` is the unit of deployment. You declare what a release contains with `install()`; the framework derives the reverse `down` direction automatically.
 
 ```ts
 import { defineMigration, odbTable } from '@odbvue/odb'
@@ -140,8 +140,9 @@ export const migration = defineMigration('20260704120000_app_users', {
 The `down` direction is generated as the mirror image: it drops the artifacts in reverse order. Tables and other plain DDL are installed and rolled back directly. Packages use blue/green deployment (see below), so a redeploy never blocks live callers and rolls back to the previous version instantly.
 
 - `install(artifact)` — schemas, tables, packages, or pre-built APIs (anything with `toSQLUp` / `toSQLDown`).
-- `expose(artifact)` — publishes ORDS endpoints (anything with `toOrdsSQL` / `toOrdsDownSQL`).
 - `upRaw(sql)` / `downRaw(sql)` — escape hatches for custom or irreversible SQL.
+
+Installed packages with service metadata publish their ORDS endpoints automatically.
 
 Artifacts run in the exact order you declare them in `up`, and in reverse for `down`, so dependencies install and roll back safely without hidden reordering.
 
@@ -253,10 +254,10 @@ Other framework packages follow the same pattern — for example `odb_jwt` (`odb
 
 ORDS support is built into the same model.
 
-Define the public HTTP contract with `.service()`. Then `toOrdsSQL()` emits the ORDS registration PL/SQL needed to expose the procedure as a REST endpoint.
+Define the public HTTP contract with `.service()`. The application generator emits the ORDS registration PL/SQL needed to expose the procedure as a REST endpoint.
 
 ```ts
-import { odbPackage } from '@odbvue/odb'
+import { generateApplication, odbPackage } from '@odbvue/odb'
 
 const usersApi = odbPackage('pck_users', (pkg) => {
   pkg.proc('get_user', (proc) => {
@@ -276,7 +277,7 @@ const usersApi = odbPackage('pck_users', (pkg) => {
   })
 })
 
-const sql = usersApi.toOrdsSQL({ schema: 'APP_USER' })
+const sql = generateApplication(usersApi.application()).ords
 ```
 
 The service contract makes the HTTP method and route visible during code review. The builder still derives infrastructure details:

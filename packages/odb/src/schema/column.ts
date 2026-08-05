@@ -34,13 +34,14 @@ export class Column<
   TDefault extends boolean = false,
   TGenerated extends boolean = false,
   TPrimaryKey extends boolean = false,
+  TType extends ColumnType = ColumnType,
 > {
   private options: ColumnOptions
   private readonly _valueType?: TValue
 
   constructor(
     readonly name: TName,
-    readonly type: ColumnType,
+    readonly type: TType,
     options: ColumnOptions = {},
   ) {
     this.options = {
@@ -49,20 +50,20 @@ export class Column<
     }
   }
 
-  notNull(): Column<TValue, TName, false, TDefault, TGenerated, TPrimaryKey> {
+  notNull(): Column<TValue, TName, false, TDefault, TGenerated, TPrimaryKey, TType> {
     this.options.nullable = false
-    return this as Column<TValue, TName, false, TDefault, TGenerated, TPrimaryKey>
+    return this as Column<TValue, TName, false, TDefault, TGenerated, TPrimaryKey, TType>
   }
 
-  nullable(): Column<TValue, TName, true, TDefault, TGenerated, TPrimaryKey> {
+  nullable(): Column<TValue, TName, true, TDefault, TGenerated, TPrimaryKey, TType> {
     this.options.nullable = true
-    return this as Column<TValue, TName, true, TDefault, TGenerated, TPrimaryKey>
+    return this as Column<TValue, TName, true, TDefault, TGenerated, TPrimaryKey, TType>
   }
 
-  primaryKey(): Column<TValue, TName, false, TDefault, TGenerated, true> {
+  primaryKey(): Column<TValue, TName, false, TDefault, TGenerated, true, TType> {
     this.options.primaryKey = true
     this.options.nullable = false
-    return this as Column<TValue, TName, false, TDefault, TGenerated, true>
+    return this as Column<TValue, TName, false, TDefault, TGenerated, true, TType>
   }
 
   unique(): this {
@@ -77,25 +78,29 @@ export class Column<
 
   default(
     value: ColumnOptions['default'],
-  ): Column<TValue, TName, TNullable, true, TGenerated, TPrimaryKey> {
+  ): Column<TValue, TName, TNullable, true, TGenerated, TPrimaryKey, TType> {
     this.options.default = value
-    return this as Column<TValue, TName, TNullable, true, TGenerated, TPrimaryKey>
+    return this as Column<TValue, TName, TNullable, true, TGenerated, TPrimaryKey, TType>
   }
 
-  defaultSysGuid(): Column<TValue, TName, false, true, TGenerated, TPrimaryKey> {
+  defaultSysGuid(
+    this: Column<TValue, TName, TNullable, TDefault, TGenerated, TPrimaryKey, 'guid'>,
+  ): Column<TValue, TName, false, true, TGenerated, TPrimaryKey, 'guid'> {
     this.options.default = 'sys_guid'
     this.options.nullable = false
-    return this as Column<TValue, TName, false, true, TGenerated, TPrimaryKey>
+    return this as Column<TValue, TName, false, true, TGenerated, TPrimaryKey, 'guid'>
   }
 
-  defaultCurrentTimestamp(): Column<TValue, TName, TNullable, true, TGenerated, TPrimaryKey> {
+  defaultCurrentTimestamp(
+    this: Column<TValue, TName, TNullable, TDefault, TGenerated, TPrimaryKey, 'date' | 'timestamp'>,
+  ): Column<TValue, TName, TNullable, true, TGenerated, TPrimaryKey, TType> {
     this.options.default = 'current_timestamp'
-    return this as Column<TValue, TName, TNullable, true, TGenerated, TPrimaryKey>
+    return this as Column<TValue, TName, TNullable, true, TGenerated, TPrimaryKey, TType>
   }
 
-  generated(): Column<TValue, TName, TNullable, TDefault, true, TPrimaryKey> {
+  generated(): Column<TValue, TName, TNullable, TDefault, true, TPrimaryKey, TType> {
     this.options.generated = true
-    return this as Column<TValue, TName, TNullable, TDefault, true, TPrimaryKey>
+    return this as Column<TValue, TName, TNullable, TDefault, true, TPrimaryKey, TType>
   }
 
   toSQL(): string {
@@ -109,10 +114,6 @@ export class Column<
       type: this.type,
       options: { ...this.options },
     }
-  }
-
-  toObject() {
-    return this.toNode()
   }
 }
 

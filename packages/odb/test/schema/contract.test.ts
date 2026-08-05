@@ -31,7 +31,7 @@ describe('generatePackageContract', () => {
 
   it('generates a procedure contract with OUT params as the response shape', () => {
     const pkg = odbPackage('PCK_USERS', (p) => {
-      p.procedure('CREATE_USER', (proc) => {
+      p.proc('CREATE_USER', (proc) => {
         proc.in('P_NAME', 'VARCHAR2')
         proc.out('P_ID', 'NUMBER')
       })
@@ -43,7 +43,7 @@ describe('generatePackageContract', () => {
 
   it('omits the input argument when a procedure has no IN parameters', () => {
     const pkg = odbPackage('PCK_APP', (p) => {
-      p.procedure('ME', (proc) => {
+      p.proc('ME', (proc) => {
         proc.out('P_VERSION', 'VARCHAR2')
       })
     })
@@ -54,7 +54,7 @@ describe('generatePackageContract', () => {
 
   it('returns Promise<void> for a procedure without OUT parameters', () => {
     const pkg = odbPackage('PCK_APP', (p) => {
-      p.procedure('PING', (proc) => {
+      p.proc('PING', (proc) => {
         proc.in('P_MESSAGE', 'VARCHAR2')
       })
     })
@@ -65,7 +65,7 @@ describe('generatePackageContract', () => {
 
   it('treats IN OUT parameters as both input and response fields', () => {
     const pkg = odbPackage('PCK_COUNTER', (p) => {
-      p.procedure('BUMP', (proc) => {
+      p.proc('BUMP', (proc) => {
         proc.inOut('P_VALUE', 'NUMBER')
       })
     })

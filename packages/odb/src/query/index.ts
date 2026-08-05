@@ -5,6 +5,7 @@ import {
   type Selectable,
   type SelectableColumnValue,
   type Table,
+  type TableColumn,
   type Updateable,
 } from '../schema/table.js'
 import {
@@ -36,6 +37,12 @@ type SelectedRow<TTable extends Table<any>, TColumns extends readonly ColumnLike
     : never]: TTable[TKey] extends ColumnLike ? SelectableColumnValue<TTable[TKey]> : never
 }
 
+type Simplify<T> = { [TKey in keyof T]: T[TKey] }
+
+type AccumulatedRow<TResult, TSelection, THasSelection extends boolean> = THasSelection extends true
+  ? Simplify<TResult & TSelection>
+  : TSelection
+
 /** Any object that carries a SQL identifier, such as a Table or a Column. */
 export type NamedRef = { readonly name: string }
 
@@ -65,8 +72,10 @@ function toPredicate(
 export class SelectQueryBuilder<
   TTable extends Table<any> = Table<any>,
   TResult = Selectable<TTable>,
+  THasSelection extends boolean = false,
 > {
   private readonly _resultType?: TResult
+  private readonly _hasSelectionType?: THasSelection
   private _columns: string[] = []
   private _selectedColumns: ColumnNode[] | undefined = []
   private _where: ExpressionNode[] = []
@@ -88,14 +97,27 @@ export class SelectQueryBuilder<
     return this._schema ? `${this._schema}.${this._table.name}` : this._table.name
   }
 
-  select<TColumn extends ColumnLike>(
+  select<TColumn extends TableColumn<TTable>>(
     column: TColumn,
-  ): SelectQueryBuilder<TTable, SelectedRow<TTable, [TColumn]>>
-  select<TColumns extends readonly ColumnLike[]>(
+  ): SelectQueryBuilder<
+    TTable,
+    AccumulatedRow<TResult, SelectedRow<TTable, [TColumn]>, THasSelection>,
+    true
+  >
+  select<TColumns extends readonly TableColumn<TTable>[]>(
     columns: [...TColumns],
-  ): SelectQueryBuilder<TTable, SelectedRow<TTable, TColumns>>
-  select(columns: SqlExpr | SqlExpr[]): SelectQueryBuilder<TTable, unknown>
-  select(columns: SqlExpr | SqlExpr[]): SelectQueryBuilder<TTable, unknown> {
+  ): SelectQueryBuilder<
+    TTable,
+    AccumulatedRow<TResult, SelectedRow<TTable, TColumns>, THasSelection>,
+    true
+  >
+  select<TExpression extends SqlExpr>(
+    columns: TExpression extends ColumnLike ? never : TExpression,
+  ): SelectQueryBuilder<TTable, unknown, true>
+  select<TExpressions extends readonly SqlExpr[]>(
+    columns: TExpressions[number] extends ColumnLike ? never : [...TExpressions],
+  ): SelectQueryBuilder<TTable, unknown, true>
+  select(columns: SqlExpr | SqlExpr[]): SelectQueryBuilder<TTable, unknown, true> {
     const cols = Array.isArray(columns) ? columns : [columns]
     this._columns.push(...cols.map(exprSql))
     if (this._selectedColumns) {
@@ -105,7 +127,7 @@ export class SelectQueryBuilder<
         this._selectedColumns = undefined
       }
     }
-    return this as SelectQueryBuilder<TTable, unknown>
+    return this as SelectQueryBuilder<TTable, unknown, true>
   }
 
   /** Selected typed columns, when the row shape can be inferred without parsing SQL. */
@@ -117,13 +139,13 @@ export class SelectQueryBuilder<
   }
 
   where(build: (eb: ExpressionBuilder) => ExpressionNode): this
-  where<TValue, TName extends string>(
-    column: Column<TValue, TName>,
+  where<TColumn extends TableColumn<TTable>>(
+    column: TColumn,
     op: ComparisonOperator,
-    value: TValue,
+    value: TColumn extends Column<infer TValue, string> ? TValue : never,
   ): this
-  where<TName extends string>(
-    column: Column<unknown, TName>,
+  where<TColumn extends TableColumn<TTable>>(
+    column: TColumn,
     op: NullOperator,
     value?: undefined,
   ): this
@@ -138,7 +160,7 @@ export class SelectQueryBuilder<
     return this
   }
 
-  orderBy(column: ColumnLike, direction?: 'asc' | 'desc'): this
+  orderBy(column: TableColumn<TTable>, direction?: 'asc' | 'desc'): this
   orderBy(column: string, direction?: 'asc' | 'desc'): this
   orderBy(column: string | ColumnLike, direction: 'asc' | 'desc' = 'asc'): this {
     this._orderBy.push({ column: typeof column === 'string' ? column : column.name, direction })
@@ -201,7 +223,7 @@ export class SelectQueryBuilder<
   }
 }
 
-export type SelectQuery<TResult> = SelectQueryBuilder<Table<any>, TResult>
+export type SelectQuery<TResult> = SelectQueryBuilder<any, TResult, true>
 
 export class InsertQueryBuilder<TTable extends Table<any> = Table<any>> {
   private _values: Record<string, unknown> = {}
@@ -219,6 +241,12 @@ export class InsertQueryBuilder<TTable extends Table<any> = Table<any>> {
     return this._schema ? `${this._schema}.${this._table.name}` : this._table.name
   }
 
+  private columnName(key: string): string {
+    return this._table instanceof Object && 'columnNameForKey' in this._table
+      ? (this._table as Table<any>).columnNameForKey(key)
+      : key
+  }
+
   values(row: Insertable<TTable>): this {
     this._values = { ...row }
     return this
@@ -229,7 +257,7 @@ export class InsertQueryBuilder<TTable extends Table<any> = Table<any>> {
     const bindings: Record<string, unknown> = {}
     for (const k of keys) bindings[k] = this._values[k]
 
-    const cols = keys.join(', ')
+    const cols = keys.map((key) => this.columnName(key)).join(', ')
     const vals = keys.map((k) => `:${k}`).join(', ')
 
     return {
@@ -240,7 +268,7 @@ export class InsertQueryBuilder<TTable extends Table<any> = Table<any>> {
 
   toSQL(): string {
     const keys = Object.keys(this._values)
-    const cols = keys.join(', ')
+    const cols = keys.map((key) => this.columnName(key)).join(', ')
     const vals = keys.map((k) => inlineValue(this._values[k])).join(', ')
     return `INSERT INTO ${this.tableName()} (${cols}) VALUES (${vals})`
   }
@@ -263,19 +291,25 @@ export class UpdateQueryBuilder<TTable extends Table<any> = Table<any>> {
     return this._schema ? `${this._schema}.${this._table.name}` : this._table.name
   }
 
+  private columnName(key: string): string {
+    return this._table instanceof Object && 'columnNameForKey' in this._table
+      ? (this._table as Table<any>).columnNameForKey(key)
+      : key
+  }
+
   set(values: Updateable<TTable>): this {
     this._set = { ...values }
     return this
   }
 
   where(build: (eb: ExpressionBuilder) => ExpressionNode): this
-  where<TValue, TName extends string>(
-    column: Column<TValue, TName>,
+  where<TColumn extends TableColumn<TTable>>(
+    column: TColumn,
     op: ComparisonOperator,
-    value: TValue,
+    value: TColumn extends Column<infer TValue, string> ? TValue : never,
   ): this
-  where<TName extends string>(
-    column: Column<unknown, TName>,
+  where<TColumn extends TableColumn<TTable>>(
+    column: TColumn,
     op: NullOperator,
     value?: undefined,
   ): this
@@ -296,7 +330,7 @@ export class UpdateQueryBuilder<TTable extends Table<any> = Table<any>> {
     const setClauses = Object.keys(this._set).map((k) => {
       const key = `s_${k}`
       bindings[key] = this._set[k]
-      return `${k} = :${key}`
+      return `${this.columnName(k)} = :${key}`
     })
 
     let sql = `UPDATE ${this.tableName()} SET ${setClauses.join(', ')}`
@@ -312,7 +346,9 @@ export class UpdateQueryBuilder<TTable extends Table<any> = Table<any>> {
   }
 
   toSQL(): string {
-    const setClauses = Object.keys(this._set).map((k) => `${k} = ${inlineValue(this._set[k])}`)
+    const setClauses = Object.keys(this._set).map(
+      (k) => `${this.columnName(k)} = ${inlineValue(this._set[k])}`,
+    )
     let sql = `UPDATE ${this.tableName()} SET ${setClauses.join(', ')}`
     const whereNode = combinePredicates(this._where)
     if (whereNode) sql += ` WHERE ${renderNode(whereNode)}`
@@ -320,7 +356,7 @@ export class UpdateQueryBuilder<TTable extends Table<any> = Table<any>> {
   }
 }
 
-export class DeleteQueryBuilder {
+export class DeleteQueryBuilder<TTable extends Table<any> = Table<any>> {
   private _where: ExpressionNode[] = []
   private _schema?: string
 
@@ -337,13 +373,13 @@ export class DeleteQueryBuilder {
   }
 
   where(build: (eb: ExpressionBuilder) => ExpressionNode): this
-  where<TValue, TName extends string>(
-    column: Column<TValue, TName>,
+  where<TColumn extends TableColumn<TTable>>(
+    column: TColumn,
     op: ComparisonOperator,
-    value: TValue,
+    value: TColumn extends Column<infer TValue, string> ? TValue : never,
   ): this
-  where<TName extends string>(
-    column: Column<unknown, TName>,
+  where<TColumn extends TableColumn<TTable>>(
+    column: TColumn,
     op: NullOperator,
     value?: undefined,
   ): this
@@ -399,8 +435,10 @@ export class OdbQuery {
     return new UpdateQueryBuilder(table as string | NamedRef)
   }
 
-  deleteFrom(table: string | NamedRef): DeleteQueryBuilder {
-    return new DeleteQueryBuilder(table)
+  deleteFrom<TTable extends Table<any>>(table: TTable): DeleteQueryBuilder<TTable>
+  deleteFrom(table: string | NamedRef): DeleteQueryBuilder
+  deleteFrom(table: string | NamedRef | Table<any>): DeleteQueryBuilder<any> {
+    return new DeleteQueryBuilder(table as string | NamedRef)
   }
 }
 

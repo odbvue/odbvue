@@ -4,9 +4,8 @@ import {
   type OrdsClientOptions,
 } from './ords-client.js'
 import {
-  applicationEndpoints,
   applicationNode,
-  emitApplicationOrdsSql,
+  compileApplicationEndpoints,
   emitApplicationSql,
   type ApplicationLike,
   type OdbApplication,
@@ -47,12 +46,43 @@ export function generateApplication(
   }
 }
 
+/** Emit ORDS registration SQL from application service metadata. */
+export function emitApplicationOrdsSql(
+  application: ApplicationLike,
+  options: { schema?: string } = {},
+): string {
+  const definedModules = new Set<string>()
+  return compileApplicationEndpoints(application)
+    .map((endpoint) => {
+      const defineModule = !definedModules.has(endpoint.module)
+      definedModules.add(endpoint.module)
+      return endpoint.toSQLUp({ ...options, defineModule })
+    })
+    .join('\n\n')
+}
+
+/** Emit SQL that removes every ORDS module declared by an application. */
+export function emitApplicationOrdsDownSql(
+  application: ApplicationLike,
+  options: { schema?: string } = {},
+): string {
+  const modules = new Set<string>()
+  return compileApplicationEndpoints(application)
+    .filter((endpoint) => {
+      if (modules.has(endpoint.module)) return false
+      modules.add(endpoint.module)
+      return true
+    })
+    .map((endpoint) => endpoint.toSQLDown(options))
+    .join('\n\n')
+}
+
 /** Emit a TypeScript ORDS client directly from an application model. */
 export function generateApplicationClient(
   application: ApplicationLike,
   options: OrdsClientOptions = {},
 ): string {
-  return generateOrdsClient(applicationEndpoints(application), options)
+  return generateOrdsClient(compileApplicationEndpoints(application), options)
 }
 
 /** Emit per-module TypeScript clients from one or more application models. */
@@ -60,7 +90,7 @@ export function generateApplicationClientModules(
   applications: ApplicationLike[],
   options: OrdsClientOptions = {},
 ) {
-  return generateOrdsClientModules(applications.flatMap(applicationEndpoints), options)
+  return generateOrdsClientModules(applications.flatMap(compileApplicationEndpoints), options)
 }
 
 /** Emit OpenAPI 3.1 from procedure service metadata in the application model. */
@@ -71,7 +101,7 @@ export function generateApplicationOpenApi(
   const node = applicationNode(application)
   const paths: Record<string, Record<string, unknown>> = {}
 
-  for (const endpoint of applicationEndpoints(node).map((value) => value.toNode())) {
+  for (const endpoint of compileApplicationEndpoints(node).map((value) => value.toNode())) {
     const path = `/${[endpoint.basePath, endpoint.pattern]
       .map((part) => part.replace(/^\/+|\/+$/g, ''))
       .filter(Boolean)

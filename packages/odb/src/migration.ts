@@ -3,11 +3,13 @@ import path from 'path'
 import { pathToFileURL } from 'url'
 
 import { Column, emitColumnDef, type ColumnOptions, type ColumnType } from './schema/column.js'
-import { odbOrdsSchema, type OrdsEndpoint } from './ords.js'
+import { odbOrdsSchema } from './ords.js'
 import { type Schema } from './schema/schema.js'
 import { type Table } from './schema/table.js'
 import type { AnyQueryBuilder } from './schema/package.js'
 import type { OdbApplication } from './schema/package.js'
+import { emitApplicationOrdsDownSql, emitApplicationOrdsSql } from './application.js'
+import { compileApplicationEndpoints } from './schema/package.js'
 
 /** Registry table tracking the active blue/green color per deployed object. */
 export const BLUE_GREEN_REGISTRY_TABLE = 'app_migrations_objects'
@@ -46,21 +48,16 @@ function isBlueGreenArtifact(artifact: unknown): artifact is BlueGreenArtifact {
   )
 }
 
-function isServiceArtifact(artifact: unknown): artifact is MigrationServiceArtifact {
+function isApplicationArtifact(artifact: unknown): artifact is MigrationApplicationArtifact {
   return (
     typeof artifact === 'object' &&
     artifact !== null &&
-    typeof (artifact as { toOrdsSQL?: unknown }).toOrdsSQL === 'function'
+    typeof (artifact as { application?: unknown }).application === 'function'
   )
 }
 
-/**
- * True when a service artifact actually declares endpoints. Artifacts that can
- * expose services but currently declare none are not auto-published.
- */
-function hasServiceEndpoints(artifact: MigrationServiceArtifact): boolean {
-  const maybe = artifact as { hasOrdsEndpoints?: () => boolean }
-  return typeof maybe.hasOrdsEndpoints === 'function' ? maybe.hasOrdsEndpoints() : true
+function hasServiceEndpoints(artifact: MigrationApplicationArtifact): boolean {
+  return compileApplicationEndpoints(artifact.application()).length > 0
 }
 
 /** Apply the migration schema to a query builder that supports deferred qualification. */
@@ -88,11 +85,8 @@ export type MigrationSqlArtifact = {
   toSQLDown(options?: { schema?: string }): string
 }
 
-export type MigrationServiceArtifact = {
-  toOrdsSQL(options?: { schema?: string }): string
-  toOrdsDownSQL(options?: { schema?: string }): string
-  ordsEndpoints?(): OrdsEndpoint[]
-  application?(): OdbApplication
+export type MigrationApplicationArtifact = {
+  application(): OdbApplication
 }
 
 function validateSchema(schema: string): string {
@@ -185,7 +179,7 @@ export class AlterTableBuilder {
 
 export class MigrationBuilder {
   private readonly _installs: MigrationSqlArtifact[] = []
-  private readonly _exposes: MigrationServiceArtifact[] = []
+  private readonly _applications: MigrationApplicationArtifact[] = []
   private readonly _upRaw: string[] = []
   private readonly _downRaw: string[] = []
   private readonly _upQueries: AnyQueryBuilder[] = []
@@ -199,35 +193,15 @@ export class MigrationBuilder {
   /** Install a schema artifact (schema, table, package, pre-built api). */
   install(artifact: MigrationSqlArtifact): this {
     this._installs.push(artifact)
-    // Auto-publish ORDS endpoints declared on installed service artifacts
-    // (e.g. a package whose procedures call `.service(...)`), so authors no
-    // longer need a separate `.expose()` call. Explicit `.expose()` still works
-    // and is deduped.
-    if (isServiceArtifact(artifact) && hasServiceEndpoints(artifact)) {
-      this.expose(artifact)
+    if (isApplicationArtifact(artifact) && hasServiceEndpoints(artifact)) {
+      this._applications.push(artifact)
     }
     return this
-  }
-
-  /** Publish the ORDS endpoints declared by a service artifact (e.g. a package). */
-  expose(artifact: MigrationServiceArtifact): this {
-    if (!this._exposes.includes(artifact)) {
-      this._exposes.push(artifact)
-    }
-    return this
-  }
-
-  /** Collect the ORDS endpoints exposed by this migration's service artifacts. */
-  ordsEndpoints(): OrdsEndpoint[] {
-    return this._exposes.flatMap((a) => a.ordsEndpoints?.() ?? [])
   }
 
   /** Collect canonical application contracts installed by this migration. */
   applications(): OdbApplication[] {
-    return this._exposes.flatMap((artifact) => {
-      const application = artifact.application?.()
-      return application ? [application] : []
-    })
+    return this._applications.map((artifact) => artifact.application())
   }
 
   /** Escape hatch: raw SQL appended to `up` after installs, before exposes. */
@@ -277,17 +251,25 @@ export class MigrationBuilder {
       }
       sql.push(...this._upRaw)
       sql.push(...this._upQueries.map((q) => applyQuerySchema(q, schema).toSQL()))
-      if (this._exposes.length) {
+      if (this._applications.length) {
         sql.push(odbOrdsSchema(schema).toSQLUp())
-        sql.push(...this._exposes.map((a) => a.toOrdsSQL({ schema })))
+        sql.push(
+          ...this._applications.map((artifact) =>
+            emitApplicationOrdsSql(artifact.application(), { schema }),
+          ),
+        )
       }
       return sql.filter(Boolean)
     }
 
     const down = (plan?: BlueGreenPlan): string[] => {
       const sql: string[] = []
-      if (this._exposes.length) {
-        sql.push(...this._exposes.toReversed().map((a) => a.toOrdsDownSQL({ schema })))
+      if (this._applications.length) {
+        sql.push(
+          ...this._applications
+            .toReversed()
+            .map((artifact) => emitApplicationOrdsDownSql(artifact.application(), { schema })),
+        )
       }
       sql.push(...this._downRaw)
       sql.push(...this._downQueries.map((q) => applyQuerySchema(q, schema).toSQL()))

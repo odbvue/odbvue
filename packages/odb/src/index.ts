@@ -5,7 +5,6 @@ export * from './schema/table.js'
 export * from './schema/attribute.js'
 export {
   odbPackage,
-  emitApplicationOrdsSql,
   emitApplicationSql,
   type OrdsServiceDefinition,
   type Package,

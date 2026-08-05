@@ -1,15 +1,15 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import type { MigrationServiceArtifact, MigrationSqlArtifact } from '../../src/migration.js'
+import type { MigrationApplicationArtifact, MigrationSqlArtifact } from '../../src/migration.js'
 import { odbLiteral, type PlsqlExpression } from '../../src/schema/attribute.js'
 import { odbPackage } from '../../src/schema/package.js'
 
 describe('odbPackage member typing', () => {
   it('exposes typed package member invokers and rejects unknown members', () => {
     const settings = odbPackage('PCK_SETTINGS', (p) => ({
-      getValue: p.function('GET_VALUE', 'VARCHAR2', (fn) => {
+      getValue: p.func('GET_VALUE', 'VARCHAR2', (fn) => {
         fn.in('P_KEY', 'VARCHAR2')
       }),
-      setValue: p.procedure('SET_VALUE', (proc) => {
+      setValue: p.proc('SET_VALUE', (proc) => {
         proc.in('P_KEY', 'VARCHAR2')
         proc.in('P_VALUE', 'VARCHAR2')
       }),
@@ -31,10 +31,10 @@ describe('odbPackage member typing', () => {
 
   it('rejects procedure members passed to call()', () => {
     const settings = odbPackage('PCK_SETTINGS', (p) => ({
-      getValue: p.function('GET_VALUE', 'VARCHAR2', (fn) => {
+      getValue: p.func('GET_VALUE', 'VARCHAR2', (fn) => {
         fn.in('P_KEY', 'VARCHAR2')
       }),
-      setValue: p.procedure('SET_VALUE', (proc) => {
+      setValue: p.proc('SET_VALUE', (proc) => {
         proc.in('P_KEY', 'VARCHAR2')
       }),
     }))
@@ -46,15 +46,17 @@ describe('odbPackage member typing', () => {
 
   it('is compatible with migration artifact interfaces', () => {
     const settings = odbPackage('PCK_SETTINGS', (p) => ({
-      getValue: p.function('GET_VALUE', 'VARCHAR2', (fn) => {
+      getValue: p.func('GET_VALUE', 'VARCHAR2', (fn) => {
         fn.in('P_KEY', 'VARCHAR2')
       }),
     }))
 
     const sqlArtifact: MigrationSqlArtifact = settings
-    const serviceArtifact: MigrationServiceArtifact = settings
+    const applicationArtifact: MigrationApplicationArtifact = settings
 
     expectTypeOf(sqlArtifact.toSQLUp()).toEqualTypeOf<string>()
-    expectTypeOf(serviceArtifact.toOrdsSQL()).toEqualTypeOf<string>()
+    expectTypeOf(applicationArtifact.application()).toEqualTypeOf<
+      ReturnType<typeof settings.application>
+    >()
   })
 })

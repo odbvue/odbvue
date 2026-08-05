@@ -1,18 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { generateOrdsClient, generateOrdsClientModules } from '../../src/ords-client.js'
+import {
+  emitApplicationOrdsSql,
+  generateApplicationClient,
+  generateApplicationClientModules,
+} from '../../src/application.js'
+import { generateOrdsClient } from '../../src/ords-client.js'
 import { odbQuery } from '../../src/query/index.js'
-import { odbPackage } from '../../src/schema/package.js'
+import { compileApplicationEndpoints, odbPackage } from '../../src/schema/package.js'
 import { odbTable } from '../../src/schema/table.js'
 import { defineMigration } from '../../src/migration.js'
 
 const appPackage = odbPackage('PCK_APP', (p) => {
-  p.procedure('me', (proc) => {
+  p.proc('me', (proc) => {
     proc.out('P_VERSION', 'VARCHAR2')
     proc.out('P_VERSION_BASE64', 'CLOB')
     proc.service({ method: 'GET', path: '/auth/me', summary: 'Current app version' })
   })
 
-  p.procedure('POST_LOGIN', (proc) => {
+  p.proc('POST_LOGIN', (proc) => {
     proc.in('P_USERNAME', 'VARCHAR2')
     proc.out('P_TOKEN', 'VARCHAR2')
     proc.service({ method: 'POST', path: '/auth/login' })
@@ -26,7 +31,7 @@ const users = odbTable('users', (table) => ({
 }))
 
 const usersPackage = odbPackage('PCK_USERS', (p) => {
-  p.procedure('get_user', (proc) => {
+  p.proc('get_user', (proc) => {
     proc.in('p_id', 'NUMBER')
     const result = proc.out('p_result', 'SYS_REFCURSOR')
     proc.body((body) =>
@@ -35,18 +40,18 @@ const usersPackage = odbPackage('PCK_USERS', (p) => {
         odbQuery().selectFrom(users).select([users.id, users.userName, users.email]),
       ),
     )
-    proc.get('/users/:id')
+    proc.service({ method: 'GET', path: '/users/:id' })
   })
 })
 
-describe('Package.ordsEndpoints', () => {
+describe('application services', () => {
   it('returns one endpoint per procedure with a service', () => {
-    const endpoints = appPackage.ordsEndpoints()
+    const endpoints = compileApplicationEndpoints(appPackage.application())
     expect(endpoints.map((e) => e.procedureName)).toEqual(['me', 'POST_LOGIN'])
   })
 
   it('defines a shared ORDS module once while retaining every template', () => {
-    const sql = appPackage.toOrdsSQL()
+    const sql = emitApplicationOrdsSql(appPackage.application())
 
     expect(sql.match(/ords\.define_module\(/g)).toHaveLength(1)
     expect(sql.match(/ords\.define_template\(/g)).toHaveLength(2)
@@ -55,15 +60,15 @@ describe('Package.ordsEndpoints', () => {
   })
 })
 
-describe('MigrationBuilder.ordsEndpoints', () => {
-  it('collects endpoints from installed service artifacts', () => {
+describe('MigrationBuilder.applications', () => {
+  it('collects applications from installed service artifacts', () => {
     const migration = defineMigration('20260101000000_app', { schema: 'APP' }).install(appPackage)
-    expect(migration.ordsEndpoints().map((e) => e.procedureName)).toEqual(['me', 'POST_LOGIN'])
+    expect(migration.applications()).toEqual([appPackage.application()])
   })
 })
 
 describe('generateOrdsClient', () => {
-  const ts = generateOrdsClient(appPackage.ordsEndpoints())
+  const ts = generateApplicationClient(appPackage.application())
 
   it('emits request and response types from IN and OUT params', () => {
     expect(ts).toContain('export type AppMeRequest = Record<string, never>')
@@ -94,7 +99,7 @@ describe('generateOrdsClient', () => {
   })
 
   it('infers a result-set row shape from typed openFor columns', () => {
-    const [endpoint] = usersPackage.ordsEndpoints()
+    const [endpoint] = compileApplicationEndpoints(usersPackage.application())
     const cursorTs = generateOrdsClient([endpoint])
 
     expect(cursorTs).toContain('export interface UsersGetUserResultItem {')
@@ -109,9 +114,9 @@ describe('generateOrdsClient', () => {
 
 describe('generateOrdsClientModules', () => {
   it('emits one file per module and a namespace barrel', () => {
-    const generated = generateOrdsClientModules([
-      ...appPackage.ordsEndpoints(),
-      ...usersPackage.ordsEndpoints(),
+    const generated = generateApplicationClientModules([
+      appPackage.application(),
+      usersPackage.application(),
     ])
 
     expect([...generated.files.keys()]).toEqual(['app.ts', 'users.ts'])

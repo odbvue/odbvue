@@ -1,7 +1,7 @@
 import type { CompiledQuery } from './query/ast.js'
 import type { ColumnType } from './schema/column.js'
 import type { ParamNode, ParameterDirection, PlsqlType } from './schema/attribute.js'
-import type { FunctionNode, PackageNode, ProcedureNode } from './schema/package.js'
+import type { FunctionNode, OdbApplication, ProcedureNode } from './schema/package.js'
 import {
   columnBuilderMethod,
   columnTypeSupportsLength,
@@ -141,7 +141,7 @@ function paramNode(row: IntrospectedArgumentRow): ParamNode {
 export function packageFromArguments(
   packageName: string,
   rows: IntrospectedArgumentRow[],
-): PackageNode {
+): OdbApplication {
   const bySubprogram = new Map<string, IntrospectedArgumentRow[]>()
   for (const row of rows) {
     if (!oracleIdentifierEquals(row.PACKAGE_NAME, packageName)) continue

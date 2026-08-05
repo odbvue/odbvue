@@ -131,10 +131,6 @@ export class Param<T extends PlsqlType | string = PlsqlType | string> implements
       options: { ...this.options },
     }
   }
-
-  toObject() {
-    return this.toNode()
-  }
 }
 
 export type LocalVarOptions = {
@@ -183,10 +179,6 @@ export class LocalVar<
       type: this.type,
       options: { ...this.options },
     }
-  }
-
-  toObject() {
-    return this.toNode()
   }
 }
 

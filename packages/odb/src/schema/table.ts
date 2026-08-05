@@ -47,6 +47,11 @@ export type ColumnKeyOf<TTable extends Table<any>> = {
     : never
 }[keyof TTable]
 
+export type TableColumn<TTable extends Table<any>> = Extract<
+  TTable[ColumnKeyOf<TTable>],
+  Column<any, string, any, any, any, any>
+>
+
 export type Selectable<TTable extends Table<any>> = {
   [TKey in ColumnKeyOf<TTable> as TKey]: TTable[TKey] extends Column<
     any,
@@ -74,6 +79,13 @@ export type ColumnIsGenerated<TColumn extends Column<any, string, any, any, any,
       : false
     : false
 
+export type ColumnIsNullable<TColumn extends Column<any, string, any, any, any, any>> =
+  TColumn extends Column<any, any, infer TNullable, any, any, any>
+    ? TNullable extends true
+      ? true
+      : false
+    : false
+
 export type InsertableValue<TColumn extends Column<any, string, any, any, any, any>> =
   TColumn extends Column<infer TValue, any, infer TNullable, any, any, any>
     ? TNullable extends true
@@ -87,7 +99,9 @@ export type RequiredInsertableKeys<TTable extends Table<any>> = {
       ? never
       : ColumnHasDefault<TTable[TKey]> extends true
         ? never
-        : TKey
+        : ColumnIsNullable<TTable[TKey]> extends true
+          ? never
+          : TKey
     : never
 }[ColumnKeyOf<TTable>]
 
@@ -97,7 +111,9 @@ export type OptionalInsertableKeys<TTable extends Table<any>> = {
       ? never
       : ColumnHasDefault<TTable[TKey]> extends true
         ? TKey
-        : never
+        : ColumnIsNullable<TTable[TKey]> extends true
+          ? TKey
+          : never
     : never
 }[ColumnKeyOf<TTable>]
 
@@ -142,6 +158,7 @@ export type Updateable<TTable extends Table<any>> = Partial<{
 export class Table<TColumns extends TableColumnMap = Record<string, never>> {
   private readonly _shape?: TColumns
   private columns: Column<any, string, any, any, any, any>[] = []
+  private columnNamesByKey = new Map<string, string>()
   private indexes: IndexNode[] = []
 
   constructor(readonly name: string) {}
@@ -153,37 +170,65 @@ export class Table<TColumns extends TableColumnMap = Record<string, never>> {
     return this
   }
 
+  /** @internal Resolve a TypeScript table property to its Oracle column name. */
+  columnNameForKey(key: string): string {
+    return this.columnNamesByKey.get(key) ?? key
+  }
+
+  /** @internal Register the property name used for a returned table column. */
+  registerColumnKey(key: string, column: Column<any, string, any, any, any, any>): this {
+    this.columnNamesByKey.set(key, column.name)
+    return this
+  }
+
   column<TName extends string, TType extends ColumnType = ColumnType>(
     name: TName,
     type: TType,
     options: ColumnOptions = {},
-  ): Column<ColumnValueForType<TType>, TName> {
-    const column = new Column<ColumnValueForType<TType>, TName>(name, type, options)
+  ): Column<ColumnValueForType<TType>, TName, true, false, false, false, TType> {
+    const column = new Column<ColumnValueForType<TType>, TName, true, false, false, false, TType>(
+      name,
+      type,
+      options,
+    )
     this.addColumn(column)
     return column
   }
 
-  string<TName extends string>(name: TName, length = 255): Column<string, TName> {
+  string<TName extends string>(
+    name: TName,
+    length = 255,
+  ): Column<string, TName, true, false, false, false, 'string'> {
     return this.column(name, 'string', { length })
   }
 
-  number<TName extends string>(name: TName): Column<number, TName> {
+  number<TName extends string>(
+    name: TName,
+  ): Column<number, TName, true, false, false, false, 'number'> {
     return this.column(name, 'number')
   }
 
-  guid<TName extends string>(name: TName): Column<string, TName> {
+  guid<TName extends string>(
+    name: TName,
+  ): Column<string, TName, true, false, false, false, 'guid'> {
     return this.column(name, 'guid')
   }
 
-  boolean<TName extends string>(name: TName): Column<boolean, TName> {
+  boolean<TName extends string>(
+    name: TName,
+  ): Column<boolean, TName, true, false, false, false, 'boolean'> {
     return this.column(name, 'boolean')
   }
 
-  timestamp<TName extends string>(name: TName): Column<Date, TName> {
+  timestamp<TName extends string>(
+    name: TName,
+  ): Column<Date, TName, true, false, false, false, 'timestamp'> {
     return this.column(name, 'timestamp')
   }
 
-  clob<TName extends string>(name: TName): Column<string, TName> {
+  clob<TName extends string>(
+    name: TName,
+  ): Column<string, TName, true, false, false, false, 'clob'> {
     return this.column(name, 'clob')
   }
 
@@ -215,10 +260,6 @@ export class Table<TColumns extends TableColumnMap = Record<string, never>> {
       columns: this.columns.map((c) => c.toNode()),
       indexes: [...this.indexes],
     }
-  }
-
-  toObject() {
-    return this.toNode()
   }
 
   toSQLUp(options: TableSqlOptions = {}): string {
@@ -313,6 +354,7 @@ export function odbTable<TColumns extends TableColumnMap>(
     for (const [key, value] of Object.entries(result)) {
       if (value instanceof Column) {
         t.addColumn(value)
+        t.registerColumnKey(key, value)
         if (!(key in tableWithColumns)) {
           ;(tableWithColumns as Record<string, unknown>)[key] = value
         }

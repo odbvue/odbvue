@@ -107,10 +107,6 @@ export class OrdsParam {
       resultColumns: this.resultColumns?.map((column) => ({ ...column })),
     }
   }
-
-  toObject() {
-    return this.toNode()
-  }
 }
 
 // ── OrdsEndpoint ──────────────────────────────────────────────────────────────
@@ -252,10 +248,6 @@ export class OrdsEndpoint {
     }
   }
 
-  toObject() {
-    return this.toNode()
-  }
-
   toSQLUp(options: OrdsEndpointSqlOptions = {}): string {
     const pattern = this.effectivePattern
     const method = this.effectiveMethod
@@ -382,10 +374,6 @@ export class OrdsSchema {
       urlMappingPattern: this._urlMappingPattern ?? schema,
       autoRestAuth: this._autoRestAuth,
     }
-  }
-
-  toObject() {
-    return this.toNode()
   }
 
   toSQLUp(): string {
