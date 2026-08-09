@@ -10,6 +10,7 @@ export {
   type Package,
 } from './schema/package.js'
 export * from './introspect.js'
+export * from './env.js'
 
 export * from './query/ast.js'
 export * from './query/index.js'

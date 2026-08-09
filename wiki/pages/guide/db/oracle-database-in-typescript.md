@@ -35,9 +35,9 @@ The main pieces are:
 Example migration shape:
 
 ```ts
-import { defineMigration, odbPackage } from '@odbvue/odb'
+import { defineMigration, odbEnv, odbPackage } from '@odbvue/odb'
 
-const schemaName = process.env.ODBVUE_ADB_SCHEMA_USERNAME ?? ''
+const schemaName = odbEnv.read('ODBVUE_ADB_SCHEMA_USERNAME')
 
 const appPackage = odbPackage('pck_app', (p) => {
   p.proc('version', (proc) => {
@@ -140,6 +140,19 @@ const sql = alterTable('app_users', 'APP_USER')
 ```
 
 This is useful for additive migrations where a full `CREATE TABLE` is no longer appropriate.
+
+### Environment Variables
+
+`odbEnv.read()` reads a required environment variable and returns it as a `string`. It throws when the variable is missing or empty, so migrations fail early instead of generating SQL with an invalid value.
+
+```ts
+import { odbEnv } from '@odbvue/odb'
+
+const schemaName = odbEnv.read('ODBVUE_ADB_SCHEMA_USERNAME')
+const tablespaceName = odbEnv.read('ODBVUE_ADB_TABLESPACE', 'DATA')
+```
+
+Pass a second argument to provide a default value. The default is used only when the environment variable is missing or empty; if no default is provided, the error identifies the missing variable by name.
 
 ### Migrations
 
