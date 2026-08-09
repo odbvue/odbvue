@@ -59,6 +59,15 @@ function exprSql(expr: SqlExpr): string {
   return typeof expr === 'string' ? expr : expr.toSQL()
 }
 
+function isSqlExpression(value: unknown): value is { toSQL(): string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'toSQL' in value &&
+    typeof value.toSQL === 'function'
+  )
+}
+
 /** Build a predicate node from a builder callback or a column/op/value triple. */
 function toPredicate(
   column: string | Column<any, string> | ((eb: ExpressionBuilder) => ExpressionNode),
@@ -255,10 +264,16 @@ export class InsertQueryBuilder<TTable extends Table<any> = Table<any>> {
   compile(): CompiledQuery {
     const keys = Object.keys(this._values)
     const bindings: Record<string, unknown> = {}
-    for (const k of keys) bindings[k] = this._values[k]
 
     const cols = keys.map((key) => this.columnName(key)).join(', ')
-    const vals = keys.map((k) => `:${k}`).join(', ')
+    const vals = keys
+      .map((key) => {
+        const value = this._values[key]
+        if (isSqlExpression(value)) return value.toSQL()
+        bindings[key] = value
+        return `:${key}`
+      })
+      .join(', ')
 
     return {
       sql: `INSERT INTO ${this.tableName()} (${cols}) VALUES (${vals})`,
@@ -328,8 +343,10 @@ export class UpdateQueryBuilder<TTable extends Table<any> = Table<any>> {
     const bindings: Record<string, unknown> = {}
 
     const setClauses = Object.keys(this._set).map((k) => {
+      const value = this._set[k]
+      if (isSqlExpression(value)) return `${this.columnName(k)} = ${value.toSQL()}`
       const key = `s_${k}`
-      bindings[key] = this._set[k]
+      bindings[key] = value
       return `${this.columnName(k)} = :${key}`
     })
 

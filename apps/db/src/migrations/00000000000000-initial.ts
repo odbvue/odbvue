@@ -1,15 +1,7 @@
-import { odbSchema, odbTable, defineMigration } from '@odbvue/odb'
+import { odbEnv, odbSchema, odbTable, defineMigration } from '@odbvue/odb'
 
-const schemaName = process.env.ODBVUE_ADB_SCHEMA_USERNAME
-const schemaPassword = process.env.ODBVUE_ADB_SCHEMA_PASSWORD
-
-if (!schemaName) {
-  throw new Error('ODBVUE_ADB_SCHEMA_USERNAME environment variable is not set')
-}
-
-if (!schemaPassword) {
-  throw new Error('ODBVUE_ADB_SCHEMA_PASSWORD environment variable is not set')
-}
+const schemaName = odbEnv.read('ODBVUE_ADB_SCHEMA_USERNAME')
+const schemaPassword = odbEnv.read('ODBVUE_ADB_SCHEMA_PASSWORD')
 
 const appSchema = odbSchema(schemaName, schemaPassword, (s) => {
   s.grant('EXECUTE ON DBMS_CRYPTO')

@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
+import { Param } from '../../src/schema/attribute.js'
 import { type SelectQuery, odbQuery } from '../../src/query/index.js'
 import { type Column } from '../../src/schema/column.js'
 import {
@@ -137,6 +138,29 @@ describe('odbQuery', () => {
       bindings: { s_email: 'x@y.com' },
     })
     expect(update.toSQL()).toBe("UPDATE APP_USERS SET EMAIL_ADDRESS = 'x@y.com'")
+  })
+
+  it('renders plain write values as literals and PL/SQL references as expressions', () => {
+    const users = odbTable('APP_USERS', (t) => ({
+      username: t.string('USERNAME').notNull(),
+      fullname: t.string('FULLNAME').notNull(),
+      attempts: t.number('ATTEMPTS').notNull(),
+    }))
+    const username = new Param('p_username', 'VARCHAR2')
+
+    const insert = odbQuery().insertInto(users).values({
+      username,
+      fullname: "Bootstrap Admin's Account",
+      attempts: 0,
+    })
+
+    expect(insert.compile()).toEqual({
+      sql: 'INSERT INTO APP_USERS (USERNAME, FULLNAME, ATTEMPTS) VALUES (p_username, :fullname, :attempts)',
+      bindings: { fullname: "Bootstrap Admin's Account", attempts: 0 },
+    })
+    expect(insert.toSQL()).toBe(
+      "INSERT INTO APP_USERS (USERNAME, FULLNAME, ATTEMPTS) VALUES (p_username, 'Bootstrap Admin''s Account', 0)",
+    )
   })
 
   it('accumulates result types across chained select calls', () => {

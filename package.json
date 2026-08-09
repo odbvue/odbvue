@@ -38,6 +38,7 @@
     "dev": "pnpm -r run dev",
     "check": "pnpm -r run check",
     "build": "pnpm -r run build",
+    "rebuild:db": "pnpm --filter @odbvue/odb run check & pnpm --filter @odbvue/odb run build & pnpm --filter @odbvue/db run check & pnpm --filter @odbvue/db run build",
     "link:cli": "pnpm -C cli link"
   },
   "devDependencies": {

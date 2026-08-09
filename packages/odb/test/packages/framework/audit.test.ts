@@ -87,16 +87,16 @@ describe('odbAudit (framework package odb_audit)', () => {
       ])
     })
 
-    it('builds a JSON_OBJECT from the attributes map', () => {
+    it('builds an attributes CLOB from the attributes map', () => {
       expect(statements((b) => b.auditEvent('user logged in', { 'user.id': 'p_uuid' }))).toEqual([
-        "odb_audit.info('user logged in', JSON_OBJECT('user.id' VALUE p_uuid RETURNING CLOB))",
+        "odb_audit.info('user logged in', odb_audit.attributes('user.id', p_uuid))",
       ])
       expect(
         statements((b) =>
           b.auditError('failed', { 'user.id': 'p_uuid', 'http.request.method': 'v_method' }),
         ),
       ).toEqual([
-        "odb_audit.error('failed', JSON_OBJECT('user.id' VALUE p_uuid, 'http.request.method' VALUE v_method RETURNING CLOB))",
+        "odb_audit.error('failed', odb_audit.attributes('user.id', p_uuid, 'http.request.method', v_method))",
       ])
     })
 

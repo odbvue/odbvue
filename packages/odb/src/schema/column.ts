@@ -41,6 +41,7 @@ export class Column<
   private options: ColumnOptions
   private readonly _valueType?: TValue
   private _name: string
+  private _tableName?: string
 
   constructor(
     name: TName,
@@ -62,6 +63,20 @@ export class Column<
   assignName(name: string): this {
     if (this._name === '') this._name = name
     return this
+  }
+
+  /** @internal Attach the owning table used by column `%TYPE` references. */
+  attachTable(tableName: string): this {
+    this._tableName = tableName
+    return this
+  }
+
+  /** Render this column as an Oracle anchored datatype. */
+  typeReference(): string {
+    if (!this._tableName) {
+      throw new Error(`Column ${this.name} is not attached to a table`)
+    }
+    return `${this._tableName}.${this.name}%TYPE`
   }
 
   notNull(): Column<TValue, TName, false, TDefault, TGenerated, TPrimaryKey, TType> {

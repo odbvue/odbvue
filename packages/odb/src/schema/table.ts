@@ -175,8 +175,8 @@ export type ColumnIsNullable<TColumn extends Column<any, string, any, any, any, 
 export type InsertableValue<TColumn extends Column<any, string, any, any, any, any>> =
   TColumn extends Column<infer TValue, any, infer TNullable, any, any, any>
     ? TNullable extends true
-      ? TValue | null
-      : TValue
+      ? TValue | null | { toSQL(): string }
+      : TValue | { toSQL(): string }
     : never
 
 export type RequiredInsertableKeys<TTable extends Table<any>> = {
@@ -252,6 +252,7 @@ export class Table<TColumns extends TableColumnMap = Record<string, never>> {
   constructor(readonly name: string) {}
 
   addColumn(column: Column<any, string, any, any, any, any, any>): this {
+    column.attachTable(this.name)
     if (!this.columns.some((existing) => existing.name === column.name)) {
       this.columns.push(column)
     }

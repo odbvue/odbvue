@@ -24,7 +24,9 @@ import {
   type OrdsResultColumnNode,
 } from '../ords.js'
 import { ordsTypeFromPlsql } from '../model.js'
-import type { ColumnNode } from './column.js'
+import { Column, type ColumnNode } from './column.js'
+import { odbQuery } from '../query/index.js'
+import type { Insertable, Table } from './table.js'
 
 // ── Query builder integration ─────────────────────────────────────────────────
 
@@ -34,13 +36,61 @@ export type AnyQueryBuilder = {
   selectedColumns?(): ColumnNode[] | undefined
 }
 
+type ParameterTypeAlias = 'string' | 'number' | 'boolean' | 'date' | 'timestamp' | 'clob'
+type ParameterInput = PlsqlType | string | Column<any, string, any, any, any, any, any>
+
+type ResolvedParameterType<TInput extends ParameterInput> =
+  TInput extends Column<any, any, any, any, any, any, any>
+    ? string
+    : TInput extends 'string'
+      ? 'VARCHAR2'
+      : TInput extends 'number'
+        ? 'NUMBER'
+        : TInput extends 'boolean'
+          ? 'BOOLEAN'
+          : TInput extends 'date'
+            ? 'DATE'
+            : TInput extends 'timestamp'
+              ? 'TIMESTAMP'
+              : TInput extends 'clob'
+                ? 'CLOB'
+                : TInput
+
+type InputParameters<TInputs extends Record<string, ParameterInput>> = {
+  [TKey in keyof TInputs]: Param<ResolvedParameterType<TInputs[TKey]>>
+}
+
+const parameterTypeAliases: Record<ParameterTypeAlias, PlsqlType> = {
+  string: 'VARCHAR2',
+  number: 'NUMBER',
+  boolean: 'BOOLEAN',
+  date: 'DATE',
+  timestamp: 'TIMESTAMP',
+  clob: 'CLOB',
+}
+
+function inputParameterName(key: string): string {
+  const snakeCase = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()
+  return `p_${snakeCase}`
+}
+
+function inputParameterType(input: ParameterInput): PlsqlType | string {
+  if (input instanceof Column) return input.typeReference()
+  return parameterTypeAliases[input as ParameterTypeAlias] ?? input
+}
+
 // ── Statement types ──────────────────────────────────────────────────────────
+
+export type IfBranchNode = { condition: string; statements: StatementNode[] }
 
 export type StatementNode =
   | { kind: 'assign'; target: string; value: string }
   | { kind: 'return'; value?: string }
   | { kind: 'null' }
   | { kind: 'raw'; sql: string }
+  | { kind: 'if'; branches: IfBranchNode[]; elseStatements?: StatementNode[] }
+
+export type ExceptionHandlerNode = { when: string; statements: StatementNode[] }
 
 // ── AST node types ───────────────────────────────────────────────────────────
 
@@ -48,6 +98,7 @@ export type ProcedureBodyNode = {
   declarations: LocalVarNode[]
   statements: StatementNode[]
   resultSets?: Record<string, OrdsResultColumnNode[]>
+  exceptionHandlers?: ExceptionHandlerNode[]
 }
 
 export type ServiceNode = {
@@ -120,6 +171,7 @@ export class ProcedureBody {
   private _statements: StatementNode[] = []
   private _returnCounter = 0
   private _cursorResultColumns = new Map<string, OrdsResultColumnNode[]>()
+  private _exceptionHandlers: ExceptionHandlerNode[] = []
 
   /**
    * @param _returnType   Return type of the enclosing function, if any. Enables
@@ -236,39 +288,43 @@ export class ProcedureBody {
    * `packages/framework/audit`) to keep the schema layer free of a
    * schema→packages import cycle.
    */
-  private audit(severity: string, message: string, attributes?: Record<string, string>): this {
+  private audit(
+    severity: string,
+    message: string,
+    attributes?: Record<string, PlsqlRenderable>,
+  ): this {
     const body = `'${message.replace(/'/g, "''")}'`
     const args = attributes ? `${body}, ${renderAuditAttributes(attributes)}` : body
     return this.raw(`odb_audit.${severity}(${args})`)
   }
 
   /** `odb_audit.debug(<message>[, <attributes>])` */
-  auditDebug(message: string, attributes?: Record<string, string>): this {
+  auditDebug(message: string, attributes?: Record<string, PlsqlRenderable>): this {
     return this.audit('debug', message, attributes)
   }
 
   /** `odb_audit.info(<message>[, <attributes>])` */
-  auditInfo(message: string, attributes?: Record<string, string>): this {
+  auditInfo(message: string, attributes?: Record<string, PlsqlRenderable>): this {
     return this.audit('info', message, attributes)
   }
 
   /** `odb_audit.warn(<message>[, <attributes>])` */
-  auditWarn(message: string, attributes?: Record<string, string>): this {
+  auditWarn(message: string, attributes?: Record<string, PlsqlRenderable>): this {
     return this.audit('warn', message, attributes)
   }
 
   /** `odb_audit.error(<message>[, <attributes>])` */
-  auditError(message: string, attributes?: Record<string, string>): this {
+  auditError(message: string, attributes?: Record<string, PlsqlRenderable>): this {
     return this.audit('error', message, attributes)
   }
 
   /** `odb_audit.fatal(<message>[, <attributes>])` */
-  auditFatal(message: string, attributes?: Record<string, string>): this {
+  auditFatal(message: string, attributes?: Record<string, PlsqlRenderable>): this {
     return this.audit('fatal', message, attributes)
   }
 
   /** Record an audit event at INFO severity (alias of `auditInfo`). */
-  auditEvent(message: string, attributes?: Record<string, string>): this {
+  auditEvent(message: string, attributes?: Record<string, PlsqlRenderable>): this {
     return this.audit('info', message, attributes)
   }
 
@@ -282,6 +338,11 @@ export class ProcedureBody {
   query(qb: AnyQueryBuilder): this {
     this._statements.push({ kind: 'raw', sql: qb.toSQL() })
     return this
+  }
+
+  /** Emit a typed `INSERT INTO ... VALUES ...` statement. */
+  insertInto<TTable extends Table<any>>(table: TTable, values: Insertable<TTable>): this {
+    return this.query(odbQuery().insertInto(table).values(values))
   }
 
   /**
@@ -344,6 +405,70 @@ export class ProcedureBody {
     return this
   }
 
+  /**
+   * Collect the statements produced by a nested block builder (an IF branch or
+   * an EXCEPTION handler). PL/SQL has no nested DECLARE section here, so any
+   * locals and typed cursor metadata declared inside are hoisted to this body.
+   */
+  private childStatements(build: (body: ProcedureBody) => void): StatementNode[] {
+    const child = new ProcedureBody(this._returnType, this._returnLength)
+    build(child)
+    for (const declaration of child._declarations) {
+      this._declarations.push(declaration)
+    }
+    for (const [name, columns] of child._cursorResultColumns) {
+      this._cursorResultColumns.set(name, columns)
+    }
+    return child._statements
+  }
+
+  /**
+   * Emit `IF <condition> THEN <then> [ELSE <else>] END IF;`. The branch builders
+   * receive a nested body; locals declared inside are hoisted to the enclosing
+   * procedure/function.
+   *
+   * @example
+   * body.ifThen(
+   *   'v_status = 200',
+   *   (t) => t.assign(rToken, issueToken),
+   *   (e) => e.auditWarn('login failed'),
+   * )
+   */
+  ifThen(
+    condition: PlsqlRenderable,
+    buildThen: (body: ProcedureBody) => void,
+    buildElse?: (body: ProcedureBody) => void,
+  ): this {
+    const node: StatementNode = {
+      kind: 'if',
+      branches: [
+        { condition: renderPlsql(condition), statements: this.childStatements(buildThen) },
+      ],
+    }
+    if (buildElse) {
+      node.elseStatements = this.childStatements(buildElse)
+    }
+    this._statements.push(node)
+    return this
+  }
+
+  /**
+   * Add an `EXCEPTION` handler for a named exception. Handlers are emitted after
+   * the body statements, in the order they are declared.
+   *
+   * @example
+   * body.when('no_data_found', (h) => h.assign(rError, odbLiteral('not found')))
+   */
+  when(exceptionName: string, build: (body: ProcedureBody) => void): this {
+    this._exceptionHandlers.push({ when: exceptionName, statements: this.childStatements(build) })
+    return this
+  }
+
+  /** Add a `WHEN OTHERS THEN ...` exception handler. */
+  whenOthers(build: (body: ProcedureBody) => void): this {
+    return this.when('OTHERS', build)
+  }
+
   /** @internal Row metadata retained for a typed SYS_REFCURSOR query. */
   cursorResultColumns(cursor: string): OrdsResultColumnNode[] | undefined {
     return this._cursorResultColumns.get(cursor.toUpperCase())
@@ -362,21 +487,31 @@ export class ProcedureBody {
               ]),
             )
           : undefined,
+      exceptionHandlers:
+        this._exceptionHandlers.length > 0
+          ? this._exceptionHandlers.map((handler) => ({
+              when: handler.when,
+              statements: [...handler.statements],
+            }))
+          : undefined,
     }
   }
 }
 
 // ── Procedure ─────────────────────────────────────────────────────────────────
 
-/**
- * Build a `JSON_OBJECT(...)` expression from an attributes map for `odb_audit`.
- * Keys are rendered as text literals; values are treated as PL/SQL expressions.
- */
-function renderAuditAttributes(attributes: Record<string, string>): string {
-  const pairs = Object.entries(attributes)
-    .map(([key, value]) => `'${key.replace(/'/g, "''")}' VALUE ${value}`)
-    .join(', ')
-  return `JSON_OBJECT(${pairs} RETURNING CLOB)`
+/** Build an `odb_audit.attributes(...)` CLOB from an attributes map. */
+function renderAuditAttributes(attributes: Record<string, PlsqlRenderable>): string {
+  const entries = Object.entries(attributes)
+  if (entries.length === 0) return `TO_CLOB('{}')`
+  if (entries.length > 6) {
+    throw new Error('Audit attributes support at most 6 entries')
+  }
+  const args = entries.flatMap(([key, value]) => [
+    `'${key.replace(/'/g, "''")}'`,
+    renderPlsql(value),
+  ])
+  return `odb_audit.attributes(${args.join(', ')})`
 }
 
 /**
@@ -493,6 +628,20 @@ export class Procedure {
   /** Shorthand: add an IN parameter. */
   in<T extends PlsqlType | string>(name: string, type: T): Param<T> {
     return this.param(name, type, 'IN')
+  }
+
+  /** Add named IN parameters using automatic `p_` names and optional column `%TYPE` anchors. */
+  inputs<TInputs extends Record<string, ParameterInput>>(
+    definitions: TInputs,
+  ): InputParameters<TInputs> {
+    const parameters = {} as InputParameters<TInputs>
+    for (const [key, input] of Object.entries(definitions)) {
+      parameters[key as keyof TInputs] = this.in(
+        inputParameterName(key),
+        inputParameterType(input),
+      ) as InputParameters<TInputs>[keyof TInputs]
+    }
+    return parameters
   }
 
   /** Shorthand: add an OUT parameter. */
@@ -819,15 +968,8 @@ function emitProcedureImpl(proc: ProcedureNode): string {
   }
 
   lines.push('  BEGIN')
-
-  if (proc.body.statements.length === 0) {
-    lines.push('    NULL;')
-  } else {
-    for (const stmt of proc.body.statements) {
-      lines.push(`    ${emitStatement(stmt)}`)
-    }
-  }
-
+  lines.push(...emitStatementBlock(proc.body.statements, '    '))
+  emitExceptionSection(lines, proc.body.exceptionHandlers, '  ')
   lines.push(`  END ${proc.name};`)
   return lines.join('\n')
 }
@@ -852,25 +994,57 @@ function emitFunctionImpl(fn: FunctionNode): string {
   if (fn.body.statements.length === 0) {
     lines.push('    RETURN NULL;')
   } else {
-    for (const stmt of fn.body.statements) {
-      lines.push(`    ${emitStatement(stmt)}`)
-    }
+    lines.push(...emitStatementBlock(fn.body.statements, '    '))
   }
 
+  emitExceptionSection(lines, fn.body.exceptionHandlers, '  ')
   lines.push(`  END ${fn.name};`)
   return lines.join('\n')
 }
 
-function emitStatement(stmt: StatementNode): string {
+/** Emit a block of statements at the given indent, or `NULL;` when empty. */
+function emitStatementBlock(statements: StatementNode[], indent: string): string[] {
+  if (statements.length === 0) return [`${indent}NULL;`]
+  return statements.flatMap((stmt) => emitStatement(stmt, indent))
+}
+
+/** Append an `EXCEPTION` section when the body declares any handlers. */
+function emitExceptionSection(
+  lines: string[],
+  handlers: ExceptionHandlerNode[] | undefined,
+  indent: string,
+): void {
+  if (!handlers || handlers.length === 0) return
+  lines.push(`${indent}EXCEPTION`)
+  for (const handler of handlers) {
+    lines.push(`${indent}  WHEN ${handler.when} THEN`)
+    lines.push(...emitStatementBlock(handler.statements, `${indent}    `))
+  }
+}
+
+function emitStatement(stmt: StatementNode, indent: string): string[] {
   switch (stmt.kind) {
     case 'assign':
-      return `${stmt.target} := ${stmt.value};`
+      return [`${indent}${stmt.target} := ${stmt.value};`]
     case 'return':
-      return stmt.value !== undefined ? `RETURN ${stmt.value};` : 'RETURN;'
+      return [stmt.value !== undefined ? `${indent}RETURN ${stmt.value};` : `${indent}RETURN;`]
     case 'null':
-      return 'NULL;'
+      return [`${indent}NULL;`]
     case 'raw':
-      return stmt.sql.trimEnd().endsWith(';') ? stmt.sql : `${stmt.sql};`
+      return [`${indent}${stmt.sql.trimEnd().endsWith(';') ? stmt.sql : `${stmt.sql};`}`]
+    case 'if': {
+      const lines: string[] = []
+      stmt.branches.forEach((branch, index) => {
+        lines.push(`${indent}${index === 0 ? 'IF' : 'ELSIF'} ${branch.condition} THEN`)
+        lines.push(...emitStatementBlock(branch.statements, `${indent}  `))
+      })
+      if (stmt.elseStatements) {
+        lines.push(`${indent}ELSE`)
+        lines.push(...emitStatementBlock(stmt.elseStatements, `${indent}  `))
+      }
+      lines.push(`${indent}END IF;`)
+      return lines
+    }
   }
 }
 
