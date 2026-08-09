@@ -1,0 +1,11 @@
+@baseUrl = https://localhost:8443/ords/odbvue
+
+@username = admin
+@password = change-me
+
+### Bootstrap the application administrator
+# @name bootstrap
+POST {{baseUrl}}/app/bootstrap
+username: {{username}}
+password: {{password}}
+

@@ -26,12 +26,12 @@ const getAppliedMigrations = async (schemaUsername: string): Promise<Set<string>
   }
 
   const result = await runDbExec(
-    `SELECT name FROM ${schemaUsername}.app_migrations ORDER BY name`,
+    `SELECT migration_name FROM ${schemaUsername}.app_migrations ORDER BY migration_name`,
     true,
     false,
   )
   const rows = (result?.[0]?.rows as Array<Record<string, unknown>>) ?? []
-  return new Set(rows.map((r) => String(r['NAME'])))
+  return new Set(rows.map((r) => String(r['MIGRATION_NAME'])))
 }
 
 const buildDbMigrations = (): void => {
@@ -100,14 +100,14 @@ export const runDbMigrate = async (direction: 'up' | 'down'): Promise<void> => {
 
     if (direction === 'up') {
       await runDbExec(
-        `INSERT INTO ${schemaUsername}.app_migrations (name) VALUES ('${migrationName}')`,
+        `INSERT INTO ${schemaUsername}.app_migrations (migration_name) VALUES ('${migrationName}')`,
         true,
         true,
       )
     } else {
       if (await schemaExists(schemaUsername)) {
         await runDbExec(
-          `DELETE FROM ${schemaUsername}.app_migrations WHERE name = '${migrationName}'`,
+          `DELETE FROM ${schemaUsername}.app_migrations WHERE migration_name = '${migrationName}'`,
           true,
           false,
         )

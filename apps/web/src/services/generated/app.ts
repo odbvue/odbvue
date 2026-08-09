@@ -7,30 +7,17 @@ export interface OrdsOperationDescriptor {
   path: string
 }
 
-export type AppMeRequest = Record<string, never>
-
-export interface AppMeResponse {
-  version: string
-  versionBase64: string
+export interface AppBootstrapRequest {
+  username: string
+  password: string
 }
 
-export interface AppMigrationsResultItem {
-  created: string
-  name: string
-}
-
-export type AppMigrationsRequest = Record<string, never>
-
-export interface AppMigrationsResponse {
-  result: AppMigrationsResultItem[]
-}
+export type AppBootstrapResponse = Record<string, never>
 
 export interface OrdsOperations {
-  appMe: { request: AppMeRequest; response: AppMeResponse }
-  appMigrations: { request: AppMigrationsRequest; response: AppMigrationsResponse }
+  appBootstrap: { request: AppBootstrapRequest; response: AppBootstrapResponse }
 }
 
 export const ordsOperations = {
-  appMe: { method: 'GET', path: 'app/auth/me' },
-  appMigrations: { method: 'GET', path: 'app/migrations' },
+  appBootstrap: { method: 'POST', path: 'app/bootstrap' },
 } as const satisfies Record<keyof OrdsOperations, OrdsOperationDescriptor>
