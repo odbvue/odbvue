@@ -1,8 +1,9 @@
+import { spawnSync } from 'child_process'
 import path from 'path'
 
 import { SecretsStore } from '../adapters/secrets-store.js'
 
-import { dbDir } from '../shared/dirs.js'
+import { dbDir, rootDir } from '../shared/dirs.js'
 import { logger } from '../shared/logger.js'
 
 import { runDbExec } from './db-exec.js'
@@ -33,8 +34,28 @@ const getAppliedMigrations = async (schemaUsername: string): Promise<Set<string>
   return new Set(rows.map((r) => String(r['NAME'])))
 }
 
+const buildDbMigrations = (): void => {
+  logger.info('Building DB migrations...')
+
+  const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+  const result = spawnSync(pnpm, ['--dir', dbDir, 'build'], {
+    cwd: rootDir,
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+  })
+
+  if (result.error) {
+    throw new Error(`Failed to start DB migration build: ${result.error.message}`)
+  }
+  if (result.status !== 0) {
+    throw new Error(`DB migration build failed with exit code ${result.status ?? 'unknown'}`)
+  }
+}
+
 export const runDbMigrate = async (direction: 'up' | 'down'): Promise<void> => {
   logger.info(`Applying DB migrations (${direction})...`)
+
+  buildDbMigrations()
 
   const sourceDir = path.join(dbDir, 'dist', 'migrations')
   const destDir = path.join(dbDir, 'dist', 'sql')
