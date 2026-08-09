@@ -61,7 +61,7 @@ export const odbTypes = {
   guid: {
     typescript: { model: 'string', json: 'string' },
     ords: 'STRING',
-    oracle: () => 'RAW(16)',
+    oracle: () => 'CHAR(32 CHAR)',
     columnBuilder: 'guid',
   },
   boolean: {

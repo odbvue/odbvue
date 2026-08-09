@@ -27,7 +27,7 @@ describe('canonical ODB model', () => {
 
   it('emits target representations from ODB types', () => {
     expect(emitOracleType('string', { length: 80 })).toBe('VARCHAR2(80 CHAR)')
-    expect(emitOracleType('guid')).toBe('RAW(16)')
+    expect(emitOracleType('guid')).toBe('CHAR(32 CHAR)')
     expect(emitOrdsType('number')).toBe('DOUBLE')
     expect(emitTypeScriptType('timestamp')).toBe('Date')
     expect(emitTypeScriptType('timestamp', 'json')).toBe('string')

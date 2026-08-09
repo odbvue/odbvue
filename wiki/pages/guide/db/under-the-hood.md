@@ -59,7 +59,7 @@ Foreign keys are named: `table_name_id`.
 
 Comments are mandatory for tables and columns.
 
-Primary key constraint must be named: `pk_table name`.
+Primary key constraints are named `primary_key_table_name`.
 
 Foreign key constraint must be named: `fk_table name`. _N.B. Index is not automatically created and should be added as well._
 
@@ -70,7 +70,7 @@ JSON field must have JSON constraint.
 ```sql
 CREATE TABLE app_storage (
    id NUMBER(19) NOT NULL,
-   guid CHAR(32 CHAR) DEFAULT SYS_GUID() NOT NULL,
+   guid CHAR(32 CHAR) DEFAULT LOWER(SYS_GUID()) NOT NULL,
    id_user NUMBER(19),
    file_name VARCHAR2(2000 CHAR),
    file_size NUMBER(19),
@@ -91,14 +91,14 @@ COMMENT ON COLUMN app_storage.id_user IS 'User who created attachment. Reference
 COMMENT ON COLUMN app_storage.sharing IS 'Is attachment shareable to other users (Y - yes, N - No)';
 /
 
-ALTER TABLE app_storage ADD CONSTRAINT pk_app_storage PRIMARY KEY (id);
+ALTER TABLE app_storage ADD CONSTRAINT primary_key_app_storage PRIMARY KEY (id);
 /
 
 ALTER TABLE app_storage ADD CONSTRAINT fk_app_storage_user FOREIGN KEY (id_user) REFERENCES app_users(id);
 CREATE INDEX idx_app_storage_user ON app_storage(id_user) ONLINE;
 /
 
-ALTER TABLE app_storage ADD CONSTRAINT ch_app_storage_sharing CHECK sharing IN ('Y','N');
+ALTER TABLE app_storage ADD CONSTRAINT check_app_storage_sharing CHECK sharing IN ('Y','N');
 /
 ```
 
@@ -112,9 +112,11 @@ Sequence shall be named `seq_table_name`.
 
 ### Indexes
 
-Indexes shall be named `idx_table_name_column_name(s)`.
+Indexes are named `index_table_name_column_name(s)`.
 
-Unique indexes shall be named `idq_`.
+Unique indexes are named `unique_table_name_column_name(s)`.
+
+Check constraints are named `check_table_name_column_name(s)`.
 
 ### PL\SQL
 

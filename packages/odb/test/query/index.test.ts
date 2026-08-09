@@ -42,7 +42,7 @@ describe('odbQuery', () => {
 
   it('infers select row shapes and typed insert/update payloads', () => {
     const users = odbTable('APP_USERS', (t) => ({
-      id: t.number('id').notNull().default('0'),
+      id: t.number('id').notNull().default(0),
       username: t.string('username', 100).notNull(),
       email: t.string('email'),
     }))
@@ -179,16 +179,24 @@ describe('odbQuery', () => {
     const table = odbTable('DEFAULTS', (t) => ({
       id: t.guid('ID').defaultSysGuid(),
       created: t.timestamp('CREATED').defaultCurrentTimestamp(),
+      observed: t.timestamp('OBSERVED').defaultSysTimestamp(),
     }))
 
-    expect(table.toSQLUp()).toContain('ID RAW(16) DEFAULT SYS_GUID() NOT NULL')
+    expect(table.toSQLUp()).toContain('ID CHAR(32 CHAR) DEFAULT LOWER(SYS_GUID()) NOT NULL')
     expect(table.toSQLUp()).toContain('CREATED TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP')
+    expect(table.toSQLUp()).toContain('OBSERVED TIMESTAMP(6) DEFAULT SYSTIMESTAMP')
 
-    odbTable('INVALID_DEFAULTS', (t) => ({
-      // @ts-expect-error SYS_GUID is only valid for GUID columns
-      id: t.number('ID').defaultSysGuid(),
-      // @ts-expect-error CURRENT_TIMESTAMP is only valid for date/timestamp columns
-      flag: t.boolean('FLAG').defaultCurrentTimestamp(),
-    }))
+    expect(() =>
+      odbTable('INVALID_DEFAULTS', (t) => ({
+        // @ts-expect-error number defaults require number values
+        invalidNumber: t.number('INVALID_NUMBER').default('0'),
+        // @ts-expect-error SYS_GUID is only valid for GUID columns
+        id: t.number('ID').defaultSysGuid(),
+        // @ts-expect-error CURRENT_TIMESTAMP is only valid for date/timestamp columns
+        flag: t.boolean('FLAG').defaultCurrentTimestamp(),
+        // @ts-expect-error SYSTIMESTAMP is only valid for date/timestamp columns
+        count: t.number('COUNT').defaultSysTimestamp(),
+      })),
+    ).toThrow('Number column defaults must be finite numbers.')
   })
 })

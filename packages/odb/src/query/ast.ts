@@ -27,6 +27,11 @@ export type BinaryExpressionNode = {
   right: ExpressionNode
 }
 export type NullTestNode = { kind: 'nullTest'; operand: ExpressionNode; op: NullOperator }
+export type InExpressionNode = {
+  kind: 'in'
+  operand: ExpressionNode
+  values: ExpressionNode[]
+}
 export type LogicalExpressionNode = {
   kind: 'logical'
   op: 'AND' | 'OR'
@@ -42,6 +47,7 @@ export type ExpressionNode =
   | RawSqlNode
   | BinaryExpressionNode
   | NullTestNode
+  | InExpressionNode
   | LogicalExpressionNode
   | NotNode
   | FunctionCallNode
@@ -53,6 +59,7 @@ const NODE_KINDS = new Set([
   'raw',
   'binary',
   'nullTest',
+  'in',
   'logical',
   'not',
   'function',
@@ -91,6 +98,7 @@ export interface ExpressionBuilder {
   and(expressions: ExpressionNode[]): LogicalExpressionNode
   or(expressions: ExpressionNode[]): LogicalExpressionNode
   not(expression: ExpressionNode): NotNode
+  in(left: ExprInput, values: readonly unknown[]): InExpressionNode
   ref(name: string): ColumnRefNode
   val(value: unknown): ValueNode
   raw(sql: string): RawSqlNode
@@ -121,6 +129,11 @@ export const odbExpr: ExpressionBuilder = Object.assign(predicate as ExpressionB
     expressions,
   }),
   not: (operand: ExpressionNode): NotNode => ({ kind: 'not', operand }),
+  in: (operand: ExprInput, values: readonly unknown[]): InExpressionNode => ({
+    kind: 'in',
+    operand: toReference(operand),
+    values: values.map(toOperand),
+  }),
   ref: (name: string): ColumnRefNode => ({ kind: 'column', name }),
   val: (value: unknown): ValueNode => ({ kind: 'value', value }),
   raw: (sql: string): RawSqlNode => ({ kind: 'raw', sql }),
@@ -204,6 +217,8 @@ export function compileNode(node: ExpressionNode, ctx: BindContext): string {
       return `${compileNode(node.left, ctx)} ${node.op} ${compileNode(node.right, ctx)}`
     case 'nullTest':
       return `${compileNode(node.operand, ctx)} ${node.op}`
+    case 'in':
+      return `${compileNode(node.operand, ctx)} IN (${node.values.map((value) => compileNode(value, ctx)).join(', ')})`
     case 'not':
       return `NOT (${compileNode(node.operand, ctx)})`
     case 'logical':
@@ -230,6 +245,8 @@ export function renderNode(node: ExpressionNode): string {
       return `${renderNode(node.left)} ${node.op} ${renderNode(node.right)}`
     case 'nullTest':
       return `${renderNode(node.operand)} ${node.op}`
+    case 'in':
+      return `${renderNode(node.operand)} IN (${node.values.map(renderNode).join(', ')})`
     case 'not':
       return `NOT (${renderNode(node.operand)})`
     case 'logical':

@@ -7,12 +7,18 @@ Beyond authoring SQL and PL/SQL, `@odbvue/odb` is a typed toolkit that turns a s
 Return an object from `odbTable()` to expose typed columns. The same definition infers selected rows, required inserts, nullable values, defaults, and updates.
 
 ```ts
+import { odbQuery, odbTable } from '@odbvue/odb'
 import type { Insertable, Selectable, Updateable } from '@odbvue/odb'
 
 const users = odbTable('APP_USERS', (t) => ({
-  id: t.number('id').notNull().defaultSysGuid(),
-  email: t.string('email', 255),
+  id: t.number().identity().primaryKey(),
+  uuid: t.guid().defaultSysGuid(),
+  email: t.string(255),
+  status: t.string(1).default('N').notNull(),
+  createdAt: t.timestamp().defaultSysTimestamp().notNull(),
 }))
+  .unique((columns) => [columns.uuid])
+  .check((columns, expression) => expression.in(columns.status, ['A', 'D', 'N']))
 
 odbQuery().selectFrom(users).select([users.id]).where(users.id, '=', 123)
 odbQuery().insertInto(users).values({ email: 'ada@example.com' })
@@ -23,7 +29,32 @@ type NewUser = Insertable<typeof users>
 type UserUpdate = Updateable<typeof users>
 ```
 
-Column-level `.unique()` emits a unique constraint. Indexes also accept column references: `t.index('ix_users_email', [users.email])`.
+Omitted names are inferred from object keys, so `createdAt` maps to `created_at`. Explicit names are supported for existing schemas. Table-level selectors provide autocomplete and reject unknown columns:
+
+```ts
+users.index((columns) => [columns.email, columns.createdAt]).unique((columns) => [columns.uuid])
+```
+
+Constraint and index names are generated from the table and selected columns. An explicit name can be supplied as the first argument when required. Column-level `.unique()` is also available for a single inline unique constraint.
+
+Typed checks use the same column shape and validate values against the selected column type:
+
+```ts
+users.check((columns, expression) =>
+  expression.and([
+    expression.in(columns.status, ['A', 'D', 'N']),
+    expression(columns.email, 'IS NOT NULL'),
+  ]),
+)
+```
+
+Table and column comments emit Oracle `COMMENT ON` statements:
+
+```ts
+const files = odbTable('app_files', (t) => ({
+  id: t.number().identity().primaryKey().comment('Primary key'),
+})).comment('Application files')
+```
 
 ## Expression builder
 

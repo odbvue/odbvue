@@ -6,6 +6,18 @@ import {
   type ColumnValueForType,
 } from './column.js'
 import { emitOracleType } from '../model.js'
+import {
+  odbExpr,
+  renderExpression,
+  type BinaryExpressionNode,
+  type ComparisonOperator,
+  type ExpressionNode,
+  type InExpressionNode,
+  type LogicalExpressionNode,
+  type NotNode,
+  type NullOperator,
+  type NullTestNode,
+} from '../query/ast.js'
 
 export type IndexNode = {
   kind: 'index'
@@ -14,22 +26,96 @@ export type IndexNode = {
   unique?: boolean
 }
 
+type TableIndexDefinition = {
+  kind: 'index'
+  name?: string
+  columns: TableIndexColumn[]
+  unique?: boolean
+}
+
+export type CheckNode = {
+  kind: 'check'
+  name: string
+  condition: string
+}
+
+type TableCheckDefinition = Omit<CheckNode, 'name'> & {
+  name?: string
+  columns?: TableIndexColumn[]
+}
+
 export type TableNode = {
   kind: 'table'
   name: string
+  comment?: string
   columns: ColumnNode[]
   indexes: IndexNode[]
+  checks: CheckNode[]
 }
 
 export type TableSqlOptions = {
   schema?: string
 }
 
-export type TableColumnMap = Record<string, Column<any, string, any, any, any, any>>
-export type TableIndexColumn = string | Column<any, string, any, any, any, any>
+export type TableColumnMap = Record<string, Column<any, string, any, any, any, any, any>>
+export type TableIndexColumn = string | Column<any, string, any, any, any, any, any>
+type TableColumnSelector<TColumns extends TableColumnMap> = (
+  columns: TColumns,
+) => TableIndexColumn[]
 
-export type TableShape<TColumns extends TableColumnMap = Record<string, never>> = Table<TColumns> &
-  TColumns
+type ColumnValue<TColumn> =
+  TColumn extends Column<infer TValue, any, any, any, any, any, any> ? TValue : never
+
+export interface CheckExpressionBuilder {
+  <TColumn extends Column<any, string, any, any, any, any, any>>(
+    left: TColumn,
+    op: ComparisonOperator,
+    right: ColumnValue<TColumn>,
+  ): BinaryExpressionNode
+  <TColumn extends Column<any, string, any, any, any, any, any>>(
+    left: TColumn,
+    op: NullOperator,
+  ): NullTestNode
+  in<TColumn extends Column<any, string, any, any, any, any, any>>(
+    column: TColumn,
+    values: readonly ColumnValue<TColumn>[],
+  ): InExpressionNode
+  and(expressions: ExpressionNode[]): LogicalExpressionNode
+  or(expressions: ExpressionNode[]): LogicalExpressionNode
+  not(expression: ExpressionNode): NotNode
+}
+
+const checkExpr = odbExpr as CheckExpressionBuilder
+
+type ResolveColumnName<TColumn, TKey extends string> =
+  TColumn extends Column<
+    infer TValue,
+    infer TName,
+    infer TNullable,
+    infer TDefault,
+    infer TGenerated,
+    infer TPrimaryKey,
+    infer TType
+  >
+    ? Column<
+        TValue,
+        TName extends '' ? TKey : TName,
+        TNullable,
+        TDefault,
+        TGenerated,
+        TPrimaryKey,
+        TType
+      >
+    : never
+
+type ResolveColumnMap<TColumns extends TableColumnMap> = {
+  [TKey in keyof TColumns]: ResolveColumnName<TColumns[TKey], TKey & string>
+}
+
+export type TableShape<TColumns extends TableColumnMap = Record<string, never>> = Table<
+  ResolveColumnMap<TColumns>
+> &
+  ResolveColumnMap<TColumns>
 
 export type ColumnName<TColumn extends Column<any, string, any, any, any, any>> =
   TColumn extends Column<any, infer TName, any, any, any, any> ? TName : never
@@ -157,13 +243,15 @@ export type Updateable<TTable extends Table<any>> = Partial<{
 
 export class Table<TColumns extends TableColumnMap = Record<string, never>> {
   private readonly _shape?: TColumns
-  private columns: Column<any, string, any, any, any, any>[] = []
+  private columns: Column<any, string, any, any, any, any, any>[] = []
   private columnNamesByKey = new Map<string, string>()
-  private indexes: IndexNode[] = []
+  private indexes: TableIndexDefinition[] = []
+  private checks: TableCheckDefinition[] = []
+  private tableComment?: string
 
   constructor(readonly name: string) {}
 
-  addColumn(column: Column<any, string, any, any, any, any>): this {
+  addColumn(column: Column<any, string, any, any, any, any, any>): this {
     if (!this.columns.some((existing) => existing.name === column.name)) {
       this.columns.push(column)
     }
@@ -176,8 +264,10 @@ export class Table<TColumns extends TableColumnMap = Record<string, never>> {
   }
 
   /** @internal Register the property name used for a returned table column. */
-  registerColumnKey(key: string, column: Column<any, string, any, any, any, any>): this {
+  registerColumnKey(key: string, column: Column<any, string, any, any, any, any, any>): this {
+    column.assignName(toSnakeCase(key))
     this.columnNamesByKey.set(key, column.name)
+    this.addColumn(column)
     return this
   }
 
@@ -195,61 +285,157 @@ export class Table<TColumns extends TableColumnMap = Record<string, never>> {
     return column
   }
 
+  string(): Column<string, '', true, false, false, false, 'string'>
+  string(length: number): Column<string, '', true, false, false, false, 'string'>
   string<TName extends string>(
     name: TName,
+    length?: number,
+  ): Column<string, TName, true, false, false, false, 'string'>
+  string(
+    nameOrLength?: string | number,
     length = 255,
-  ): Column<string, TName, true, false, false, false, 'string'> {
-    return this.column(name, 'string', { length })
+  ): Column<string, string, true, false, false, false, 'string'> {
+    const name = typeof nameOrLength === 'string' ? nameOrLength : ''
+    const resolvedLength = typeof nameOrLength === 'number' ? nameOrLength : length
+    return this.createColumn(name, 'string', { length: resolvedLength })
   }
 
+  number(): Column<number, '', true, false, false, false, 'number'>
   number<TName extends string>(
     name: TName,
-  ): Column<number, TName, true, false, false, false, 'number'> {
-    return this.column(name, 'number')
+  ): Column<number, TName, true, false, false, false, 'number'>
+  number(name = ''): Column<number, string, true, false, false, false, 'number'> {
+    return this.createColumn(name, 'number')
   }
 
-  guid<TName extends string>(
-    name: TName,
-  ): Column<string, TName, true, false, false, false, 'guid'> {
-    return this.column(name, 'guid')
+  guid(): Column<string, '', true, false, false, false, 'guid'>
+  guid<TName extends string>(name: TName): Column<string, TName, true, false, false, false, 'guid'>
+  guid(name = ''): Column<string, string, true, false, false, false, 'guid'> {
+    return this.createColumn(name, 'guid')
   }
 
+  boolean(): Column<boolean, '', true, false, false, false, 'boolean'>
   boolean<TName extends string>(
     name: TName,
-  ): Column<boolean, TName, true, false, false, false, 'boolean'> {
-    return this.column(name, 'boolean')
+  ): Column<boolean, TName, true, false, false, false, 'boolean'>
+  boolean(name = ''): Column<boolean, string, true, false, false, false, 'boolean'> {
+    return this.createColumn(name, 'boolean')
   }
 
+  timestamp(): Column<Date, '', true, false, false, false, 'timestamp'>
   timestamp<TName extends string>(
     name: TName,
-  ): Column<Date, TName, true, false, false, false, 'timestamp'> {
-    return this.column(name, 'timestamp')
+  ): Column<Date, TName, true, false, false, false, 'timestamp'>
+  timestamp(name = ''): Column<Date, string, true, false, false, false, 'timestamp'> {
+    return this.createColumn(name, 'timestamp')
   }
 
-  clob<TName extends string>(
+  clob(): Column<string, '', true, false, false, false, 'clob'>
+  clob<TName extends string>(name: TName): Column<string, TName, true, false, false, false, 'clob'>
+  clob(name = ''): Column<string, string, true, false, false, false, 'clob'> {
+    return this.createColumn(name, 'clob')
+  }
+
+  private createColumn<TName extends string, TType extends ColumnType>(
     name: TName,
-  ): Column<string, TName, true, false, false, false, 'clob'> {
-    return this.column(name, 'clob')
+    type: TType,
+    options: ColumnOptions = {},
+  ): Column<ColumnValueForType<TType>, TName, true, false, false, false, TType> {
+    const column = new Column<ColumnValueForType<TType>, TName, true, false, false, false, TType>(
+      name,
+      type,
+      options,
+    )
+    if (name !== '') this.addColumn(column)
+    return column
   }
 
-  index(name: string, columns: TableIndexColumn[]): this {
+  index(columns: TableIndexColumn[] | TableColumnSelector<TColumns>): this
+  index(name: string, columns: TableIndexColumn[]): this
+  index(name: string, select: TableColumnSelector<TColumns>): this
+  index(
+    nameOrColumns: string | TableIndexColumn[] | TableColumnSelector<TColumns>,
+    columns?: TableIndexColumn[] | TableColumnSelector<TColumns>,
+  ): this {
     this.indexes.push({
       kind: 'index',
-      name,
-      columns: columns.map(resolveIndexColumnName),
+      name: typeof nameOrColumns === 'string' ? nameOrColumns : undefined,
+      columns: this.resolveSelectedColumns(
+        typeof nameOrColumns === 'string' ? (columns ?? []) : nameOrColumns,
+      ),
     })
 
     return this
   }
 
-  unique(name: string, columns: TableIndexColumn[]): this {
+  unique(columns: TableIndexColumn[] | TableColumnSelector<TColumns>): this
+  unique(name: string, columns: TableIndexColumn[]): this
+  unique(name: string, select: TableColumnSelector<TColumns>): this
+  unique(
+    nameOrColumns: string | TableIndexColumn[] | TableColumnSelector<TColumns>,
+    columns?: TableIndexColumn[] | TableColumnSelector<TColumns>,
+  ): this {
     this.indexes.push({
       kind: 'index',
-      name,
-      columns: columns.map(resolveIndexColumnName),
+      name: typeof nameOrColumns === 'string' ? nameOrColumns : undefined,
+      columns: this.resolveSelectedColumns(
+        typeof nameOrColumns === 'string' ? (columns ?? []) : nameOrColumns,
+      ),
       unique: true,
     })
 
+    return this
+  }
+
+  check(columns: TableIndexColumn[], condition: string): this
+  check(name: string, condition: string): this
+  check(build: (columns: TColumns, expression: CheckExpressionBuilder) => ExpressionNode): this
+  check(
+    name: string,
+    build: (columns: TColumns, expression: CheckExpressionBuilder) => ExpressionNode,
+  ): this
+  check(
+    nameOrColumns:
+      | string
+      | TableIndexColumn[]
+      | ((columns: TColumns, expression: CheckExpressionBuilder) => ExpressionNode),
+    condition?:
+      | string
+      | ((columns: TColumns, expression: CheckExpressionBuilder) => ExpressionNode),
+  ): this {
+    const build =
+      typeof nameOrColumns === 'function'
+        ? nameOrColumns
+        : typeof condition === 'function'
+          ? condition
+          : undefined
+    const expression = build?.(this.columnShape(), checkExpr)
+    this.checks.push({
+      kind: 'check',
+      name: typeof nameOrColumns === 'string' ? nameOrColumns : undefined,
+      columns:
+        expression !== undefined
+          ? collectExpressionColumns(expression)
+          : Array.isArray(nameOrColumns)
+            ? nameOrColumns
+            : undefined,
+      condition: expression === undefined ? (condition as string) : renderExpression(expression),
+    })
+    return this
+  }
+
+  private resolveSelectedColumns(
+    columns: TableIndexColumn[] | TableColumnSelector<TColumns>,
+  ): TableIndexColumn[] {
+    return typeof columns === 'function' ? columns(this.columnShape()) : columns
+  }
+
+  private columnShape(): TColumns {
+    return this as unknown as TColumns
+  }
+
+  comment(value: string): this {
+    this.tableComment = value
     return this
   }
 
@@ -257,8 +443,26 @@ export class Table<TColumns extends TableColumnMap = Record<string, never>> {
     return {
       kind: 'table',
       name: this.name,
+      comment: this.tableComment,
       columns: this.columns.map((c) => c.toNode()),
-      indexes: [...this.indexes],
+      indexes: this.indexes.map((index) => {
+        const columns = index.columns.map(resolveIndexColumnName)
+        return {
+          ...index,
+          name:
+            index.name ??
+            generatedObjectName(index.unique ? 'unique' : 'index', this.name, columns),
+          columns,
+        }
+      }),
+      checks: this.checks.map((check) => {
+        const columns = check.columns?.map(resolveIndexColumnName) ?? []
+        return {
+          kind: check.kind,
+          name: check.name ?? generatedObjectName('check', this.name, columns),
+          condition: check.condition,
+        }
+      }),
     }
   }
 
@@ -278,7 +482,11 @@ function emitOracleCreateTable(table: TableNode, options: TableSqlOptions = {}):
   const primaryKeys = table.columns.filter((c) => c.options.primaryKey).map((c) => c.name)
 
   if (primaryKeys.length > 0) {
-    columnSql.push(`CONSTRAINT pk_${table.name} PRIMARY KEY (${primaryKeys.join(', ')})`)
+    columnSql.push(`CONSTRAINT primary_key_${table.name} PRIMARY KEY (${primaryKeys.join(', ')})`)
+  }
+
+  for (const check of table.checks) {
+    columnSql.push(`CONSTRAINT ${check.name} CHECK (${check.condition})`)
   }
 
   return [
@@ -286,6 +494,15 @@ function emitOracleCreateTable(table: TableNode, options: TableSqlOptions = {}):
     `  ${columnSql.join(',\n  ')}`,
     `);`,
     ...table.indexes.map((index) => emitOracleIndex(table.name, index, options)),
+    ...(table.comment
+      ? [`COMMENT ON TABLE ${tableName} IS ${quoteOracleString(table.comment)};`]
+      : []),
+    ...table.columns
+      .filter((column) => column.options.comment !== undefined)
+      .map(
+        (column) =>
+          `COMMENT ON COLUMN ${tableName}.${column.name} IS ${quoteOracleString(column.options.comment ?? '')};`,
+      ),
   ].join('\n')
 }
 
@@ -305,8 +522,12 @@ function emitOracleDropTable(table: TableNode | string, schema?: string): string
 function emitOracleColumn(column: ColumnNode): string {
   const parts = [column.name, emitOracleType(column.type, column.options)]
 
-  if (column.options.default === 'sys_guid') {
-    parts.push('DEFAULT SYS_GUID()')
+  if (column.options.identity) {
+    parts.push('GENERATED BY DEFAULT AS IDENTITY')
+  } else if (column.options.default === 'sys_guid') {
+    parts.push('DEFAULT LOWER(SYS_GUID())')
+  } else if (column.options.default === 'sys_timestamp') {
+    parts.push('DEFAULT SYSTIMESTAMP')
   } else if (column.options.default === 'current_timestamp') {
     parts.push('DEFAULT CURRENT_TIMESTAMP')
   } else if (column.options.default) {
@@ -338,8 +559,64 @@ function resolveIndexColumnName(column: TableIndexColumn): string {
   return typeof column === 'string' ? column : column.name
 }
 
+function collectExpressionColumns(expression: ExpressionNode): TableIndexColumn[] {
+  const columns = new Map<string, string>()
+
+  const visit = (node: ExpressionNode): void => {
+    switch (node.kind) {
+      case 'column':
+        columns.set(node.name, node.name)
+        break
+      case 'binary':
+        visit(node.left)
+        visit(node.right)
+        break
+      case 'in':
+        visit(node.operand)
+        node.values.forEach(visit)
+        break
+      case 'nullTest':
+      case 'not':
+        visit(node.kind === 'nullTest' ? node.operand : node.operand)
+        break
+      case 'logical':
+        node.expressions.forEach(visit)
+        break
+      case 'function':
+        node.args.forEach(visit)
+        break
+      case 'subquery':
+      case 'raw':
+      case 'value':
+        break
+    }
+  }
+
+  visit(expression)
+  return [...columns.values()]
+}
+
+function toSnakeCase(name: string): string {
+  return name
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .toLowerCase()
+}
+
+function generatedObjectName(
+  prefix: 'index' | 'unique' | 'check',
+  table: string,
+  columns: string[],
+): string {
+  return [prefix, table, ...columns].map(toSnakeCase).join('_')
+}
+
 function qualifyName(name: string, schema?: string): string {
   return schema ? `${schema}.${name}` : name
+}
+
+function quoteOracleString(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`
 }
 
 export function odbTable<TColumns extends TableColumnMap>(
