@@ -7,7 +7,13 @@ import { EnvironmentStore } from '../adapters/environment-store.js'
 import { ConfigStore } from '../adapters/config-store.js'
 import { PodmanClient } from '../adapters/podman-client.js'
 
-export const runImplode = async () => {
+import { runDbImplode } from './db-implode.js'
+
+export type ImplodeOptions = {
+  destroyDb?: boolean
+}
+
+export const runImplode = async (options: ImplodeOptions = {}) => {
   logger.info('Removing project setup...')
   logger.warn('This action cannot be undone!')
   const { currentEnv, envDir } = new EnvironmentStore().getCurrent()
@@ -20,6 +26,11 @@ export const runImplode = async () => {
 
   if (!confirm) {
     logger.info('Implode cancelled.')
+    return
+  }
+
+  if (options.destroyDb && !(await runDbImplode())) {
+    logger.info('Implode cancelled before local cleanup.')
     return
   }
 

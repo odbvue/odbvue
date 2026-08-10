@@ -15,5 +15,7 @@ export * from './env.js'
 export * from './query/ast.js'
 export * from './query/index.js'
 export * from './migration.js'
+export * from './migration-planner.js'
+export * from './migration-metadata.js'
 
 export * from './packages/index.js'

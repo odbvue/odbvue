@@ -1,0 +1,5 @@
+@baseUrl = https://localhost:8443/ords/odbvue
+
+### Test migration service
+# @name test
+GET {{baseUrl}}/test/test

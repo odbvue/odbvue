@@ -28,7 +28,7 @@ const schemaName = process.env.ODBVUE_ADB_SCHEMA_USERNAME ?? ''
 
 export const migration = defineMigration('${namePart.replaceAll('-', '_')}', {
   schema: schemaName,
-  version: '${nextVersionStr}',
+  tag: '${nextVersionStr}',
 })
 `
   fs.writeFileSync(filePath, template)

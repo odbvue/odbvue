@@ -20,7 +20,7 @@ At a high level, the flow is:
 1. Define Oracle objects in TypeScript with `@odbvue/odb`.
 2. Export those definitions from migration files in `apps/db/src/migrations`.
 3. Let the CLI compile migrations into `.sql` files.
-4. Execute the generated SQL against Oracle and record applied migrations in `app_migrations`.
+4. Execute the generated SQL against Oracle and record applied migrations in `odb_migrations`.
 
 In practice, the system is closer to a typed SQL and PL/SQL code generator than to a classic ORM.
 
@@ -29,7 +29,7 @@ In practice, the system is closer to a typed SQL and PL/SQL code generator than 
 The main pieces are:
 
 - `packages/odb`: fluent builders for Oracle concepts such as tables, packages, ORDS endpoints, and queries.
-- `apps/db`: migration source files that assemble those builders into deployable database changes.
+- `apps/db`: project schema configuration plus migration source files that assemble builders into deployable database changes.
 - `cli db-*` commands: compile and execute the generated SQL.
 
 Example migration shape:
@@ -69,16 +69,18 @@ That single migration can emit package DDL, ORDS registration PL/SQL, and the ma
 
 ### DDL: Schemas and Users
 
-`odbSchema()` describes an Oracle schema user and emits the SQL needed to create it.
+`odbSchema()` describes an Oracle schema user and emits the SQL needed to create it. Export it from `apps/db/src/schema.ts`; schema lifecycle is infrastructure and is not an application migration.
 
 ```ts
-import { odbSchema } from '@odbvue/odb'
+import { odbEnv, odbSchema } from '@odbvue/odb'
 
-const appSchema = odbSchema('APP_USER', 'secret', (schema) => {
-  schema.grant('EXECUTE ON DBMS_CRYPTO')
-})
-
-const sql = appSchema.toSQLUp()
+export const schema = odbSchema(
+  odbEnv.read('ODBVUE_ADB_SCHEMA_USERNAME'),
+  odbEnv.read('ODBVUE_ADB_SCHEMA_PASSWORD'),
+  (definition) => {
+    definition.grant('EXECUTE ON DBMS_CRYPTO')
+  },
+)
 ```
 
 This compiles to statements such as:
@@ -86,7 +88,7 @@ This compiles to statements such as:
 - `CREATE USER ...`
 - `GRANT CREATE SESSION ...`
 
-This is infrastructure DDL, not application DML. Everything stays in the default `ORA$BASE` edition — OdbVue does not use Oracle editions.
+Before planning migrations, the CLI creates the schema if needed and ensures the ODB-owned `odb_migrations` and `odb_migration_objects` tables exist. This is infrastructure DDL, not application migration history. Everything stays in the default `ORA$BASE` edition — OdbVue does not use Oracle editions.
 
 ### DDL: Tables and Indexes
 
@@ -176,7 +178,7 @@ export const migration = defineMigration('20260704120000_app_users', {
 
 The `down` direction is generated as the mirror image: it drops the artifacts in reverse order. Tables and other plain DDL are installed and rolled back directly. Packages use blue/green deployment (see below), so a redeploy never blocks live callers and rolls back to the previous version instantly.
 
-- `install(artifact)` — schemas, tables, packages, or pre-built APIs (anything with `toSQLUp` / `toSQLDown`).
+- `install(artifact)` — application tables, packages, or pre-built APIs (anything with `toSQLUp` / `toSQLDown`). Schema provisioning belongs in `apps/db/src/schema.ts`.
 - `upRaw(sql)` / `downRaw(sql)` — escape hatches for custom or irreversible SQL.
 
 Installed packages with service metadata publish their ORDS endpoints automatically.
@@ -341,7 +343,7 @@ How it works:
 - Each package is created under a colored physical name, e.g. `PCK_APP_BLUE` / `PCK_APP_GREEN`.
 - A stable synonym (`PCK_APP`) points at the active color. All callers reference the synonym, so they resolve to whichever color is live.
 - On each redeploy the framework compiles the **idle** color (the copy nobody is using), then repoints the synonym. Because the recompiled copy is never in use, there is no library-cache lock contention (`ORA-04021`).
-- The active color per object is tracked in the `app_migrations_objects` registry table.
+- The active color per object is tracked in the ODB-owned `odb_migration_objects` registry table.
 - `down` reverts by swapping the synonym back to the previous color, which is still present — an instant rollback with no recompile. The first install's `down` drops the package and synonym outright.
 
 Colors alternate deterministically per object across the ordered migration set, so the generated SQL is plain, reviewable DDL.
@@ -365,21 +367,29 @@ Runs the migration pipeline in the `up` direction.
 What it does:
 
 1. Loads secrets such as `ODBVUE_ADB_SCHEMA_USERNAME`.
-2. Compiles migration modules into SQL files.
-3. Reads applied migration names from `<schema>.app_migrations`.
-4. Executes only pending `_up.sql` files.
-5. Inserts each successful migration name into `app_migrations`.
+2. Creates the project schema if it does not exist.
+3. Ensures the ODB-owned migration control tables exist.
+4. Compiles migration modules into SQL files.
+5. Reads applied migration names from `<schema>.odb_migrations`.
+6. Applies one pending migration by default, or moves to `base`, `latest`, or an exact tag.
+7. Inserts each successful migration name into `odb_migrations`.
+
+```bash
+ov du
+ov du latest
+ov du 1.0.0
+```
 
 ### `ov db-down`
 
-Runs the same migration pipeline in reverse order using `_down.sql` files and removes applied migration records after successful rollback.
+Rolls back one application migration by default, or moves down to `base` or an exact tag. It never drops the schema or ODB control tables; use `ov db-implode` for destructive schema removal.
 
 ### `ov db-exec`
 
 Executes a single SQL statement or a SQL file.
 
 ```bash
-ov db-exec "SELECT * FROM app_user.app_migrations"
+ov db-exec "SELECT * FROM app_user.odb_migrations"
 ov db-exec apps/db/dist/sql/20260628161706_test_up.sql
 ```
 
@@ -405,7 +415,7 @@ So "Oracle Database in TypeScript" here does not mean Oracle is replaced by Type
 
 ## When To Use Which Concept
 
-- Use `odbSchema()` for schema-user provisioning.
+- Use `odbSchema()` in `apps/db/src/schema.ts` for schema-user provisioning.
 - Use `odbTable()` and `alterTable()` for DDL.
 - Use `odbQuery()` for DML and read queries.
 - Use `odbPackage()` for business logic that belongs in PL/SQL.

@@ -6,8 +6,9 @@ export const registerDbUpCommand = (program: Command) => {
   program
     .command('db-up')
     .alias('du')
-    .description('Load secrets and generate database migration SQL files')
-    .action(async () => {
-      await runDbUp()
+    .description('Apply one migration or migrate up to base, latest, or a tag')
+    .argument('[target]', 'base, latest, or migration tag')
+    .action(async (target?: string) => {
+      await runDbUp(target)
     })
 }

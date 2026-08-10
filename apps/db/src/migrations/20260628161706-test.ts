@@ -58,6 +58,7 @@ const appPackage = odbPackage('pck_app', (p) => {
 
 export const migration = defineMigration('20260628161706_test', {
   schema: schemaName,
+  tag: '1.0.0',
 })
   .install(odbLob)
   .install(odbAudit)

@@ -5,7 +5,8 @@ export const registerImplodeCommand = (program: Command) => {
   program
     .command('implode')
     .description('Remove project setup')
-    .action(async () => {
-      await runImplode()
+    .option('--destroy-db', 'remove the database schema before local resources')
+    .action(async (options: { destroyDb?: boolean }) => {
+      await runImplode({ destroyDb: options.destroyDb })
     })
 }

@@ -23,7 +23,7 @@ export type DbExecResponse = {
 }
 
 /** Resolve wallet/TNS/secret configuration for the current environment. */
-const buildConnectionConfig = (silent: boolean): OracleConnectionConfig => {
+export const buildConnectionConfig = (silent: boolean): OracleConnectionConfig => {
   const { envDir, projectName } = new EnvironmentStore().getCurrent()
 
   const walletPath = path.join(envDir, '.wallets', `${projectName}-adb.zip`)

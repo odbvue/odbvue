@@ -1,5 +1,7 @@
 import { spawnSync } from 'child_process'
+import { rmSync } from 'fs'
 import path from 'path'
+import { pathToFileURL } from 'url'
 
 import { SecretsStore } from '../adapters/secrets-store.js'
 
@@ -8,7 +10,24 @@ import { logger } from '../shared/logger.js'
 
 import { runDbExec } from './db-exec.js'
 
-import { generateMigrationsFromCompiledModules } from '@odbvue/odb'
+import {
+  generateMigrationsFromCompiledModules,
+  migrationMetadataSql,
+  ODB_MIGRATIONS_TABLE,
+  ODB_MIGRATION_OBJECTS_TABLE,
+  planMigrations,
+  type GeneratedMigration,
+  type MigrationDirection,
+} from '@odbvue/odb'
+import { splitSqlStatements } from '@odbvue/odb-oracledb'
+
+const normalizeSchemaName = (schema: string): string => {
+  const normalized = schema.trim().toUpperCase()
+  if (!/^[A-Z][A-Z0-9_$#]{0,127}$/.test(normalized)) {
+    throw new Error(`Invalid Oracle schema name "${schema}"`)
+  }
+  return normalized
+}
 
 const schemaExists = async (schemaUsername: string): Promise<boolean> => {
   const result = await runDbExec(
@@ -20,22 +39,79 @@ const schemaExists = async (schemaUsername: string): Promise<boolean> => {
   return rows.length > 0
 }
 
-const getAppliedMigrations = async (schemaUsername: string): Promise<Set<string>> => {
-  if (!(await schemaExists(schemaUsername))) {
-    return new Set()
-  }
-
+const tableExists = async (schemaUsername: string, tableName: string): Promise<boolean> => {
   const result = await runDbExec(
-    `SELECT migration_name FROM ${schemaUsername}.app_migrations ORDER BY migration_name`,
+    `SELECT 1 FROM all_tables WHERE owner = '${schemaUsername.toUpperCase()}' AND table_name = '${tableName.toUpperCase()}'`,
     true,
     false,
   )
   const rows = (result?.[0]?.rows as Array<Record<string, unknown>>) ?? []
-  return new Set(rows.map((r) => String(r['MIGRATION_NAME'])))
+  return rows.length > 0
+}
+
+const executeSql = async (sql: string): Promise<void> => {
+  for (const statement of splitSqlStatements(sql)) {
+    await runDbExec(statement, true, true)
+  }
+}
+
+const ensureSchema = async (schemaUsername: string): Promise<void> => {
+  if (await schemaExists(schemaUsername)) return
+
+  const schemaModulePath = path.join(dbDir, 'dist', 'schema.js')
+  const mod = (await import(pathToFileURL(schemaModulePath).href)) as {
+    schema?: { username: string; toSQLUp(): string }
+  }
+  if (!mod.schema) {
+    throw new Error('Database project must export schema from src/schema.ts')
+  }
+  if (mod.schema.username.toUpperCase() !== schemaUsername.toUpperCase()) {
+    throw new Error(
+      `Exported schema ${mod.schema.username} does not match configured schema ${schemaUsername}`,
+    )
+  }
+
+  logger.info(`Creating schema ${schemaUsername}...`)
+  await executeSql(mod.schema.toSQLUp())
+}
+
+const ensureMetadataTable = async (
+  schemaUsername: string,
+  tableName: string,
+  createSql: string,
+): Promise<void> => {
+  if (await tableExists(schemaUsername, tableName)) return
+
+  logger.info(`Creating ${tableName}...`)
+  await executeSql(createSql)
+}
+
+const ensureMigrationInfrastructure = async (schemaUsername: string): Promise<void> => {
+  await ensureSchema(schemaUsername)
+  const [migrationsSql, objectsSql] = migrationMetadataSql(schemaUsername)
+  await ensureMetadataTable(schemaUsername, ODB_MIGRATIONS_TABLE, migrationsSql)
+  await ensureMetadataTable(schemaUsername, ODB_MIGRATION_OBJECTS_TABLE, objectsSql)
+}
+
+const getAppliedMigrations = async (schemaUsername: string): Promise<string[]> => {
+  if (!(await schemaExists(schemaUsername))) {
+    return []
+  }
+
+  const result = await runDbExec(
+    `SELECT migration_name FROM ${schemaUsername}.${ODB_MIGRATIONS_TABLE} ORDER BY migration_name`,
+    true,
+    false,
+  )
+  const rows = (result?.[0]?.rows as Array<Record<string, unknown>>) ?? []
+  return rows.map((r) => String(r['MIGRATION_NAME']))
 }
 
 const buildDbMigrations = (): void => {
   logger.info('Building DB migrations...')
+
+  rmSync(path.join(dbDir, 'dist', 'migrations'), { recursive: true, force: true })
+  rmSync(path.join(dbDir, 'dist', 'sql'), { recursive: true, force: true })
 
   const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
   const result = spawnSync(pnpm, ['--dir', dbDir, 'build'], {
@@ -52,9 +128,19 @@ const buildDbMigrations = (): void => {
   }
 }
 
-export const runDbMigrate = async (direction: 'up' | 'down'): Promise<void> => {
-  logger.info(`Applying DB migrations (${direction})...`)
+export type DbMigrationState = {
+  migrations: GeneratedMigration[]
+  appliedIds: string[]
+  schemaUsername: string
+}
 
+export type LoadDbMigrationStateOptions = {
+  ensureInfrastructure?: boolean
+}
+
+export const loadDbMigrationState = async (
+  options: LoadDbMigrationStateOptions = {},
+): Promise<DbMigrationState | null> => {
   buildDbMigrations()
 
   const sourceDir = path.join(dbDir, 'dist', 'migrations')
@@ -62,52 +148,66 @@ export const runDbMigrate = async (direction: 'up' | 'down'): Promise<void> => {
 
   const secrets = new SecretsStore()
   secrets.load()
-  const schemaUsername = secrets.get('ODBVUE_ADB_SCHEMA_USERNAME')
-  if (!schemaUsername) {
+  const configuredSchema = secrets.get('ODBVUE_ADB_SCHEMA_USERNAME')
+  if (!configuredSchema) {
     logger.error('Schema username not found in secrets')
-    return
+    return null
   }
+  const schemaUsername = normalizeSchemaName(configuredSchema)
 
-  const allEntries = await generateMigrationsFromCompiledModules(sourceDir, destDir)
+  const migrations = await generateMigrationsFromCompiledModules(sourceDir, destDir)
+  if (options.ensureInfrastructure === false) {
+    if (!(await schemaExists(schemaUsername))) {
+      logger.warn(`Schema ${schemaUsername} does not exist`)
+      return null
+    }
+  } else {
+    await ensureMigrationInfrastructure(schemaUsername)
+  }
+  const appliedIds = await getAppliedMigrations(schemaUsername)
 
-  const entries = allEntries
-    .filter((e) => e.endsWith(`_${direction}.sql`))
-    .toSorted(direction === 'down' ? (a, b) => b.localeCompare(a) : undefined)
+  return { migrations, appliedIds, schemaUsername }
+}
 
-  if (entries.length === 0) {
+export const runDbMigrate = async (
+  direction: MigrationDirection,
+  target?: string,
+): Promise<void> => {
+  logger.info(`Applying DB migrations (${direction})...`)
+
+  const state = await loadDbMigrationState()
+  if (!state) return
+
+  const { migrations, appliedIds, schemaUsername } = state
+
+  if (migrations.length === 0) {
     logger.info('No migrations found')
     return
   }
 
-  const applied = await getAppliedMigrations(schemaUsername)
+  const plan = planMigrations(migrations, appliedIds, { direction, target })
+  const migrationsById = new Map(migrations.map((migration) => [migration.id, migration]))
 
   let ran = 0
-  for (const entry of entries) {
-    const migrationName = path.basename(entry).replace(`_${direction}.sql`, '')
+  for (const step of plan.steps) {
+    const migration = migrationsById.get(step.id)
+    if (!migration) throw new Error(`Migration ${step.id} is missing from the generated catalog`)
+    const migrationPath = step.direction === 'up' ? migration.upPath : migration.downPath
 
-    if (direction === 'up' && applied.has(migrationName)) {
-      logger.muted(`  Skipping ${migrationName} (already applied)`)
-      continue
-    }
-    if (direction === 'down' && !applied.has(migrationName)) {
-      logger.muted(`  Skipping ${migrationName} (not applied)`)
-      continue
-    }
+    logger.info(`  Running ${step.id}...`)
 
-    logger.info(`  Running ${migrationName}...`)
+    await runDbExec(migrationPath, false, true)
 
-    await runDbExec(entry, false, true)
-
-    if (direction === 'up') {
+    if (step.direction === 'up') {
       await runDbExec(
-        `INSERT INTO ${schemaUsername}.app_migrations (migration_name) VALUES ('${migrationName}')`,
+        `INSERT INTO ${schemaUsername}.${ODB_MIGRATIONS_TABLE} (migration_name) VALUES ('${step.id}')`,
         true,
         true,
       )
     } else {
       if (await schemaExists(schemaUsername)) {
         await runDbExec(
-          `DELETE FROM ${schemaUsername}.app_migrations WHERE migration_name = '${migrationName}'`,
+          `DELETE FROM ${schemaUsername}.${ODB_MIGRATIONS_TABLE} WHERE migration_name = '${step.id}'`,
           true,
           false,
         )
@@ -119,13 +219,13 @@ export const runDbMigrate = async (direction: 'up' | 'down'): Promise<void> => {
     }
 
     ran++
-    logger.success(`  ${migrationName} done.`)
+    logger.success(`  ${step.id} done.`)
   }
 
   if (ran === 0) {
-    logger.info('No new migrations to apply')
+    logger.info('Migration target already reached')
   } else {
-    logger.success(`${ran} migration(s) applied successfully.`)
+    logger.success(`${ran} migration(s) completed successfully.`)
   }
   logger.lf()
 }

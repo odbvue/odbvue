@@ -10,9 +10,10 @@ import type { AnyQueryBuilder } from './schema/package.js'
 import type { OdbApplication } from './schema/package.js'
 import { emitApplicationOrdsDownSql, emitApplicationOrdsSql } from './application.js'
 import { compileApplicationEndpoints } from './schema/package.js'
+import { ODB_MIGRATION_OBJECTS_TABLE } from './migration-metadata.js'
 
 /** Registry table tracking the active blue/green color per deployed object. */
-export const BLUE_GREEN_REGISTRY_TABLE = 'app_migrations_objects'
+export const BLUE_GREEN_REGISTRY_TABLE = ODB_MIGRATION_OBJECTS_TABLE
 
 export type BlueGreenColor = 'BLUE' | 'GREEN'
 
@@ -69,11 +70,13 @@ function applyQuerySchema<T extends AnyQueryBuilder>(query: T, schema: string): 
 
 export type MigrationOptions = {
   schema: string
+  tag?: string
 }
 
 export type MigrationDefinition = {
   name: string
   schema: string
+  tag?: string
   /** Public names of blue/green artifacts installed by this migration. */
   blueGreenObjects: string[]
   up: (plan?: BlueGreenPlan) => string[]
@@ -305,6 +308,7 @@ export class MigrationBuilder {
     return {
       name: migrationName,
       schema,
+      tag: this._options.tag,
       blueGreenObjects,
       up,
       down,
@@ -326,6 +330,13 @@ export type MigrationSqlOptions = {
   headerComments?: string[]
 }
 
+export type GeneratedMigration = {
+  id: string
+  tag?: string
+  upPath: string
+  downPath: string
+}
+
 export function emitMigrationSql(
   sql: string | string[],
   options: MigrationSqlOptions = {},
@@ -342,7 +353,7 @@ export function emitMigrationSql(
 export async function generateMigrationsFromCompiledModules(
   migrationsSourceDir: string,
   sqlOutputDir: string,
-): Promise<string[]> {
+): Promise<GeneratedMigration[]> {
   fs.mkdirSync(sqlOutputDir, { recursive: true })
 
   for (const entry of fs.readdirSync(sqlOutputDir)) {
@@ -351,7 +362,7 @@ export async function generateMigrationsFromCompiledModules(
     }
   }
 
-  const result: string[] = []
+  const result: GeneratedMigration[] = []
   const entries = fs
     .readdirSync(migrationsSourceDir)
     .filter((e) => e.endsWith('.js'))
@@ -362,6 +373,18 @@ export async function generateMigrationsFromCompiledModules(
     const migrationPath = path.join(migrationsSourceDir, entry)
     const mod = await import(pathToFileURL(migrationPath).href)
     compiled.push((mod.migration as MigrationBuilder).compile())
+  }
+
+  const tags = new Set<string>()
+  for (const migration of compiled) {
+    if (!migration.tag) continue
+    if (migration.tag === 'base' || migration.tag === 'latest') {
+      throw new Error(`Migration ${migration.name} uses reserved tag "${migration.tag}"`)
+    }
+    if (tags.has(migration.tag)) {
+      throw new Error(`Duplicate migration tag "${migration.tag}"`)
+    }
+    tags.add(migration.tag)
   }
 
   // Deterministic blue/green color per object, alternating on each install in
@@ -385,7 +408,12 @@ export async function generateMigrationsFromCompiledModules(
 
     const upPath = path.join(sqlOutputDir, `${mig.name}_up.sql`)
     const downPath = path.join(sqlOutputDir, `${mig.name}_down.sql`)
-    result.push(upPath, downPath)
+    result.push({
+      id: mig.name,
+      tag: mig.tag,
+      upPath,
+      downPath,
+    })
 
     fs.writeFileSync(upPath, `${emitMigrationSql(mig.up(plan))}\n`, 'utf8')
     fs.writeFileSync(downPath, `${emitMigrationSql(mig.down(plan))}\n`, 'utf8')
