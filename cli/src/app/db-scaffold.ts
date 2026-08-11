@@ -17,16 +17,30 @@ export const runDbScaffold = async (name?: string): Promise<void> => {
     .toISOString()
     .replace(/[-T:.]/g, '')
     .substring(0, 14)
-  const namePart = (name ? `${ts}-${name}` : `${ts}`)
-    .replaceAll(' ', '-')
-    .replaceAll('_', '-')
-    .toLowerCase()
+  const slug = name?.trim().toLowerCase()
+
+  if (name && (!slug || !/^[a-z0-9-]+$/.test(slug))) {
+    throw new Error('Migration name must contain only Latin letters, numbers, and hyphens')
+  }
+
+  const namePart = slug ? `${ts}-${slug}` : ts
+  const migrationId = namePart.replaceAll('-', '_')
+
+  if (!/^[a-z0-9_]+$/.test(migrationId)) {
+    throw new Error(`Generated migration ID is invalid: ${migrationId}`)
+  }
+
   const filePath = path.join(dbDir, 'src', 'migrations', `${namePart}.ts`)
+
+  if (fs.existsSync(filePath)) {
+    throw new Error(`Migration file already exists: ${filePath}`)
+  }
+
   const template = `import { defineMigration } from '@odbvue/odb'
 
 const schemaName = process.env.ODBVUE_ADB_SCHEMA_USERNAME ?? ''
 
-export const migration = defineMigration('${namePart.replaceAll('-', '_')}', {
+export const migration = defineMigration('${migrationId}', {
   schema: schemaName,
   tag: '${nextVersionStr}',
 })
