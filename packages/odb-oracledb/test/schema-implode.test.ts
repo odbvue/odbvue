@@ -13,6 +13,7 @@ class FakeExecutor implements SchemaImplodeExecutor {
   constructor(
     private readonly existence: boolean[],
     private readonly dropErrors: unknown[] = [],
+    private readonly drainErrors: unknown[] = [],
   ) {}
 
   async run<T = unknown>(sql: string, bindings?: Record<string, unknown>) {
@@ -25,6 +26,10 @@ class FakeExecutor implements SchemaImplodeExecutor {
 
     if (sql.startsWith('DROP USER') && this.dropErrors.length > 0) {
       throw this.dropErrors.shift()
+    }
+
+    if (sql.includes('FROM gv$session') && this.drainErrors.length > 0) {
+      throw this.drainErrors.shift()
     }
 
     return {}
@@ -78,7 +83,27 @@ describe('implodeSchema', () => {
 
     expect(result.dropAttempts).toBe(2)
     expect(executor.calls.filter((call) => call.sql.startsWith('DROP USER'))).toHaveLength(2)
-    expect(executor.calls.filter((call) => call.sql.includes('FROM v$session'))).toHaveLength(2)
+    expect(executor.calls.filter((call) => call.sql.includes('FROM gv$session'))).toHaveLength(2)
+  })
+
+  it('continues when session draining lacks ALTER SYSTEM privileges', async () => {
+    const executor = new FakeExecutor([true, false], [], [{ errorNum: 1031 }])
+
+    await expect(implodeSchema(executor, 'APP')).resolves.toEqual({
+      schema: 'APP',
+      userExisted: true,
+      dropAttempts: 1,
+    })
+    expect(executor.calls.filter((call) => call.sql.startsWith('DROP USER'))).toHaveLength(1)
+  })
+
+  it('reports active sessions when the database denies session termination', async () => {
+    const executor = new FakeExecutor([true], [{ errorNum: 1940 }], [{ errorNum: 1031 }])
+
+    await expect(implodeSchema(executor, 'APP')).rejects.toThrow(
+      'Stop all application and ORDS connections using APP',
+    )
+    expect(executor.calls.filter((call) => call.sql.startsWith('DROP USER'))).toHaveLength(1)
   })
 
   it('does not retry unrelated drop errors', async () => {

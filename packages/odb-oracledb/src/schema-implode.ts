@@ -57,17 +57,18 @@ END;`,
   await executor.commit()
 }
 
-const drainSessions = async (executor: SchemaImplodeExecutor, schema: string): Promise<void> => {
-  await executor.run(
-    `BEGIN
+const drainSessions = async (executor: SchemaImplodeExecutor, schema: string): Promise<boolean> => {
+  try {
+    await executor.run(
+      `BEGIN
   FOR session_row IN (
-    SELECT sid, serial#
-    FROM v$session
+    SELECT inst_id, sid, serial#
+    FROM gv$session
     WHERE username = :schema
   ) LOOP
     BEGIN
       EXECUTE IMMEDIATE
-        'ALTER SYSTEM DISCONNECT SESSION ''' || session_row.sid || ',' || session_row.serial# || ''' IMMEDIATE';
+        'ALTER SYSTEM KILL SESSION ''' || session_row.sid || ',' || session_row.serial# || ',@' || session_row.inst_id || ''' IMMEDIATE';
     EXCEPTION
       WHEN OTHERS THEN
         IF SQLCODE NOT IN (-30, -31) THEN
@@ -76,8 +77,14 @@ const drainSessions = async (executor: SchemaImplodeExecutor, schema: string): P
     END;
   END LOOP;
 END;`,
-    { schema },
-  )
+      { schema },
+    )
+    return true
+  } catch (error) {
+    // Autonomous Database ADMIN can drop users without ALTER SYSTEM privileges.
+    if (errorNumber(error) !== 1031) throw error
+    return false
+  }
 }
 
 export const implodeSchema = async (
@@ -105,7 +112,7 @@ export const implodeSchema = async (
   let dropAttempts = 0
   for (; dropAttempts < maxDropAttempts; dropAttempts++) {
     options.onPhase?.('drain')
-    await drainSessions(executor, normalizedSchema)
+    const sessionsDrained = await drainSessions(executor, normalizedSchema)
 
     options.onPhase?.('drop')
     try {
@@ -113,6 +120,12 @@ export const implodeSchema = async (
       dropAttempts++
       break
     } catch (error) {
+      if (errorNumber(error) === 1940 && !sessionsDrained) {
+        throw new Error(
+          `Cannot drop schema ${normalizedSchema}: it has active sessions, and this database does not permit session termination. Stop all application and ORDS connections using ${normalizedSchema}, wait for them to close, then retry.`,
+          { cause: error },
+        )
+      }
       if (errorNumber(error) !== 1940 || dropAttempts === maxDropAttempts - 1) throw error
     }
   }
