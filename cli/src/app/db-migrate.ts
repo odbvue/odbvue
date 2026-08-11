@@ -1,13 +1,12 @@
-import { spawnSync } from 'child_process'
-import { rmSync } from 'fs'
 import path from 'path'
 import { pathToFileURL } from 'url'
 
 import { SecretsStore } from '../adapters/secrets-store.js'
 
-import { dbDir, rootDir } from '../shared/dirs.js'
+import { dbDir } from '../shared/dirs.js'
 import { logger } from '../shared/logger.js'
 
+import { buildDbProject } from './db-build.js'
 import { runDbExec } from './db-exec.js'
 
 import {
@@ -107,27 +106,6 @@ const getAppliedMigrations = async (schemaUsername: string): Promise<string[]> =
   return rows.map((r) => String(r['MIGRATION_NAME']))
 }
 
-const buildDbMigrations = (): void => {
-  logger.info('Building DB migrations...')
-
-  rmSync(path.join(dbDir, 'dist', 'migrations'), { recursive: true, force: true })
-  rmSync(path.join(dbDir, 'dist', 'sql'), { recursive: true, force: true })
-
-  const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
-  const result = spawnSync(pnpm, ['--dir', dbDir, 'build'], {
-    cwd: rootDir,
-    stdio: 'inherit',
-    shell: process.platform === 'win32',
-  })
-
-  if (result.error) {
-    throw new Error(`Failed to start DB migration build: ${result.error.message}`)
-  }
-  if (result.status !== 0) {
-    throw new Error(`DB migration build failed with exit code ${result.status ?? 'unknown'}`)
-  }
-}
-
 export type DbMigrationState = {
   migrations: GeneratedMigration[]
   appliedIds: string[]
@@ -141,7 +119,7 @@ export type LoadDbMigrationStateOptions = {
 export const loadDbMigrationState = async (
   options: LoadDbMigrationStateOptions = {},
 ): Promise<DbMigrationState | null> => {
-  buildDbMigrations()
+  buildDbProject()
 
   const sourceDir = path.join(dbDir, 'dist', 'migrations')
   const destDir = path.join(dbDir, 'dist', 'sql')

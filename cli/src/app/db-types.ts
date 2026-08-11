@@ -13,28 +13,25 @@ import { SecretsStore } from '../adapters/secrets-store.js'
 import { dbDir, webDir } from '../shared/dirs.js'
 import { logger } from '../shared/logger.js'
 
+import { buildDbProject } from './db-build.js'
+
 const DEFAULT_OUTPUT_DIRECTORY = path.join(webDir, 'src', 'services', 'generated')
 const LEGACY_OUTPUT = path.join(webDir, 'src', 'services', 'ords.generated.ts')
 
 /**
- * Generate typed ORDS service contracts from the compiled migration modules.
- * Definition-first: reads `.migration.applications()` from each compiled
- * migration in `apps/db/dist/migrations` — no database connection required.
+ * Generate typed ORDS service contracts from migration application definitions.
+ * Definition-first: no database connection required.
  */
 export const runDbTypes = async (
   outputDirectory: string = DEFAULT_OUTPUT_DIRECTORY,
 ): Promise<void> => {
   logger.info('Generating ORDS service types...')
+  buildDbProject()
 
   // Migration modules read schema credentials from the environment at import time.
   new SecretsStore().load()
 
   const migrationsDir = path.join(dbDir, 'dist', 'migrations')
-  if (!fs.existsSync(migrationsDir)) {
-    logger.error(`Compiled migrations not found at ${migrationsDir}. Build apps/db first.`)
-    return
-  }
-
   const entries = fs
     .readdirSync(migrationsDir)
     .filter((e) => e.endsWith('.js'))
