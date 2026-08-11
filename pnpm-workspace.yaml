@@ -5,3 +5,6 @@ packages:
   - "packages/odb-oracledb"
   - "cli"
   - "wiki"
+allowBuilds:
+  esbuild: true
+  oracledb: true
