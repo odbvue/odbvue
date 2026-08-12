@@ -11,7 +11,7 @@ import {
   type OdbApplication,
 } from './schema/package.js'
 import { generatePackageContract, type ContractOptions } from './schema/contract.js'
-import { emitTypeScriptType, odbTypeFromOrds, oracleParameterName } from './model.js'
+import { emitTypeScriptType, odbTypeFromOrds, oracleParameterName, toPascalCase } from './model.js'
 
 export type ApplicationArtifacts = {
   plsql: string
@@ -99,68 +99,98 @@ export function generateApplicationOpenApi(
   options: OpenApiOptions = {},
 ): Record<string, unknown> {
   const node = applicationNode(application)
+  return generateApplicationsOpenApi([node], {
+    title: options.title ?? node.name,
+    version: options.version,
+  })
+}
+
+/** Emit one OpenAPI 3.1 document for every service in the supplied applications. */
+export function generateApplicationsOpenApi(
+  applications: ApplicationLike[],
+  options: OpenApiOptions = {},
+): Record<string, unknown> {
   const paths: Record<string, Record<string, unknown>> = {}
+  const schemas: Record<string, Record<string, unknown>> = {}
 
-  for (const endpoint of compileApplicationEndpoints(node).map((value) => value.toNode())) {
-    const path = `/${[endpoint.basePath, endpoint.pattern]
-      .map((part) => part.replace(/^\/+|\/+$/g, ''))
-      .filter(Boolean)
-      .join('/')}`.replace(/:([A-Za-z0-9_-]+)/g, '{$1}')
-    const parameters = endpoint.params
-      .filter((param) => param.direction === 'IN' || param.direction === 'IN OUT')
-      .map((param) => ({
-        name: param.name,
-        in: param.sourceType === 'URI' ? 'path' : 'header',
-        required: param.sourceType === 'URI',
-        schema: openApiSchema(param.paramType),
-      }))
-    const outputs = Object.fromEntries(
-      endpoint.params
-        .filter((param) => param.direction === 'OUT' || param.direction === 'IN OUT')
-        .map((param) => [
-          oracleParameterName(param.plsqlArg),
-          param.resultColumns?.length
-            ? {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: Object.fromEntries(
-                    param.resultColumns.map((column) => [
-                      oracleParameterName(column.name, { stripPrefix: false }),
-                      {
-                        ...jsonSchema(emitTypeScriptType(column.type, 'json')),
-                        nullable: column.nullable || undefined,
-                      },
-                    ]),
-                  ),
-                },
-              }
-            : openApiSchema(param.paramType),
-        ]),
-    )
+  for (const application of applications) {
+    for (const endpoint of compileApplicationEndpoints(application).map((value) =>
+      value.toNode(),
+    )) {
+      const path = `/${[endpoint.basePath, endpoint.pattern]
+        .map((part) => part.replace(/^\/+|\/+$/g, ''))
+        .filter(Boolean)
+        .join('/')}`.replace(/:([A-Za-z0-9_-]+)/g, '{$1}')
+      const parameters = endpoint.params
+        .filter((param) => param.direction === 'IN' || param.direction === 'IN OUT')
+        .map((param) => ({
+          name: param.name,
+          in: param.sourceType === 'URI' ? 'path' : 'header',
+          required: param.sourceType === 'URI',
+          schema: openApiSchema(param.paramType),
+        }))
+      const operationName = toPascalCase(`${endpoint.module}_${endpoint.procedureName}`)
+      const outputs: Record<string, Record<string, unknown>> = {}
+      const requiredOutputs: string[] = []
 
-    paths[path] ??= {}
-    paths[path][endpoint.method.toLowerCase()] = {
-      operationId: `${endpoint.module}_${endpoint.procedureName}`,
-      summary: endpoint.comment,
-      parameters,
-      responses: {
-        '200': {
-          description: 'Successful response',
-          content: {
-            'application/json': {
-              schema: { type: 'object', properties: outputs },
+      for (const param of endpoint.params.filter(
+        (value) => value.direction === 'OUT' || value.direction === 'IN OUT',
+      )) {
+        const outputName = oracleParameterName(param.plsqlArg)
+        requiredOutputs.push(outputName)
+        if (param.resultColumns?.length) {
+          const itemName = `${operationName}${toPascalCase(param.name)}Item`
+          schemas[itemName] = objectSchema(
+            Object.fromEntries(
+              param.resultColumns.map((column) => [
+                oracleParameterName(column.name, { stripPrefix: false }),
+                nullableSchema(
+                  jsonSchema(emitTypeScriptType(column.type, 'json')),
+                  column.nullable,
+                ),
+              ]),
+            ),
+            param.resultColumns
+              .filter((column) => !column.nullable)
+              .map((column) => oracleParameterName(column.name, { stripPrefix: false })),
+          )
+          outputs[outputName] = {
+            type: 'array',
+            items: { $ref: `#/components/schemas/${itemName}` },
+            'x-odb-oracle': { plsqlType: 'SYS_REFCURSOR', ordsType: param.paramType },
+          }
+        } else {
+          outputs[outputName] = openApiSchema(param.paramType)
+        }
+      }
+
+      const responseName = `${operationName}Response`
+      schemas[responseName] = objectSchema(outputs, requiredOutputs)
+
+      paths[path] ??= {}
+      paths[path][endpoint.method.toLowerCase()] = {
+        operationId: `${endpoint.module}_${endpoint.procedureName}`,
+        summary: endpoint.comment,
+        parameters,
+        responses: {
+          '200': {
+            description: 'Successful response',
+            content: {
+              'application/json': {
+                schema: { $ref: `#/components/schemas/${responseName}` },
+              },
             },
           },
         },
-      },
+      }
     }
   }
 
   return {
     openapi: '3.1.0',
-    info: { title: options.title ?? node.name, version: options.version ?? '1.0.0' },
+    info: { title: options.title ?? 'ODB API', version: options.version ?? '1.0.0' },
     paths,
+    components: { schemas },
   }
 }
 
@@ -174,6 +204,27 @@ function jsonSchema(type: string): Record<string, unknown> {
   if (type.endsWith('[]')) return { type: 'array', items: {} }
   if (type === 'unknown') return {}
   return { type: 'string' }
+}
+
+function nullableSchema(
+  schema: Record<string, unknown>,
+  nullable: boolean,
+): Record<string, unknown> {
+  if (!nullable) return schema
+  const type = schema.type
+  return typeof type === 'string' ? { ...schema, type: [type, 'null'] } : schema
+}
+
+function objectSchema(
+  properties: Record<string, Record<string, unknown>>,
+  required: string[],
+): Record<string, unknown> {
+  return {
+    type: 'object',
+    properties,
+    ...(required.length > 0 ? { required } : {}),
+    additionalProperties: false,
+  }
 }
 
 export type { ApplicationLike, OdbApplication }

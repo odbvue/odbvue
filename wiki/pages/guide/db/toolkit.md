@@ -94,7 +94,7 @@ await withConnection(config, async (_conn, db) => {
 })
 ```
 
-## Typed ORDS client
+## OpenAPI contract
 
 Use `p.proc()`, `proc.body()`, and `proc.service()` to define a service. A typed table query passed to `body.openFor()` carries its selected row shape into the generated response.
 
@@ -106,11 +106,8 @@ proc.body((body) =>
 proc.service({ method: 'GET', path: '/users' })
 ```
 
-Run `ov dt` to generate one client per ORDS module under `apps/web/src/services/generated`, plus a namespace index. No database connection is needed.
+The CLI writes `apps/db/dist/openapi.json` after every successful database migration operation. The document describes the API currently deployed to ORDS: `ov du` includes newly applied migrations, `ov dd` removes rolled-back migrations, and `ov di` writes an empty document after the schema is removed.
 
-```ts
-import { app } from '@/services/generated'
+`SYS_REFCURSOR` outputs opened through a typed ODB query become reusable OpenAPI row schemas. The response preserves column types and nullability, so OpenAPI client generators can produce typed result arrays.
 
-const operation = app.ordsOperations.appMigrations
-const { data } = await http.get<app.AppMigrationsResponse>(operation.path)
-```
+The web app consumes this manifest through `openapi-typescript`; see [Consuming Web Services](/guide/web/consuming-web-services#generated-ords-types).

@@ -8,6 +8,7 @@ import { logger } from '../shared/logger.js'
 
 import { buildDbProject } from './db-build.js'
 import { runDbExec } from './db-exec.js'
+import { writeDeployedOpenApi } from './db-openapi.js'
 
 import {
   generateMigrationsFromCompiledModules,
@@ -158,11 +159,6 @@ export const runDbMigrate = async (
 
   const { migrations, appliedIds, schemaUsername } = state
 
-  if (migrations.length === 0) {
-    logger.info('No migrations found')
-    return
-  }
-
   const plan = planMigrations(migrations, appliedIds, { direction, target })
   const migrationsById = new Map(migrations.map((migration) => [migration.id, migration]))
 
@@ -205,5 +201,15 @@ export const runDbMigrate = async (
   } else {
     logger.success(`${ran} migration(s) completed successfully.`)
   }
+  const deployedIds = new Set(appliedIds)
+  for (const step of plan.steps) {
+    if (step.direction === 'up') deployedIds.add(step.id)
+    else deployedIds.delete(step.id)
+  }
+  await writeDeployedOpenApi(
+    migrations
+      .filter((migration) => deployedIds.has(migration.id))
+      .map((migration) => migration.id),
+  )
   logger.lf()
 }

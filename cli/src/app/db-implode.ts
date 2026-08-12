@@ -6,6 +6,7 @@ import { SecretsStore } from '../adapters/secrets-store.js'
 import { logger } from '../shared/logger.js'
 
 import { buildConnectionConfig } from './db-exec.js'
+import { writeEmptyDeployedOpenApi } from './db-openapi.js'
 
 export type DbImplodeOptions = {
   schema?: string
@@ -54,6 +55,7 @@ export const runDbImplode = async (options: DbImplodeOptions = {}): Promise<bool
   } else {
     logger.success(`ORDS metadata removed; schema ${schema} was already absent.`)
   }
+  await writeEmptyDeployedOpenApi()
   logger.lf()
   return true
 }

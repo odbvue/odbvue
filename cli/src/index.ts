@@ -22,7 +22,6 @@ import { registerDbDownCommand } from './commands/db-down.js'
 import { registerDbPlanCommand } from './commands/db-plan.js'
 import { registerDbMigrationsCommand } from './commands/db-migrations.js'
 import { registerDbImplodeCommand } from './commands/db-implode.js'
-import { registerDbTypesCommand } from './commands/db-types.js'
 
 const program = new Command()
 const environmentStore = new EnvironmentStore()
@@ -51,7 +50,6 @@ registerDbDownCommand(program)
 registerDbPlanCommand(program)
 registerDbMigrationsCommand(program)
 registerDbImplodeCommand(program)
-registerDbTypesCommand(program)
 
 program.parse(process.argv)
 

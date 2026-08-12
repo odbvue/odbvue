@@ -50,6 +50,7 @@
     "gray-matter": "^4.0.3",
     "jsdom": "^29.1.1",
     "npm-run-all2": "^9.0.2",
+    "openapi-typescript": "^7.11.0",
     "typescript": "~6.0.0",
     "unplugin-auto-import": "^21.0.0",
     "unplugin-vue-components": "^32.1.0",

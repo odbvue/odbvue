@@ -9,6 +9,7 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 import { AutoImportMdiIcons } from './vite-plugin-autoimport-mdi-icons.ts'
 import { i18nDevPlugin } from './vite-plugin-i18n.ts'
+import { openapiPlugin } from './vite-plugin-openapi.ts'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { unheadVueComposablesImports } from '@unhead/vue'
@@ -59,6 +60,10 @@ export default defineConfig({
       locales: ['en', 'fr'],
       dumpInterval: 300_000,
       i18nDir: 'i18n',
+    }),
+    openapiPlugin({
+      source: '../db/dist/openapi.json',
+      dest: 'src/services/openapi.generated.ts',
     }),
     AutoImport({
       imports: [

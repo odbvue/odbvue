@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   generateApplication,
   generateApplicationClient,
+  generateApplicationsOpenApi,
   generateApplicationOpenApi,
 } from '../src/application.js'
 import { odbQuery } from '../src/query/index.js'
@@ -73,6 +74,30 @@ describe('ODB application contract', () => {
     expect(document.openapi).toBe('3.1.0')
     expect(document.info).toEqual({ title: 'Users API', version: '2.0.0' })
     expect(document.paths['/users/users/{id}']).toHaveProperty('get')
+  })
+
+  it('places typed cursor rows in reusable OpenAPI schemas', () => {
+    const document = generateApplicationsOpenApi([application]) as {
+      components: { schemas: Record<string, Record<string, any>> }
+    }
+
+    expect(document.components.schemas.UsersGetUserResultItem).toMatchObject({
+      type: 'object',
+      required: ['id'],
+      properties: {
+        id: { type: 'number' },
+        email: { type: ['string', 'null'] },
+      },
+    })
+    expect(document.components.schemas.UsersGetUserResponse).toMatchObject({
+      required: ['result'],
+      properties: {
+        result: {
+          type: 'array',
+          items: { $ref: '#/components/schemas/UsersGetUserResultItem' },
+        },
+      },
+    })
   })
 
   it('offers focused client generation without endpoint extraction', () => {

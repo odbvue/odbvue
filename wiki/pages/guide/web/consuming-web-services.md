@@ -52,6 +52,21 @@ The current flow is:
 
 If there is no dedicated backend yet, step 1 and step 2 can stay in place while pages consume external public APIs directly.
 
+## Generated ORDS types
+
+ODB writes the deployed ORDS contract to `apps/db/dist/openapi.json` after each successful `ov du`, `ov dd`, or `ov di` operation. The manifest therefore represents the API currently deployed to the database, rather than every migration present in the working tree.
+
+During `pnpm dev`, the local `openapiPlugin` watches that manifest and regenerates `apps/web/src/services/openapi.generated.ts` with `openapi-typescript` whenever it changes. Import the generated OpenAPI types from that file when typing HTTP calls.
+
+```ts
+import type { components, paths } from '@/services/openapi.generated'
+
+type User = components['schemas']['UsersGetUserResultItem']
+type GetUser = paths['/users/users/{id}']['get']
+```
+
+The generated file is an artifact. Do not edit it by hand. For CI and production builds, generate it before type checking so the checked-in artifact matches `apps/db/dist/openapi.json`.
+
 ## Install `ofetch`
 
 Install [ofetch](https://github.com/unjs/ofetch) in the web app.
