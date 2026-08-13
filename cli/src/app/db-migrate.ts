@@ -58,12 +58,14 @@ const executeSql = async (sql: string): Promise<void> => {
 const ensureSchema = async (schemaUsername: string): Promise<void> => {
   if (await schemaExists(schemaUsername)) return
 
-  const schemaModulePath = path.join(dbDir, 'dist', 'schema.js')
+  const schemaModulePath = path.join(dbDir, 'dist', 'migrations', '00000000000000-bootstrap.js')
   const mod = (await import(pathToFileURL(schemaModulePath).href)) as {
     schema?: { username: string; toSQLUp(): string }
   }
   if (!mod.schema) {
-    throw new Error('Database project must export schema from src/schema.ts')
+    throw new Error(
+      'Database project must export schema from src/migrations/00000000000000-bootstrap.ts',
+    )
   }
   if (mod.schema.username.toUpperCase() !== schemaUsername.toUpperCase()) {
     throw new Error(

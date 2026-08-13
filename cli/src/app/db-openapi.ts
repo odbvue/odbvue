@@ -13,6 +13,12 @@ import { logger } from '../shared/logger.js'
 
 const OUTPUT_PATH = path.join(dbDir, 'dist', 'openapi.json')
 
+const writeOpenApi = (applications: OdbApplication[]): void => {
+  const manifest = generateApplicationsOpenApi(applications, { title: 'OdbVue API' })
+  fs.writeFileSync(OUTPUT_PATH, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+  logger.info(`Wrote deployed OpenAPI manifest to ${OUTPUT_PATH}`)
+}
+
 export const writeDeployedOpenApi = async (appliedIds: readonly string[]): Promise<void> => {
   const applied = new Set(appliedIds)
   const migrationsDir = path.join(dbDir, 'dist', 'migrations')
@@ -30,11 +36,9 @@ export const writeDeployedOpenApi = async (appliedIds: readonly string[]): Promi
     }
   }
 
-  const manifest = generateApplicationsOpenApi(applications, { title: 'OdbVue API' })
-  fs.writeFileSync(OUTPUT_PATH, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
-  logger.info(`Wrote deployed OpenAPI manifest to ${OUTPUT_PATH}`)
+  writeOpenApi(applications)
 }
 
 export const writeEmptyDeployedOpenApi = async (): Promise<void> => {
-  await writeDeployedOpenApi([])
+  writeOpenApi([])
 }

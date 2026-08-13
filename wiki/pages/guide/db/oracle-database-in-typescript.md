@@ -69,7 +69,7 @@ That single migration can emit package DDL, ORDS registration PL/SQL, and the ma
 
 ### DDL: Schemas and Users
 
-`odbSchema()` describes an Oracle schema user and emits the SQL needed to create it. Export it from `apps/db/src/schema.ts`; schema lifecycle is infrastructure and is not an application migration.
+`odbSchema()` describes an Oracle schema user and emits the SQL needed to create it. Export it from the canonical first migration, `apps/db/src/migrations/00000000000000-bootstrap.ts`; schema lifecycle runs before the migration plan is applied.
 
 ```ts
 import { odbEnv, odbSchema } from '@odbvue/odb'
@@ -178,7 +178,7 @@ export const migration = defineMigration('20260704120000_app_users', {
 
 The `down` direction is generated as the mirror image: it drops the artifacts in reverse order. Tables and other plain DDL are installed and rolled back directly. Packages use blue/green deployment (see below), so a redeploy never blocks live callers and rolls back to the previous version instantly.
 
-- `install(artifact)` — application tables, packages, or pre-built APIs (anything with `toSQLUp` / `toSQLDown`). Schema provisioning belongs in `apps/db/src/schema.ts`.
+- `install(artifact)` — application tables, packages, or pre-built APIs (anything with `toSQLUp` / `toSQLDown`). Schema provisioning is exported by `apps/db/src/migrations/00000000000000-bootstrap.ts`.
 - `upRaw(sql)` / `downRaw(sql)` — escape hatches for custom or irreversible SQL.
 
 Installed packages with service metadata publish their ORDS endpoints automatically.
@@ -415,7 +415,7 @@ So "Oracle Database in TypeScript" here does not mean Oracle is replaced by Type
 
 ## When To Use Which Concept
 
-- Use `odbSchema()` in `apps/db/src/schema.ts` for schema-user provisioning.
+- Use `odbSchema()` in `apps/db/src/migrations/00000000000000-bootstrap.ts` for schema-user provisioning.
 - Use `odbTable()` and `alterTable()` for DDL.
 - Use `odbQuery()` for DML and read queries.
 - Use `odbPackage()` for business logic that belongs in PL/SQL.
