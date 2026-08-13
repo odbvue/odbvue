@@ -224,7 +224,11 @@ export class OrdsEndpoint {
 
   private get handlerSource(): string {
     const args = this._params
-      .map((p) => `${p.plsqlArg.toLowerCase()} => :${p.bindVariable}`)
+      .map((p) =>
+        p.plsqlArg.toUpperCase() === 'P_BODY'
+          ? `${p.plsqlArg.toLowerCase()} => :body`
+          : `${p.plsqlArg.toLowerCase()} => :${p.bindVariable}`,
+      )
       .join(', ')
     return `BEGIN ${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args}); END;`
   }

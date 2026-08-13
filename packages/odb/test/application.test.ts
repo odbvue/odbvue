@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  emitApplicationOrdsSql,
   generateApplication,
   generateApplicationClient,
   generateApplicationsOpenApi,
@@ -31,6 +32,11 @@ const application = odbPackage('PCK_USERS', (p) => {
 
   p.func('COUNT_USERS', 'NUMBER', (fn) => {
     fn.body((body) => body.return(0))
+  })
+
+  p.proc('POST_USER', (proc) => {
+    proc.in('P_BODY', 'CLOB')
+    proc.service({ method: 'POST', path: '/users' })
   })
 })
 
@@ -81,6 +87,14 @@ describe('ODB application contract', () => {
     expect(document.openapi).toBe('3.1.0')
     expect(document.info).toEqual({ title: 'Users API', version: '2.0.0' })
     expect(document.paths['/users/users/{id}']).toHaveProperty('get')
+    expect(document.paths['/users/users']?.post).toMatchObject({
+      parameters: [],
+      requestBody: { content: { 'application/json': { schema: {} } } },
+    })
+  })
+
+  it('binds P_BODY to ORDS request content', () => {
+    expect(emitApplicationOrdsSql(application)).toContain('p_body => :body')
   })
 
   it('places typed cursor rows in reusable OpenAPI schemas', () => {

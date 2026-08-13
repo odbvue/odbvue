@@ -128,13 +128,22 @@ export function generateApplicationsOpenApi(
         .filter(Boolean)
         .join('/')}`.replace(/:([A-Za-z0-9_-]+)/g, '{$1}')
       const parameters = endpoint.params
-        .filter((param) => param.direction === 'IN' || param.direction === 'IN OUT')
+        .filter(
+          (param) =>
+            (param.direction === 'IN' || param.direction === 'IN OUT') &&
+            param.plsqlArg.toUpperCase() !== 'P_BODY',
+        )
         .map((param) => ({
           name: param.name,
           in: param.sourceType === 'URI' ? 'path' : 'header',
           required: param.sourceType === 'URI',
           schema: openApiSchema(param.paramType, param.odbType),
         }))
+      const bodyParam = endpoint.params.find(
+        (param) =>
+          (param.direction === 'IN' || param.direction === 'IN OUT') &&
+          param.plsqlArg.toUpperCase() === 'P_BODY',
+      )
       const operationName = toPascalCase(`${endpoint.module}_${endpoint.procedureName}`)
       const outputs: Record<string, Record<string, unknown>> = {}
       const requiredOutputs: string[] = []
@@ -175,6 +184,13 @@ export function generateApplicationsOpenApi(
         operationId: `${endpoint.module}_${endpoint.procedureName}`,
         summary: endpoint.comment,
         parameters,
+        ...(bodyParam
+          ? {
+              requestBody: {
+                content: { 'application/json': { schema: {} } },
+              },
+            }
+          : {}),
         responses: {
           '200': {
             description: 'Successful response',
