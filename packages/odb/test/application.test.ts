@@ -11,6 +11,8 @@ import { odbTable } from '../src/schema/table.js'
 
 const users = odbTable('APP_USERS', (table) => ({
   id: table.number('ID').primaryKey(),
+  uuid: table.guid('UUID').notNull(),
+  createdAt: table.timestamp('CREATED_AT').notNull(),
   email: table.string('EMAIL'),
 }))
 
@@ -19,7 +21,10 @@ const application = odbPackage('PCK_USERS', (p) => {
     proc.in('P_ID', 'NUMBER')
     const result = proc.out('R_RESULT', 'SYS_REFCURSOR')
     proc.body((body) =>
-      body.openFor(result, odbQuery().selectFrom(users).select([users.id, users.email])),
+      body.openFor(
+        result,
+        odbQuery().selectFrom(users).select([users.id, users.uuid, users.createdAt, users.email]),
+      ),
     )
     proc.service({ method: 'GET', path: '/users/:id', summary: 'Fetch a user' })
   })
@@ -41,10 +46,12 @@ describe('ODB application contract', () => {
     })
     expect(procedure.body?.statements[0]).toEqual({
       kind: 'raw',
-      sql: 'OPEN R_RESULT FOR SELECT ID, EMAIL FROM APP_USERS',
+      sql: 'OPEN R_RESULT FOR SELECT ID, UUID, CREATED_AT, EMAIL FROM APP_USERS',
     })
     expect(procedure.body?.resultSets?.R_RESULT).toEqual([
       { name: 'ID', type: 'number', nullable: false },
+      { name: 'UUID', type: 'guid', nullable: false },
+      { name: 'CREATED_AT', type: 'timestamp', nullable: false },
       { name: 'EMAIL', type: 'string', nullable: true },
     ])
   })
@@ -83,9 +90,11 @@ describe('ODB application contract', () => {
 
     expect(document.components.schemas.UsersGetUserResultItem).toMatchObject({
       type: 'object',
-      required: ['id'],
+      required: ['id', 'uuid', 'createdAt'],
       properties: {
         id: { type: 'number' },
+        uuid: { type: 'string', pattern: '^[0-9a-fA-F]{32}$' },
+        createdAt: { type: 'string', format: 'date-time' },
         email: { type: ['string', 'null'] },
       },
     })

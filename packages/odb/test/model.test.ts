@@ -5,6 +5,7 @@ import {
   emitOrdsType,
   emitTypeScriptType,
   normalizeOracleIdentifier,
+  odbTypeToJsonSchema,
   odbTypeFromOracle,
   odbTypeFromOrds,
   odbTypeFromPlsql,
@@ -35,6 +36,15 @@ describe('canonical ODB model', () => {
     expect(ordsTypeFromPlsql('PLS_INTEGER')).toBe('INT')
     expect(ordsTypeFromPlsql('NUMBER')).toBe('STRING')
     expectTypeOf<OdbValueForType<'number'>>().toEqualTypeOf<number>()
+  })
+
+  it('emits JSON Schema directly from canonical types', () => {
+    expect(odbTypeToJsonSchema('guid')).toEqual({
+      type: 'string',
+      pattern: '^[0-9a-fA-F]{32}$',
+    })
+    expect(odbTypeToJsonSchema('timestamp')).toEqual({ type: 'string', format: 'date-time' })
+    expect(odbTypeToJsonSchema('resultset')).toEqual({ type: 'array', items: {} })
   })
 
   it('normalizes code and Oracle parameter names consistently', () => {

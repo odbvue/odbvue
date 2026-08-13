@@ -100,6 +100,26 @@ export function emitTypeScriptType(type: OdbType, target: TypeScriptTarget = 'mo
   return odbTypes[type].typescript[target]
 }
 
+export function odbTypeToJsonSchema(type: OdbType): Record<string, unknown> {
+  switch (type) {
+    case 'number':
+      return { type: 'number' }
+    case 'boolean':
+      return { type: 'boolean' }
+    case 'guid':
+      return { type: 'string', pattern: '^[0-9a-fA-F]{32}$' }
+    case 'date':
+    case 'timestamp':
+      return { type: 'string', format: 'date-time' }
+    case 'resultset':
+      return { type: 'array', items: {} }
+    case 'unknown':
+      return {}
+    default:
+      return { type: 'string' }
+  }
+}
+
 export function emitOracleType(type: OdbColumnType, options: { length?: number } = {}): string {
   return odbTypes[type].oracle(options)
 }

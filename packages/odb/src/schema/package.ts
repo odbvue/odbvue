@@ -23,7 +23,7 @@ import {
   type OrdsParamType,
   type OrdsResultColumnNode,
 } from '../ords.js'
-import { ordsTypeFromPlsql } from '../model.js'
+import { odbTypeFromPlsql, ordsTypeFromPlsql } from '../model.js'
 import { Column, type ColumnNode } from './column.js'
 import { odbQuery } from '../query/index.js'
 import type { Insertable, Table } from './table.js'
@@ -582,7 +582,8 @@ function buildOrdsEndpoint(
     Object.entries(service.paramTypes ?? {}).map(([name, type]) => [name.toUpperCase(), type]),
   )
   for (const param of procedure.params) {
-    const ordsType = typeOverrides.get(param.name.toUpperCase()) ?? plsqlToOrdsType(param.type)
+    const overriddenType = typeOverrides.get(param.name.toUpperCase())
+    const ordsType = overriddenType ?? plsqlToOrdsType(param.type)
     endpoint.param(
       param.name,
       param.direction,
@@ -591,6 +592,7 @@ function buildOrdsEndpoint(
       ordsType === 'RESULTSET'
         ? procedure.body?.resultSets?.[param.name.toUpperCase()]?.map((column) => ({ ...column }))
         : undefined,
+      overriddenType === undefined ? odbTypeFromPlsql(param.type) : undefined,
     )
   }
 

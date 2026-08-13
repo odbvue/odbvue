@@ -11,7 +11,13 @@ import {
   type OdbApplication,
 } from './schema/package.js'
 import { generatePackageContract, type ContractOptions } from './schema/contract.js'
-import { emitTypeScriptType, odbTypeFromOrds, oracleParameterName, toPascalCase } from './model.js'
+import {
+  odbTypeFromOrds,
+  odbTypeToJsonSchema,
+  oracleParameterName,
+  toPascalCase,
+  type OdbType,
+} from './model.js'
 
 export type ApplicationArtifacts = {
   plsql: string
@@ -127,7 +133,7 @@ export function generateApplicationsOpenApi(
           name: param.name,
           in: param.sourceType === 'URI' ? 'path' : 'header',
           required: param.sourceType === 'URI',
-          schema: openApiSchema(param.paramType),
+          schema: openApiSchema(param.paramType, param.odbType),
         }))
       const operationName = toPascalCase(`${endpoint.module}_${endpoint.procedureName}`)
       const outputs: Record<string, Record<string, unknown>> = {}
@@ -144,10 +150,7 @@ export function generateApplicationsOpenApi(
             Object.fromEntries(
               param.resultColumns.map((column) => [
                 oracleParameterName(column.name, { stripPrefix: false }),
-                nullableSchema(
-                  jsonSchema(emitTypeScriptType(column.type, 'json')),
-                  column.nullable,
-                ),
+                nullableSchema(odbTypeToJsonSchema(column.type), column.nullable),
               ]),
             ),
             param.resultColumns
@@ -160,7 +163,7 @@ export function generateApplicationsOpenApi(
             'x-odb-oracle': { plsqlType: 'SYS_REFCURSOR', ordsType: param.paramType },
           }
         } else {
-          outputs[outputName] = openApiSchema(param.paramType)
+          outputs[outputName] = openApiSchema(param.paramType, param.odbType)
         }
       }
 
@@ -194,16 +197,11 @@ export function generateApplicationsOpenApi(
   }
 }
 
-function openApiSchema(type: Parameters<typeof odbTypeFromOrds>[0]): Record<string, unknown> {
-  return jsonSchema(emitTypeScriptType(odbTypeFromOrds(type), 'json'))
-}
-
-function jsonSchema(type: string): Record<string, unknown> {
-  if (type === 'number') return { type: 'number' }
-  if (type === 'boolean') return { type: 'boolean' }
-  if (type.endsWith('[]')) return { type: 'array', items: {} }
-  if (type === 'unknown') return {}
-  return { type: 'string' }
+function openApiSchema(
+  type: Parameters<typeof odbTypeFromOrds>[0],
+  odbType?: OdbType,
+): Record<string, unknown> {
+  return odbTypeToJsonSchema(odbType ?? odbTypeFromOrds(type))
 }
 
 function nullableSchema(

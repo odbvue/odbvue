@@ -1,6 +1,6 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-import { oracleParameterName, toKebabCase, type OdbOrdsType } from './model.js'
+import { oracleParameterName, toKebabCase, type OdbOrdsType, type OdbType } from './model.js'
 import type { ColumnType } from './schema/column.js'
 
 export type OrdsHttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
@@ -28,6 +28,7 @@ export type OrdsParamNode = {
   bindVariable: string
   direction: OrdsParamDirection
   paramType: OrdsParamType
+  odbType?: OdbType
   sourceType: 'HEADER' | 'RESPONSE' | 'URI'
   comment?: string
   resultColumns?: OrdsResultColumnNode[]
@@ -75,6 +76,7 @@ export class OrdsParam {
     readonly paramType: OrdsParamType,
     readonly comment?: string,
     readonly resultColumns?: OrdsResultColumnNode[],
+    readonly odbType?: OdbType,
   ) {}
 
   /**
@@ -102,6 +104,7 @@ export class OrdsParam {
       bindVariable: this.bindVariable,
       direction: this.direction,
       paramType: this.paramType,
+      odbType: this.odbType,
       sourceType,
       comment: this.comment,
       resultColumns: this.resultColumns?.map((column) => ({ ...column })),
@@ -170,8 +173,9 @@ export class OrdsEndpoint {
     type: OrdsParamType,
     comment?: string,
     resultColumns?: OrdsResultColumnNode[],
+    odbType?: OdbType,
   ): this {
-    this._params.push(new OrdsParam(plsqlArg, direction, type, comment, resultColumns))
+    this._params.push(new OrdsParam(plsqlArg, direction, type, comment, resultColumns, odbType))
     return this
   }
 
