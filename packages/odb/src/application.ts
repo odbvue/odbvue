@@ -1,9 +1,4 @@
 import {
-  generateOrdsClient,
-  generateOrdsClientModules,
-  type OrdsClientOptions,
-} from './ords-client.js'
-import {
   applicationNode,
   compileApplicationEndpoints,
   emitApplicationSql,
@@ -23,13 +18,11 @@ export type ApplicationArtifacts = {
   plsql: string
   ords: string
   contract: string
-  client: string
   openapi: Record<string, unknown>
 }
 
 export type ApplicationGeneratorOptions = {
   contract?: ContractOptions
-  client?: OrdsClientOptions
   openapi?: OpenApiOptions
 }
 
@@ -47,7 +40,6 @@ export function generateApplication(
     plsql: emitApplicationSql(application),
     ords: emitApplicationOrdsSql(application),
     contract: generatePackageContract(application, options.contract),
-    client: generateApplicationClient(application, options.client),
     openapi: generateApplicationOpenApi(application, options.openapi),
   }
 }
@@ -81,22 +73,6 @@ export function emitApplicationOrdsDownSql(
     })
     .map((endpoint) => endpoint.toSQLDown(options))
     .join('\n\n')
-}
-
-/** Emit a TypeScript ORDS client directly from an application model. */
-export function generateApplicationClient(
-  application: ApplicationLike,
-  options: OrdsClientOptions = {},
-): string {
-  return generateOrdsClient(compileApplicationEndpoints(application), options)
-}
-
-/** Emit per-module TypeScript clients from one or more application models. */
-export function generateApplicationClientModules(
-  applications: ApplicationLike[],
-  options: OrdsClientOptions = {},
-) {
-  return generateOrdsClientModules(applications.flatMap(compileApplicationEndpoints), options)
 }
 
 /** Emit OpenAPI 3.1 from procedure service metadata in the application model. */

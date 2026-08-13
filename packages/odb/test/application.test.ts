@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   emitApplicationOrdsSql,
   generateApplication,
-  generateApplicationClient,
   generateApplicationsOpenApi,
   generateApplicationOpenApi,
 } from '../src/application.js'
@@ -70,8 +69,7 @@ describe('ODB application contract', () => {
     expect(generated.ords).toContain('ords.define_module(')
     expect(generated.contract).toContain('getUser(input: { id: number })')
     expect(generated.contract).toContain('countUsers(): Promise<number>')
-    expect(generated.client).toContain('UsersGetUserResultItem[]')
-    expect(generated.client).toContain("usersGetUser: { method: 'GET', path: 'users/users/:id' }")
+    expect(generated.openapi).toMatchObject({ openapi: '3.1.0' })
   })
 
   it('generates OpenAPI from procedure service metadata', () => {
@@ -121,9 +119,5 @@ describe('ODB application contract', () => {
         },
       },
     })
-  })
-
-  it('offers focused client generation without endpoint extraction', () => {
-    expect(generateApplicationClient(application)).toContain('UsersGetUserResponse')
   })
 })

@@ -78,7 +78,7 @@ const settings = odbPackage('PCK_SETTINGS', (p) => ({
 body.set(result, settings.getValue(odbLiteral('APP_VERSION')))
 ```
 
-Use `generateApplication(pkg)` to emit its TypeScript contract, ORDS client, and OpenAPI document together.
+Use `generateApplication(pkg)` to emit its TypeScript contract, ORDS registration SQL, and OpenAPI document together. Generate HTTP clients from the OpenAPI document with your preferred OpenAPI tool.
 
 ## Introspection
 
