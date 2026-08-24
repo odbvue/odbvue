@@ -496,7 +496,81 @@ everything.
 - No per-capability independent semver.
 - No enterprise event bus; typed contracts + a tiny emitter suffice.
 
-## 12. Open questions
+## 12. Documentation roadmap
+
+### Phase 1 — Establish the new framework story
+
+- [ ] Add **Framework Overview** under Introduction.
+- [ ] Explain OdbVue as a framework composed of database, ORDS/OpenAPI, web runtime, configuration, and CLI.
+- [ ] Document the boundary between **framework-owned** and **application-owned** code.
+- [ ] Update **Architecture and Design** to reflect `packages/odb`, Oracle support, `packages/web`, `apps/db`, and `apps/web`.
+- [ ] Review **Why OdbVue?** and replace remaining "template/reference implementation" language where OdbVue is now acting as a framework.
+- [ ] Add a simple architecture diagram showing `Oracle → ORDS/OpenAPI → @odbvue/web → application`.
+
+### Phase 2 — Rebuild the Web guide around OdbVue
+
+- [ ] Replace **Setting up VueJs** with **Web Overview**.
+- [ ] Explain that Vue, Vuetify, and standard web runtime setup are provided by `@odbvue/web`.
+- [ ] Add **Web Configuration** centered on `odbvue.config.ts`.
+- [ ] Document the current top-level configuration areas: capabilities, `ui`, integrations, hooks, and modules.
+- [ ] Replace **UI Component Framework** with **UI & Themes**.
+- [ ] Document `ui.theme`, `ui.defaults`, and `ui.icons`.
+- [ ] Explain that Vuetify is the underlying UI framework, but OdbVue owns its setup.
+- [ ] Link to Vuetify for component-level API documentation instead of documenting Vuetify setup internally.
+- [ ] Rewrite **File Based Routing** as **Routing & Pages**, documenting the OdbVue convention rather than how the routing library is installed.
+- [ ] Review **Internationalization** from the same perspective: document configuration and application usage, not plugin installation.
+- [ ] Review **State Management** and remove framework-bootstrap instructions that applications no longer need.
+- [ ] Review **Auto Imports** and move implementation/build details to Advanced where appropriate.
+- [ ] Keep **Layouts**, but rewrite it around what application developers create/customize versus what OdbVue provides.
+- [ ] Rename/rewrite **Consuming Web Services** around the intended `ORDS → OpenAPI → generated web client` workflow.
+
+### Phase 3 — Separate capabilities from generic Web features
+
+- [ ] Define documentation terminology for **framework**, **capability**, **integration**, **module**, and **application**.
+- [ ] Create a **Capabilities Overview** page.
+- [ ] Move Settings toward the capability documentation model.
+- [ ] Prepare documentation slots for Auth, Audit, Storage, AI, and Email as their implementations mature.
+- [ ] Document capability enable/disable configuration through `odbvue.config.ts`.
+- [ ] Keep purely visual/application-shell features such as layouts, navigation, feedback, and page-not-found under Web.
+- [ ] Avoid creating capability pages before the corresponding framework API is stable.
+
+### Phase 4 — Reclassify existing detailed content
+
+- [ ] Audit every existing Web page with the question: "Does an OdbVue application developer need to do this?"
+- [ ] Keep normal application-development instructions in Guide.
+- [ ] Move framework implementation details to **Advanced / Under the Hood**.
+- [ ] Remove obsolete setup instructions entirely when they only describe code now owned by `@odbvue/web`.
+- [ ] Review Advanced UI Components individually; retain useful OdbVue component documentation without duplicating third-party library documentation.
+- [ ] Review Default Layout, Navigation, Home Page, UI Feedback, Page Not Found, and Drag & Drop and place each under the correct new concept.
+
+### Phase 5 — Add an Advanced section
+
+- [ ] Add **Extending OdbVue**.
+- [ ] Add **Web Runtime / Under the Hood** for developers who need to understand the Vue/Vuetify/runtime composition.
+- [ ] Add **Hooks** when the hook contract is stable.
+- [ ] Add **Integrations** when the integration contract is stable.
+- [ ] Add **Modules** when the module contract is stable.
+- [ ] Move Vite/plugin implementation details here instead of exposing them in normal setup documentation.
+
+### Phase 6 — Introduce Reference documentation
+
+- [ ] Add a **Reference** section separate from task-oriented guides.
+- [ ] Create an `odbvue.config.ts` reference.
+- [ ] Document each stable configuration property with type, default, purpose, and example.
+- [ ] Add package references for `@odbvue/odb`, Oracle-specific APIs, and `@odbvue/web`.
+- [ ] Add CLI command reference.
+- [ ] Investigate generating configuration/API reference from TypeScript definitions to reduce documentation drift.
+
+### Phase 7 — Fix onboarding and navigation
+
+- [ ] Update the Getting Started flow so a new developer does not manually assemble Vue/Vuetify/plugins.
+- [ ] Add **Project Structure** explaining what belongs in `apps/web`, `apps/db`, `odbvue.config.ts`, and application-owned source directories.
+- [ ] Make the first practical tutorial modify an existing OdbVue application rather than construct Vue from scratch.
+- [ ] Update the VitePress sidebar to match the new information architecture.
+- [ ] Check and redirect/remove links to retired Web setup pages.
+- [ ] Update README links and wording after the wiki structure stabilizes.
+
+## 13. Open questions
 
 - Where should module **DB objects** live and how do they register with migrations
   in [apps/db/src/migrations](apps/db/src/migrations)? (Likely a `db/modules/<name>`

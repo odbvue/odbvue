@@ -39,6 +39,7 @@ export default defineConfig({
           text: 'Introduction',
           items: [
             { text: 'Why OdbVue?', link: '/introduction/vision' },
+            { text: 'Framework overview', link: '/introduction/framework-overview' },
             { text: 'Skills and habits', link: '/introduction/skills-and-habits' },
             { text: 'Architecture and design', link: '/introduction/architecture-and-design' },
           ],
@@ -77,9 +78,10 @@ export default defineConfig({
         {
           text: 'Web',
           items: [
-            { text: 'Setting up VueJs', link: '/guide/web/setting-up-vuejs' },
-            { text: 'File based routing', link: '/guide/web/file-based-routing' },
-            { text: 'UI Component Framework', link: '/guide/web/ui-component-framework' },
+            { text: 'Web overview', link: '/guide/web/setting-up-vuejs' },
+            { text: 'Web configuration', link: '/guide/web/web-configuration' },
+            { text: 'UI and themes', link: '/guide/web/ui-component-framework' },
+            { text: 'Routing and pages', link: '/guide/web/file-based-routing' },
             { text: 'Internationalization', link: '/guide/web/i18n' },
             { text: 'State Management', link: '/guide/web/state-management' },
             { text: 'Auto imports', link: '/guide/web/auto-imports' },
@@ -117,7 +119,7 @@ export default defineConfig({
                 { text: 'View', link: '/guide/web/advanced-ui-components/view' },
               ],
             },
-            { text: 'Consuming Web Services', link: '/guide/web/consuming-web-services' },
+            { text: 'ORDS and generated clients', link: '/guide/web/consuming-web-services' },
           ],
         },
         {

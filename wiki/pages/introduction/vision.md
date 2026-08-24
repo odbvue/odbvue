@@ -10,7 +10,7 @@ Over time, these in-house systems evolve into living digital organisms constantl
 
 ## Platform
 
-**OdbVue** is the platform that helps in this transformation journey. Built on the best of two worlds
+**OdbVue** is the framework that helps in this transformation journey. It composes Oracle database tooling, ORDS/OpenAPI, a Vue web runtime, configuration, and CLI workflow. It is built on the best of two worlds:
 
 - as enterprise as it can get [Oracle Data base](https://www.oracle.com/database/) ensuring the absolute top class for resilience, performance and security, and
 
