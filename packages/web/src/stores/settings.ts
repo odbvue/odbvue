@@ -1,6 +1,7 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
 import { computed, ref, type Ref, watch } from 'vue'
-import { getOdbVueI18n, getOdbVueVuetify } from '../index.js'
+import { getOdbVueI18n } from '../i18n/index.js'
+import { getOdbVueVuetify } from '../ui/index.js'
 
 const themes = ['system', 'light', 'dark'] as const
 

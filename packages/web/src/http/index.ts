@@ -52,6 +52,20 @@ export function configureHttp(configuration: HttpConfiguration): void {
   Object.assign(httpConfiguration, configuration)
 }
 
+/** Configures OdbVue's HTTP client with framework defaults and app overrides. */
+export function configureOdbVueHttp(options: HttpConfiguration = {}): void {
+  const { onSlowRequest, slowRequestThresholdMs = 3000, ...configuration } = options
+  configureHttp({
+    ...configuration,
+    slowRequestThresholdMs,
+    onSlowRequest:
+      onSlowRequest ??
+      (({ request, duration }) => {
+        console.warn(`Slow API call: ${request} (${Math.round(duration)}ms)`)
+      }),
+  })
+}
+
 function getErrorStatus(error: unknown): number | null {
   if (!(error instanceof Error)) return null
   const response = error as Error & { status?: unknown; statusCode?: unknown }
