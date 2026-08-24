@@ -37,7 +37,9 @@ export function installOdbVueConfig(app: App, config: OdbVueAppConfig): void {
 export function useOdbVueConfig(): OdbVueAppConfig {
   const config = inject(odbVueConfigKey)
   if (!config) {
-    throw new Error('OdbVue config is not installed. Call installOdbVueConfig() before mounting the app.')
+    throw new Error(
+      'OdbVue config is not installed. Call installOdbVueConfig() before mounting the app.',
+    )
   }
   return config
 }

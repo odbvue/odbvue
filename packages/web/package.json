@@ -20,12 +20,12 @@
     "test:run": "vitest run",
     "check": "pnpm format && pnpm lint && pnpm type-check && pnpm test:run"
   },
-  "peerDependencies": {
-    "vue": "^3.5.0"
-  },
   "devDependencies": {
     "@types/node": "^24.9.1",
     "vitest": "^4.1.9",
     "vue": "^3.5.41"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.0"
   }
 }
