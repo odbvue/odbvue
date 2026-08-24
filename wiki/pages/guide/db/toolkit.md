@@ -84,9 +84,9 @@ Use `generateApplication(pkg)` to emit its TypeScript contract, ORDS registratio
 
 `introspect.ts` emits data-dictionary queries and maps the returned rows into ODB tables, TypeScript row interfaces, and `odbTable(...)` scaffolds — useful for adopting an existing database. It stays driver-free (you supply the rows).
 
-## Execution adapter
+## Oracle execution
 
-`@odbvue/odb-oracledb` runs compiled queries against Oracle with `OdbExecutor` (`execute`, `run`, `transaction`, `executeMany`). The core `@odbvue/odb` stays dependency-free; only the adapter depends on `oracledb`.
+`@odbvue/odb` runs compiled queries against Oracle with `OdbExecutor` (`execute`, `run`, `transaction`, `executeMany`) and includes its `oracledb` integration.
 
 ```ts
 await withConnection(config, async (_conn, db) => {

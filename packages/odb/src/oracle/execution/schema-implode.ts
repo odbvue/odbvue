@@ -81,7 +81,6 @@ END;`,
     )
     return true
   } catch (error) {
-    // Autonomous Database ADMIN can drop users without ALTER SYSTEM privileges.
     if (errorNumber(error) !== 1031) throw error
     return false
   }
@@ -101,10 +100,7 @@ export const implodeSchema = async (
   const existed = await userExists(executor, normalizedSchema)
   options.onPhase?.('ords')
   await removeOrdsMetadata(executor, normalizedSchema, existed)
-
-  if (!existed) {
-    return { schema: normalizedSchema, userExisted: false, dropAttempts: 0 }
-  }
+  if (!existed) return { schema: normalizedSchema, userExisted: false, dropAttempts: 0 }
 
   options.onPhase?.('lock')
   await executor.run(`ALTER USER ${normalizedSchema} ACCOUNT LOCK`)
@@ -113,7 +109,6 @@ export const implodeSchema = async (
   for (; dropAttempts < maxDropAttempts; dropAttempts++) {
     options.onPhase?.('drain')
     const sessionsDrained = await drainSessions(executor, normalizedSchema)
-
     options.onPhase?.('drop')
     try {
       await executor.run(`DROP USER ${normalizedSchema} CASCADE`)
@@ -134,6 +129,5 @@ export const implodeSchema = async (
   if (await userExists(executor, normalizedSchema)) {
     throw new Error(`Schema ${normalizedSchema} still exists after DROP USER`)
   }
-
   return { schema: normalizedSchema, userExisted: true, dropAttempts }
 }

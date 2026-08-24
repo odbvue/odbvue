@@ -8,18 +8,17 @@ OdbVue is an Oracle and Vue framework. It keeps database tooling, the generated 
 Oracle Database -> ORDS/OpenAPI -> @odbvue/web -> application
 ```
 
-`@odbvue/odb` models, builds, and migrates Oracle database objects. `@odbvue/odb-oracledb` executes ODB work against Oracle. ORDS exposes the deployed database contract, which ODB emits as OpenAPI. `@odbvue/web` supplies the Vue/Vuetify runtime and accepts application choices through `odbvue.config.ts`.
+`@odbvue/odb` models, builds, migrates, and executes work against Oracle. ORDS exposes the deployed database contract, which ODB emits as OpenAPI. `@odbvue/web` supplies the Vue/Vuetify runtime and accepts application choices through `odbvue.config.ts`.
 
 ## Repository Structure
 
-| Path                     | Purpose                                                           |
-| ------------------------ | ----------------------------------------------------------------- |
-| `packages/odb/`          | Oracle schema, migrations, ORDS, and OpenAPI tooling              |
-| `packages/odb-oracledb/` | Oracle execution adapter                                          |
-| `packages/web/`          | Web runtime and configuration API                                 |
-| `apps/db/`               | Application-owned Oracle migrations and database artifacts        |
-| `apps/web/`              | Application pages, brand, generated client, and web configuration |
-| `cli/`                   | The `ov` development workflow                                     |
+| Path            | Purpose                                                           |
+| --------------- | ----------------------------------------------------------------- |
+| `packages/odb/` | Oracle schema, migrations, execution, ORDS, and OpenAPI tooling   |
+| `packages/web/` | Web runtime and configuration API                                 |
+| `apps/db/`      | Application-owned Oracle migrations and database artifacts        |
+| `apps/web/`     | Application pages, brand, generated client, and web configuration |
+| `cli/`          | The `ov` development workflow                                     |
 
 ## Application Boundary
 

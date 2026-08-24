@@ -19,3 +19,4 @@ export * from './migration-planner.js'
 export * from './migration-metadata.js'
 
 export * from './packages/index.js'
+export * from './oracle/execution/index.js'

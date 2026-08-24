@@ -19,7 +19,7 @@ import {
   type GeneratedMigration,
   type MigrationDirection,
 } from '@odbvue/odb'
-import { splitSqlStatements } from '@odbvue/odb-oracledb'
+import { splitSqlStatements } from '@odbvue/odb'
 
 const normalizeSchemaName = (schema: string): string => {
   const normalized = schema.trim().toUpperCase()

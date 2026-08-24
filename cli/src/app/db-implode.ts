@@ -1,6 +1,6 @@
 import prompts from 'prompts'
 
-import { implodeSchema, withConnection, type SchemaImplodePhase } from '@odbvue/odb-oracledb'
+import { implodeSchema, withConnection, type SchemaImplodePhase } from '@odbvue/odb'
 
 import { SecretsStore } from '../adapters/secrets-store.js'
 import { logger } from '../shared/logger.js'

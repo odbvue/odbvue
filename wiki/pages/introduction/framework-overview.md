@@ -8,8 +8,7 @@ Oracle Database -> ORDS/OpenAPI -> @odbvue/web -> application
 
 ## Framework components
 
-- `@odbvue/odb` models, builds, and migrates Oracle database objects.
-- `@odbvue/odb-oracledb` executes ODB work against Oracle.
+- `@odbvue/odb` models, builds, migrates, and executes work against Oracle.
 - ORDS exposes the deployed database contract; ODB emits its OpenAPI manifest.
 - `@odbvue/web` provides the web runtime, OdbVue configuration, and Vuetify setup.
 - `ov` coordinates common database and generated-client workflows.

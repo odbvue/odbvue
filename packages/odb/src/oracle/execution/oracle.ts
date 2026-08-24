@@ -8,19 +8,14 @@ oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT
 
 export type OracleConnectionConfig = oracledb.ConnectionAttributes
 
-/** Open a node-oracledb connection using the given attributes. */
 export function connect(config: OracleConnectionConfig): Promise<oracledb.Connection> {
   return oracledb.getConnection(config)
 }
 
-/** Wrap a connection in an {@link OdbExecutor}. */
 export function createExecutor(connection: oracledb.Connection): OdbExecutor {
   return new OdbExecutor(connection as unknown as OracleConnectionLike)
 }
 
-/**
- * Open a connection, pass it (and an executor) to `fn`, and always close it.
- */
 export async function withConnection<T>(
   config: OracleConnectionConfig,
   fn: (connection: oracledb.Connection, executor: OdbExecutor) => Promise<T>,
@@ -33,10 +28,6 @@ export async function withConnection<T>(
   }
 }
 
-/**
- * Resolve a TNS alias from a `tnsnames.ora` file, preferring an alias whose name
- * ends with one of `preferredEndsWith` (defaults to `_medium`).
- */
 export function resolveTnsAlias(
   tnsPath: string,
   preferredEndsWith: string[] = ['_medium'],
@@ -46,30 +37,26 @@ export function resolveTnsAlias(
   for (const match of tnsContent.matchAll(/^\s*(\w+)\s*=/gm)) {
     aliases.push(match[1])
   }
-  return aliases.find((a) => preferredEndsWith.some((suffix) => a.endsWith(suffix))) ?? aliases[0]
+  return (
+    aliases.find((alias) => preferredEndsWith.some((suffix) => alias.endsWith(suffix))) ??
+    aliases[0]
+  )
 }
 
-/** Enable server-side `DBMS_OUTPUT` buffering on the connection. */
 export async function enableDbmsOutput(connection: oracledb.Connection): Promise<void> {
   await connection.execute(`BEGIN DBMS_OUTPUT.ENABLE(1000000); END;`)
 }
 
-/** Drain buffered `DBMS_OUTPUT` lines from the connection. */
 export async function readDbmsOutput(connection: oracledb.Connection): Promise<string[]> {
   const lines: string[] = []
-
   for (;;) {
     const result = await connection.execute(`BEGIN DBMS_OUTPUT.GET_LINE(:line, :status); END;`, {
       line: { dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 32767 },
       status: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
     })
-
     const outBinds = result.outBinds as { line?: string | null; status?: number }
-    const status = outBinds.status ?? 1
-    if (status !== 0) break
-
+    if ((outBinds.status ?? 1) !== 0) break
     lines.push(outBinds.line ?? '')
   }
-
   return lines
 }

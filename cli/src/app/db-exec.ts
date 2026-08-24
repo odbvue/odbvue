@@ -9,7 +9,7 @@ import {
   resolveTnsAlias,
   splitSqlStatements,
   type OracleConnectionConfig,
-} from '@odbvue/odb-oracledb'
+} from '@odbvue/odb'
 
 import { SecretsStore } from '../adapters/secrets-store.js'
 import { EnvironmentStore } from '../adapters/environment-store.js'

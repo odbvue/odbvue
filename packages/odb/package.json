@@ -20,9 +20,12 @@
     "test:run": "vitest run",
     "check": "pnpm format && pnpm lint && pnpm type-check && pnpm test:run"
   },
-  "dependencies": {},
+  "dependencies": {
+    "oracledb": "^6.10.0"
+  },
   "devDependencies": {
     "@types/node": "^24.9.1",
+    "@types/oracledb": "^6.10.3",
     "vitest": "^4.1.9"
   }
 }
