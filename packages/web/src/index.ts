@@ -1,5 +1,7 @@
 import { inject, type App, type InjectionKey } from 'vue'
+import { createHead } from '@unhead/vue/client'
 import { createPinia, type Pinia } from 'pinia'
+import type { Router } from 'vue-router'
 import 'vuetify/styles'
 import { createI18n, type I18nOptions } from 'vue-i18n'
 import messages from '@intlify/unplugin-vue-i18n/messages'
@@ -82,8 +84,8 @@ export function defineOdbVueApp<const Config extends OdbVueAppConfig>(config: Co
   return config
 }
 
-/** Makes an OdbVue application configuration available to Vue composables. */
-export function installOdbVueConfig(app: App, config: OdbVueAppConfig): void {
+/** Installs OdbVue's configured runtime into a Vue application. */
+export function installOdbVueConfig(app: App, config: OdbVueAppConfig, router?: Router): void {
   app.provide(odbVueConfigKey, config)
   pinia = createOdbVuePinia()
   app.use(pinia)
@@ -92,6 +94,8 @@ export function installOdbVueConfig(app: App, config: OdbVueAppConfig): void {
   app.use(vuetify)
   i18n = createOdbVueI18n(config.i18n)
   app.use(i18n)
+  if (router) app.use(router)
+  app.use(createHead())
 }
 
 /** Creates OdbVue's Pinia runtime with persistence support. */

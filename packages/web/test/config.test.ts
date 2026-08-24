@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createApp } from 'vue'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import {
   defineOdbVueApp,
   getOdbVueVuetify,
@@ -38,6 +39,15 @@ describe('OdbVue application config', () => {
     expect(auth).toEqual({ local: true })
     expect(audit).toBeUndefined()
     expect(getOdbVueVuetify().theme.name.value).toBe('dark')
+  })
+
+  it('installs the application router', () => {
+    const app = createApp({})
+    const router = createRouter({ history: createMemoryHistory(), routes: [] })
+
+    installOdbVueConfig(app, defineOdbVueApp({}), router)
+
+    expect(app.config.globalProperties.$router).toBe(router)
   })
 
   it('matches the browser language to a configured locale', () => {
