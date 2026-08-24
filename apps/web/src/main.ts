@@ -8,8 +8,12 @@ import i18n from './plugins/i18n'
 import { createHttpPlugin } from './plugins/http'
 import piniaPersist from './plugins/pinia-persist'
 import { createHead } from '@unhead/vue/client'
+import { installOdbVueConfig } from '@odbvue/web'
+import odbvueConfig from '../odbvue.config'
 
 const app = createApp(App)
+
+installOdbVueConfig(app, odbvueConfig)
 
 const pinia = createPinia()
 pinia.use(piniaPersist)

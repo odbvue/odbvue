@@ -16,6 +16,7 @@
     "check": "pnpm format && pnpm lint && pnpm type-check"
   },
   "dependencies": {
+    "@odbvue/web": "workspace:*",
     "@mdi/js": "^7.4.47",
     "@tiptap/extension-image": "^3.14.0",
     "@tiptap/markdown": "^3.27.1",

@@ -9,6 +9,7 @@
     "vitest.config.*",
     "playwright.config.*",
     "eslint.config.*",
+    "odbvue.config.ts",
     "auto-imports.d.ts",
     "components.d.ts"
   ],

@@ -33,6 +33,9 @@ importers:
       '@mdi/js':
         specifier: ^7.4.47
         version: 7.4.47
+      '@odbvue/web':
+        specifier: workspace:*
+        version: link:../../packages/web
       '@tiptap/extension-image':
         specifier: ^3.14.0
         version: 3.27.1(@tiptap/core@3.27.1(@tiptap/pm@3.27.1))
@@ -228,6 +231,18 @@ importers:
       vitest:
         specifier: ^4.1.9
         version: 4.1.9(@types/node@24.13.2)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(yaml@2.9.0))
+
+  packages/web:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.9.1
+        version: 24.13.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@24.13.2)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(yaml@2.9.0))
+      vue:
+        specifier: ^3.5.41
+        version: 3.5.41(typescript@6.0.2)
 
   wiki:
     devDependencies:

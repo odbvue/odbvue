@@ -3,6 +3,7 @@ packages:
   - "apps/db"
   - "packages/odb"
   - "packages/odb-oracledb"
+  - "packages/web"
   - "cli"
   - "wiki"
 allowBuilds:
