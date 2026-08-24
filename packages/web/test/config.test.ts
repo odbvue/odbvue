@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createApp } from 'vue'
 import {
   defineOdbVueApp,
+  getOdbVueVuetify,
   installOdbVueConfig,
   useCapability,
   useOdbVueConfig,
@@ -15,7 +16,11 @@ describe('OdbVue application config', () => {
   })
 
   it('provides config and enabled capabilities to composables', () => {
-    const config = defineOdbVueApp({ auth: { local: true }, audit: false })
+    const config = defineOdbVueApp({
+      auth: { local: true },
+      audit: false,
+      ui: { theme: { default: 'dark' } },
+    })
     let providedConfig: unknown
     let auth: unknown
     let audit: unknown
@@ -31,5 +36,6 @@ describe('OdbVue application config', () => {
     expect(providedConfig).toBe(config)
     expect(auth).toEqual({ local: true })
     expect(audit).toBeUndefined()
+    expect(getOdbVueVuetify().theme.name.value).toBe('dark')
   })
 })

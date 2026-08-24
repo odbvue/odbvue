@@ -2,8 +2,8 @@ import { defineStore, acceptHMRUpdate } from 'pinia'
 
 import { computed, ref, watch } from 'vue'
 
+import { getOdbVueVuetify } from '@odbvue/web'
 import i18n from '@/plugins/i18n'
-import vuetify from '@/plugins/vuetify'
 
 const themes = ['system', 'light', 'dark'] as const
 
@@ -29,7 +29,7 @@ export const useSettingsStore = defineStore(
     watch(
       theme,
       (nextTheme) => {
-        void vuetify.theme.change(nextTheme)
+        void getOdbVueVuetify().theme.change(nextTheme)
       },
       { immediate: true },
     )

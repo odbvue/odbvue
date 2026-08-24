@@ -20,6 +20,9 @@
     "test:run": "vitest run",
     "check": "pnpm format && pnpm lint && pnpm type-check && pnpm test:run"
   },
+  "dependencies": {
+    "vuetify": "^4.1.2"
+  },
   "devDependencies": {
     "@types/node": "^24.9.1",
     "vitest": "^4.1.9",
