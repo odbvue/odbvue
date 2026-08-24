@@ -1,10 +1,23 @@
 import { inject, type App, type InjectionKey } from 'vue'
+import { createPinia, type Pinia } from 'pinia'
 import 'vuetify/styles'
 import { createI18n, type I18nOptions } from 'vue-i18n'
 import messages from '@intlify/unplugin-vue-i18n/messages'
 import { createVuetify, type IconAliases, type ThemeDefinition, type VuetifyOptions } from 'vuetify'
 import { md3 } from 'vuetify/blueprints'
 import { aliases, mdi } from 'vuetify/iconsets/mdi-svg'
+import { configureHttp, type HttpConfiguration } from './http.js'
+import piniaPersistPlugin from './pinia-persist.js'
+
+export {
+  configureHttp,
+  useHttp,
+  type HttpConfiguration,
+  type HttpRefreshFailureContext,
+  type HttpResponse,
+  type HttpSlowRequestContext,
+} from './http.js'
+export type { PersistCookieOptions, PersistOptions, PersistStorage } from './pinia-persist.js'
 
 export type OdbVueAuthConfig = boolean | Record<string, unknown>
 export type OdbVueProviderConfig = boolean | { provider: string; [key: string]: unknown }
@@ -62,6 +75,7 @@ const defaultLocales = ['en', 'fr', 'de'] as const
 
 let vuetify: OdbVueVuetify | undefined
 let i18n: OdbVueI18n | undefined
+let pinia: Pinia | undefined
 
 /** Defines an OdbVue application configuration with inferred literal types. */
 export function defineOdbVueApp<const Config extends OdbVueAppConfig>(config: Config): Config {
@@ -71,10 +85,42 @@ export function defineOdbVueApp<const Config extends OdbVueAppConfig>(config: Co
 /** Makes an OdbVue application configuration available to Vue composables. */
 export function installOdbVueConfig(app: App, config: OdbVueAppConfig): void {
   app.provide(odbVueConfigKey, config)
+  pinia = createOdbVuePinia()
+  app.use(pinia)
+  configureOdbVueHttp()
   vuetify = createOdbVueVuetify(config.ui)
   app.use(vuetify)
   i18n = createOdbVueI18n(config.i18n)
   app.use(i18n)
+}
+
+/** Creates OdbVue's Pinia runtime with persistence support. */
+export function createOdbVuePinia(): Pinia {
+  const instance = createPinia()
+  instance.use(piniaPersistPlugin)
+  return instance
+}
+
+/** Returns the Pinia runtime installed with the OdbVue application. */
+export function getOdbVuePinia(): Pinia {
+  if (!pinia) {
+    throw new Error('OdbVue Pinia is not installed. Call installOdbVueConfig() before using it.')
+  }
+  return pinia
+}
+
+/** Configures OdbVue's HTTP client with framework defaults and app overrides. */
+export function configureOdbVueHttp(options: HttpConfiguration = {}): void {
+  const { onSlowRequest, slowRequestThresholdMs = 3000, ...configuration } = options
+  configureHttp({
+    ...configuration,
+    slowRequestThresholdMs,
+    onSlowRequest:
+      onSlowRequest ??
+      (({ request, duration }) => {
+        console.warn(`Slow API call: ${request} (${Math.round(duration)}ms)`)
+      }),
+  })
 }
 
 /** Creates OdbVue's Vuetify runtime from stable application UI settings. */

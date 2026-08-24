@@ -11,7 +11,7 @@ declare global {
   const computedRouteParam: typeof import('./src/stores/navigation').computedRouteParam
   const computedRouteParams: typeof import('./src/stores/navigation').computedRouteParams
   const computedRouteQuery: typeof import('./src/stores/navigation').computedRouteQuery
-  const configureHttp: typeof import('./src/composables/http').configureHttp
+  const configureHttp: typeof import('@odbvue/web').configureHttp
   const createApp: typeof import('vue').createApp
   const customRef: typeof import('vue').customRef
   const defineAsyncComponent: typeof import('vue').defineAsyncComponent
@@ -73,7 +73,7 @@ declare global {
   const useHead: typeof import('@unhead/vue').useHead
   const useHeadSafe: typeof import('@unhead/vue').useHeadSafe
   const useHtml5DragDrop: typeof import('./src/composables/dnd').useHtml5DragDrop
-  const useHttp: typeof import('./src/composables/http').useHttp
+  const useHttp: typeof import('@odbvue/web').useHttp
   const useI18n: typeof import('vue-i18n').useI18n
   const useId: typeof import('vue').useId
   const useLayout: typeof import('vuetify').useLayout
@@ -104,9 +104,6 @@ declare global {
   // @ts-ignore
   export type { DragDropOptions } from './src/composables/dnd'
   import('./src/composables/dnd')
-  // @ts-ignore
-  export type { HttpSlowRequestContext, HttpRefreshFailureContext, HttpConfiguration } from './src/composables/http'
-  import('./src/composables/http')
   // @ts-ignore
   export type { AlertOptions } from './src/stores/ui'
   import('./src/stores/ui')

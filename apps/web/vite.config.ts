@@ -32,6 +32,9 @@ export async function extractMetaFromMarkdown(filePath: string) {
 
 // https://vite.dev/config/
 export default defineConfig({
+  optimizeDeps: {
+    exclude: ['@odbvue/web'],
+  },
   plugins: [
     VueRouter({
       extensions: ['.vue', '.md'],
@@ -58,6 +61,10 @@ export default defineConfig({
         'vue',
         'vue-router',
         'vue-i18n',
+        {
+          from: '@odbvue/web',
+          imports: ['configureHttp', 'useHttp'],
+        },
         {
           from: 'vuetify',
           imports: [
