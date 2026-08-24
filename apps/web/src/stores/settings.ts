@@ -1,9 +1,8 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
 
-import { computed, ref, watch } from 'vue'
+import { computed, ref, type Ref, watch } from 'vue'
 
-import { getOdbVueVuetify } from '@odbvue/web'
-import i18n from '@/plugins/i18n'
+import { getOdbVueI18n, getOdbVueVuetify } from '@odbvue/web'
 
 const themes = ['system', 'light', 'dark'] as const
 
@@ -34,7 +33,10 @@ export const useSettingsStore = defineStore(
       { immediate: true },
     )
 
-    const i18nManager = i18n.global
+    const i18nManager = getOdbVueI18n().global as {
+      locale: Ref<string>
+      availableLocales: string[]
+    }
 
     const locale = ref(i18nManager.locale.value)
 

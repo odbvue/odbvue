@@ -219,12 +219,18 @@ importers:
 
   packages/web:
     dependencies:
+      '@intlify/unplugin-vue-i18n':
+        specifier: ^11.2.4
+        version: 11.2.4(@vue/compiler-dom@3.5.41)(eslint@10.5.0(supports-color@10.2.2))(rollup@4.62.2)(supports-color@10.2.2)(typescript@6.0.2)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(yaml@2.9.0))(vue-i18n@11.4.6(vue@3.5.41(typescript@6.0.2)))(vue@3.5.41(typescript@6.0.2))
       '@mdi/js':
         specifier: ^7.4.47
         version: 7.4.47
       vite:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(yaml@2.9.0)
+      vue-i18n:
+        specifier: ^11.4.6
+        version: 11.4.6(vue@3.5.41(typescript@6.0.2))
       vuetify:
         specifier: ^4.1.2
         version: 4.1.2(typescript@6.0.2)(vite-plugin-vuetify@2.1.3)(vue@3.5.41(typescript@6.0.2))
@@ -5446,6 +5452,31 @@ snapshots:
 
   '@intlify/shared@11.4.6': {}
 
+  '@intlify/unplugin-vue-i18n@11.2.4(@vue/compiler-dom@3.5.41)(eslint@10.5.0(supports-color@10.2.2))(rollup@4.62.2)(supports-color@10.2.2)(typescript@6.0.2)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(yaml@2.9.0))(vue-i18n@11.4.6(vue@3.5.41(typescript@6.0.2)))(vue@3.5.41(typescript@6.0.2))':
+    dependencies:
+      '@eslint-community/eslint-utils': 4.9.1(eslint@10.5.0(supports-color@10.2.2))
+      '@intlify/bundle-utils': 11.2.4(vue-i18n@11.4.6(vue@3.5.41(typescript@6.0.2)))
+      '@intlify/shared': 11.4.6
+      '@intlify/vue-i18n-extensions': 8.0.0(@intlify/shared@11.4.6)(@vue/compiler-dom@3.5.41)(vue-i18n@11.4.6(vue@3.5.41(typescript@6.0.2)))(vue@3.5.41(typescript@6.0.2))
+      '@rollup/pluginutils': 5.4.0(rollup@4.62.2)
+      '@typescript-eslint/scope-manager': 8.61.1
+      '@typescript-eslint/typescript-estree': 8.61.1(supports-color@10.2.2)(typescript@6.0.2)
+      debug: 4.4.3(supports-color@10.2.2)
+      fast-glob: 3.3.3
+      pathe: 2.0.3
+      picocolors: 1.1.1
+      unplugin: 2.3.11
+      vue: 3.5.41(typescript@6.0.2)
+    optionalDependencies:
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(yaml@2.9.0)
+      vue-i18n: 11.4.6(vue@3.5.41(typescript@6.0.2))
+    transitivePeerDependencies:
+      - '@vue/compiler-dom'
+      - eslint
+      - rollup
+      - supports-color
+      - typescript
+
   '@intlify/unplugin-vue-i18n@11.2.4(@vue/compiler-dom@3.6.0-beta.17)(eslint@10.5.0(supports-color@10.2.2))(rollup@4.62.2)(supports-color@10.2.2)(typescript@6.0.2)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(yaml@2.9.0))(vue-i18n@11.4.6(vue@3.5.41(typescript@6.0.2)))(vue@3.5.41(typescript@6.0.2))':
     dependencies:
       '@eslint-community/eslint-utils': 4.9.1(eslint@10.5.0(supports-color@10.2.2))
@@ -5470,6 +5501,15 @@ snapshots:
       - rollup
       - supports-color
       - typescript
+
+  '@intlify/vue-i18n-extensions@8.0.0(@intlify/shared@11.4.6)(@vue/compiler-dom@3.5.41)(vue-i18n@11.4.6(vue@3.5.41(typescript@6.0.2)))(vue@3.5.41(typescript@6.0.2))':
+    dependencies:
+      '@babel/parser': 7.29.7
+    optionalDependencies:
+      '@intlify/shared': 11.4.6
+      '@vue/compiler-dom': 3.5.41
+      vue: 3.5.41(typescript@6.0.2)
+      vue-i18n: 11.4.6(vue@3.5.41(typescript@6.0.2))
 
   '@intlify/vue-i18n-extensions@8.0.0(@intlify/shared@11.4.6)(@vue/compiler-dom@3.6.0-beta.17)(vue-i18n@11.4.6(vue@3.5.41(typescript@6.0.2)))(vue@3.5.41(typescript@6.0.2))':
     dependencies:

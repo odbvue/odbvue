@@ -3,7 +3,6 @@ import { createPinia } from 'pinia'
 
 import App from './App.vue'
 import router from './router'
-import i18n from './plugins/i18n'
 import { createHttpPlugin } from './plugins/http'
 import piniaPersist from './plugins/pinia-persist'
 import { createHead } from '@unhead/vue/client'
@@ -20,7 +19,6 @@ app.use(pinia)
 app.use(createHttpPlugin())
 
 app.use(router)
-app.use(i18n)
 app.use(createHead())
 
 app.mount('#app')

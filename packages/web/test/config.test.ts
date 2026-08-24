@@ -4,6 +4,7 @@ import {
   defineOdbVueApp,
   getOdbVueVuetify,
   installOdbVueConfig,
+  resolveOdbVueLocale,
   useCapability,
   useOdbVueConfig,
 } from '../src/index.js'
@@ -37,5 +38,10 @@ describe('OdbVue application config', () => {
     expect(auth).toEqual({ local: true })
     expect(audit).toBeUndefined()
     expect(getOdbVueVuetify().theme.name.value).toBe('dark')
+  })
+
+  it('matches the browser language to a configured locale', () => {
+    expect(resolveOdbVueLocale(['en', 'fr', 'de'], 'en', ['de-AT', 'fr'])).toBe('de')
+    expect(resolveOdbVueLocale(['en', 'fr', 'de'], 'en', ['es-MX'])).toBe('en')
   })
 })

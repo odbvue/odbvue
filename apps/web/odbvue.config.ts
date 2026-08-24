@@ -24,6 +24,10 @@ export default defineOdbVueApp({
     },
     icons,
   },
+  i18n: {
+    locales: ['en', 'fr', 'de'],
+    fallbackLocale: 'en',
+  },
   integrations: {},
   hooks: {},
   modules: [],

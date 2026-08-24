@@ -1,11 +1,20 @@
 import { existsSync, statSync } from 'node:fs'
 import * as fs from 'node:fs/promises'
 import path from 'node:path'
-import type { Plugin, ViteDevServer } from 'vite'
+import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
+import type { Plugin, PluginOption, ViteDevServer } from 'vite'
 
 type I18nScope = { type: 'shared' } | { type: 'page'; pageDir: string }
-type I18nCacheKey = `${string}:${string}:${string}` // scope:locale:key
+type I18nCacheKey = `${string}:${string}:${string}`
 type I18nCache = Map<I18nCacheKey, { scope: I18nScope; locale: string; key: string; value: string }>
+
+export type OdbVueI18nViteOptions = {
+  locales?: string[]
+  dumpInterval?: number
+  flushDelay?: number
+  i18nDir?: string
+  include?: string[]
+}
 
 function isDirectory(filePath: string): boolean {
   try {
@@ -17,20 +26,11 @@ function isDirectory(filePath: string): boolean {
 
 function resolveI18nScopeFromPathname(pathname: string): I18nScope {
   const normalizedPath = pathname.replace(/\/+$/, '')
+  if (!normalizedPath || normalizedPath === '/') return { type: 'shared' }
 
-  if (!normalizedPath || normalizedPath === '/') {
-    return { type: 'shared' }
-  }
-
-  const relativeRoutePath = normalizedPath.replace(/^\//, '')
   const pagesRoot = path.resolve(process.cwd(), 'src', 'pages')
-  const pageDir = path.resolve(pagesRoot, relativeRoutePath)
-
-  if (isDirectory(pageDir)) {
-    return { type: 'page', pageDir }
-  }
-
-  return { type: 'page', pageDir }
+  const pageDir = path.resolve(pagesRoot, normalizedPath.replace(/^\//, ''))
+  return isDirectory(pageDir) ? { type: 'page', pageDir } : { type: 'page', pageDir }
 }
 
 function getScopeKey(scope: I18nScope): string {
@@ -40,22 +40,25 @@ function getScopeKey(scope: I18nScope): string {
 }
 
 function getI18nPath(scope: I18nScope, locale: string, i18nDir: string): string {
-  if (scope.type === 'page') {
-    return path.resolve(scope.pageDir, i18nDir, `${locale}.json`)
-  }
-
-  return path.resolve(process.cwd(), 'src', i18nDir, `${locale}.json`)
+  return scope.type === 'page'
+    ? path.resolve(scope.pageDir, i18nDir, `${locale}.json`)
+    : path.resolve(process.cwd(), 'src', i18nDir, `${locale}.json`)
 }
 
-export function i18nDevPlugin(
-  options: {
-    locales?: string[]
-    dumpInterval?: number
-    flushDelay?: number
-    i18nDir?: string
-  } = {},
-): Plugin {
-  const { locales = ['en'], dumpInterval = 300_000, flushDelay = 500, i18nDir = 'i18n' } = options
+/** Adds OdbVue's generated-message and missing-key development plugins. */
+export function odbVueI18nPlugin(options: OdbVueI18nViteOptions = {}): PluginOption[] {
+  const { include = ['src/i18n/**', 'src/pages/**/i18n/**'] } = options
+  return [VueI18nPlugin({ include }), i18nDevPlugin(options)]
+}
+
+/** Records missing translations to the matching shared or page locale file in development. */
+export function i18nDevPlugin(options: OdbVueI18nViteOptions = {}): Plugin {
+  const {
+    locales = ['en', 'fr', 'de'],
+    dumpInterval = 300_000,
+    flushDelay = 500,
+    i18nDir = 'i18n',
+  } = options
   const supportedLocales = new Set(locales)
   const i18nCache: I18nCache = new Map()
   let timer: NodeJS.Timeout | null = null
@@ -65,7 +68,7 @@ export function i18nDevPlugin(
     if (flushTimer) clearTimeout(flushTimer)
     flushTimer = setTimeout(() => {
       flushTimer = null
-      dumpI18nData().catch(console.error)
+      void dumpI18nData()
     }, flushDelay)
   }
 
@@ -82,37 +85,32 @@ export function i18nDevPlugin(
     await Promise.allSettled(
       Array.from(fileGroups.entries()).map(async ([filePath, translations]) => {
         const dir = path.dirname(filePath)
-        if (!existsSync(dir)) {
-          await fs.mkdir(dir, { recursive: true })
-        }
+        if (!existsSync(dir)) await fs.mkdir(dir, { recursive: true })
 
-        const fileExists = existsSync(filePath)
-        const currentData: Record<string, string> = fileExists
+        const currentData: Record<string, string> = existsSync(filePath)
           ? JSON.parse(await fs.readFile(filePath, 'utf-8'))
           : {}
-
         const missingEntries = Object.fromEntries(
           Object.entries(translations).filter(([key]) => currentData[key] === undefined),
         )
-        const hasChanges = Object.keys(missingEntries).length > 0
 
-        if (hasChanges) {
-          const merged = { ...currentData, ...missingEntries }
+        if (Object.keys(missingEntries).length > 0) {
           const tempPath = `${filePath}.tmp`
-          await fs.writeFile(tempPath, JSON.stringify(merged, null, 2))
+          await fs.writeFile(
+            tempPath,
+            JSON.stringify({ ...currentData, ...missingEntries }, null, 2),
+          )
           await fs.rename(tempPath, filePath)
           console.log(`✅ [i18n] Updated: ${path.relative(process.cwd(), filePath)}`)
         }
       }),
     )
-
     i18nCache.clear()
   }
 
   return {
-    name: 'i18n-dev-plugin',
+    name: 'odbvue:i18n-dev',
     configureServer(server: ViteDevServer) {
-      // Middleware to add translations
       server.middlewares.use('/i18n-add', (req, res, next) => {
         void (async () => {
           if (req.method !== 'POST') {
@@ -127,21 +125,19 @@ export function i18nDevPlugin(
               req.on('end', () => resolve(data))
               req.on('error', reject)
             })
-
             const {
               data: { locale, key, value },
               referer: bodyReferer,
             } = JSON.parse(body)
-
             if (!supportedLocales.has(locale)) {
               res.statusCode = 400
               return res.end(JSON.stringify({ error: `Unsupported locale: ${locale}` }))
             }
 
             const referer = bodyReferer || req.headers.referer || '/'
-            const url = new URL(referer, `http://${req.headers.host}`)
-            const scope = resolveI18nScopeFromPathname(url.pathname)
-
+            const scope = resolveI18nScopeFromPathname(
+              new URL(referer, `http://${req.headers.host}`).pathname,
+            )
             for (const targetLocale of supportedLocales) {
               const cacheKey: I18nCacheKey = `${getScopeKey(scope)}:${targetLocale}:${key}`
               if (!i18nCache.has(cacheKey)) {
@@ -153,21 +149,18 @@ export function i18nDevPlugin(
                 })
               }
             }
-
             scheduleDump()
-
             res.setHeader('Content-Type', 'application/json')
             res.end(JSON.stringify({ status: 'ok' }))
-          } catch (err) {
-            console.error('❌ [i18n] Error:', err)
+          } catch (error) {
+            console.error('❌ [i18n] Error:', error)
             res.statusCode = 400
             res.end(JSON.stringify({ error: 'Invalid request' }))
           }
         })().catch(next)
       })
 
-      // Status endpoint
-      server.middlewares.use('/i18n-status', (req, res) => {
+      server.middlewares.use('/i18n-status', (_req, res) => {
         res.setHeader('Content-Type', 'application/json')
         res.end(
           JSON.stringify({
@@ -178,14 +171,11 @@ export function i18nDevPlugin(
         )
       })
 
-      // Periodic dump
-      timer = setInterval(() => dumpI18nData().catch(console.error), dumpInterval)
-
-      // Cleanup
+      timer = setInterval(() => void dumpI18nData(), dumpInterval)
       server.httpServer?.on('close', () => {
         if (timer) clearInterval(timer)
         if (flushTimer) clearTimeout(flushTimer)
-        dumpI18nData().catch(console.error) // Flush on shutdown
+        void dumpI18nData()
       })
     },
   }

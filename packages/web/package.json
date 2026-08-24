@@ -25,8 +25,10 @@
     "check": "pnpm format && pnpm lint && pnpm type-check && pnpm test:run"
   },
   "dependencies": {
+    "@intlify/unplugin-vue-i18n": "^11.2.4",
     "@mdi/js": "^7.4.47",
     "vite": "^8.0.16",
+    "vue-i18n": "^11.4.6",
     "vuetify": "^4.1.2"
   },
   "devDependencies": {

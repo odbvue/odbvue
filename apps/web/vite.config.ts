@@ -6,9 +6,7 @@ import vue from '@vitejs/plugin-vue'
 import Vuetify from 'vite-plugin-vuetify'
 import Markdown from 'unplugin-vue-markdown/vite'
 import vueDevTools from 'vite-plugin-vue-devtools'
-import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
-import { autoImportMdiIcons } from '@odbvue/web/vite'
-import { i18nDevPlugin } from './vite-plugin-i18n.ts'
+import { autoImportMdiIcons, odbVueI18nPlugin } from '@odbvue/web/vite'
 import { openapiPlugin } from './vite-plugin-openapi.ts'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
@@ -50,17 +48,7 @@ export default defineConfig({
     Vuetify(),
     Markdown({}),
     autoImportMdiIcons(),
-    VueI18nPlugin({
-      include: [
-        fileURLToPath(new URL('./src/i18n/**', import.meta.url)),
-        fileURLToPath(new URL('./src/pages/**/i18n/**', import.meta.url)),
-      ],
-    }),
-    i18nDevPlugin({
-      locales: ['en', 'fr'],
-      dumpInterval: 300_000,
-      i18nDir: 'i18n',
-    }),
+    odbVueI18nPlugin(),
     openapiPlugin({
       source: '../db/dist/openapi.json',
       dest: 'src/services/openapi.generated.ts',
