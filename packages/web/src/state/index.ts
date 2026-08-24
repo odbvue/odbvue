@@ -17,7 +17,7 @@ export function setOdbVuePinia(instance: Pinia): void {
 /** Returns the Pinia runtime installed with the OdbVue application. */
 export function getOdbVuePinia(): Pinia {
   if (!pinia) {
-    throw new Error('OdbVue Pinia is not installed. Call installOdbVueConfig() before using it.')
+    throw new Error('OdbVue Pinia is not installed. Call installOdbVue() before using it.')
   }
   return pinia
 }

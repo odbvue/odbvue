@@ -44,7 +44,7 @@ export function setOdbVueVuetify(instance: OdbVueVuetify): void {
 /** Returns the Vuetify runtime installed with the OdbVue application. */
 export function getOdbVueVuetify(): OdbVueVuetify {
   if (!vuetify) {
-    throw new Error('OdbVue UI is not installed. Call installOdbVueConfig() before using it.')
+    throw new Error('OdbVue UI is not installed. Call installOdbVue() before using it.')
   }
   return vuetify
 }

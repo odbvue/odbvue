@@ -9,7 +9,7 @@ import { createOdbVueVuetify, setOdbVueVuetify } from '../ui/index.js'
 import { odbVueConfigKey, setOdbVueConfig } from './config.js'
 
 /** Installs OdbVue's configured runtime into a Vue application. */
-export function installOdbVueConfig(app: App, config: OdbVueAppConfig, router?: Router): void {
+export function installOdbVue(app: App, config: OdbVueAppConfig, router?: Router): void {
   setOdbVueConfig(config)
   app.provide(odbVueConfigKey, config)
 

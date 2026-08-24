@@ -69,7 +69,7 @@ export function resolveOdbVueLocale(
 /** Returns the Vue I18n runtime installed with the OdbVue application. */
 export function getOdbVueI18n(): OdbVueI18n {
   if (!i18n) {
-    throw new Error('OdbVue i18n is not installed. Call installOdbVueConfig() before using it.')
+    throw new Error('OdbVue i18n is not installed. Call installOdbVue() before using it.')
   }
   return i18n
 }

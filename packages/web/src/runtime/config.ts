@@ -12,7 +12,7 @@ export function setOdbVueConfig(config: OdbVueAppConfig): void {
 /** Returns the configuration installed when the OdbVue application was created. */
 export function getOdbVueConfig(): OdbVueAppConfig {
   if (!installedConfig) {
-    throw new Error('OdbVue config is not installed. Call installOdbVueConfig() before using it.')
+    throw new Error('OdbVue config is not installed. Call installOdbVue() before using it.')
   }
   return installedConfig
 }

@@ -4,7 +4,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import {
   defineOdbVueApp,
   getOdbVueVuetify,
-  installOdbVueConfig,
+  installOdbVue,
   resolveOdbVueLocale,
   useAppStore,
   useCapability,
@@ -29,7 +29,7 @@ describe('OdbVue application config', () => {
     let audit: unknown
 
     const app = createApp({})
-    installOdbVueConfig(app, config)
+    installOdbVue(app, config)
     app.runWithContext(() => {
       providedConfig = useOdbVueConfig()
       auth = useCapability('auth')
@@ -46,7 +46,7 @@ describe('OdbVue application config', () => {
     const app = createApp({})
     const router = createRouter({ history: createMemoryHistory(), routes: [] })
 
-    installOdbVueConfig(app, defineOdbVueApp({}), router)
+    installOdbVue(app, defineOdbVueApp({}), router)
 
     expect(app.config.globalProperties.$router).toBe(router)
   })
@@ -55,7 +55,7 @@ describe('OdbVue application config', () => {
     const app = createApp({})
     const router = createRouter({ history: createMemoryHistory(), routes: [] })
 
-    installOdbVueConfig(app, defineOdbVueApp({ title: 'Example', version: '2.0.0' }), router)
+    installOdbVue(app, defineOdbVueApp({ title: 'Example', version: '2.0.0' }), router)
 
     app.runWithContext(() => {
       expect(useAppStore().title).toBe('Example')
