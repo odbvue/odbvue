@@ -368,7 +368,7 @@ tooling). The app keeps business (`pages/`), generated (ORDS client), and brand
 | [src/main.ts](apps/web/src/main.ts) | `@odbvue/web` | **`createOdbVueApp()`** | Bootstrap moves into the framework; app `main.ts` shrinks to `createOdbVueApp(config).mount('#app')`. |
 | [src/layouts](apps/web/src/layouts) | `@odbvue/web` | **Defaults, overridable** | Ship as defaults; app shadows by name. |
 | [src/themes](apps/web/src/themes) (`defaults.ts`, `icons.ts`) | `@odbvue/web` | **Defaults** | `themes.json` (brand) **stays in app**. |
-| Root [vite-plugin-openapi.ts](apps/web/vite-plugin-openapi.ts), [vite-plugin-i18n.ts](apps/web/vite-plugin-i18n.ts), [vite-plugin-autoimport-mdi-icons.ts](apps/web/vite-plugin-autoimport-mdi-icons.ts) | `@odbvue/web/vite` | **Full** | Pure framework tooling under a `/vite` subpath export. |
+| Root [vite-plugin-openapi.ts](apps/web/vite-plugin-openapi.ts), [vite-plugin-i18n.ts](apps/web/vite-plugin-i18n.ts), and `@odbvue/web/vite` MDI icon plugin | `@odbvue/web/vite` | **Full** | Pure framework tooling under a `/vite` subpath export. |
 | Root [vite.config.ts](apps/web/vite.config.ts) | app (thin) | **Preset** | App calls an `odbvue()` Vite preset that bundles the plugin stack. |
 
 **Stays in the app (user-owned):** [src/pages](apps/web/src/pages) (except a

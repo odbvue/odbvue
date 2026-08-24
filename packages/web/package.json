@@ -8,6 +8,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./vite": {
+      "types": "./dist/vite/index.d.ts",
+      "import": "./dist/vite/index.js"
     }
   },
   "scripts": {
@@ -21,6 +25,8 @@
     "check": "pnpm format && pnpm lint && pnpm type-check && pnpm test:run"
   },
   "dependencies": {
+    "@mdi/js": "^7.4.47",
+    "vite": "^8.0.16",
     "vuetify": "^4.1.2"
   },
   "devDependencies": {
