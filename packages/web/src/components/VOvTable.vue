@@ -332,6 +332,29 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, inject, useSlots, onBeforeUnmount, type Ref } from 'vue'
 import { useDisplay } from 'vuetify'
+import VOvDialog from './VOvDialog.vue'
+import VOvForm from './VOvForm.vue'
+import {
+  VBtn,
+  VCard,
+  VCardActions,
+  VCardText,
+  VCardTitle,
+  VChip,
+  VCol,
+  VContainer,
+  VDefaultsProvider,
+  VDialog,
+  VIcon,
+  VList,
+  VListItem,
+  VMenu,
+  VOverlay,
+  VProgressCircular,
+  VRow,
+  VTable,
+  VTextField,
+} from 'vuetify/components'
 import {
   type OvTableOptions,
   type OvTableData,

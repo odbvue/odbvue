@@ -62,11 +62,12 @@
 </template>
 
 <script setup lang="ts">
-import { type StyleValue } from 'vue'
+import { computed, onBeforeUnmount, ref, type StyleValue, watch } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
 import { Markdown } from '@tiptap/markdown'
+import { VBtn } from 'vuetify/components'
 
 const props = withDefaults(
   defineProps<{

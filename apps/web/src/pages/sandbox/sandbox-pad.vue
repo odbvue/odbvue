@@ -44,7 +44,7 @@ definePage({
   },
 })
 
-import VOvPad from '@/components/VOvPad.vue'
+import { VOvPad } from '@odbvue/web/components'
 
 const pad = ref<typeof VOvPad | null>(null)
 

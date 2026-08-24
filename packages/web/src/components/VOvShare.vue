@@ -57,6 +57,7 @@
 <script setup lang="ts">
 import type { PropType } from 'vue'
 import { STwitter, SFacebook, SLinkedIn, SWhatsApp } from 'vue-socials'
+import { VBtn, VDefaultsProvider } from 'vuetify/components'
 
 export type Share = 'twitter' | 'facebook' | 'linkedin' | 'whatsapp' | 'copy'
 

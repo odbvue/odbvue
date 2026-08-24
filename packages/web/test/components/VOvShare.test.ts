@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import VOvShare, { type Share } from '../VOvShare.vue'
+import VOvShare, { type Share } from '../../src/components/VOvShare.vue'
 
 // Mock vue-socials components
 vi.mock('vue-socials', () => ({

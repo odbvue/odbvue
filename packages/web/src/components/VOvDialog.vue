@@ -73,6 +73,19 @@
 </template>
 
 <script setup lang="ts">
+import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useDisplay } from 'vuetify'
+import {
+  VBanner,
+  VBannerText,
+  VBtn,
+  VCard,
+  VCardActions,
+  VCardText,
+  VChip,
+  VDialog,
+} from 'vuetify/components'
 import { OvFieldFormat, OvActionFormat, sanitizeHtml, type OvAction, type OvFormat } from '.'
 
 const { name, thresholds } = useDisplay()

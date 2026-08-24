@@ -134,8 +134,8 @@ export const useNavigationStore = defineStore('navigation', () => {
   })
 
   const title = computed(() => (path: string) => {
-    const page = allPages.find((page) => page.path === path)
-    return page ? page.title : ''
+    const matchedPage = allPages.find((candidate) => candidate.path === path)
+    return matchedPage ? matchedPage.title : ''
   })
 
   const breadcrumbs = computed(() => {

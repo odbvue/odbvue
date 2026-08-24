@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
-import VOvTable from '../VOvTable.vue'
+import VOvTable from '../../src/components/VOvTable.vue'
 import { globalPlugins } from './setup'
 import type { OvTableOptions, OvTableData } from '../index'
 

@@ -102,16 +102,28 @@
 
 <script setup lang="ts">
 import {
+  VBtn,
   VTextField,
   VSelect,
   VCombobox,
   VAutocomplete,
+  VColorPicker,
+  VCol,
+  VContainer,
+  VDefaultsProvider,
   VFileInput,
+  VForm,
+  VIcon,
+  VMenu,
+  VOverlay,
+  VProgressCircular,
   VSwitch,
   VCheckbox,
   VRating,
+  VRow,
   VTextarea,
 } from 'vuetify/components'
+import { useDefaults } from 'vuetify'
 import VOvEditor from './VOvEditor.vue'
 
 import {

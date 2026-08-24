@@ -9,6 +9,7 @@ import { createVuetify, type IconAliases, type ThemeDefinition, type VuetifyOpti
 import { md3 } from 'vuetify/blueprints'
 import { aliases, mdi } from 'vuetify/iconsets/mdi-svg'
 import { mdiWeatherNight, mdiWeatherSunny } from '@mdi/js'
+import { odbVueComponentIcons } from './components/icons.js'
 import { configureHttp, type HttpConfiguration } from './http.js'
 import piniaPersistPlugin from './pinia-persist.js'
 
@@ -165,7 +166,13 @@ export function createOdbVueVuetify(ui: OdbVueUiConfig = {}): OdbVueVuetify {
     defaults: ui.defaults,
     icons: {
       defaultSet: 'mdi',
-      aliases: { ...aliases, mdiWeatherNight, mdiWeatherSunny, ...ui.icons },
+      aliases: {
+        ...aliases,
+        mdiWeatherNight,
+        mdiWeatherSunny,
+        ...odbVueComponentIcons,
+        ...ui.icons,
+      },
       sets: { mdi },
     },
   })

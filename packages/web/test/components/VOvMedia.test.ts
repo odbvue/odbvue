@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import VOvMedia from '../VOvMedia.vue'
+import VOvMedia from '../../src/components/VOvMedia.vue'
 
 class MockMediaStream {
   getTracks() {

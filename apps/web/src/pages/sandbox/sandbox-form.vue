@@ -15,7 +15,7 @@
 </template>
 
 <script setup lang="ts">
-import type { OvFormOptions } from '@/components'
+import type { OvFormOptions } from '@odbvue/web/components'
 
 definePage({
   meta: {

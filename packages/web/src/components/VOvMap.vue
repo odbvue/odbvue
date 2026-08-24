@@ -27,8 +27,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, shallowRef, computed, watch, onBeforeUnmount, onMounted, nextTick } from 'vue'
 import { useDefaults } from 'vuetify'
+import { VContainer, VDefaultsProvider, VOverlay, VProgressCircular } from 'vuetify/components'
 import 'leaflet/dist/leaflet.css'
 import markerIconUrl from 'leaflet/dist/images/marker-icon.png'
 import markerIconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png'
@@ -83,6 +84,7 @@ const emit = defineEmits<{
 
 const mapContainer = ref<HTMLElement>() // used as template ref
 void mapContainer
+let resizeObserver: ResizeObserver | undefined
 const leafletMap = ref<InstanceType<typeof LMap>>()
 const mapInstance = shallowRef<LeafletMap | null>(null)
 const editLayerGroup = shallowRef<LayerGroup | null>(null)
@@ -188,6 +190,17 @@ onMounted(async () => {
   ensureEditLayer()
   syncEditableState()
   syncMapView()
+
+  if (typeof ResizeObserver !== 'undefined' && mapContainer.value) {
+    resizeObserver = new ResizeObserver(() => {
+      mapInstance.value?.invalidateSize({ pan: false })
+    })
+    resizeObserver.observe(mapContainer.value)
+  }
+})
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
 })
 
 watch(
@@ -393,6 +406,7 @@ function onMapReady() {
   syncMapView()
 
   nextTick(() => {
+    mapInstance.value?.invalidateSize({ pan: false })
     if (geojson && options.autoFit !== false) {
       fitBounds()
     }

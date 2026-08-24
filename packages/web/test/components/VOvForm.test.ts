@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import VOvForm from '../VOvForm.vue'
+import VOvForm from '../../src/components/VOvForm.vue'
 import { globalPlugins } from './setup'
 import type { OvFormOptions } from '../index'
 

@@ -10,5 +10,11 @@
   "add": "add",
   "status-all": "status-all",
   "previous": "previous",
-  "next": "next"
+  "next": "next",
+  "ascending": "ascending",
+  "descending": "descending",
+  "left": "left",
+  "right": "right",
+  "Phone": "Phone",
+  "copy.to.clipboard": "copy.to.clipboard"
 }

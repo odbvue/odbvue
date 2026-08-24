@@ -1,3 +1,5 @@
+import { h, type Component } from 'vue'
+
 export type OvGeoJsonGeometry = {
   type: 'Point' | 'LineString' | 'Polygon' | 'MultiPoint' | 'MultiLineString' | 'MultiPolygon'
   coordinates: number[] | number[][] | number[][][] | number[][][][]

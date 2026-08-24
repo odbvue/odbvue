@@ -59,6 +59,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { VBtn } from 'vuetify/components'
 
 const props = defineProps({
   src: {

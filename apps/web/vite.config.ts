@@ -6,7 +6,7 @@ import vue from '@vitejs/plugin-vue'
 import Vuetify from 'vite-plugin-vuetify'
 import Markdown from 'unplugin-vue-markdown/vite'
 import vueDevTools from 'vite-plugin-vue-devtools'
-import { autoImportMdiIcons, odbVueI18nPlugin } from '@odbvue/web/vite'
+import { autoImportMdiIcons, odbVueComponentsResolver, odbVueI18nPlugin } from '@odbvue/web/vite'
 import { openapiPlugin } from './vite-plugin-openapi.ts'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
@@ -94,7 +94,9 @@ export default defineConfig({
       ],
       dirs: ['./src/composables/**'],
     }),
-    Components({}),
+    Components({
+      resolvers: [odbVueComponentsResolver],
+    }),
     vueDevTools(),
   ],
   resolve: {

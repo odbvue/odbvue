@@ -29,7 +29,7 @@ definePage({
   },
 })
 
-import type { OvViewOptions } from '@/components'
+import type { OvViewOptions } from '@odbvue/web/components'
 
 function action(name: string, value: unknown) {
   if (!name || !value) return

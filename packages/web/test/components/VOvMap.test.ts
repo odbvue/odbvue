@@ -1,37 +1,39 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { nextTick } from 'vue'
-import VOvMap from '../VOvMap.vue'
+import VOvMap from '../../src/components/VOvMap.vue'
 import { globalPlugins } from './setup'
 import type { OvMapOptions, OvGeoJson } from '../index'
 
-const { mockFitBounds, mockGetBounds, mockGetLayers, mockMarker, mockIcon } = vi.hoisted(() => ({
-  mockFitBounds: vi.fn<() => void>(),
-  mockGetBounds: vi.fn<
-    () => {
-      isValid: () => boolean
-      getSouthWest: () => { lat: number; lng: number }
-      getNorthEast: () => { lat: number; lng: number }
-    }
-  >(() => ({
-    isValid: (): boolean => true,
-    getSouthWest: () => ({ lat: 56.9496, lng: 24.1052 }),
-    getNorthEast: () => ({ lat: 57.0, lng: 24.25 }),
-  })),
-  mockGetLayers: vi.fn<() => object[]>(() => [{}]),
-  mockMarker: vi.fn<(latlng: unknown, options: unknown) => object>(
-    (latlng: unknown, options: unknown) => ({
-      latlng,
-      options,
-      on: vi.fn<() => void>(),
-      getLatLng: vi.fn<() => { lat: number; lng: number }>(() => ({
-        lat: 56.95,
-        lng: 24.11,
-      })),
-    }),
-  ),
-  mockIcon: vi.fn<(options: unknown) => unknown>((options: unknown) => options),
-}))
+const { mockFitBounds, mockInvalidateSize, mockGetBounds, mockGetLayers, mockMarker, mockIcon } =
+  vi.hoisted(() => ({
+    mockFitBounds: vi.fn<() => void>(),
+    mockInvalidateSize: vi.fn<() => void>(),
+    mockGetBounds: vi.fn<
+      () => {
+        isValid: () => boolean
+        getSouthWest: () => { lat: number; lng: number }
+        getNorthEast: () => { lat: number; lng: number }
+      }
+    >(() => ({
+      isValid: (): boolean => true,
+      getSouthWest: () => ({ lat: 56.9496, lng: 24.1052 }),
+      getNorthEast: () => ({ lat: 57.0, lng: 24.25 }),
+    })),
+    mockGetLayers: vi.fn<() => object[]>(() => [{}]),
+    mockMarker: vi.fn<(latlng: unknown, options: unknown) => object>(
+      (latlng: unknown, options: unknown) => ({
+        latlng,
+        options,
+        on: vi.fn<() => void>(),
+        getLatLng: vi.fn<() => { lat: number; lng: number }>(() => ({
+          lat: 56.95,
+          lng: 24.11,
+        })),
+      }),
+    ),
+    mockIcon: vi.fn<(options: unknown) => unknown>((options: unknown) => options),
+  }))
 
 vi.mock('leaflet', async () => {
   const mockLayerGroup: {
@@ -84,6 +86,7 @@ vi.mock('@vue-leaflet/vue-leaflet', () => ({
         setView: vi.fn<() => void>(),
         setZoom: vi.fn<() => void>(),
         fitBounds: mockFitBounds,
+        invalidateSize: mockInvalidateSize,
         once: vi.fn<(event: string, callback: Function) => void>(
           (event: string, callback: Function) => {
             if (!eventListeners[event]) eventListeners[event] = []
@@ -176,6 +179,7 @@ function mountMap(geojson: OvGeoJson | null = null, options: OvMapOptions = {}) 
 describe('VOvMap', () => {
   beforeEach(() => {
     mockFitBounds.mockClear()
+    mockInvalidateSize.mockClear()
     mockGetBounds.mockClear()
     mockGetLayers.mockClear()
     mockMarker.mockClear()
@@ -203,6 +207,14 @@ describe('VOvMap', () => {
   it('renders tile layer', () => {
     const wrapper = mountMap()
     expect(wrapper.find('.leaflet-tile-layer').exists()).toBe(true)
+  })
+
+  it('invalidates the Leaflet size after the map becomes ready', async () => {
+    mountMap()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flushPromises()
+    await nextTick()
+    expect(mockInvalidateSize).toHaveBeenCalledWith({ pan: false })
   })
 
   it('does not render geojson layer when no data', () => {
