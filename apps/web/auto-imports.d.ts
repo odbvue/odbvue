@@ -8,9 +8,9 @@ export {}
 declare global {
   const EffectScope: typeof import('vue').EffectScope
   const computed: typeof import('vue').computed
-  const computedRouteParam: typeof import('./src/stores/navigation').computedRouteParam
-  const computedRouteParams: typeof import('./src/stores/navigation').computedRouteParams
-  const computedRouteQuery: typeof import('./src/stores/navigation').computedRouteQuery
+  const computedRouteParam: typeof import('@odbvue/web').computedRouteParam
+  const computedRouteParams: typeof import('@odbvue/web').computedRouteParams
+  const computedRouteQuery: typeof import('@odbvue/web').computedRouteQuery
   const configureHttp: typeof import('@odbvue/web').configureHttp
   const createApp: typeof import('vue').createApp
   const customRef: typeof import('vue').customRef
@@ -61,7 +61,7 @@ declare global {
   const triggerRef: typeof import('vue').triggerRef
   const undefined: typeof import('vuetify').undefined
   const unref: typeof import('vue').unref
-  const useAppStore: typeof import('./src/stores/index').useAppStore
+  const useAppStore: typeof import('@odbvue/web').useAppStore
   const useAttrs: typeof import('vue').useAttrs
   const useCardBackground: typeof import('./src/composables/ui').useCardBackground
   const useCssModule: typeof import('vue').useCssModule
@@ -80,17 +80,17 @@ declare global {
   const useLink: typeof import('vue-router').useLink
   const useLocale: typeof import('vuetify').useLocale
   const useModel: typeof import('vue').useModel
-  const useNavigationStore: typeof import('./src/stores/navigation').useNavigationStore
+  const useNavigationStore: typeof import('@odbvue/web').useNavigationStore
   const useRoute: typeof import('vue-router').useRoute
-  const useRouteParams: typeof import('./src/stores/navigation').useRouteParams
+  const useRouteParams: typeof import('@odbvue/web').useRouteParams
   const useRouter: typeof import('vue-router').useRouter
   const useRtl: typeof import('vuetify').useRtl
   const useSeoMeta: typeof import('@unhead/vue').useSeoMeta
-  const useSettingsStore: typeof import('./src/stores/settings').useSettingsStore
+  const useSettingsStore: typeof import('@odbvue/web').useSettingsStore
   const useSlots: typeof import('vue').useSlots
   const useTemplateRef: typeof import('vue').useTemplateRef
   const useTheme: typeof import('vuetify').useTheme
-  const useUiStore: typeof import('./src/stores/ui').useUiStore
+  const useUiStore: typeof import('@odbvue/web').useUiStore
   const watch: typeof import('vue').watch
   const watchEffect: typeof import('vue').watchEffect
   const watchPostEffect: typeof import('vue').watchPostEffect
@@ -104,7 +104,4 @@ declare global {
   // @ts-ignore
   export type { DragDropOptions } from './src/composables/dnd'
   import('./src/composables/dnd')
-  // @ts-ignore
-  export type { AlertOptions } from './src/stores/ui'
-  import('./src/stores/ui')
 }

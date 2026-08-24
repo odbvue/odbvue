@@ -8,8 +8,21 @@ import messages from '@intlify/unplugin-vue-i18n/messages'
 import { createVuetify, type IconAliases, type ThemeDefinition, type VuetifyOptions } from 'vuetify'
 import { md3 } from 'vuetify/blueprints'
 import { aliases, mdi } from 'vuetify/iconsets/mdi-svg'
+import { mdiWeatherNight, mdiWeatherSunny } from '@mdi/js'
 import { configureHttp, type HttpConfiguration } from './http.js'
 import piniaPersistPlugin from './pinia-persist.js'
+
+export {
+  computedRouteParam,
+  computedRouteParams,
+  computedRouteQuery,
+  useAppStore,
+  useNavigationStore,
+  useRouteParams,
+  useSettingsStore,
+  useUiStore,
+} from './stores/index.js'
+export type { AlertOptions } from './stores/ui.js'
 
 export {
   configureHttp,
@@ -78,6 +91,7 @@ const defaultLocales = ['en', 'fr', 'de'] as const
 let vuetify: OdbVueVuetify | undefined
 let i18n: OdbVueI18n | undefined
 let pinia: Pinia | undefined
+let installedConfig: OdbVueAppConfig | undefined
 
 /** Defines an OdbVue application configuration with inferred literal types. */
 export function defineOdbVueApp<const Config extends OdbVueAppConfig>(config: Config): Config {
@@ -86,6 +100,7 @@ export function defineOdbVueApp<const Config extends OdbVueAppConfig>(config: Co
 
 /** Installs OdbVue's configured runtime into a Vue application. */
 export function installOdbVueConfig(app: App, config: OdbVueAppConfig, router?: Router): void {
+  installedConfig = config
   app.provide(odbVueConfigKey, config)
   pinia = createOdbVuePinia()
   app.use(pinia)
@@ -96,6 +111,14 @@ export function installOdbVueConfig(app: App, config: OdbVueAppConfig, router?: 
   app.use(i18n)
   if (router) app.use(router)
   app.use(createHead())
+}
+
+/** Returns the configuration installed when the OdbVue application was created. */
+export function getOdbVueConfig(): OdbVueAppConfig {
+  if (!installedConfig) {
+    throw new Error('OdbVue config is not installed. Call installOdbVueConfig() before using it.')
+  }
+  return installedConfig
 }
 
 /** Creates OdbVue's Pinia runtime with persistence support. */
@@ -142,7 +165,7 @@ export function createOdbVueVuetify(ui: OdbVueUiConfig = {}): OdbVueVuetify {
     defaults: ui.defaults,
     icons: {
       defaultSet: 'mdi',
-      aliases: { ...aliases, ...ui.icons },
+      aliases: { ...aliases, mdiWeatherNight, mdiWeatherSunny, ...ui.icons },
       sets: { mdi },
     },
   })
@@ -220,13 +243,7 @@ export function getOdbVueI18n(): OdbVueI18n {
 
 /** Returns the configuration installed when the OdbVue application was created. */
 export function useOdbVueConfig(): OdbVueAppConfig {
-  const config = inject(odbVueConfigKey)
-  if (!config) {
-    throw new Error(
-      'OdbVue config is not installed. Call installOdbVueConfig() before mounting the app.',
-    )
-  }
-  return config
+  return inject(odbVueConfigKey) ?? getOdbVueConfig()
 }
 
 /** Returns an enabled capability's configuration, or undefined when it is disabled. */

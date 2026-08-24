@@ -31,13 +31,13 @@ export const computedRouteParams = (
     const merged: Record<string, string> = {}
 
     for (const [key, value] of Object.entries(route.params as Record<string, unknown>)) {
-      const v = routeValueToString(value)
-      if (v) merged[key] = v
+      const result = routeValueToString(value)
+      if (result) merged[key] = result
     }
 
     for (const [key, value] of Object.entries(route.query)) {
-      const v = routeValueToString(value)
-      if (v) merged[key] = v
+      const result = routeValueToString(value)
+      if (result) merged[key] = result
     }
 
     return merged
@@ -56,8 +56,8 @@ export const useRouteParams = (): {
   const pathParams = computed(() => {
     const result: Record<string, string> = {}
     for (const [key, value] of Object.entries(route.params as Record<string, unknown>)) {
-      const v = routeValueToString(value)
-      if (v) result[key] = v
+      const parameter = routeValueToString(value)
+      if (parameter) result[key] = parameter
     }
     return result
   })
@@ -65,14 +65,13 @@ export const useRouteParams = (): {
   const queryParams = computed(() => {
     const result: Record<string, string> = {}
     for (const [key, value] of Object.entries(route.query)) {
-      const v = routeValueToString(value)
-      if (v) result[key] = v
+      const parameter = routeValueToString(value)
+      if (parameter) result[key] = parameter
     }
     return result
   })
 
   const routeParams = computed(() => ({ ...pathParams.value, ...queryParams.value }))
-
   const param = (name: string) => computedRouteParam(route, name)
   const query = (name: string) => computedRouteQuery(route, name)
 
@@ -106,17 +105,18 @@ export const useNavigationStore = defineStore('navigation', () => {
   const router = useRouter()
   const routes = router.getRoutes()
   const route = useRoute()
-
   const breadcrumb = ref<Breadcrumb>()
 
-  const allPages: Page[] = routes.map((r) => {
-    const path = r.path
+  const allPages: Page[] = routes.map((routeRecord) => {
+    const path = routeRecord.path
     return {
       path,
       level: path == '/' ? 0 : path.split('/').length - 1,
-      children: routes.find((rr) => rr.path.includes(path) && rr.path !== path) !== undefined,
+      children:
+        routes.find((otherRoute) => otherRoute.path.includes(path) && otherRoute.path !== path) !==
+        undefined,
       title:
-        r.meta?.title?.toString() ||
+        routeRecord.meta?.title?.toString() ||
         path
           .split('/')
           .at(-1)
@@ -124,31 +124,36 @@ export const useNavigationStore = defineStore('navigation', () => {
           .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
           .join(' ') ||
         '',
-      description: r.meta?.description?.toString() || '',
-      icon: (r.meta?.icon as string) || '$mdiMinus',
-      color: (r.meta?.color as string) || '',
-      visibility: (r.meta?.visibility as Visibility) || 'never',
-      access: (r.meta?.access as Access) || 'never',
-      roles: (r.meta?.roles as string[]) || [],
+      description: routeRecord.meta?.description?.toString() || '',
+      icon: (routeRecord.meta?.icon as string) || '$mdiMinus',
+      color: (routeRecord.meta?.color as string) || '',
+      visibility: (routeRecord.meta?.visibility as Visibility) || 'never',
+      access: (routeRecord.meta?.access as Access) || 'never',
+      roles: (routeRecord.meta?.roles as string[]) || [],
     }
   })
 
   const title = computed(() => (path: string) => {
-    const page = allPages.find((p) => p.path === path)
+    const page = allPages.find((page) => page.path === path)
     return page ? page.title : ''
   })
 
   const breadcrumbs = computed(() => {
-    const paths = ['', ...route.path.split('/').filter(Boolean)].map((_, i, arr) => {
-      const p = arr.slice(1, i + 1).join('/')
-      return '/' + p
+    const paths = ['', ...route.path.split('/').filter(Boolean)].map((_, index, values) => {
+      const path = values.slice(1, index + 1).join('/')
+      return '/' + path
     })
 
     const crumbs = allPages
-      .filter((p) => p.path !== '/:path(.*)')
-      .filter((p) => paths.includes(p.path))
-      .toSorted((a, b) => a.level - b.level)
-      .map((p) => ({ title: p.title, disabled: route.path === p.path, href: p.path, icon: p.icon }))
+      .filter((page) => page.path !== '/:path(.*)')
+      .filter((page) => paths.includes(page.path))
+      .toSorted((first, second) => first.level - second.level)
+      .map((page) => ({
+        title: page.title,
+        disabled: route.path === page.path,
+        href: page.path,
+        icon: page.icon,
+      }))
 
     if (breadcrumb.value) crumbs.push(breadcrumb.value)
 
@@ -156,7 +161,7 @@ export const useNavigationStore = defineStore('navigation', () => {
   })
 
   const pages: ComputedRef<Page[]> = computed(() => {
-    return allPages.filter((p) => p.level < 2).filter((p) => p.path !== '/:path(.*)')
+    return allPages.filter((page) => page.level < 2).filter((page) => page.path !== '/:path(.*)')
   })
 
   function setBreadcrumb(breadcrumbTitle: string, href?: string, icon?: string, disabled = true) {

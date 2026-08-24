@@ -6,6 +6,7 @@ import {
   getOdbVueVuetify,
   installOdbVueConfig,
   resolveOdbVueLocale,
+  useAppStore,
   useCapability,
   useOdbVueConfig,
 } from '../src/index.js'
@@ -48,6 +49,18 @@ describe('OdbVue application config', () => {
     installOdbVueConfig(app, defineOdbVueApp({}), router)
 
     expect(app.config.globalProperties.$router).toBe(router)
+  })
+
+  it('provides app metadata to the framework store', () => {
+    const app = createApp({})
+    const router = createRouter({ history: createMemoryHistory(), routes: [] })
+
+    installOdbVueConfig(app, defineOdbVueApp({ title: 'Example', version: '2.0.0' }), router)
+
+    app.runWithContext(() => {
+      expect(useAppStore().title).toBe('Example')
+      expect(useAppStore().version).toBe('2.0.0')
+    })
   })
 
   it('matches the browser language to a configured locale', () => {

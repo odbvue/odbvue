@@ -96,11 +96,9 @@ export const useUiStore = defineStore('ui', () => {
     setAlertBehavior(options)
     if ((options.timeout ?? 0) > 0) {
       scheduleAlertClear(options.timeout ?? 0)
-    } else {
-      if (activeAlertTimeout.value !== undefined) {
-        clearTimeout(activeAlertTimeout.value)
-        activeAlertTimeout.value = undefined
-      }
+    } else if (activeAlertTimeout.value !== undefined) {
+      clearTimeout(activeAlertTimeout.value)
+      activeAlertTimeout.value = undefined
     }
   }
 

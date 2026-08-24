@@ -63,7 +63,18 @@ export default defineConfig({
         'vue-i18n',
         {
           from: '@odbvue/web',
-          imports: ['configureHttp', 'useHttp'],
+          imports: [
+            'computedRouteParam',
+            'computedRouteParams',
+            'computedRouteQuery',
+            'configureHttp',
+            'useAppStore',
+            'useHttp',
+            'useNavigationStore',
+            'useRouteParams',
+            'useSettingsStore',
+            'useUiStore',
+          ],
         },
         {
           from: 'vuetify',
@@ -81,7 +92,7 @@ export default defineConfig({
         },
         unheadVueComposablesImports,
       ],
-      dirs: ['./src/composables/**', './src/stores/**'],
+      dirs: ['./src/composables/**'],
     }),
     Components({}),
     vueDevTools(),

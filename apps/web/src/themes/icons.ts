@@ -82,8 +82,6 @@ import {
 	mdiTwitter,
 	mdiUndo,
 	mdiViewDashboard,
-	mdiWeatherNight,
-	mdiWeatherSunny,
 	mdiWeb,
 	mdiWhatsapp
 } from '@mdi/js'
@@ -166,8 +164,6 @@ export default {
 	mdiTwitter,
 	mdiUndo,
 	mdiViewDashboard,
-	mdiWeatherNight,
-	mdiWeatherSunny,
 	mdiWeb,
 	mdiWhatsapp
 }

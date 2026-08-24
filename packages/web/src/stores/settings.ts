@@ -1,8 +1,6 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
-
 import { computed, ref, type Ref, watch } from 'vue'
-
-import { getOdbVueI18n, getOdbVueVuetify } from '@odbvue/web'
+import { getOdbVueI18n, getOdbVueVuetify } from '../index.js'
 
 const themes = ['system', 'light', 'dark'] as const
 
@@ -37,9 +35,7 @@ export const useSettingsStore = defineStore(
       locale: Ref<string>
       availableLocales: string[]
     }
-
     const locale = ref(i18nManager.locale.value)
-
     const locales = computed(() => i18nManager.availableLocales)
 
     function setLocale(newLocale: string) {
@@ -50,16 +46,13 @@ export const useSettingsStore = defineStore(
       if (!locales.value.includes(newLocale)) {
         console.warn(`[Settings Store] Invalid locale: ${newLocale}`)
         const firstLocale = locales.value[0]
-        if (firstLocale) {
-          locale.value = firstLocale
-        }
+        if (firstLocale) locale.value = firstLocale
         return
       }
       i18nManager.locale.value = newLocale
     })
 
     const fontSize = ref(100)
-
     const fontSizes = [100, 150, 200]
 
     function setFontSize(newFontSize: number) {
@@ -69,15 +62,13 @@ export const useSettingsStore = defineStore(
         return
       }
       fontSize.value = newFontSize
-      if (typeof document !== 'undefined') {
+      if (typeof document !== 'undefined')
         document.documentElement.style.fontSize = `${newFontSize}%`
-      }
     }
 
     watch(fontSize, (newFontSize) => {
-      if (typeof document !== 'undefined') {
+      if (typeof document !== 'undefined')
         document.documentElement.style.fontSize = `${newFontSize}%`
-      }
     })
 
     return {

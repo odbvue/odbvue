@@ -4,6 +4,8 @@ import { light, dark } from './src/themes/themes.json'
 import icons from './src/themes/icons'
 
 export default defineOdbVueApp({
+  title: 'OdbVue',
+  version: '1.0.0',
   auth: false,
   audit: false,
   settings: false,
