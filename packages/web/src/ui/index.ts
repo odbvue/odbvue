@@ -8,8 +8,6 @@ import { odbVueComponentIcons } from '../components/icons.js'
 
 type OdbVueVuetify = ReturnType<typeof createVuetify>
 
-let vuetify: OdbVueVuetify | undefined
-
 /** Creates OdbVue's Vuetify runtime from stable application UI settings. */
 export function createOdbVueVuetify(ui: OdbVueUiConfig = {}): OdbVueVuetify {
   return createVuetify({
@@ -35,16 +33,4 @@ export function createOdbVueVuetify(ui: OdbVueUiConfig = {}): OdbVueVuetify {
       sets: { mdi },
     },
   } satisfies VuetifyOptions)
-}
-
-export function setOdbVueVuetify(instance: OdbVueVuetify): void {
-  vuetify = instance
-}
-
-/** Returns the Vuetify runtime installed with the OdbVue application. */
-export function getOdbVueVuetify(): OdbVueVuetify {
-  if (!vuetify) {
-    throw new Error('OdbVue UI is not installed. Call installOdbVue() before using it.')
-  }
-  return vuetify
 }

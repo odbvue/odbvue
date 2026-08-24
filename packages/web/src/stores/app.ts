@@ -1,11 +1,11 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
-import { getOdbVueConfig } from '../runtime/config.js'
+import { useOdbVue } from '../runtime/context.js'
 import { useSettingsStore } from './settings.js'
 import { useNavigationStore } from './navigation.js'
 import { useUiStore } from './ui.js'
 
 export const useAppStore = defineStore('app', () => {
-  const config = getOdbVueConfig()
+  const { config } = useOdbVue()
 
   return {
     version: config.version ?? '',

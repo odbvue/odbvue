@@ -1,7 +1,6 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
 import { computed, ref, type Ref, watch } from 'vue'
-import { getOdbVueI18n } from '../i18n/index.js'
-import { getOdbVueVuetify } from '../ui/index.js'
+import { useOdbVue } from '../runtime/context.js'
 
 const themes = ['system', 'light', 'dark'] as const
 
@@ -10,6 +9,7 @@ type ThemeName = (typeof themes)[number]
 export const useSettingsStore = defineStore(
   'settings',
   () => {
+    const { i18n, vuetify } = useOdbVue()
     const theme = ref<ThemeName>('system')
 
     function setTheme(nextTheme: ThemeName) {
@@ -27,12 +27,12 @@ export const useSettingsStore = defineStore(
     watch(
       theme,
       (nextTheme) => {
-        void getOdbVueVuetify().theme.change(nextTheme)
+        void vuetify.theme.change(nextTheme)
       },
       { immediate: true },
     )
 
-    const i18nManager = getOdbVueI18n().global as {
+    const i18nManager = i18n.global as {
       locale: Ref<string>
       availableLocales: string[]
     }
