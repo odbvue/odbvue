@@ -13,7 +13,8 @@
     "dev": "pnpm -r run dev",
     "check": "pnpm -r run check",
     "build": "pnpm -r run build",
-    "rebuild:db": "pnpm --filter @odbvue/odb run check & pnpm --filter @odbvue/odb run build & pnpm --filter @odbvue/db run check & pnpm --filter @odbvue/db run build",
+    "build:odb": "pnpm --filter @odbvue/odb run check && pnpm --filter @odbvue/odb run build && pnpm --filter @odbvue/db run check && pnpm --filter @odbvue/db run build",
+    "build:web": "pnpm --filter @odbvue/web run check && pnpm --filter @odbvue/web run build && pnpm --filter apps run check && pnpm --filter apps run build",
     "link:cli": "pnpm -C cli link"
   },
   "devDependencies": {

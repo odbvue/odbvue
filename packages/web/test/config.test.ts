@@ -68,7 +68,10 @@ describe('OdbVue application config', () => {
 
   it('installs the application router', () => {
     const app = createApp({})
-    const router = createRouter({ history: createMemoryHistory(), routes: [] })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }],
+    })
 
     installOdbVue(app, defineOdbVueApp({}), router)
 
@@ -77,7 +80,10 @@ describe('OdbVue application config', () => {
 
   it('provides app metadata to the framework store', () => {
     const app = createApp({})
-    const router = createRouter({ history: createMemoryHistory(), routes: [] })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }],
+    })
 
     installOdbVue(app, defineOdbVueApp({ title: 'Example', version: '2.0.0' }), router)
 

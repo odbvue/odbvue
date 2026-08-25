@@ -36,7 +36,7 @@
                 @update:model-value="(val: unknown) => handleFieldChange(field.name, val)"
                 v-bind="
                   field.type === 'custom'
-                    ? field.props
+                    ? definedProps(field.props)
                     : {
                         ...field.props,
                         id: field.name,
@@ -219,12 +219,20 @@ const loadCustomComponent = async (fieldName: string, field: OvFormCustomField) 
     component && typeof component === 'object' && 'default' in component
       ? component.default
       : component
+  const rawComponent =
+    resolvedComponent !== null &&
+    (typeof resolvedComponent === 'object' || typeof resolvedComponent === 'function')
+      ? markRaw(toRaw(resolvedComponent))
+      : resolvedComponent
   customComponents.value = {
     ...customComponents.value,
-    [fieldName]: resolvedComponent,
+    [fieldName]: rawComponent,
   }
-  return resolvedComponent
+  return rawComponent
 }
+
+const definedProps = (props: Record<string, unknown>) =>
+  Object.fromEntries(Object.entries(props).filter(([, value]) => value !== undefined))
 
 // Convert various string formats to boolean (Y/N, 0/1, T/F, true/false)
 const toBoolean = (value: unknown): boolean => {

@@ -3,7 +3,9 @@ import { config } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
+import { aliases, mdi } from 'vuetify/iconsets/mdi-svg'
 import { createI18n } from 'vue-i18n'
+import { odbVueComponentIcons } from '../../src/components/icons'
 
 if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver = class ResizeObserver {
@@ -30,7 +32,17 @@ if (typeof globalThis.visualViewport === 'undefined') {
   })
 }
 
-const vuetify = createVuetify({ components, directives })
+HTMLCanvasElement.prototype.toDataURL = vi.fn<() => string>(() => 'data:image/png;base64,test')
+
+const vuetify = createVuetify({
+  components,
+  directives,
+  icons: {
+    defaultSet: 'mdi',
+    aliases: { ...aliases, ...odbVueComponentIcons },
+    sets: { mdi },
+  },
+})
 
 export const i18n = createI18n({
   legacy: false,

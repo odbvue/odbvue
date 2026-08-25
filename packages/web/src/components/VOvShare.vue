@@ -120,7 +120,6 @@ const copyToClipboard = () => {
   if (navigator.clipboard) {
     navigator.clipboard
       .writeText(props.shareOptions.text || '')
-      .then(() => console.log('Copied to clipboard'))
       .catch((err) => console.error('Error copying to clipboard', err))
   } else {
     const el = document.createElement('textarea')

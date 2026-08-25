@@ -332,17 +332,6 @@ rewrite; existing `src/pages` keeps working throughout.
 - [ ] Record the "config before scaffolding" and "one release train" rules as
       framework principles.
 
-### Phase 1 — `defineOdbVueApp` config core
-
-- [ ] Add `odbvue.config.ts` at the web app root with a typed
-      `defineOdbVueApp(config)` helper exported from `@odbvue/web`.
-- [ ] Define the config schema: `auth`, `audit`, `settings`, `storage`, `ai`,
-      `email`, `integrations`, `hooks`, `modules`, `preset`.
-- [ ] Provide runtime access via a composable, e.g. `useOdbVueConfig()`, and a
-      capability accessor `useCapability(name)`.
-- [ ] Wire config load into [apps/web/src/main.ts](apps/web/src/main.ts) before
-      `app.mount`.
-
 ### Phase 1.5 — Framework extraction (`apps/web` → `@odbvue/web`)
 
 `defineOdbVueApp` and the module system both assume a framework package exists to
@@ -415,8 +404,6 @@ always-on (see the compile-time composition section).
       routes with `vue-router/auto-routes`.
 - [ ] Feed module navigation into
       [apps/web/src/stores/navigation.ts](apps/web/src/stores/navigation.ts).
-- [ ] Extend [apps/web/vite-plugin-i18n.ts](apps/web/vite-plugin-i18n.ts) to also
-      scan `src/modules/*/i18n/**`.
 
 #### HMR & the module registry
 
@@ -498,28 +485,9 @@ everything.
 
 ## 12. Documentation roadmap
 
-### Phase 1 — Establish the new framework story
-
-- [ ] Add **Framework Overview** under Introduction.
-- [ ] Explain OdbVue as a framework composed of database, ORDS/OpenAPI, web runtime, configuration, and CLI.
-- [ ] Document the boundary between **framework-owned** and **application-owned** code.
-- [ ] Update **Architecture and Design** to reflect `packages/odb`, Oracle support, `packages/web`, `apps/db`, and `apps/web`.
-- [ ] Review **Why OdbVue?** and replace remaining "template/reference implementation" language where OdbVue is now acting as a framework.
-- [ ] Add a simple architecture diagram showing `Oracle → ORDS/OpenAPI → @odbvue/web → application`.
-
 ### Phase 2 — Rebuild the Web guide around OdbVue
 
-- [ ] Replace **Setting up VueJs** with **Web Overview**.
-- [ ] Explain that Vue, Vuetify, and standard web runtime setup are provided by `@odbvue/web`.
-- [ ] Add **Web Configuration** centered on `odbvue.config.ts`.
-- [ ] Document the current top-level configuration areas: capabilities, `ui`, integrations, hooks, and modules.
-- [ ] Replace **UI Component Framework** with **UI & Themes**.
-- [ ] Document `ui.theme`, `ui.defaults`, and `ui.icons`.
-- [ ] Explain that Vuetify is the underlying UI framework, but OdbVue owns its setup.
-- [ ] Link to Vuetify for component-level API documentation instead of documenting Vuetify setup internally.
-- [ ] Rewrite **File Based Routing** as **Routing & Pages**, documenting the OdbVue convention rather than how the routing library is installed.
 - [ ] Review **Internationalization** from the same perspective: document configuration and application usage, not plugin installation.
-- [ ] Review **State Management** and remove framework-bootstrap instructions that applications no longer need.
 - [ ] Review **Auto Imports** and move implementation/build details to Advanced where appropriate.
 - [ ] Keep **Layouts**, but rewrite it around what application developers create/customize versus what OdbVue provides.
 - [ ] Rename/rewrite **Consuming Web Services** around the intended `ORDS → OpenAPI → generated web client` workflow.
@@ -530,7 +498,6 @@ everything.
 - [ ] Create a **Capabilities Overview** page.
 - [ ] Move Settings toward the capability documentation model.
 - [ ] Prepare documentation slots for Auth, Audit, Storage, AI, and Email as their implementations mature.
-- [ ] Document capability enable/disable configuration through `odbvue.config.ts`.
 - [ ] Keep purely visual/application-shell features such as layouts, navigation, feedback, and page-not-found under Web.
 - [ ] Avoid creating capability pages before the corresponding framework API is stable.
 

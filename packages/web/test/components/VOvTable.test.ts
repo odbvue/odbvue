@@ -89,7 +89,7 @@ describe('VOvTable', () => {
               {
                 name: 'edit',
                 title: 'Edit record',
-                format: { icon: '$mdiPencil' },
+                format: { icon: '$edit' },
               },
             ],
           },
@@ -114,7 +114,7 @@ describe('VOvTable', () => {
               {
                 name: 'edit',
                 title: 'Edit record',
-                format: { icon: '$mdiPencil' },
+                format: { icon: '$edit' },
               },
             ],
           },
