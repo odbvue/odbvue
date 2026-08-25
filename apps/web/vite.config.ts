@@ -1,4 +1,5 @@
 import { fileURLToPath, URL } from 'node:url'
+import { relative, resolve } from 'node:path'
 
 import { defineConfig } from 'vite'
 import VueRouter from 'vue-router/vite'
@@ -38,6 +39,19 @@ export default defineConfig({
   plugins: [
     VueRouter({
       extensions: ['.vue', '.md'],
+      routesFolder: [
+        'src/pages',
+        {
+          src: 'src/modules',
+          path: (filePath) => {
+            const [moduleName, pagesDirectory, ...pagePath] = relative(
+              resolve(process.cwd(), 'src/modules'),
+              filePath,
+            ).split(/[/\\]/)
+            return `/${moduleName}/${pagesDirectory === 'pages' ? pagePath.join('/') : ''}`
+          },
+        },
+      ],
       async extendRoute(route) {
         if (route.component?.endsWith('.md')) {
           const meta = await extractMetaFromMarkdown(route.component)
@@ -92,7 +106,7 @@ export default defineConfig({
         },
         unheadVueComposablesImports,
       ],
-      dirs: ['./src/composables/**'],
+      dirs: ['./src/composables/**', './src/modules/*/composables/**'],
     }),
     Components({
       resolvers: [odbVueComponentsResolver],

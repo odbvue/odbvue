@@ -28,6 +28,16 @@ function resolveI18nScopeFromPathname(pathname: string): I18nScope {
   const normalizedPath = pathname.replace(/\/+$/, '')
   if (!normalizedPath || normalizedPath === '/') return { type: 'shared' }
 
+  const [moduleName, ...pageSegments] = normalizedPath.replace(/^\//, '').split('/')
+  const moduleRoot = path.resolve(process.cwd(), 'src', 'modules', moduleName)
+  if (isDirectory(moduleRoot)) {
+    return {
+      type: 'page',
+      pageDir:
+        pageSegments.length === 0 ? moduleRoot : path.resolve(moduleRoot, 'pages', ...pageSegments),
+    }
+  }
+
   const pagesRoot = path.resolve(process.cwd(), 'src', 'pages')
   const pageDir = path.resolve(pagesRoot, normalizedPath.replace(/^\//, ''))
   return isDirectory(pageDir) ? { type: 'page', pageDir } : { type: 'page', pageDir }
@@ -47,7 +57,14 @@ function getI18nPath(scope: I18nScope, locale: string, i18nDir: string): string 
 
 /** Adds OdbVue's generated-message and missing-key development plugins. */
 export function odbVueI18nPlugin(options: OdbVueI18nViteOptions = {}): PluginOption[] {
-  const { include = ['src/i18n/**', 'src/pages/**/i18n/**'] } = options
+  const {
+    include = [
+      'src/i18n/**',
+      'src/pages/**/i18n/**',
+      'src/modules/*/i18n/**',
+      'src/modules/*/pages/**/i18n/**',
+    ],
+  } = options
   return [VueI18nPlugin({ include }), i18nDevPlugin(options)]
 }
 
