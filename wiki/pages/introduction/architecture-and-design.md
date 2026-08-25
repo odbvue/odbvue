@@ -16,9 +16,9 @@ Oracle Database -> ORDS/OpenAPI -> @odbvue/web -> application
 | --------------- | ----------------------------------------------------------------- |
 | `packages/odb/` | Oracle schema, migrations, execution, ORDS, and OpenAPI tooling   |
 | `packages/web/` | Web runtime and configuration API                                 |
+| `packages/cli/` | The `ov` development workflow                                     |
 | `apps/db/`      | Application-owned Oracle migrations and database artifacts        |
 | `apps/web/`     | Application pages, brand, generated client, and web configuration |
-| `cli/`          | The `ov` development workflow                                     |
 
 ## Application Boundary
 

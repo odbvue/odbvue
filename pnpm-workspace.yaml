@@ -4,7 +4,7 @@ packages:
   - "packages/odb"
   - "packages/odb-oracledb"
   - "packages/web"
-  - "cli"
+  - "packages/cli"
   - "wiki"
 allowBuilds:
   esbuild: true

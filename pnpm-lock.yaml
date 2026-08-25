@@ -161,14 +161,14 @@ importers:
         specifier: ^3.3.5
         version: 3.3.5(typescript@6.0.2)
 
-  cli:
+  packages/cli:
     dependencies:
       '@odbvue/db':
         specifier: workspace:*
-        version: link:../apps/db
+        version: link:../../apps/db
       '@odbvue/odb':
         specifier: workspace:*
-        version: link:../packages/odb
+        version: link:../odb
       chalk:
         specifier: ^5.6.2
         version: 5.6.2

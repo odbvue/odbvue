@@ -9,8 +9,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "link": "pnpm link --global",
-    "unlink": "pnpm unlink --global",
+    "link": "npm link",
+    "unlink": "npm unlink --global @odbvue/cli",
     "format": "oxfmt",
     "lint": "oxlint",
     "type-check": "tsc -p tsconfig.json --noEmit",

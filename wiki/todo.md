@@ -29,13 +29,13 @@ distribution**. They are not the same thing.
 OdbVue recognizes four different things people lazily call "modules", plus the
 configuration that composes them:
 
-| Concept         | Meaning                                        | Example                         | Distribution                       |
-| --------------- | ---------------------------------------------- | ------------------------------- | ---------------------------------- |
-| **Package**     | Distribution mechanism (real npm boundary)     | `@odbvue/web`, `@odbvue/odb`    | npm package, one release train     |
-| **Capability**  | Optional framework functionality               | `audit`, `settings`, `auth`     | built into a package, feature flag |
-| **Integration** | Connection to an external technology/service   | Google OAuth, OpenAI, S3, SMTP  | built into a package, provider     |
-| **Module**      | A business/application domain                   | `customers`, `contracts`        | source folder in the app           |
-| **Config**      | Declares which of the above are on, and how     | `odbvue.config.ts`              | one file in the app                |
+| Concept         | Meaning                                      | Example                        | Distribution                       |
+| --------------- | -------------------------------------------- | ------------------------------ | ---------------------------------- |
+| **Package**     | Distribution mechanism (real npm boundary)   | `@odbvue/web`, `@odbvue/odb`   | npm package, one release train     |
+| **Capability**  | Optional framework functionality             | `audit`, `settings`, `auth`    | built into a package, feature flag |
+| **Integration** | Connection to an external technology/service | Google OAuth, OpenAI, S3, SMTP | built into a package, provider     |
+| **Module**      | A business/application domain                | `customers`, `contracts`       | source folder in the app           |
+| **Config**      | Declares which of the above are on, and how  | `odbvue.config.ts`             | one file in the app                |
 
 Rule of thumb:
 
@@ -167,10 +167,10 @@ Each module declares an explicit, shallow contract:
 // src/modules/contracts/module.ts
 export default defineModule({
   name: 'contracts',
-  requires: ['customers'],   // shallow, one-way dependency
-  routes,                     // contributed to the router
-  navigation,                 // contributed to navigation store
-  permissions,                // contributed to auth capability
+  requires: ['customers'], // shallow, one-way dependency
+  routes, // contributed to the router
+  navigation, // contributed to navigation store
+  permissions, // contributed to auth capability
 })
 ```
 
@@ -212,11 +212,15 @@ defineOdbVueApp({
   auth: {
     google: {
       enabled: true,
-      mapUser(ctx) { /* app-specific behavior */ },
+      mapUser(ctx) {
+        /* app-specific behavior */
+      },
     },
   },
   hooks: {
-    'auth:user-created': async (ctx) => { /* ... */ },
+    'auth:user-created': async (ctx) => {
+      /* ... */
+    },
   },
 })
 ```
@@ -344,21 +348,21 @@ generated + brand code plus a thin `odbvue.config.ts` and `main.ts`.
 tooling). The app keeps business (`pages/`), generated (ORDS client), and brand
 (theme/i18n) code.
 
-| Current path | Destination | Move type | Notes |
-| --- | --- | --- | --- |
-| [src/components](apps/web/src/components) (`VOv*` + `index.ts` types) | `@odbvue/web` | **Full** | Pure framework UI. Ship via an auto-import/components **resolver** so the app keeps them ambient. |
-| [src/composables](apps/web/src/composables) (`dnd`, `http`, `ui`) | `@odbvue/web` | **Full** | Generic; `http.ts` is the framework fetch client. |
-| [src/plugins](apps/web/src/plugins) (`http`, `i18n`, `pinia-persist`, `vuetify`) | `@odbvue/web` | **Factory** | Move factories; app passes config (locales, themes). Already the shape of `createHttpPlugin(options)`. |
-| [src/stores/ui.ts](apps/web/src/stores/ui.ts), [navigation.ts](apps/web/src/stores/navigation.ts) | `@odbvue/web` | **Full** | Alerts/loading + route-derived nav are framework. |
-| [src/stores/settings.ts](apps/web/src/stores/settings.ts) | `@odbvue/web` | **Full** | Theme/locale prefs; app can extend persisted keys. |
-| [src/stores/index.ts](apps/web/src/stores/index.ts) (`app` store) | `@odbvue/web` | **Full, decouple** | Today imports **root `package.json`** for `title`/`version` — must become injected config (`defineOdbVueApp({ title, version })`), not a relative import. |
-| [src/router/index.ts](apps/web/src/router/index.ts) | `@odbvue/web` | **Factory** | `createRouter` + `handleHotUpdate` + title guard is framework; routes are fed in from app scan + modules. |
-| [src/App.vue](apps/web/src/App.vue) | `@odbvue/web` | **Full** | The `import.meta.glob('./layouts/*.vue')` layout resolver becomes a framework root component. |
-| [src/main.ts](apps/web/src/main.ts) | `@odbvue/web` | **`createOdbVueApp()`** | Bootstrap moves into the framework; app `main.ts` shrinks to `createOdbVueApp(config).mount('#app')`. |
-| [src/layouts](apps/web/src/layouts) | `@odbvue/web` | **Defaults, overridable** | Ship as defaults; app shadows by name. |
-| [src/themes](apps/web/src/themes) (`defaults.ts`, `icons.ts`) | `@odbvue/web` | **Defaults** | `themes.json` (brand) **stays in app**. |
-| Root [vite-plugin-openapi.ts](apps/web/vite-plugin-openapi.ts), [vite-plugin-i18n.ts](apps/web/vite-plugin-i18n.ts), and `@odbvue/web/vite` MDI icon plugin | `@odbvue/web/vite` | **Full** | Pure framework tooling under a `/vite` subpath export. |
-| Root [vite.config.ts](apps/web/vite.config.ts) | app (thin) | **Preset** | App calls an `odbvue()` Vite preset that bundles the plugin stack. |
+| Current path                                                                                                                                                | Destination        | Move type                 | Notes                                                                                                                                                     |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [src/components](apps/web/src/components) (`VOv*` + `index.ts` types)                                                                                       | `@odbvue/web`      | **Full**                  | Pure framework UI. Ship via an auto-import/components **resolver** so the app keeps them ambient.                                                         |
+| [src/composables](apps/web/src/composables) (`dnd`, `http`, `ui`)                                                                                           | `@odbvue/web`      | **Full**                  | Generic; `http.ts` is the framework fetch client.                                                                                                         |
+| [src/plugins](apps/web/src/plugins) (`http`, `i18n`, `pinia-persist`, `vuetify`)                                                                            | `@odbvue/web`      | **Factory**               | Move factories; app passes config (locales, themes). Already the shape of `createHttpPlugin(options)`.                                                    |
+| [src/stores/ui.ts](apps/web/src/stores/ui.ts), [navigation.ts](apps/web/src/stores/navigation.ts)                                                           | `@odbvue/web`      | **Full**                  | Alerts/loading + route-derived nav are framework.                                                                                                         |
+| [src/stores/settings.ts](apps/web/src/stores/settings.ts)                                                                                                   | `@odbvue/web`      | **Full**                  | Theme/locale prefs; app can extend persisted keys.                                                                                                        |
+| [src/stores/index.ts](apps/web/src/stores/index.ts) (`app` store)                                                                                           | `@odbvue/web`      | **Full, decouple**        | Today imports **root `package.json`** for `title`/`version` — must become injected config (`defineOdbVueApp({ title, version })`), not a relative import. |
+| [src/router/index.ts](apps/web/src/router/index.ts)                                                                                                         | `@odbvue/web`      | **Factory**               | `createRouter` + `handleHotUpdate` + title guard is framework; routes are fed in from app scan + modules.                                                 |
+| [src/App.vue](apps/web/src/App.vue)                                                                                                                         | `@odbvue/web`      | **Full**                  | The `import.meta.glob('./layouts/*.vue')` layout resolver becomes a framework root component.                                                             |
+| [src/main.ts](apps/web/src/main.ts)                                                                                                                         | `@odbvue/web`      | **`createOdbVueApp()`**   | Bootstrap moves into the framework; app `main.ts` shrinks to `createOdbVueApp(config).mount('#app')`.                                                     |
+| [src/layouts](apps/web/src/layouts)                                                                                                                         | `@odbvue/web`      | **Defaults, overridable** | Ship as defaults; app shadows by name.                                                                                                                    |
+| [src/themes](apps/web/src/themes) (`defaults.ts`, `icons.ts`)                                                                                               | `@odbvue/web`      | **Defaults**              | `themes.json` (brand) **stays in app**.                                                                                                                   |
+| Root [vite-plugin-openapi.ts](apps/web/vite-plugin-openapi.ts), [vite-plugin-i18n.ts](apps/web/vite-plugin-i18n.ts), and `@odbvue/web/vite` MDI icon plugin | `@odbvue/web/vite` | **Full**                  | Pure framework tooling under a `/vite` subpath export.                                                                                                    |
+| Root [vite.config.ts](apps/web/vite.config.ts)                                                                                                              | app (thin)         | **Preset**                | App calls an `odbvue()` Vite preset that bundles the plugin stack.                                                                                        |
 
 **Stays in the app (user-owned):** [src/pages](apps/web/src/pages) (except a
 framework-default `[...path].vue` 404), [generated ORDS client](apps/web/src/services/openapi.generated.ts),
@@ -379,9 +383,9 @@ comparison):
       `@tiptap/*`, `ofetch`, `pinia`, `vue-i18n`, `vue-router`, `@unhead/vue`) move to
       `@odbvue/web` as deps/peerDeps — peer-vs-bundled decided per lib (Vue/Vuetify →
       peer; leaflet/tiptap → lazy/optional).
-- [ ] **Config injection replaces upward imports.** Anything reaching *up* into the
+- [ ] **Config injection replaces upward imports.** Anything reaching _up_ into the
       app (the `app` store reading root `package.json`, locale lists, theme names)
-      flows *down* through `defineOdbVueApp` config instead — this is what keeps
+      flows _down_ through `defineOdbVueApp` config instead — this is what keeps
       upgrades non-breaking.
 
 **Heavy-component tension.** `VOvMap` (leaflet), `VOvEditor` (tiptap), `VOvChart`
@@ -430,7 +434,7 @@ one eager hub that Vite then invalidates wholesale. Design rules:
 - **Route contributed nav/state through Pinia with `acceptHMRUpdate`** (as
   [apps/web/src/stores/navigation.ts](apps/web/src/stores/navigation.ts) already
   does) so navigation hot-swaps instead of reloading.
-- **Add `src/modules/*/i18n/**` to the i18n plugin watch globs** so module locales
+- **Add `src/modules/\*/i18n/**` to the i18n plugin watch globs\*\* so module locales
   get the same per-scope HMR that pages already have.
 
 Done this way, HMR granularity stays essentially unchanged from the current
@@ -466,8 +470,8 @@ everything.
       pages, components, i18n) + optional `db/modules/<name>`.
 - [ ] `ov upgrade` — version check, config-schema codemods, DB framework migration
       upgrade, ORDS/OpenAPI regen, compatibility validation, tests.
-- [ ] Add these under [cli/src/commands](cli/src/commands) +
-      [cli/src/app](cli/src/app), matching the existing Commander structure.
+  - [ ] Add these under [packages/cli/src/commands](packages/cli/src/commands) +
+        [packages/cli/src/app](packages/cli/src/app), matching the existing Commander structure.
 
 ### Phase 6 — Presets & polish
 
