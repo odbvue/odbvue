@@ -3,11 +3,25 @@ export type {
   OdbVueAppConfig,
   OdbVueAuthConfig,
   OdbVueCapabilityName,
+  OdbVueErrorsConfig,
   OdbVueHook,
   OdbVueI18nConfig,
   OdbVueProviderConfig,
   OdbVueUiConfig,
 } from './runtime/config.js'
+export {
+  createConsoleErrorReporter,
+  createLocalStorageErrorReporter,
+  createOdbVueErrors,
+} from './capabilities/errors/index.js'
+export type {
+  CaptureErrorOptions,
+  ErrorReporter,
+  ErrorSeverity,
+  LocalStorageErrorReporterOptions,
+  OdbVueErrorEvent,
+  OdbVueErrors,
+} from './capabilities/errors/index.js'
 export * from './capabilities/http/index.js'
 export { createOdbVueI18n, resolveOdbVueLocale } from './capabilities/i18n/index.js'
 export { odbVueRuntimeKey, useOdbVue } from './runtime/context.js'

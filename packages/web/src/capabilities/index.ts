@@ -54,6 +54,14 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     icon: '$mdiWeb',
   }),
   defineCapability({
+    name: 'errors',
+    kind: 'core',
+    required: true,
+    title: 'Error handling',
+    description: 'Application error capture and reporting.',
+    icon: '$mdiAlertCircle',
+  }),
+  defineCapability({
     name: 'auth',
     kind: 'feature',
     title: 'Authentication',

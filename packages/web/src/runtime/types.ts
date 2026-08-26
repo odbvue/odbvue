@@ -2,6 +2,7 @@ import type { Pinia } from 'pinia'
 import { createVuetify } from 'vuetify'
 import type { OdbVueAppConfig } from './config.js'
 import type { createOdbVueI18n } from '../capabilities/i18n/index.js'
+import type { OdbVueErrors } from '../capabilities/errors/index.js'
 
 type OdbVueVuetify = ReturnType<typeof createVuetify>
 type OdbVueI18n = ReturnType<typeof createOdbVueI18n>
@@ -11,4 +12,5 @@ export interface OdbVueRuntime {
   pinia: Pinia
   vuetify: OdbVueVuetify
   i18n: OdbVueI18n
+  errors: OdbVueErrors
 }

@@ -1,4 +1,4 @@
-import { defineOdbVueApp } from '@odbvue/web'
+import { createLocalStorageErrorReporter, defineOdbVueApp } from '@odbvue/web'
 
 import { light, dark } from './src/themes/themes.json'
 import icons from './src/themes/icons'
@@ -29,6 +29,9 @@ export default defineOdbVueApp({
   i18n: {
     locales: ['en', 'fr', 'de'],
     fallbackLocale: 'en',
+  },
+  errors: {
+    reporters: [createLocalStorageErrorReporter()],
   },
   integrations: {},
   hooks: {},

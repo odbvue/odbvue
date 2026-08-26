@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createApp } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import {
   defineOdbVueApp,
   installOdbVue,
+  createOdbVueErrors,
   resolveOdbVueLocale,
   useAppStore,
   useCapability,
@@ -12,6 +13,24 @@ import {
 } from '../src/index.js'
 
 describe('OdbVue application config', () => {
+  it('captures normalized errors and isolates reporter failures', async () => {
+    const reporter = vi.fn<() => void>(() => {
+      throw new Error('Reporter unavailable')
+    })
+    const errors = createOdbVueErrors({ bufferSize: 1, reporters: [reporter] })
+
+    const event = errors.capture(new Error('Save failed'), { source: 'orders' })
+    errors.capture('Second error')
+    await Promise.resolve()
+
+    expect(event.message).toBe('Save failed')
+    expect(event.name).toBe('Error')
+    expect(event.source).toBe('orders')
+    expect(errors.getEvents()).toHaveLength(1)
+    expect(errors.getEvents()[0]?.message).toBe('Second error')
+    expect(reporter).toHaveBeenCalledTimes(2)
+  })
+
   it('preserves the declared configuration', () => {
     const config = defineOdbVueApp({ auth: { local: true }, audit: true })
 
@@ -43,6 +62,7 @@ describe('OdbVue application config', () => {
     expect(auth).toEqual({ local: true })
     expect(audit).toBeUndefined()
     expect(runtime.vuetify.theme.name.value).toBe('dark')
+    expect(runtime.errors).toBeDefined()
   })
 
   it('creates independent runtimes for independent applications', () => {

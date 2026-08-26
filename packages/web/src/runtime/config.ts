@@ -30,6 +30,8 @@ export type OdbVueI18nConfig = {
   >
 }
 
+export type OdbVueErrorsConfig = import('../capabilities/errors/index.js').OdbVueErrorsConfig
+
 export type OdbVueAppConfig = {
   title?: string
   version?: string
@@ -41,6 +43,7 @@ export type OdbVueAppConfig = {
   email?: OdbVueProviderConfig
   ui?: OdbVueUiConfig
   i18n?: OdbVueI18nConfig
+  errors?: OdbVueErrorsConfig
   integrations?: Record<string, unknown>
   hooks?: Record<string, OdbVueHook | OdbVueHook[]>
   modules?: string[]

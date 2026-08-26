@@ -2,6 +2,7 @@ import { createHead } from '@unhead/vue/client'
 import type { App } from 'vue'
 import type { Router } from 'vue-router'
 import type { OdbVueAppConfig } from './config.js'
+import { createOdbVueErrors } from '../capabilities/errors/index.js'
 import { configureOdbVueHttp } from '../capabilities/http/index.js'
 import { createOdbVueI18n } from '../capabilities/i18n/index.js'
 import { createOdbVuePinia } from '../capabilities/state/index.js'
@@ -14,10 +15,20 @@ export function installOdbVue(app: App, config: OdbVueAppConfig, router?: Router
   const pinia = createOdbVuePinia()
   const vuetify = createOdbVueVuetify(config.ui)
   const i18n = createOdbVueI18n(config.i18n)
+  const errors = createOdbVueErrors(config.errors)
 
-  const runtime: OdbVueRuntime = { config, pinia, vuetify, i18n }
+  const runtime: OdbVueRuntime = { config, pinia, vuetify, i18n, errors }
 
   app.use(pinia)
+  app.config.errorHandler = (error, instance, info) => {
+    errors.capture(error, {
+      source: 'vue',
+      context: {
+        component: instance?.$options.name,
+        info,
+      },
+    })
+  }
   configureOdbVueHttp()
   app.use(vuetify)
   app.use(i18n)
