@@ -24,3 +24,13 @@ An application owns its business pages, domain components, database migrations, 
 ## Composition
 
 `odbvue.config.ts` is the application-level registration point. It selects capabilities and integrations, supplies UI customizations, and will compose business modules as the module API becomes stable. OdbVue then applies those choices to its runtime without generating framework files for the application to maintain.
+
+## Framework capabilities
+
+Capabilities are reusable framework behavior exposed by OdbVue packages. They give applications a shared implementation and contract while leaving application pages, domain rules, and presentation in application code.
+
+The web runtime includes capabilities for configuration, errors, HTTP, internationalization, state, UI, and routing. Some capabilities are enabled or configured in `odbvue.config.ts`; routing is always available when an application uses the OdbVue web runtime and Vue Router.
+
+- [Routing](/guide/web/capabilities/routing) turns generated Vue Router records into typed, metadata-rich pages that application shells can use for navigation, breadcrumbs, titles, and page-aware UI.
+
+Capabilities expose framework-level information and operations. They do not replace application-specific authorization or business logic.
