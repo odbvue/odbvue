@@ -16,7 +16,7 @@ export { installOdbVue } from './runtime/install.js'
 export { defineOdbVueModule } from './runtime/module.js'
 export type { OdbVueRuntime } from './runtime/types.js'
 export type { OdbVueModule, OdbVueModuleNavigationItem } from './runtime/module.js'
-export { createOdbVuePinia } from './capabilities/state/index.js'
+export { createOdbVuePinia, getPersistOptions } from './capabilities/state/index.js'
 export type {
   PersistCookieOptions,
   PersistOptions,

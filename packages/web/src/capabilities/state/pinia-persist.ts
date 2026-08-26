@@ -1,4 +1,4 @@
-import type { PiniaPluginContext, StateTree } from 'pinia'
+import type { PiniaPluginContext, StateTree, StoreGeneric } from 'pinia'
 
 export type PersistStorage = 'localStorage' | 'sessionStorage' | 'indexedDB' | 'cookie'
 export interface PersistCookieOptions {
@@ -15,6 +15,13 @@ export interface PersistOptions {
   dbName?: string
   storeName?: string
   cookie?: PersistCookieOptions
+}
+
+const persistOptionsByStore = new WeakMap<StoreGeneric, PersistOptions>()
+
+/** Returns persistence configured for an installed store, if any. */
+export function getPersistOptions(store: StoreGeneric): PersistOptions | undefined {
+  return persistOptionsByStore.get(store)
 }
 
 declare module 'pinia' {
@@ -103,7 +110,9 @@ function pickPaths(state: Record<string, unknown>, paths?: string[]): Record<str
 
 export default function piniaPersistPlugin({ store, options }: PiniaPluginContext): void {
   const persist = (options as { persist?: PersistOptions }).persist
-  if (!persist || typeof window === 'undefined') return
+  if (!persist) return
+  persistOptionsByStore.set(store, persist)
+  if (typeof window === 'undefined') return
   const persistOptions = persist
   const key = persistOptions.key ?? store.$id
   const dbName = persistOptions.dbName ?? 'pinia'

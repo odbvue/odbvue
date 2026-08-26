@@ -8,4 +8,5 @@ export function createOdbVuePinia(): Pinia {
   return instance
 }
 
+export { getPersistOptions } from './pinia-persist.js'
 export type { PersistCookieOptions, PersistOptions, PersistStorage } from './pinia-persist.js'

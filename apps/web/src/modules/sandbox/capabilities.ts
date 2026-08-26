@@ -16,7 +16,7 @@ const capabilityDetails: Record<
 > = {
   state: {
     title: 'State',
-    description: 'Application state management and stores.',
+    description: 'Application state management, stores, and persistence.',
     icon: '$mdiDatabase',
   },
   ui: {

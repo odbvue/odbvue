@@ -13,6 +13,7 @@
       :subtitle="props.subtitle"
       :prepend-icon="props.icon"
       :color="props.color"
+      :style="props.scrollable ? { maxHeight: '90vh' } : undefined"
     >
       <v-card-text>
         <span class="text-pre-wrap text-break" v-if="props.content && !hasContentProps">
