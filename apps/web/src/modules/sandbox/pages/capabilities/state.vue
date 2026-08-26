@@ -117,8 +117,7 @@
 </template>
 
 <script setup lang="ts">
-import { getPersistOptions, useOdbVue, type PersistOptions } from '@odbvue/web'
-import type { StoreGeneric } from 'pinia'
+import { getOdbVueStores, getPersistOptions, useOdbVue, type PersistOptions } from '@odbvue/web'
 import { computed, onMounted, ref } from 'vue'
 
 definePage({
@@ -161,7 +160,7 @@ const dialogOpen = computed({
 })
 
 async function refresh() {
-  stores.value = [...pinia._s.values()].map((store: StoreGeneric) => ({
+  stores.value = getOdbVueStores(pinia).map((store) => ({
     id: store.$id,
     currentState: store.$state,
     persist: getPersistOptions(store),
