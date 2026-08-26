@@ -6,9 +6,10 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach(async (_to) => {
+router.beforeEach(async (to) => {
   const appTitle = useAppStore().title || 'OdbVue'
-  useHead({ title: appTitle })
+  const pageTitle = to.meta.title
+  useHead({ title: pageTitle ? `${appTitle} - ${pageTitle}` : appTitle })
   useAppStore().ui.clearAlertForRouteChange()
   return true
 })

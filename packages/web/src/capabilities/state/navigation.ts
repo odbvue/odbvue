@@ -1,5 +1,6 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
-import { useRouter, useRoute, type RouteLocationNormalizedLoaded } from 'vue-router'
+import { useRoute, type RouteLocationNormalizedLoaded } from 'vue-router'
+import { useRouting } from '../routing/index.js'
 import { computed, ref, type ComputedRef } from 'vue'
 
 const routeValueToString = (value: unknown): string => {
@@ -92,6 +93,8 @@ type Page = {
   visibility: Visibility
   access: Access
   roles: string[]
+  navigation: boolean
+  order: number
 }
 
 type Breadcrumb = {
@@ -102,58 +105,36 @@ type Breadcrumb = {
 }
 
 export const useNavigationStore = defineStore('navigation', () => {
-  const router = useRouter()
-  const routes = router.getRoutes()
-  const route = useRoute()
+  const routing = useRouting()
   const breadcrumb = ref<Breadcrumb>()
 
-  const allPages: Page[] = routes.map((routeRecord) => {
-    const path = routeRecord.path
-    return {
-      path,
-      level: path == '/' ? 0 : path.split('/').length - 1,
-      children:
-        routes.find((otherRoute) => otherRoute.path.includes(path) && otherRoute.path !== path) !==
-        undefined,
-      title:
-        routeRecord.meta?.title?.toString() ||
-        path
-          .split('/')
-          .at(-1)
-          ?.split('-')
-          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ') ||
-        '',
-      description: routeRecord.meta?.description?.toString() || '',
-      icon: (routeRecord.meta?.icon as string) || '$mdiMinus',
-      color: (routeRecord.meta?.color as string) || '',
-      visibility: (routeRecord.meta?.visibility as Visibility) || 'never',
-      access: (routeRecord.meta?.access as Access) || 'never',
-      roles: (routeRecord.meta?.roles as string[]) || [],
-    }
+  const allPages = computed<Page[]>(() => {
+    const routes = routing.pages.value
+    return routes.map((page) => ({
+      path: page.path,
+      level: page.path == '/' ? 0 : page.path.split('/').length - 1,
+      children: routes.some(
+        (otherPage) => otherPage.path.includes(page.path) && otherPage.path !== page.path,
+      ),
+      title: page.title,
+      description: page.meta.description || '',
+      icon: page.meta.icon || '$mdiMinus',
+      color: page.meta.color || '',
+      visibility: page.meta.visibility || 'never',
+      access: page.meta.access || 'never',
+      roles: page.meta.roles || [],
+      navigation: page.navigation !== false,
+      order: page.navigation === false ? 0 : page.navigation.order || 0,
+    }))
   })
 
   const title = computed(() => (path: string) => {
-    const matchedPage = allPages.find((candidate) => candidate.path === path)
+    const matchedPage = allPages.value.find((candidate) => candidate.path === path)
     return matchedPage ? matchedPage.title : ''
   })
 
   const breadcrumbs = computed(() => {
-    const paths = ['', ...route.path.split('/').filter(Boolean)].map((_, index, values) => {
-      const path = values.slice(1, index + 1).join('/')
-      return '/' + path
-    })
-
-    const crumbs = allPages
-      .filter((page) => page.path !== '/:path(.*)')
-      .filter((page) => paths.includes(page.path))
-      .toSorted((first, second) => first.level - second.level)
-      .map((page) => ({
-        title: page.title,
-        disabled: route.path === page.path,
-        href: page.path,
-        icon: page.icon,
-      }))
+    const crumbs = routing.breadcrumbs.value.map((page) => ({ ...page, icon: page.icon || '' }))
 
     if (breadcrumb.value) crumbs.push(breadcrumb.value)
 
@@ -161,7 +142,13 @@ export const useNavigationStore = defineStore('navigation', () => {
   })
 
   const pages: ComputedRef<Page[]> = computed(() => {
-    return allPages.filter((page) => page.level < 2).filter((page) => page.path !== '/:path(.*)')
+    return allPages.value
+      .filter((page) => page.navigation)
+      .filter((page) => page.level < 2)
+      .filter((page) => page.path !== '/:path(.*)')
+      .toSorted(
+        (first, second) => first.order - second.order || first.path.localeCompare(second.path),
+      )
   })
 
   function setBreadcrumb(breadcrumbTitle: string, href?: string, icon?: string, disabled = true) {

@@ -22,6 +22,14 @@ export function defineCapability<const Definition extends CapabilityDefinition>(
 
 export const odbVueCapabilities: readonly CapabilityDefinition[] = [
   defineCapability({
+    name: 'routing',
+    kind: 'core',
+    required: true,
+    title: 'Routing',
+    description: 'File-based pages, route metadata, and navigation conventions.',
+    icon: '$mdiRoutes',
+  }),
+  defineCapability({
     name: 'state',
     kind: 'core',
     required: true,

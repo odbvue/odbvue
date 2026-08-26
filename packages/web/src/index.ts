@@ -43,5 +43,6 @@ export type {
 export * from './capabilities/state/stores.js'
 export type { AlertOptions } from './capabilities/state/ui.js'
 export { createOdbVueVuetify } from './capabilities/ui/index.js'
+export * from './capabilities/routing/index.js'
 export { defineCapability, odbVueCapabilities } from './capabilities/index.js'
 export type { CapabilityDefinition, CapabilityKind } from './capabilities/index.js'

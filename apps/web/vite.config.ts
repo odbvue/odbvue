@@ -48,7 +48,7 @@ export default defineConfig({
               resolve(process.cwd(), 'src/modules'),
               filePath,
             ).split(/[/\\]/)
-            return `/${moduleName}/${pagesDirectory === 'pages' ? pagePath.join('/') : ''}`
+            return `${moduleName}/${pagesDirectory === 'pages' ? pagePath.join('/') : ''}`
           },
         },
       ],
@@ -85,7 +85,9 @@ export default defineConfig({
             'useAppStore',
             'useHttp',
             'useNavigationStore',
+            'usePageMeta',
             'useRouteParams',
+            'useRouting',
             'useSettingsStore',
             'useUiStore',
           ],

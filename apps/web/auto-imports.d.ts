@@ -81,9 +81,11 @@ declare global {
   const useLocale: typeof import('vuetify').useLocale
   const useModel: typeof import('vue').useModel
   const useNavigationStore: typeof import('@odbvue/web').useNavigationStore
+  const usePageMeta: typeof import('@odbvue/web').usePageMeta
   const useRoute: typeof import('vue-router').useRoute
   const useRouteParams: typeof import('@odbvue/web').useRouteParams
   const useRouter: typeof import('vue-router').useRouter
+  const useRouting: typeof import('@odbvue/web').useRouting
   const useRtl: typeof import('vuetify').useRtl
   const useSeoMeta: typeof import('@unhead/vue').useSeoMeta
   const useSettingsStore: typeof import('@odbvue/web').useSettingsStore

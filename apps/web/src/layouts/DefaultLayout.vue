@@ -107,11 +107,6 @@
         <template v-slot:divider>
           <v-icon icon="$mdiChevronRight"></v-icon>
         </template>
-        <template v-slot:title="{ item, index }">
-          <v-breadcrumbs-item :to="item.href" :disabled="item.disabled">
-            {{ item.title }}
-          </v-breadcrumbs-item>
-        </template>
       </v-breadcrumbs>
     </v-app-bar>
 
