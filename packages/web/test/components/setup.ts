@@ -5,7 +5,7 @@ import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 import { aliases, mdi } from 'vuetify/iconsets/mdi-svg'
 import { createI18n } from 'vue-i18n'
-import { odbVueComponentIcons } from '../../src/components/icons'
+import { odbVueComponentIcons } from '../../src/capabilities/ui/components/icons'
 
 if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver = class ResizeObserver {

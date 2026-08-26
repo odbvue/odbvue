@@ -1,4 +1,4 @@
-import type { OdbVueAppConfig, OdbVueCapabilityName } from '../config/index.js'
+import type { OdbVueAppConfig, OdbVueCapabilityName } from './app-config.js'
 import { useOdbVue } from './context.js'
 
 /** Returns the configuration installed when the OdbVue application was created. */

@@ -1,5 +1,5 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
-import { useOdbVue } from '../runtime/context.js'
+import { useOdbVue } from '../../runtime/context.js'
 import { useSettingsStore } from './settings.js'
 import { useNavigationStore } from './navigation.js'
 import { useUiStore } from './ui.js'

@@ -10,8 +10,8 @@
       "import": "./dist/index.js"
     },
     "./vite": {
-      "types": "./dist/vite/index.d.ts",
-      "import": "./dist/vite/index.js"
+      "types": "./dist/capabilities/vite/index.d.ts",
+      "import": "./dist/capabilities/vite/index.js"
     },
     "./components": {
       "types": "./dist/components/index.d.ts",

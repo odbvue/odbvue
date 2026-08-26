@@ -9,7 +9,7 @@ import {
   isValidDuration,
   camelToKebabCase,
   transformKeysToKebabCase,
-} from '../../src/components/api'
+} from '../../src/capabilities/ui/components/api'
 
 const customRule = (value: unknown) => value === 'ok'
 

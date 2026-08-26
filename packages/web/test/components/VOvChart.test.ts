@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import type { ChartData } from 'chart.js'
-import VOvChart from '../../src/components/VOvChart.vue'
+import VOvChart from '../../src/capabilities/ui/components/VOvChart.vue'
 
 vi.mock('vue-chartjs', () => ({
   Bar: { name: 'Bar', template: '<div />' },

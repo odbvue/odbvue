@@ -2,7 +2,9 @@ import { readdir, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 
-const sourceDirectory = fileURLToPath(new URL('../src/components/', import.meta.url))
+const sourceDirectory = fileURLToPath(
+  new URL('../src/capabilities/ui/components/', import.meta.url),
+)
 const outputDirectory = fileURLToPath(new URL('../dist/components/', import.meta.url))
 const declaration = `import type { DefineComponent } from 'vue'\ndeclare const component: DefineComponent<Record<string, unknown>>\nexport default component\n`
 

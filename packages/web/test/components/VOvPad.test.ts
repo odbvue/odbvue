@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import VOvPad from '../../src/components/VOvPad.vue'
+import VOvPad from '../../src/capabilities/ui/components/VOvPad.vue'
 
 class MockImage {
   src = ''

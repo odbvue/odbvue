@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div id="container" ref="container" @touchmove.prevent>
     <canvas
       ref="canvas"

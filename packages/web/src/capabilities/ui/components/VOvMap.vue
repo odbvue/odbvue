@@ -94,7 +94,7 @@ const initialEditableGeometry = ref<string>('null')
 const LATVIA_CENTER: [number, number] = [56.95, 24.11]
 const LATVIA_ZOOM = 7
 
-// Stable non-reactive values for l-map props — never change after mount
+// Stable non-reactive values for l-map props G�� never change after mount
 // so vue-leaflet's propsBinder won't re-trigger setZoom/setCenter
 const mapInitCenter = options.center ?? LATVIA_CENTER
 const mapInitZoom = options.zoom ?? LATVIA_ZOOM
