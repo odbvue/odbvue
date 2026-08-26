@@ -48,8 +48,7 @@
 </template>
 
 <script setup lang="ts">
-import { useOdbVueConfig } from '@odbvue/web'
-import { sandboxCapabilities } from '../capabilities'
+import { odbVueCapabilities, useOdbVueConfig } from '@odbvue/web'
 
 definePage({
   meta: {
@@ -64,9 +63,9 @@ definePage({
 })
 
 const config = useOdbVueConfig()
-const capabilities = sandboxCapabilities
+const capabilities = odbVueCapabilities
 
-function isEnabled(capability: (typeof sandboxCapabilities)[number]) {
+function isEnabled(capability: (typeof odbVueCapabilities)[number]) {
   return capability.required || (capability.configKey && config[capability.configKey] !== false)
 }
 </script>

@@ -39,10 +39,9 @@
 </template>
 
 <script setup lang="ts">
-import { useOdbVueConfig } from '@odbvue/web'
+import { odbVueCapabilities, useOdbVueConfig } from '@odbvue/web'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { sandboxCapabilities } from '../../capabilities'
 
 definePage({
   meta: {
@@ -55,7 +54,7 @@ definePage({
 const route = useRoute()
 const config = useOdbVueConfig()
 const capability = computed(() =>
-  sandboxCapabilities.find((item) => item.name === route.params.capability),
+  odbVueCapabilities.find((item) => item.name === route.params.capability),
 )
 const enabled = computed(
   () =>
