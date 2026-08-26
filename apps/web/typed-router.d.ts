@@ -52,6 +52,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '//sandbox/capabilities/i18n': RouteRecordInfo<
+      '//sandbox/capabilities/i18n',
+      '/sandbox/capabilities/i18n',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '//sandbox/capabilities/state': RouteRecordInfo<
       '//sandbox/capabilities/state',
       '/sandbox/capabilities/state',
@@ -203,6 +210,14 @@ declare module 'vue-router/auto-routes' {
     'src/modules/sandbox/pages/capabilities/errors.vue': {
       routes:
         | '//sandbox/capabilities/errors'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/modules/sandbox/pages/capabilities/i18n.vue': {
+      routes:
+        | '//sandbox/capabilities/i18n'
       views:
         | never
       pathParamNames:

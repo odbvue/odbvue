@@ -8,6 +8,14 @@ type I18nScope = { type: 'shared' } | { type: 'page'; pageDir: string }
 type I18nCacheKey = `${string}:${string}:${string}`
 type I18nCache = Map<I18nCacheKey, { scope: I18nScope; locale: string; key: string; value: string }>
 
+const i18nInventoryVirtualModuleId = 'virtual:odbvue-i18n-inventory'
+const resolvedI18nInventoryVirtualModuleId = `\0${i18nInventoryVirtualModuleId}`
+
+type I18nInventory = {
+  app: Record<string, number>
+  modules: Record<string, Record<string, number>>
+}
+
 export type OdbVueI18nViteOptions = {
   locales?: string[]
   dumpInterval?: number
@@ -65,7 +73,68 @@ export function odbVueI18nPlugin(options: OdbVueI18nViteOptions = {}): PluginOpt
       'src/modules/*/pages/**/i18n/**',
     ],
   } = options
-  return [VueI18nPlugin({ include }), i18nDevPlugin(options)]
+  return [VueI18nPlugin({ include }), i18nDevPlugin(options), i18nInventoryPlugin()]
+}
+
+/** Publishes source-file translation counts for developer diagnostics. */
+function i18nInventoryPlugin(): Plugin {
+  return {
+    name: 'odbvue:i18n-inventory',
+    resolveId(id) {
+      return id === i18nInventoryVirtualModuleId ? resolvedI18nInventoryVirtualModuleId : undefined
+    },
+    async load(id) {
+      if (id !== resolvedI18nInventoryVirtualModuleId) return undefined
+
+      const sourceRoot = path.resolve(process.cwd(), 'src')
+      const modulesRoot = path.join(sourceRoot, 'modules')
+      const inventory: I18nInventory = {
+        app: await countLocaleFiles(path.join(sourceRoot, 'i18n')),
+        modules: {},
+      }
+
+      try {
+        const modules = await fs.readdir(modulesRoot, { withFileTypes: true })
+        for (const module of modules) {
+          if (!module.isDirectory()) continue
+          const counts = await countLocaleFiles(path.join(modulesRoot, module.name, 'i18n'))
+          if (Object.keys(counts).length) inventory.modules[module.name] = counts
+        }
+      } catch {
+        // Applications without modules do not contribute module translations.
+      }
+
+      return `export default ${JSON.stringify(inventory)}`
+    },
+  }
+}
+
+async function countLocaleFiles(i18nDirectory: string): Promise<Record<string, number>> {
+  try {
+    const files = await fs.readdir(i18nDirectory, { withFileTypes: true })
+    return Object.fromEntries(
+      await Promise.all(
+        files
+          .filter((file) => file.isFile() && file.name.endsWith('.json'))
+          .map(async (file) => {
+            const messages = JSON.parse(
+              await fs.readFile(path.join(i18nDirectory, file.name), 'utf-8'),
+            )
+            return [file.name.slice(0, -'.json'.length), countTranslationKeys(messages)]
+          }),
+      ),
+    )
+  } catch {
+    return {}
+  }
+}
+
+function countTranslationKeys(messages: unknown): number {
+  if (!messages || typeof messages !== 'object') return 1
+  return Object.values(messages).reduce<number>(
+    (count, value) => count + countTranslationKeys(value),
+    0,
+  )
 }
 
 /** Records missing translations to the matching shared or page locale file in development. */

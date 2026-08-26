@@ -50,6 +50,7 @@ import {
 	mdiServer,
 	mdiStar,
 	mdiSwapHorizontal,
+	mdiTranslate,
 	mdiWeb
 } from '@mdi/js'
 
@@ -99,5 +100,6 @@ export default {
 	mdiServer,
 	mdiStar,
 	mdiSwapHorizontal,
+	mdiTranslate,
 	mdiWeb
 }
