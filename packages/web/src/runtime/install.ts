@@ -1,7 +1,7 @@
 import { createHead } from '@unhead/vue/client'
 import type { App } from 'vue'
 import type { Router } from 'vue-router'
-import type { OdbVueAppConfig } from './app-config.js'
+import type { OdbVueAppConfig } from './config.js'
 import { configureOdbVueHttp } from '../capabilities/http/index.js'
 import { createOdbVueI18n } from '../capabilities/i18n/index.js'
 import { createOdbVuePinia } from '../capabilities/state/index.js'

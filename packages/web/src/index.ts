@@ -1,4 +1,13 @@
-export * from './runtime/app-config.js'
+export { defineOdbVueApp } from './runtime/config.js'
+export type {
+  OdbVueAppConfig,
+  OdbVueAuthConfig,
+  OdbVueCapabilityName,
+  OdbVueHook,
+  OdbVueI18nConfig,
+  OdbVueProviderConfig,
+  OdbVueUiConfig,
+} from './runtime/config.js'
 export * from './capabilities/http/index.js'
 export { createOdbVueI18n, resolveOdbVueLocale } from './capabilities/i18n/index.js'
 export { odbVueRuntimeKey, useOdbVue } from './runtime/context.js'

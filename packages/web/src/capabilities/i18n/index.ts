@@ -1,6 +1,6 @@
 import { createI18n } from 'vue-i18n'
 import messages from '@intlify/unplugin-vue-i18n/messages'
-import type { OdbVueI18nConfig } from '../../runtime/app-config.js'
+import type { OdbVueI18nConfig } from '../../runtime/config.js'
 
 type OdbVueI18n = ReturnType<typeof createI18n>
 
