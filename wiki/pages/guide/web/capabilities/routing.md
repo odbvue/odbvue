@@ -8,12 +8,12 @@ Use it when an application shell, navigation component, breadcrumb trail, or pag
 
 `useRouting()` reads the active Vue Router instance and returns computed values:
 
-| Value | Description |
-| --- | --- |
-| `pages` | Every registered route, adapted to an OdbVue page. |
-| `currentPage` | The deepest route record matched by the current URL. |
+| Value           | Description                                                     |
+| --------------- | --------------------------------------------------------------- |
+| `pages`         | Every registered route, adapted to an OdbVue page.              |
+| `currentPage`   | The deepest route record matched by the current URL.            |
 | `currentModule` | The first URL segment, such as `customers` for `/customers/42`. |
-| `breadcrumbs` | Visible pages along the current URL hierarchy. |
+| `breadcrumbs`   | Visible pages along the current URL hierarchy.                  |
 
 Each page exposes its route path, the original normalized Vue Router record, `meta`, a derived `title`, and `navigation` metadata. A title comes from `meta.title` when present; otherwise it is derived from the final path segment, so `/customer-orders` becomes `Customer Orders`.
 
