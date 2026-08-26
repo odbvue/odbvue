@@ -54,14 +54,6 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     icon: '$mdiWeb',
   }),
   defineCapability({
-    name: 'vite',
-    kind: 'infrastructure',
-    required: false,
-    title: 'Vite',
-    description: 'Vite development and build integration.',
-    icon: '$mdiLightningBolt',
-  }),
-  defineCapability({
     name: 'auth',
     kind: 'feature',
     title: 'Authentication',
