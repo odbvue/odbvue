@@ -3,8 +3,19 @@
     <v-row>
       <v-col cols="12">
         <h3>Routing</h3>
-        <p>Total routes: {{ String(pages.length) }}</p>
+        <p>Routes: {{ String(pages.length) }} of {{ String(allPages.length) }}</p>
+        <v-text-field
+          v-model="routeFilter"
+          label="Filter routes"
+          placeholder="Enter a route path"
+          prepend-inner-icon="$mdiMagnify"
+          clearable
+          hide-details
+          class="mt-4"
+        />
       </v-col>
+    </v-row>
+    <v-row class="pt-4">
       <v-col v-for="page in pages" :key="page.path" cols="12" md="6" lg="4">
         <v-card class="h-100">
           <v-card-item :prepend-icon="page.meta.icon || '$mdiFileDocumentOutline'">
@@ -38,7 +49,7 @@
 
 <script setup lang="ts">
 import { useRouting, type OdbVuePageMeta } from '@odbvue/web'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 definePage({
@@ -54,9 +65,14 @@ definePage({
 
 const route = useRoute()
 const { currentModule, currentPage, pages: allPages } = useRouting()
-const pages = computed(() =>
-  allPages.value.toSorted((first, second) => first.path.localeCompare(second.path)),
-)
+const routeFilter = ref('')
+const pages = computed(() => {
+  const filter = routeFilter.value.trim().toLocaleLowerCase()
+
+  return allPages.value
+    .filter((page) => page.path.toLocaleLowerCase().includes(filter))
+    .toSorted((first, second) => first.path.localeCompare(second.path))
+})
 
 function isStaticRoute(path: string): boolean {
   return !path.includes(':')
