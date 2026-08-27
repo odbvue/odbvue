@@ -7,11 +7,6 @@ function routeModule(path: string): string | undefined {
   return path.split('/').filter(Boolean).at(0)
 }
 
-function normalizePath(path: string): string {
-  const segments = path.split('/').filter(Boolean)
-  return segments.length ? `/${segments.join('/')}` : '/'
-}
-
 export function useRouting(): OdbVueRouting {
   const router = useRouter()
   const route = useRoute()
@@ -22,27 +17,19 @@ export function useRouting(): OdbVueRouting {
   })
   const currentModule = computed(() => routeModule(route.path))
   const breadcrumbs = computed<OdbVueBreadcrumb[]>(() => {
-    const pathParts = route.path.split('/').filter(Boolean)
-    const paths = [
-      '/',
-      ...pathParts.map((_, index) => `/${pathParts.slice(0, index + 1).join('/')}`),
-    ]
-
-    return paths.flatMap((path) => {
-      const page = pages.value.find(
-        (candidate) =>
-          normalizePath(candidate.path) === path && candidate.meta.visibility !== 'never',
-      )
-      if (!page) return []
-      return [
-        {
-          title: page.title,
-          disabled: normalizePath(route.path) === path,
-          href: path,
-          icon: page.meta.icon,
-        },
-      ]
-    })
+    return route.matched
+      .map(toRoutePage)
+      .filter((page) => page.meta.visibility !== 'never')
+      .map((page, index, matched) => ({
+        title: page.title,
+        disabled: index === matched.length - 1,
+        href: page.route.name
+          ? router.resolve({ name: page.route.name, params: route.params }).href
+          : page.route.path.includes(':')
+            ? route.path
+            : router.resolve(page.route.path).href,
+        icon: page.meta.icon,
+      }))
   })
 
   return { currentPage, currentModule, breadcrumbs, pages }
