@@ -1,6 +1,6 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
 import { useRoute, type RouteLocationNormalizedLoaded } from 'vue-router'
-import { useRouting } from '../routing/index.js'
+import { useRouting } from './index.js'
 import { computed, ref, type ComputedRef } from 'vue'
 
 const routeValueToString = (value: unknown): string => {

@@ -1,8 +1,8 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
-import { useOdbVue } from '../../runtime/context.js'
-import { useSettingsStore } from './settings.js'
-import { useNavigationStore } from './navigation.js'
-import { useUiStore } from './ui.js'
+import { useOdbVue } from './context.js'
+import { useSettingsStore } from '../capabilities/ui/settings.js'
+import { useNavigationStore } from '../capabilities/routing/navigation.js'
+import { useUiStore } from '../capabilities/ui/store.js'
 
 export const useAppStore = defineStore('app', () => {
   const { config } = useOdbVue()

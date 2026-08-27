@@ -1,9 +1,19 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import type { RouteParamsRaw } from 'vue-router'
 import { getOdbVuePageManifest } from './registry.js'
 import { toRoutePage } from './metadata.js'
 import { toManifestPage } from './manifest.js'
 import type { OdbVueBreadcrumb, OdbVueRouting } from './types.js'
+
+function routeParamsForPath(path: string, params: Record<string, unknown>): RouteParamsRaw {
+  const parameterNames = [...path.matchAll(/:([A-Za-z0-9_]+)/g)].map((match) => match[1])
+  return Object.fromEntries(
+    parameterNames
+      .filter((name): name is string => name !== undefined && name in params)
+      .map((name) => [name, params[name] as string | string[]]),
+  )
+}
 
 export function useRouting(): OdbVueRouting {
   const router = useRouter()
@@ -47,7 +57,10 @@ export function useRouting(): OdbVueRouting {
         title: page.title,
         disabled: index === matched.length - 1,
         href: page.route.name
-          ? router.resolve({ name: page.route.name, params: route.params }).href
+          ? router.resolve({
+              name: page.route.name,
+              params: routeParamsForPath(page.route.path, route.params),
+            }).href
           : page.route.path.includes(':')
             ? route.path
             : router.resolve(page.route.path).href,

@@ -58,9 +58,9 @@ describe('routing metadata', () => {
       routes,
     })
     registerOdbVuePageManifest(router, createOdbVuePageManifest(routes))
+    await router.push('/customers/42')
     const app = createApp({})
     app.use(router)
-    await router.push('/customers/42')
 
     let breadcrumbs: ReturnType<typeof useRouting>['breadcrumbs']
     app.runWithContext(() => {
@@ -99,9 +99,9 @@ describe('routing metadata', () => {
     ]
     const router = createRouter({ history: createMemoryHistory(), routes })
     registerOdbVuePageManifest(router, createOdbVuePageManifest(routes))
+    await router.push('/sandbox/capabilities/routing')
     const app = createApp({})
     app.use(router)
-    await router.push('/sandbox/capabilities/routing')
 
     let breadcrumbs: ReturnType<typeof useRouting>['breadcrumbs']
     app.runWithContext(() => {
@@ -115,7 +115,7 @@ describe('routing metadata', () => {
     ])
   })
 
-  it('omits structural and duplicate routes from the page registry', () => {
+  it('omits structural and duplicate routes from the page registry', async () => {
     const routes = [
       {
         path: '/sandbox',
@@ -139,6 +139,7 @@ describe('routing metadata', () => {
     ]
     const router = createRouter({ history: createMemoryHistory(), routes })
     registerOdbVuePageManifest(router, createOdbVuePageManifest(routes))
+    await router.push('/sandbox')
     const app = createApp({})
     app.use(router)
 
@@ -168,9 +169,9 @@ describe('routing metadata', () => {
       routes,
     })
     registerOdbVuePageManifest(router, createOdbVuePageManifest(routes))
+    await router.push('/crm/customers/42')
     const app = createApp({})
     app.use(router)
-    await router.push('/crm/customers/42')
 
     let currentModule: ReturnType<typeof useRouting>['currentModule']
     app.runWithContext(() => {
