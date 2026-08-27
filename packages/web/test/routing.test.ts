@@ -73,6 +73,87 @@ describe('routing metadata', () => {
     ])
   })
 
+  it('uses manifest pages for breadcrumbs instead of directory-only routes', async () => {
+    const routes = [
+      { path: '/', name: 'home', component: {}, meta: { title: 'Home' } },
+      {
+        path: '/sandbox',
+        name: 'sandbox',
+        component: {},
+        meta: { title: 'Sandbox' },
+        children: [
+          {
+            path: 'capabilities',
+            component: undefined,
+            children: [
+              {
+                path: 'routing',
+                name: 'sandbox-routing',
+                component: {},
+                meta: { title: 'Routing' },
+              },
+            ],
+          },
+        ],
+      },
+    ]
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    registerOdbVuePageManifest(router, createOdbVuePageManifest(routes))
+    const app = createApp({})
+    app.use(router)
+    await router.push('/sandbox/capabilities/routing')
+
+    let breadcrumbs: ReturnType<typeof useRouting>['breadcrumbs']
+    app.runWithContext(() => {
+      breadcrumbs = useRouting().breadcrumbs
+    })
+
+    expect(breadcrumbs!.value.map((breadcrumb) => breadcrumb.title)).toEqual([
+      'Home',
+      'Sandbox',
+      'Routing',
+    ])
+  })
+
+  it('omits structural and duplicate routes from the page registry', () => {
+    const routes = [
+      {
+        path: '/sandbox',
+        component: {},
+        children: [
+          { path: '', name: 'sandbox', component: {}, meta: { title: 'Sandbox' } },
+          {
+            path: 'capabilities',
+            component: undefined,
+            children: [
+              {
+                path: 'routing',
+                name: 'sandbox-routing',
+                component: {},
+                meta: { title: 'Routing' },
+              },
+            ],
+          },
+        ],
+      },
+    ]
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    registerOdbVuePageManifest(router, createOdbVuePageManifest(routes))
+    const app = createApp({})
+    app.use(router)
+
+    let pages: ReturnType<typeof useRouting>['pages']
+    app.runWithContext(() => {
+      pages = useRouting().pages
+    })
+
+    expect(pages!.value.map((page) => page.path)).toEqual([
+      '/sandbox',
+      '/sandbox/capabilities/routing',
+    ])
+    expect(pages!.value[0].title).toBe('Sandbox')
+  })
+
   it('uses generated module metadata instead of URL segments', async () => {
     const routes = [
       {
