@@ -13,6 +13,7 @@ import {
   moduleFromComponent,
   odbVueComponentsResolver,
   odbVueI18nPlugin,
+  odbVuePagesPlugin,
 } from '@odbvue/web/vite'
 import { openapiPlugin } from './vite-plugin-openapi.ts'
 import AutoImport from 'unplugin-auto-import/vite'
@@ -46,9 +47,15 @@ export default defineConfig({
           const meta = await extractMetaFromMarkdown(route.component)
           route.meta = { ...route.meta, ...meta }
         }
-        if (moduleName) route.meta = { ...route.meta, module: moduleName }
+        if (moduleName) {
+          route.meta = {
+            ...route.meta,
+            module: moduleName,
+          }
+        }
       },
     }),
+    odbVuePagesPlugin(),
     vue({
       include: [/\.vue$/, /\.md$/],
     }),

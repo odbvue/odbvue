@@ -1,5 +1,9 @@
 import type { ComputedRef } from 'vue'
-import type { RouteLocationNormalizedLoaded, RouteRecordNormalized } from 'vue-router'
+import type {
+  RouteLocationNormalizedLoaded,
+  RouteRecordNormalized,
+  RouteRecordRaw,
+} from 'vue-router'
 
 export type OdbVuePageVisibility =
   | 'always'
@@ -33,10 +37,10 @@ export interface OdbVuePageMeta {
 }
 
 export interface OdbVueRoutePage {
-  name?: RouteRecordNormalized['name']
+  name?: RouteRecordNormalized['name'] | RouteRecordRaw['name']
   path: string
   module?: string
-  route: RouteRecordNormalized
+  route: RouteRecordNormalized | RouteRecordRaw
   meta: OdbVuePageMeta
   title: string
   navigation: false | OdbVueNavigationMeta

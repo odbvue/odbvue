@@ -1,12 +1,15 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { getOdbVuePageManifest } from './registry.js'
 import { toRoutePage } from './metadata.js'
+import { toManifestPage } from './manifest.js'
 import type { OdbVueBreadcrumb, OdbVueRouting } from './types.js'
 
 export function useRouting(): OdbVueRouting {
   const router = useRouter()
   const route = useRoute()
-  const pages = computed(() => router.getRoutes().map(toRoutePage))
+  const manifest = getOdbVuePageManifest(router)
+  const pages = computed(() => manifest.pages.map(toManifestPage))
   const currentPage = computed(() => {
     const matched = route.matched.at(-1)
     return matched ? toRoutePage(matched) : undefined
