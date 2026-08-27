@@ -3,10 +3,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { toRoutePage } from './metadata.js'
 import type { OdbVueBreadcrumb, OdbVueRouting } from './types.js'
 
-function routeModule(path: string): string | undefined {
-  return path.split('/').filter(Boolean).at(0)
-}
-
 export function useRouting(): OdbVueRouting {
   const router = useRouter()
   const route = useRoute()
@@ -15,7 +11,7 @@ export function useRouting(): OdbVueRouting {
     const matched = route.matched.at(-1)
     return matched ? toRoutePage(matched) : undefined
   })
-  const currentModule = computed(() => routeModule(route.path))
+  const currentModule = computed(() => currentPage.value?.module)
   const breadcrumbs = computed<OdbVueBreadcrumb[]>(() => {
     return route.matched
       .map(toRoutePage)

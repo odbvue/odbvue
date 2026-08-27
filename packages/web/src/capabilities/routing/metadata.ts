@@ -25,7 +25,9 @@ export function getNavigationMeta(meta: OdbVuePageMeta): false | OdbVueNavigatio
 export function toRoutePage(route: RouteRecordNormalized): OdbVueRoutePage {
   const meta = getPageMeta(route)
   return {
+    name: route.name,
     path: route.path,
+    module: meta.module,
     route,
     meta,
     title: meta.title || titleFromPath(route.path),

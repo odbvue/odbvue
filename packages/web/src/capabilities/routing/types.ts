@@ -17,6 +17,7 @@ export interface OdbVueNavigationMeta {
 }
 
 export interface OdbVuePageMeta {
+  module?: string
   title?: string
   description?: string
   icon?: string
@@ -32,7 +33,9 @@ export interface OdbVuePageMeta {
 }
 
 export interface OdbVueRoutePage {
+  name?: RouteRecordNormalized['name']
   path: string
+  module?: string
   route: RouteRecordNormalized
   meta: OdbVuePageMeta
   title: string

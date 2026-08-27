@@ -249,6 +249,9 @@ importers:
       chartjs-plugin-autocolors:
         specifier: ^0.3.1
         version: 0.3.1(@kurkle/color@0.3.4)(chart.js@4.5.1)
+      gray-matter:
+        specifier: ^4.0.3
+        version: 4.0.3
       leaflet:
         specifier: ^1.9.4
         version: 1.9.4
