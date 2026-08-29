@@ -47,12 +47,11 @@ function setCookie(key: string, value: string, options: PersistCookieOptions = {
 }
 function getCookie(key: string): string | null {
   const prefix = `${encodeURIComponent(key)}=`
-  return (
-    document.cookie
-      .split('; ')
-      .find((cookie) => cookie.startsWith(prefix))
-      ?.slice(prefix.length) ?? null
-  )
+  const value = document.cookie
+    .split('; ')
+    .find((cookie) => cookie.startsWith(prefix))
+    ?.slice(prefix.length)
+  return value === undefined ? null : decodeURIComponent(value)
 }
 async function openDB(dbName: string, storeName: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
