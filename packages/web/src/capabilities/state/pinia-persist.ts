@@ -1,4 +1,5 @@
 import type { PiniaPluginContext, StateTree, StoreGeneric } from 'pinia'
+import { toRaw } from 'vue'
 
 export type PersistStorage = 'localStorage' | 'sessionStorage' | 'indexedDB' | 'cookie'
 export interface PersistCookieOptions {
@@ -53,9 +54,9 @@ function getCookie(key: string): string | null {
     ?.slice(prefix.length)
   return value === undefined ? null : decodeURIComponent(value)
 }
-async function openDB(dbName: string, storeName: string): Promise<IDBDatabase> {
+function requestDB(dbName: string, storeName: string, version?: number): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(dbName, 1)
+    const request = version === undefined ? indexedDB.open(dbName) : indexedDB.open(dbName, version)
     request.addEventListener('upgradeneeded', () => {
       if (!request.result.objectStoreNames.contains(storeName))
         request.result.createObjectStore(storeName)
@@ -64,13 +65,25 @@ async function openDB(dbName: string, storeName: string): Promise<IDBDatabase> {
     request.addEventListener('error', () => reject(request.error), { once: true })
   })
 }
+async function openDB(dbName: string, storeName: string): Promise<IDBDatabase> {
+  const db = await requestDB(dbName, storeName)
+  if (db.objectStoreNames.contains(storeName)) return db
+
+  const version = db.version + 1
+  db.close()
+  return requestDB(dbName, storeName, version)
+}
 async function idbGet(dbName: string, storeName: string, key: string): Promise<unknown> {
   const db = await openDB(dbName, storeName)
-  return new Promise((resolve, reject) => {
-    const request = db.transaction(storeName, 'readonly').objectStore(storeName).get(key)
-    request.addEventListener('success', () => resolve(request.result), { once: true })
-    request.addEventListener('error', () => reject(request.error), { once: true })
-  })
+  try {
+    return await new Promise((resolve, reject) => {
+      const request = db.transaction(storeName, 'readonly').objectStore(storeName).get(key)
+      request.addEventListener('success', () => resolve(request.result), { once: true })
+      request.addEventListener('error', () => reject(request.error), { once: true })
+    })
+  } finally {
+    db.close()
+  }
 }
 async function idbSet(
   dbName: string,
@@ -79,12 +92,16 @@ async function idbSet(
   value: unknown,
 ): Promise<void> {
   const db = await openDB(dbName, storeName)
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(storeName, 'readwrite')
-    transaction.objectStore(storeName).put(value, key)
-    transaction.addEventListener('complete', () => resolve(), { once: true })
-    transaction.addEventListener('error', () => reject(transaction.error), { once: true })
-  })
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(storeName, 'readwrite')
+      transaction.objectStore(storeName).put(value, key)
+      transaction.addEventListener('complete', () => resolve(), { once: true })
+      transaction.addEventListener('error', () => reject(transaction.error), { once: true })
+    })
+  } finally {
+    db.close()
+  }
 }
 function pickPaths(state: Record<string, unknown>, paths?: string[]): Record<string, unknown> {
   if (!paths?.length) return state
@@ -148,7 +165,7 @@ export default function piniaPersistPlugin({ store, options }: PiniaPluginContex
 
   async function persistState(state: StateTree): Promise<void> {
     try {
-      const data = pickPaths(state as Record<string, unknown>, persistOptions.paths)
+      const data = pickPaths(toRaw(state) as Record<string, unknown>, persistOptions.paths)
       if (persistOptions.storage === 'localStorage')
         window.localStorage.setItem(key, JSON.stringify(data))
       else if (persistOptions.storage === 'sessionStorage')
