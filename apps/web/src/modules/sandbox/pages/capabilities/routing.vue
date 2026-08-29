@@ -3,7 +3,7 @@
     <v-row>
       <v-col cols="12">
         <h3>Routing</h3>
-        <p>Routes: {{ String(pages.length) }} of {{ String(allPages.length) }}</p>
+        <p>Routes: {{ String(routingPages.length) }} of {{ String(allPages.length) }}</p>
         <v-text-field
           v-model="routeFilter"
           label="Filter routes"
@@ -16,7 +16,7 @@
       </v-col>
     </v-row>
     <v-row class="pt-4">
-      <v-col v-for="page in pages" :key="page.path" cols="12" md="6" lg="4">
+      <v-col v-for="page in routingPages" :key="page.path" cols="12" md="6" lg="4">
         <v-card class="h-100">
           <v-card-item :prepend-icon="page.meta.icon || '$mdiFileDocumentOutline'">
             <v-card-title>{{ page.title || page.path }}</v-card-title>
@@ -50,7 +50,6 @@
 <script setup lang="ts">
 import { useRouting, type OdbVuePageMeta } from '@odbvue/web'
 import { computed, ref } from 'vue'
-import { useRoute } from 'vue-router'
 
 definePage({
   meta: {
@@ -63,20 +62,15 @@ definePage({
   },
 })
 
-const route = useRoute()
-const { currentModule, currentPage, pages: allPages } = useRouting()
+const { allPages } = useRouting()
 const routeFilter = ref('')
-const pages = computed(() => {
+const routingPages = computed(() => {
   const filter = routeFilter.value.trim().toLocaleLowerCase()
 
   return allPages.value
     .filter((page) => page.path.toLocaleLowerCase().includes(filter))
     .toSorted((first, second) => first.path.localeCompare(second.path))
 })
-
-function isStaticRoute(path: string): boolean {
-  return !path.includes(':')
-}
 
 function toYaml(meta: OdbVuePageMeta): string {
   return Object.entries(meta)

@@ -1,12 +1,21 @@
 export { usePageMeta, useRouting } from './helpers.js'
-export { getNavigationMeta, getPageMeta, toRoutePage } from './metadata.js'
+export {
+  getNavigationMeta,
+  getPageMeta,
+  resolveNavigationMeta,
+  resolvePageTitle,
+  toRoutePage,
+} from './metadata.js'
 export { createOdbVuePageManifest, toManifestPage } from './manifest.js'
-export { getOdbVuePageManifest, registerOdbVuePageManifest } from './registry.js'
+export {
+  getOdbVueBreadcrumbOverride,
+  getOdbVuePageManifest,
+  registerOdbVuePageManifest,
+} from './registry.js'
 export {
   computedRouteParam,
   computedRouteParams,
   computedRouteQuery,
-  useNavigationStore,
   useRouteParams,
 } from './navigation.js'
 export type {
@@ -15,6 +24,7 @@ export type {
   OdbVuePageAccess,
   OdbVuePageMeta,
   OdbVuePageVisibility,
+  OdbVueRouteParams,
   OdbVueRoutePage,
   OdbVueRouting,
 } from './types.js'

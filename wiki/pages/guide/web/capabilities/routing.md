@@ -10,17 +10,21 @@ Use it when an application shell, navigation component, breadcrumb trail, or pag
 
 | Value           | Description                                                     |
 | --------------- | --------------------------------------------------------------- |
-| `pages`         | Every registered route, adapted to an OdbVue page.              |
+| `pages`         | Navigable, ordered root-level pages.                            |
+| `allPages`      | Every registered route, adapted to an OdbVue page.              |
 | `currentPage`   | The deepest route record matched by the current URL.            |
-| `currentModule` | The first URL segment, such as `customers` for `/customers/42`. |
+| `currentModule` | The module declared by the current page metadata.               |
 | `breadcrumbs`   | Visible pages along the current URL hierarchy.                  |
+| `title`         | A function that resolves a registered page title by path.       |
+| `params`        | Normalized path and query parameters for the current route.     |
+| `navigate`      | Vue Router's programmatic navigation function.                  |
 
 Each page exposes its route path, the original normalized Vue Router record, `meta`, a derived `title`, and `navigation` metadata. A title comes from `meta.title` when present; otherwise it is derived from the final path segment, so `/customer-orders` becomes `Customer Orders`.
 
 ```ts
 import { useRouting } from '@odbvue/web'
 
-const { breadcrumbs, currentModule, currentPage, pages } = useRouting()
+const { allPages, breadcrumbs, currentModule, currentPage, navigate, pages, params, title } = useRouting()
 ```
 
 The returned values are Vue computed refs. Read their values in script with `.value`; Vue automatically unwraps them in templates.
@@ -52,30 +56,23 @@ definePage({
 
 ### Build a navigation list
 
-`page.navigation` is `false` when a page sets `navigation: false`, `hidden: true`, or `visibility: 'never'`. Otherwise it contains the explicit navigation settings or inherits the page icon and order.
+`routing.pages` is already filtered and ordered for application navigation. A page's `navigation` metadata is `false` when it sets `navigation: false`, `hidden: true`, or `visibility: 'never'`. Otherwise it contains the explicit navigation settings or inherits the page icon and order.
 
 ```vue
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useRouting } from '@odbvue/web'
 
 const { pages } = useRouting()
-
-const navigationPages = computed(() =>
-  pages.value
-    .filter((page) => page.navigation)
-    .toSorted((first, second) => (first.navigation.order ?? 0) - (second.navigation.order ?? 0)),
-)
 </script>
 
 <template>
   <v-list nav>
     <v-list-item
-      v-for="page in navigationPages"
+      v-for="page in pages.value"
       :key="page.path"
       :to="page.path"
-      :prepend-icon="page.navigation.icon"
-      :title="page.navigation.label || page.title"
+      :prepend-icon="page.meta.icon || '$mdiMinus'"
+      :title="page.navigation === false ? page.title : page.navigation.label || page.title"
     />
   </v-list>
 </template>
@@ -126,7 +123,7 @@ const pageMeta = usePageMeta()
 
 ### Detect the active module
 
-`currentModule` is based on the first path segment and is `undefined` at the root route. A layout can use it to select module-specific UI without duplicating path parsing.
+`currentModule` is declared in page metadata and is `undefined` when the current page has no `module`. A layout can use it to select module-specific UI without parsing paths.
 
 ```ts
 import { computed } from 'vue'

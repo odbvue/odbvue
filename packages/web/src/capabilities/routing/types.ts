@@ -3,6 +3,7 @@ import type {
   RouteLocationNormalizedLoaded,
   RouteRecordNormalized,
   RouteRecordRaw,
+  Router,
 } from 'vue-router'
 
 export type OdbVuePageVisibility =
@@ -40,6 +41,9 @@ export interface OdbVueRoutePage {
   name?: RouteRecordNormalized['name'] | RouteRecordRaw['name']
   path: string
   module?: string
+  parent?: string
+  level: number
+  children: string[]
   route: RouteRecordNormalized | RouteRecordRaw
   meta: OdbVuePageMeta
   title: string
@@ -53,11 +57,24 @@ export interface OdbVueBreadcrumb {
   icon?: string
 }
 
+export interface OdbVueRouteParams {
+  pathParams: ComputedRef<Record<string, string>>
+  queryParams: ComputedRef<Record<string, string>>
+  routeParams: ComputedRef<Record<string, string>>
+  param: (name: string) => ComputedRef<string>
+  query: (name: string) => ComputedRef<string>
+}
+
 export interface OdbVueRouting {
   currentPage: ComputedRef<OdbVueRoutePage | undefined>
   currentModule: ComputedRef<string | undefined>
   breadcrumbs: ComputedRef<OdbVueBreadcrumb[]>
   pages: ComputedRef<OdbVueRoutePage[]>
+  allPages: ComputedRef<OdbVueRoutePage[]>
+  title: ComputedRef<(path: string) => string>
+  params: OdbVueRouteParams
+  navigate: Router['push']
+  setBreadcrumb: (breadcrumbTitle: string, href?: string, icon?: string, disabled?: boolean) => void
 }
 
 declare module 'vue-router' {

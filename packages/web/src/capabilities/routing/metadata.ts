@@ -1,7 +1,8 @@
 import type { RouteRecordNormalized } from 'vue-router'
 import type { OdbVueNavigationMeta, OdbVuePageMeta, OdbVueRoutePage } from './types.js'
 
-function titleFromPath(path: string): string {
+export function resolvePageTitle(meta: OdbVuePageMeta, path: string): string {
+  if (meta.title) return meta.title
   return (
     path
       .split('/')
@@ -18,6 +19,10 @@ export function getPageMeta(route: RouteRecordNormalized): OdbVuePageMeta {
 }
 
 export function getNavigationMeta(meta: OdbVuePageMeta): false | OdbVueNavigationMeta {
+  return resolveNavigationMeta(meta)
+}
+
+export function resolveNavigationMeta(meta: OdbVuePageMeta): false | OdbVueNavigationMeta {
   if (meta.navigation === false || meta.hidden || meta.visibility === 'never') return false
   return meta.navigation || { icon: meta.icon, order: meta.order }
 }
@@ -28,9 +33,11 @@ export function toRoutePage(route: RouteRecordNormalized): OdbVueRoutePage {
     name: route.name,
     path: route.path,
     module: meta.module,
+    level: route.path === '/' ? 0 : route.path.split('/').length - 1,
+    children: route.children?.map((child) => child.path) ?? [],
     route,
     meta,
-    title: meta.title || titleFromPath(route.path),
-    navigation: getNavigationMeta(meta),
+    title: resolvePageTitle(meta, route.path),
+    navigation: resolveNavigationMeta(meta),
   }
 }

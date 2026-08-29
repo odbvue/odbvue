@@ -81,7 +81,6 @@ export default defineConfig({
             'configureHttp',
             'useAppStore',
             'useHttp',
-            'useNavigationStore',
             'usePageMeta',
             'useRouteParams',
             'useRouting',

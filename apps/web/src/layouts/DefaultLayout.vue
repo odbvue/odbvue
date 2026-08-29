@@ -3,9 +3,9 @@
     <v-navigation-drawer v-model="drawer" app>
       <v-list>
         <v-list-item
-          v-for="page in app.navigation.pages"
+          v-for="page in navigationPages"
           :key="page.path"
-          :prepend-icon="page.icon || '$mdiMinus'"
+          :prepend-icon="page.meta.icon || '$mdiMinus'"
           :to="page.path"
         >
           <v-list-item-title>{{ page.title }}</v-list-item-title>
@@ -103,7 +103,7 @@
       ></v-progress-linear>
     </v-app-bar>
     <v-app-bar>
-      <v-breadcrumbs :items="app.navigation.breadcrumbs">
+      <v-breadcrumbs :items="routing.breadcrumbs.value">
         <template v-slot:divider>
           <v-icon icon="$mdiChevronRight"></v-icon>
         </template>
@@ -163,6 +163,10 @@
 <script setup lang="ts">
 const drawer = ref(false)
 const app = useAppStore()
+const routing = useRouting()
+const navigationPages = computed(() =>
+  routing.pages.value.filter((page) => page.module === undefined),
+)
 const { mobile } = useDisplay()
 const { t } = useI18n()
 </script>

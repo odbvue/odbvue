@@ -80,7 +80,6 @@ declare global {
   const useLink: typeof import('vue-router').useLink
   const useLocale: typeof import('vuetify').useLocale
   const useModel: typeof import('vue').useModel
-  const useNavigationStore: typeof import('@odbvue/web').useNavigationStore
   const usePageMeta: typeof import('@odbvue/web').usePageMeta
   const useRoute: typeof import('vue-router').useRoute
   const useRouteParams: typeof import('@odbvue/web').useRouteParams

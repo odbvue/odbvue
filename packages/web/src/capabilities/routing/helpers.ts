@@ -1,9 +1,10 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { RouteParamsRaw } from 'vue-router'
-import { getOdbVuePageManifest } from './registry.js'
+import { getOdbVueBreadcrumbOverride, getOdbVuePageManifest } from './registry.js'
 import { toRoutePage } from './metadata.js'
 import { toManifestPage } from './manifest.js'
+import { useRouteParams } from './navigation.js'
 import type { OdbVueBreadcrumb, OdbVueRouting } from './types.js'
 
 function routeParamsForPath(path: string, params: Record<string, unknown>): RouteParamsRaw {
@@ -19,6 +20,8 @@ export function useRouting(): OdbVueRouting {
   const router = useRouter()
   const route = useRoute()
   const manifest = getOdbVuePageManifest(router)
+  const breadcrumbOverride = getOdbVueBreadcrumbOverride(router)
+  const params = useRouteParams()
   const pageEntries = computed(() => {
     return manifest.pages.reduce<(typeof manifest.pages)[number][]>((pages, page) => {
       if (page.route.component === undefined) return pages
@@ -30,7 +33,23 @@ export function useRouting(): OdbVueRouting {
       return pages
     }, [])
   })
-  const pages = computed(() => pageEntries.value.map(toManifestPage))
+  const allPages = computed(() => pageEntries.value.map(toManifestPage))
+  const pages = computed(() => {
+    return allPages.value
+      .filter((page) => page.navigation !== false)
+      .filter((page) => page.level === 0)
+      .filter((page) => page.path !== '/:path(.*)')
+      .toSorted(
+        (first, second) =>
+          (first.navigation === false ? 0 : first.navigation.order || 0) -
+            (second.navigation === false ? 0 : second.navigation.order || 0) ||
+          first.path.localeCompare(second.path),
+      )
+  })
+  const title = computed(() => (path: string) => {
+    const page = allPages.value.find((candidate) => candidate.path === path)
+    return page?.title || ''
+  })
   const currentPage = computed(() => {
     const matched = route.matched.at(-1)
     return matched ? toRoutePage(matched) : undefined
@@ -51,7 +70,7 @@ export function useRouting(): OdbVueRouting {
       .toSorted((first, second) => first.path.length - second.path.length)
       .map(toManifestPage)
 
-    return matchedPages
+    const items: OdbVueBreadcrumb[] = matchedPages
       .filter((page) => page.meta.visibility !== 'never')
       .map((page, index, matched) => ({
         title: page.title,
@@ -66,9 +85,25 @@ export function useRouting(): OdbVueRouting {
             : router.resolve(page.route.path).href,
         icon: page.meta.icon,
       }))
+    if (breadcrumbOverride.value) items.push(breadcrumbOverride.value)
+    return items
   })
 
-  return { currentPage, currentModule, breadcrumbs, pages }
+  function setBreadcrumb(breadcrumbTitle: string, href = '', icon = '', disabled = true): void {
+    breadcrumbOverride.value = { title: breadcrumbTitle, href, icon, disabled }
+  }
+
+  return {
+    currentPage,
+    currentModule,
+    breadcrumbs,
+    pages,
+    allPages,
+    title,
+    params,
+    navigate: router.push,
+    setBreadcrumb,
+  }
 }
 
 export function usePageMeta() {

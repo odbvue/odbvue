@@ -6,6 +6,7 @@ import {
   createOdbVuePageManifest,
   getNavigationMeta,
   registerOdbVuePageManifest,
+  resolvePageTitle,
   toRoutePage,
   useRouting,
 } from '../src/capabilities/routing/index.js'
@@ -34,6 +35,11 @@ describe('routing metadata', () => {
     expect(getNavigationMeta({ navigation: false })).toBe(false)
     expect(getNavigationMeta({ hidden: true })).toBe(false)
     expect(getNavigationMeta({ visibility: 'never' })).toBe(false)
+  })
+
+  it('resolves page titles consistently from metadata and paths', () => {
+    expect(resolvePageTitle({}, '/customer-orders')).toBe('Customer Orders')
+    expect(resolvePageTitle({ title: 'Orders' }, '/customer-orders')).toBe('Orders')
   })
 
   it('includes matched dynamic routes in breadcrumbs', async () => {
@@ -143,9 +149,9 @@ describe('routing metadata', () => {
     const app = createApp({})
     app.use(router)
 
-    let pages: ReturnType<typeof useRouting>['pages']
+    let pages: ReturnType<typeof useRouting>['allPages']
     app.runWithContext(() => {
-      pages = useRouting().pages
+      pages = useRouting().allPages
     })
 
     expect(pages!.value.map((page) => page.path)).toEqual([
@@ -153,6 +159,7 @@ describe('routing metadata', () => {
       '/sandbox/capabilities/routing',
     ])
     expect(pages!.value[0].title).toBe('Sandbox')
+    expect(pages!.value[0].level).toBe(0)
   })
 
   it('uses generated module metadata instead of URL segments', async () => {
@@ -210,8 +217,62 @@ describe('routing metadata', () => {
     ])
 
     expect(manifest.pages).toMatchObject([
-      { name: 'sandbox', path: '/sandbox', module: 'sandbox' },
-      { name: 'sandbox-routing', path: '/sandbox/capabilities/routing', module: 'sandbox' },
+      {
+        name: 'sandbox',
+        path: '/sandbox',
+        module: 'sandbox',
+        level: 0,
+        children: ['/sandbox/capabilities/routing'],
+      },
+      {
+        name: 'sandbox-routing',
+        path: '/sandbox/capabilities/routing',
+        module: 'sandbox',
+        parent: '/sandbox',
+        level: 1,
+        children: [],
+      },
     ])
+  })
+
+  it('derives navigation and breadcrumb overrides from the routing runtime', async () => {
+    const routes = [
+      { path: '/', name: 'home', component: {}, meta: { title: 'Home', order: 20 } },
+      {
+        path: '/customers',
+        name: 'customers',
+        component: {},
+        meta: { title: 'Customers', order: 10 },
+        children: [
+          {
+            path: ':id',
+            name: 'customer',
+            component: {},
+            meta: { title: 'Customer' },
+          },
+        ],
+      },
+    ]
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    registerOdbVuePageManifest(router, createOdbVuePageManifest(routes))
+    await router.push('/customers')
+    const app = createApp({})
+    app.use(router)
+
+    let routing: ReturnType<typeof useRouting>
+    app.runWithContext(() => {
+      routing = useRouting()
+    })
+
+    expect(routing!.pages.value.map((page) => page.path)).toEqual(['/customers', '/'])
+    routing!.setBreadcrumb('Acme Corp')
+    expect(routing!.breadcrumbs.value.at(-1)).toEqual({
+      title: 'Acme Corp',
+      href: '',
+      icon: '',
+      disabled: true,
+    })
+    await routing!.navigate('/customers/42')
+    expect(routing!.params.pathParams.value).toEqual({ id: '42' })
   })
 })

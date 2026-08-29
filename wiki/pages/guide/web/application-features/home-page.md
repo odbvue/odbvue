@@ -80,17 +80,17 @@ definePage({
     <v-col
       cols="12"
       md="4"
-      v-for="page in app.navigation.pages.filter((page) => page.path !== '/')"
+      v-for="page in navigationPages"
       :key="page.path"
     >
       <v-card
         hover
         class="h-100"
-        :style="useCardBackground(page.color || '#ffffff').value"
-        :prepend-icon="page.icon"
+        :style="useCardBackground(page.meta.color || '#ffffff').value"
+        :prepend-icon="page.meta.icon"
         :title="page.title"
         :to="page.path"
-        :text="page.description"
+        :text="page.meta.description"
       >
       </v-card>
     </v-col>
@@ -108,6 +108,9 @@ definePage({
     access: 'always',
   },
 })
+
+const routing = useRouting()
+const navigationPages = computed(() => routing.pages.value.filter((page) => page.path !== '/'))
 import { useCardBackground } from '@/composables/ui'
 const app = useAppStore()
 </script>

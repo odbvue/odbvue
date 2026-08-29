@@ -28,9 +28,9 @@ Modify default layout to have app layout with navigation drawer, app bar and foo
     <v-navigation-drawer v-model="drawer" app>
       <v-list>
         <v-list-item
-          v-for="page in pages"
+          v-for="page in routing.pages.value"
           :key="page.path"
-          :prepend-icon="page.icon || '$mdiMinus'"
+          :prepend-icon="page.meta.icon || '$mdiMinus'"
           :to="page.path"
         >
           <v-list-item-title>{{ page.title }}</v-list-item-title>
@@ -70,11 +70,7 @@ Modify default layout to have app layout with navigation drawer, app bar and foo
 
 <script setup lang="ts">
 const drawer = ref(false)
-const pages = ref([
-  { title: 'Home', icon: '$mdiHome', path: '/' },
-  { title: 'About', icon: '$mdiInformation', path: '/about' },
-  { title: 'Sandbox', icon: '$mdiCog', path: '/sandbox' },
-])
+const routing = useRouting()
 </script>
 ```
 
