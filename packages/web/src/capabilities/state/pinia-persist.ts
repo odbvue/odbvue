@@ -165,14 +165,14 @@ export default function piniaPersistPlugin({ store, options }: PiniaPluginContex
 
   async function persistState(state: StateTree): Promise<void> {
     try {
-      const data = pickPaths(toRaw(state) as Record<string, unknown>, persistOptions.paths)
+      const data = pickPaths(state as Record<string, unknown>, persistOptions.paths)
       if (persistOptions.storage === 'localStorage')
         window.localStorage.setItem(key, JSON.stringify(data))
       else if (persistOptions.storage === 'sessionStorage')
         window.sessionStorage.setItem(key, JSON.stringify(data))
       else if (persistOptions.storage === 'cookie')
         setCookie(key, JSON.stringify(data), persistOptions.cookie)
-      else await idbSet(dbName, storeName, key, data)
+      else await idbSet(dbName, storeName, key, toRaw(data))
     } catch (error) {
       console.warn('[pinia-persist] persist failed', error)
     }

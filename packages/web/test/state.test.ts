@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { createApp, nextTick } from 'vue'
+import { createApp, nextTick, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import 'fake-indexeddb/auto'
 import { createOdbVuePinia, getOdbVueStores } from '../src/index.js'
@@ -52,6 +52,27 @@ describe('OdbVue Pinia state', () => {
 
     expect(counter.count).toBe(42)
     document.cookie = 'counter-persist=; Max-Age=0; Path=/'
+  })
+
+  it('persists selected setup-store refs in localStorage', async () => {
+    const pinia = createOdbVuePinia()
+    createApp({}).use(pinia)
+    const usePreferencesStore = defineStore(
+      'preferences-persist',
+      () => {
+        const fontSize = ref(100)
+        return { fontSize }
+      },
+      { persist: { storage: 'localStorage', paths: ['fontSize'] } },
+    )
+
+    const preferences = usePreferencesStore(pinia)
+    preferences.fontSize = 150
+
+    await vi.waitFor(() => {
+      expect(window.localStorage.getItem('preferences-persist')).toBe('{"fontSize":150}')
+    })
+    window.localStorage.removeItem('preferences-persist')
   })
 
   it('persists stores in separate IndexedDB object stores', async () => {
