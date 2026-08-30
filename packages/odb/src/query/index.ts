@@ -90,6 +90,7 @@ export class SelectQueryBuilder<
   private _where: ExpressionNode[] = []
   private _orderBy: OrderByClause[] = []
   private _limit?: number
+  private _forUpdate = false
   private _into?: string
   private _schema?: string
 
@@ -181,6 +182,12 @@ export class SelectQueryBuilder<
     return this
   }
 
+  /** Lock the selected rows for update. */
+  forUpdate(): this {
+    this._forUpdate = true
+    return this
+  }
+
   into(target: string | NamedRef): this {
     this._into = refName(target)
     return this
@@ -212,6 +219,7 @@ export class SelectQueryBuilder<
     if (this._limit !== undefined) {
       sql += ` FETCH FIRST ${this._limit} ROWS ONLY`
     }
+    if (this._forUpdate) sql += ' FOR UPDATE'
 
     return { sql, bindings }
   }
@@ -228,6 +236,7 @@ export class SelectQueryBuilder<
       sql += ` ORDER BY ${parts.join(', ')}`
     }
     if (this._limit !== undefined) sql += ` FETCH FIRST ${this._limit} ROWS ONLY`
+    if (this._forUpdate) sql += ' FOR UPDATE'
     return sql
   }
 }
