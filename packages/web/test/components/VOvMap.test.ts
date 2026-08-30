@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { nextTick } from 'vue'
-import VOvMap from '../../src/capabilities/ui/components/VOvMap.vue'
+import VOvMap from '../../src/components/content/VOvMap.vue'
 import { globalPlugins } from './setup'
 import type { OvMapOptions, OvGeoJson } from '../index'
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
-import VOvView from '../../src/capabilities/ui/components/VOvView.vue'
+import VOvView from '../../src/components/data/VOvView.vue'
 import { globalPlugins } from './setup'
 import type { OvViewOptions } from '../index'
 

@@ -87,7 +87,7 @@ import {
   VChip,
   VDialog,
 } from 'vuetify/components'
-import { OvFieldFormat, OvActionFormat, sanitizeHtml, type OvAction, type OvFormat } from '.'
+import { OvFieldFormat, OvActionFormat, sanitizeHtml, type OvAction, type OvFormat } from '../index'
 
 const { name, thresholds } = useDisplay()
 const previousBreakpointWidth = computed<string>(() => {

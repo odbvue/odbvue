@@ -1,6 +1,5 @@
 <template>
-  <RouterView v-if="isComponentRoute" />
-  <v-container v-else>
+  <v-container>
     <v-row>
       <v-col cols="12">
         <h3>Preferences</h3>
@@ -95,17 +94,6 @@
           </v-card-text>
         </v-card>
       </v-col>
-
-      <v-col cols="12">
-        <h3>Components</h3>
-      </v-col>
-      <v-col v-for="component in components" :key="component.to" cols="12" sm="6" md="4">
-        <v-card :title="component.title" :prepend-icon="component.icon" class="h-100">
-          <v-card-actions>
-            <v-btn :to="component.to" append-icon="$mdiArrowRight">Open</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-col>
     </v-row>
   </v-container>
 </template>
@@ -113,7 +101,6 @@
 <script setup lang="ts">
 import { useOdbVue, usePreferencesStore, useUi } from '@odbvue/web'
 import { computed } from 'vue'
-import { RouterView, useRoute } from 'vue-router'
 
 definePage({
   meta: {
@@ -127,25 +114,7 @@ definePage({
 const preferences = usePreferencesStore()
 const ui = useUi()
 const { config } = useOdbVue()
-const route = useRoute()
-const isComponentRoute = computed(() => route.path !== '/sandbox/capabilities/ui')
 const iconAliases = computed(() => Object.keys(config.ui?.icons ?? {}))
-const components = [
-  { title: 'Chart', icon: '$mdiChartBar', to: '/sandbox/capabilities/ui/components/chart' },
-  { title: 'Dialog', icon: '$mdiMessageText', to: '/sandbox/capabilities/ui/components/dialog' },
-  {
-    title: 'Editor',
-    icon: '$mdiFileDocumentEdit',
-    to: '/sandbox/capabilities/ui/components/editor',
-  },
-  { title: 'Form', icon: '$mdiFormSelect', to: '/sandbox/capabilities/ui/components/form' },
-  { title: 'Map', icon: '$mdiMap', to: '/sandbox/capabilities/ui/components/map' },
-  { title: 'Media', icon: '$mdiMultimedia', to: '/sandbox/capabilities/ui/components/media' },
-  { title: 'Pad', icon: '$mdiDraw', to: '/sandbox/capabilities/ui/components/pad' },
-  { title: 'Share', icon: '$mdiShareVariant', to: '/sandbox/capabilities/ui/components/share' },
-  { title: 'Table', icon: '$mdiTable', to: '/sandbox/capabilities/ui/components/table' },
-  { title: 'View', icon: '$mdiEye', to: '/sandbox/capabilities/ui/components/view' },
-]
 
 function formatConfiguration(value: unknown): string {
   return value === undefined ? 'None configured' : JSON.stringify(value, null, 2)

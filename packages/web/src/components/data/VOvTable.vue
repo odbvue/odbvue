@@ -332,8 +332,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, inject, useSlots, onBeforeUnmount, type Ref } from 'vue'
 import { useDisplay } from 'vuetify'
-import VOvDialog from './VOvDialog.vue'
-import VOvForm from './VOvForm.vue'
+import VOvDialog from '../overlays/VOvDialog.vue'
+import VOvForm from '../forms/VOvForm.vue'
 import {
   VBtn,
   VCard,
@@ -366,7 +366,8 @@ import {
   type OvFormFieldError,
   OvActionFormat,
   renderViewItem,
-} from './index'
+} from '../index'
+import { emptyRowCount, pageItems } from './pagination'
 
 import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
@@ -491,7 +492,7 @@ watch(
   },
   { deep: true },
 )
-const page = computed(() => localData.value.slice(0, itemsPerPage.value))
+const page = computed(() => pageItems(localData.value, itemsPerPage.value))
 const pageCursor = ref<string | undefined>(undefined)
 const cursorStack = ref<(string | undefined)[]>([])
 const itemsPerPage = computed(() => {
@@ -501,9 +502,7 @@ const itemsPerPage = computed(() => {
 const hasNextPage = computed(() => !!nextCursor)
 const hasPrevPage = computed(() => cursorStack.value.length > 0)
 const canRefresh = computed(() => options.canRefresh ?? true)
-const emptyRowsCount = computed(() =>
-  page.value.length < itemsPerPage.value ? itemsPerPage.value - page.value.length : 0,
-)
+const emptyRowsCount = computed(() => emptyRowCount(page.value.length, itemsPerPage.value))
 
 watch(mobile, () => {
   cursorStack.value = []

@@ -39,11 +39,20 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
   }),
   defineCapability({
     name: 'ui',
-    kind: 'ui',
+    kind: 'core',
     required: true,
     title: 'UI',
     description: 'Vuetify integration, themes, and UI defaults.',
     icon: '$mdiPalette',
+  }),
+  defineCapability({
+    name: 'components',
+    kind: 'core',
+    required: true,
+    requires: ['ui'],
+    title: 'Components',
+    description: 'Reusable OdbVue form, data, content, and overlay components.',
+    icon: '$mdiShape',
   }),
   defineCapability({
     name: 'i18n',

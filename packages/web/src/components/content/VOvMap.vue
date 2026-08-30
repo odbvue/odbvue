@@ -42,7 +42,7 @@ import type {
   Marker,
   PointExpression,
 } from 'leaflet'
-import type { OvMapOptions, OvGeoJson, OvGeoJsonGeometry } from '.'
+import type { OvMapOptions, OvGeoJson, OvGeoJsonGeometry } from '../index'
 
 type MapFeatureLike = {
   properties?: Record<string, unknown>

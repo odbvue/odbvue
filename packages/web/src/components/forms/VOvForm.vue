@@ -143,7 +143,8 @@ import {
   minutesToDuration,
   durationToMinutes,
   isValidDuration,
-} from './index'
+} from '../index'
+import { detectSwitchFormat, toBoolean, transformFormData } from './transforms'
 
 const { defaults } = useDefaults({
   name: 'VOvForm',
@@ -235,16 +236,6 @@ const definedProps = (props: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(props).filter(([, value]) => value !== undefined))
 
 // Convert various string formats to boolean (Y/N, 0/1, T/F, true/false)
-const toBoolean = (value: unknown): boolean => {
-  if (typeof value === 'boolean') return value
-  if (typeof value === 'string') {
-    const lower = value.toLowerCase()
-    return lower === 'y' || lower === 't' || lower === 'true' || lower === '1'
-  }
-  if (typeof value === 'number') return value !== 0
-  return Boolean(value)
-}
-
 // Convert boolean back to original format
 const fromBoolean = (value: boolean, originalFormat?: string): string | number | boolean => {
   // If we know the original format, use it
@@ -257,45 +248,16 @@ const fromBoolean = (value: boolean, originalFormat?: string): string | number |
   return value ? 'Y' : 'N'
 }
 
-// Detect the format of a switch field value
-const detectFormat = (value: unknown): string => {
-  if (typeof value === 'boolean') return 'boolean'
-  if (typeof value === 'string') {
-    const lower = value.toLowerCase()
-    if (lower === 'y' || lower === 'n') return 'Y/N'
-    if (lower === 't' || lower === 'f') return 'T/F'
-    if (lower === 'true' || lower === 'false') return 'true/false'
-  }
-  if (typeof value === 'number') {
-    if (value === 0 || value === 1) return '0/1'
-  }
-  return 'Y/N' // default
-}
-
 // Transform incoming numeric values to duration strings for display
 // Also convert switch field values from strings to booleans
 const transformIncomingData = (incomingData: OvFormData): OvFormData => {
-  const result = { ...incomingData }
-  const durationFields = getDurationFieldNames()
-  for (const fieldName of durationFields) {
-    const val = result[fieldName]
-    if (typeof val === 'number') {
-      result[fieldName] = minutesToDuration(val)
-    }
-  }
-
-  const switchFields = getSwitchFieldNames()
-  for (const fieldName of switchFields) {
-    const val = result[fieldName]
-    if (val !== undefined && val !== null) {
-      // Remember the original format
-      switchFieldFormats.value[fieldName] = detectFormat(val)
-      // Convert to boolean for display
-      result[fieldName] = toBoolean(val)
-    }
-  }
-
-  return result
+  const transformed = transformFormData(
+    incomingData,
+    getDurationFieldNames(),
+    getSwitchFieldNames(),
+  )
+  Object.assign(switchFieldFormats.value, transformed.switchFieldFormats)
+  return transformed.values
 }
 
 watch(

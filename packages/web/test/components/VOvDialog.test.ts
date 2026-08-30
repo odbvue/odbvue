@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { mount, VueWrapper } from '@vue/test-utils'
-import VOvDialog from '../../src/capabilities/ui/components/VOvDialog.vue'
+import VOvDialog from '../../src/components/overlays/VOvDialog.vue'
 import { globalPlugins } from './setup'
 
 let wrapper: VueWrapper

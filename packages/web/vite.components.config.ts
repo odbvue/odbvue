@@ -7,7 +7,7 @@ export default defineConfig({
   build: {
     emptyOutDir: false,
     lib: {
-      entry: fileURLToPath(new URL('./src/capabilities/ui/components/index.ts', import.meta.url)),
+      entry: fileURLToPath(new URL('./src/components/index.ts', import.meta.url)),
       formats: ['es'],
       fileName: () => 'components/index.js',
     },

@@ -66,6 +66,92 @@ declare module 'vue-router/auto-routes' {
       { capability: ParamValue<false> },
       | never
     >,
+    '/sandbox/capabilities/components': RouteRecordInfo<
+      '/sandbox/capabilities/components',
+      '/sandbox/capabilities/components',
+      Record<never, never>,
+      Record<never, never>,
+      | '/sandbox/capabilities/components/chart'
+      | '/sandbox/capabilities/components/dialog'
+      | '/sandbox/capabilities/components/editor'
+      | '/sandbox/capabilities/components/form'
+      | '/sandbox/capabilities/components/map'
+      | '/sandbox/capabilities/components/media'
+      | '/sandbox/capabilities/components/pad'
+      | '/sandbox/capabilities/components/share'
+      | '/sandbox/capabilities/components/table'
+      | '/sandbox/capabilities/components/view'
+    >,
+    '/sandbox/capabilities/components/chart': RouteRecordInfo<
+      '/sandbox/capabilities/components/chart',
+      '/sandbox/capabilities/components/chart',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/sandbox/capabilities/components/dialog': RouteRecordInfo<
+      '/sandbox/capabilities/components/dialog',
+      '/sandbox/capabilities/components/dialog',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/sandbox/capabilities/components/editor': RouteRecordInfo<
+      '/sandbox/capabilities/components/editor',
+      '/sandbox/capabilities/components/editor',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/sandbox/capabilities/components/form': RouteRecordInfo<
+      '/sandbox/capabilities/components/form',
+      '/sandbox/capabilities/components/form',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/sandbox/capabilities/components/map': RouteRecordInfo<
+      '/sandbox/capabilities/components/map',
+      '/sandbox/capabilities/components/map',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/sandbox/capabilities/components/media': RouteRecordInfo<
+      '/sandbox/capabilities/components/media',
+      '/sandbox/capabilities/components/media',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/sandbox/capabilities/components/pad': RouteRecordInfo<
+      '/sandbox/capabilities/components/pad',
+      '/sandbox/capabilities/components/pad',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/sandbox/capabilities/components/share': RouteRecordInfo<
+      '/sandbox/capabilities/components/share',
+      '/sandbox/capabilities/components/share',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/sandbox/capabilities/components/table': RouteRecordInfo<
+      '/sandbox/capabilities/components/table',
+      '/sandbox/capabilities/components/table',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/sandbox/capabilities/components/view': RouteRecordInfo<
+      '/sandbox/capabilities/components/view',
+      '/sandbox/capabilities/components/view',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/sandbox/capabilities/errors': RouteRecordInfo<
       '/sandbox/capabilities/errors',
       '/sandbox/capabilities/errors',
@@ -97,85 +183,6 @@ declare module 'vue-router/auto-routes' {
     '/sandbox/capabilities/ui': RouteRecordInfo<
       '/sandbox/capabilities/ui',
       '/sandbox/capabilities/ui',
-      Record<never, never>,
-      Record<never, never>,
-      | '/sandbox/capabilities/ui/components/chart'
-      | '/sandbox/capabilities/ui/components/dialog'
-      | '/sandbox/capabilities/ui/components/editor'
-      | '/sandbox/capabilities/ui/components/form'
-      | '/sandbox/capabilities/ui/components/map'
-      | '/sandbox/capabilities/ui/components/media'
-      | '/sandbox/capabilities/ui/components/pad'
-      | '/sandbox/capabilities/ui/components/share'
-      | '/sandbox/capabilities/ui/components/table'
-      | '/sandbox/capabilities/ui/components/view'
-    >,
-    '/sandbox/capabilities/ui/components/chart': RouteRecordInfo<
-      '/sandbox/capabilities/ui/components/chart',
-      '/sandbox/capabilities/ui/components/chart',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
-    '/sandbox/capabilities/ui/components/dialog': RouteRecordInfo<
-      '/sandbox/capabilities/ui/components/dialog',
-      '/sandbox/capabilities/ui/components/dialog',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
-    '/sandbox/capabilities/ui/components/editor': RouteRecordInfo<
-      '/sandbox/capabilities/ui/components/editor',
-      '/sandbox/capabilities/ui/components/editor',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
-    '/sandbox/capabilities/ui/components/form': RouteRecordInfo<
-      '/sandbox/capabilities/ui/components/form',
-      '/sandbox/capabilities/ui/components/form',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
-    '/sandbox/capabilities/ui/components/map': RouteRecordInfo<
-      '/sandbox/capabilities/ui/components/map',
-      '/sandbox/capabilities/ui/components/map',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
-    '/sandbox/capabilities/ui/components/media': RouteRecordInfo<
-      '/sandbox/capabilities/ui/components/media',
-      '/sandbox/capabilities/ui/components/media',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
-    '/sandbox/capabilities/ui/components/pad': RouteRecordInfo<
-      '/sandbox/capabilities/ui/components/pad',
-      '/sandbox/capabilities/ui/components/pad',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
-    '/sandbox/capabilities/ui/components/share': RouteRecordInfo<
-      '/sandbox/capabilities/ui/components/share',
-      '/sandbox/capabilities/ui/components/share',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
-    '/sandbox/capabilities/ui/components/table': RouteRecordInfo<
-      '/sandbox/capabilities/ui/components/table',
-      '/sandbox/capabilities/ui/components/table',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
-    '/sandbox/capabilities/ui/components/view': RouteRecordInfo<
-      '/sandbox/capabilities/ui/components/view',
-      '/sandbox/capabilities/ui/components/view',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -247,6 +254,104 @@ declare module 'vue-router/auto-routes' {
       pathParamNames:
         | 'capability'
     }
+    'src/modules/sandbox/pages/capabilities/components.vue': {
+      routes:
+        | '/sandbox/capabilities/components'
+        | '/sandbox/capabilities/components/chart'
+        | '/sandbox/capabilities/components/dialog'
+        | '/sandbox/capabilities/components/editor'
+        | '/sandbox/capabilities/components/form'
+        | '/sandbox/capabilities/components/map'
+        | '/sandbox/capabilities/components/media'
+        | '/sandbox/capabilities/components/pad'
+        | '/sandbox/capabilities/components/share'
+        | '/sandbox/capabilities/components/table'
+        | '/sandbox/capabilities/components/view'
+      views:
+        | 'default'
+      pathParamNames:
+        | never
+    }
+    'src/modules/sandbox/pages/capabilities/components/chart.vue': {
+      routes:
+        | '/sandbox/capabilities/components/chart'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/modules/sandbox/pages/capabilities/components/dialog.vue': {
+      routes:
+        | '/sandbox/capabilities/components/dialog'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/modules/sandbox/pages/capabilities/components/editor.vue': {
+      routes:
+        | '/sandbox/capabilities/components/editor'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/modules/sandbox/pages/capabilities/components/form.vue': {
+      routes:
+        | '/sandbox/capabilities/components/form'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/modules/sandbox/pages/capabilities/components/map.vue': {
+      routes:
+        | '/sandbox/capabilities/components/map'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/modules/sandbox/pages/capabilities/components/media.vue': {
+      routes:
+        | '/sandbox/capabilities/components/media'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/modules/sandbox/pages/capabilities/components/pad.vue': {
+      routes:
+        | '/sandbox/capabilities/components/pad'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/modules/sandbox/pages/capabilities/components/share.vue': {
+      routes:
+        | '/sandbox/capabilities/components/share'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/modules/sandbox/pages/capabilities/components/table.vue': {
+      routes:
+        | '/sandbox/capabilities/components/table'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/modules/sandbox/pages/capabilities/components/view.vue': {
+      routes:
+        | '/sandbox/capabilities/components/view'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
     'src/modules/sandbox/pages/capabilities/errors.vue': {
       routes:
         | '/sandbox/capabilities/errors'
@@ -282,96 +387,6 @@ declare module 'vue-router/auto-routes' {
     'src/modules/sandbox/pages/capabilities/ui.vue': {
       routes:
         | '/sandbox/capabilities/ui'
-        | '/sandbox/capabilities/ui/components/chart'
-        | '/sandbox/capabilities/ui/components/dialog'
-        | '/sandbox/capabilities/ui/components/editor'
-        | '/sandbox/capabilities/ui/components/form'
-        | '/sandbox/capabilities/ui/components/map'
-        | '/sandbox/capabilities/ui/components/media'
-        | '/sandbox/capabilities/ui/components/pad'
-        | '/sandbox/capabilities/ui/components/share'
-        | '/sandbox/capabilities/ui/components/table'
-        | '/sandbox/capabilities/ui/components/view'
-      views:
-        | 'default'
-      pathParamNames:
-        | never
-    }
-    'src/modules/sandbox/pages/capabilities/ui/components/chart.vue': {
-      routes:
-        | '/sandbox/capabilities/ui/components/chart'
-      views:
-        | never
-      pathParamNames:
-        | never
-    }
-    'src/modules/sandbox/pages/capabilities/ui/components/dialog.vue': {
-      routes:
-        | '/sandbox/capabilities/ui/components/dialog'
-      views:
-        | never
-      pathParamNames:
-        | never
-    }
-    'src/modules/sandbox/pages/capabilities/ui/components/editor.vue': {
-      routes:
-        | '/sandbox/capabilities/ui/components/editor'
-      views:
-        | never
-      pathParamNames:
-        | never
-    }
-    'src/modules/sandbox/pages/capabilities/ui/components/form.vue': {
-      routes:
-        | '/sandbox/capabilities/ui/components/form'
-      views:
-        | never
-      pathParamNames:
-        | never
-    }
-    'src/modules/sandbox/pages/capabilities/ui/components/map.vue': {
-      routes:
-        | '/sandbox/capabilities/ui/components/map'
-      views:
-        | never
-      pathParamNames:
-        | never
-    }
-    'src/modules/sandbox/pages/capabilities/ui/components/media.vue': {
-      routes:
-        | '/sandbox/capabilities/ui/components/media'
-      views:
-        | never
-      pathParamNames:
-        | never
-    }
-    'src/modules/sandbox/pages/capabilities/ui/components/pad.vue': {
-      routes:
-        | '/sandbox/capabilities/ui/components/pad'
-      views:
-        | never
-      pathParamNames:
-        | never
-    }
-    'src/modules/sandbox/pages/capabilities/ui/components/share.vue': {
-      routes:
-        | '/sandbox/capabilities/ui/components/share'
-      views:
-        | never
-      pathParamNames:
-        | never
-    }
-    'src/modules/sandbox/pages/capabilities/ui/components/table.vue': {
-      routes:
-        | '/sandbox/capabilities/ui/components/table'
-      views:
-        | never
-      pathParamNames:
-        | never
-    }
-    'src/modules/sandbox/pages/capabilities/ui/components/view.vue': {
-      routes:
-        | '/sandbox/capabilities/ui/components/view'
       views:
         | never
       pathParamNames:

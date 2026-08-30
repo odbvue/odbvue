@@ -47,7 +47,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useDisplay, useDefaults } from 'vuetify'
-import VOvForm from './VOvForm.vue'
+import VOvForm from '../forms/VOvForm.vue'
 import {
   VBtn,
   VCard,
@@ -61,8 +61,14 @@ import {
   VProgressCircular,
   VRow,
 } from 'vuetify/components'
-import type { OvViewOptions, OvViewData, OvFormOptions, OvFormData, OvFormFieldError } from '.'
-import { renderViewItem, OvTextAlign, OvActionFormat } from '.'
+import type {
+  OvViewOptions,
+  OvViewData,
+  OvFormOptions,
+  OvFormData,
+  OvFormFieldError,
+} from '../index'
+import { renderViewItem, OvTextAlign, OvActionFormat } from '../index'
 
 const { defaults } = useDefaults({
   name: 'VOvView',
