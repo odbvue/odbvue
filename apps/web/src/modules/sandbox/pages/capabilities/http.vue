@@ -48,7 +48,7 @@
 </template>
 
 <script setup lang="ts">
-import { configureHttp, useHttp, useNetwork } from '@odbvue/web'
+import { useHttp, useNetwork } from '@odbvue/web'
 import { ref } from 'vue'
 
 definePage({
@@ -116,21 +116,22 @@ const scenarios: Array<{
   },
 ]
 
-configureHttp({
-  getAccessToken: () => accessToken,
-  refreshAccessToken: async () => {
-    refreshCount.value += 1
-    await delay(100)
-    accessToken = 'fresh'
-    return true
-  },
-  slowRequestThresholdMs: 500,
-  onSlowRequest: () => {
-    slowRequestCount.value += 1
+const http = useHttp({
+  fetch: laboratoryFetch,
+  configuration: {
+    getAccessToken: () => accessToken,
+    refreshAccessToken: async () => {
+      refreshCount.value += 1
+      await delay(100)
+      accessToken = 'fresh'
+      return true
+    },
+    slowRequestThresholdMs: 500,
+    onSlowRequest: () => {
+      slowRequestCount.value += 1
+    },
   },
 })
-
-const http = useHttp({ fetch: laboratoryFetch })
 
 async function run(scenario: ScenarioName) {
   running.value = scenario

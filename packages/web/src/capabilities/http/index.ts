@@ -5,8 +5,6 @@ const baseURL = (import.meta as ImportMeta & { env?: { DEV?: boolean; VITE_API_U
   ? '/api/'
   : (import.meta as ImportMeta & { env?: { VITE_API_URI?: string } }).env?.VITE_API_URI
 
-let refreshPromise: Promise<boolean> | null = null
-
 export interface HttpResponse<T = unknown> {
   data: T | null
   error: HttpError | null
@@ -39,6 +37,8 @@ export interface HttpConfiguration {
 export interface HttpClientOptions {
   /** Overrides fetch for a dedicated client, such as deterministic tests or a sandbox. */
   fetch?: typeof globalThis.fetch
+  /** Overrides runtime HTTP configuration for this client only. */
+  configuration?: HttpConfiguration
 }
 export interface HttpClient {
   <T>(request: string, options?: FetchOptions<'json'>): Promise<HttpResponse<T>>
@@ -83,22 +83,12 @@ function getErrorStatus(error: unknown): number | null {
 function createHttpError(error: unknown, request: string, status: number | null): HttpError {
   const source = error instanceof Error ? error : new Error(String(error))
   const response = error as { data?: unknown }
-  return Object.assign(source, { status, request, data: response?.data })
-}
-
-function authHeaders(): Record<string, string> {
-  const token = httpConfiguration.getAccessToken?.()
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
-
-function refreshAccessToken(): Promise<boolean> {
-  if (!refreshPromise) {
-    const refresh = httpConfiguration.refreshAccessToken
-    refreshPromise = Promise.resolve(refresh ? refresh() : false).finally(() => {
-      refreshPromise = null
-    })
-  }
-  return refreshPromise
+  return Object.assign(new Error(source.message), {
+    name: source.name,
+    status,
+    request,
+    data: response?.data,
+  })
 }
 
 function retryDelay(context: FetchContext): number {
@@ -109,9 +99,7 @@ function retryDelay(context: FetchContext): number {
     const retryAt = Date.parse(retryAfter)
     if (!Number.isNaN(retryAt)) return Math.max(0, retryAt - Date.now())
   }
-  const retriesRemaining = typeof context.options.retry === 'number' ? context.options.retry : 0
-  const attempt = 3 - retriesRemaining
-  return 300 * 2 ** Math.max(0, attempt) + Math.random() * 150
+  return 300 + Math.random() * 150
 }
 
 function requestRetryOptions(options?: FetchOptions<'json'>): FetchOptions<'json'> {
@@ -122,6 +110,8 @@ function requestRetryOptions(options?: FetchOptions<'json'>): FetchOptions<'json
 
 async function executeRequest<T>(
   client: ReturnType<typeof $fetch.create>,
+  configuration: HttpConfiguration,
+  refresh: () => Promise<boolean>,
   request: string,
   options?: FetchOptions<'json'>,
   didRefresh = false,
@@ -130,14 +120,19 @@ async function executeRequest<T>(
     const startTime = performance.now()
     const response = await client.raw<T>(request, {
       ...requestRetryOptions(options),
-      headers: { ...authHeaders(), ...(options?.headers as Record<string, string>) },
+      headers: {
+        ...(configuration.getAccessToken?.()
+          ? { Authorization: `Bearer ${configuration.getAccessToken?.()}` }
+          : {}),
+        ...(options?.headers as Record<string, string>),
+      },
     })
     const duration = performance.now() - startTime
     if (
-      typeof httpConfiguration.slowRequestThresholdMs === 'number' &&
-      duration >= httpConfiguration.slowRequestThresholdMs
+      typeof configuration.slowRequestThresholdMs === 'number' &&
+      duration >= configuration.slowRequestThresholdMs
     )
-      httpConfiguration.onSlowRequest?.({ request, duration, options })
+      configuration.onSlowRequest?.({ request, duration, options })
     return {
       data: response._data ?? null,
       error: null,
@@ -148,15 +143,16 @@ async function executeRequest<T>(
     const status = getErrorStatus(error)
     const shouldRefresh =
       status === 401 &&
-      !!httpConfiguration.refreshAccessToken &&
-      (httpConfiguration.shouldRefresh?.(request, options) ?? true)
+      !!configuration.refreshAccessToken &&
+      (configuration.shouldRefresh?.(request, options) ?? true)
     if (shouldRefresh && !didRefresh) {
       const expired = new Error('session.expired')
       try {
-        if (await refreshAccessToken()) return executeRequest<T>(client, request, options, true)
-        httpConfiguration.onRefreshFailure?.({ request, error: expired, options })
+        if (await refresh())
+          return executeRequest<T>(client, configuration, refresh, request, options, true)
+        configuration.onRefreshFailure?.({ request, error: expired, options })
       } catch (refreshError) {
-        httpConfiguration.onRefreshFailure?.({ request, error: refreshError, options })
+        configuration.onRefreshFailure?.({ request, error: refreshError, options })
       }
     }
     return { data: null, error: createHttpError(error, request, status), status, headers: null }
@@ -164,6 +160,19 @@ async function executeRequest<T>(
 }
 
 export function useHttp(clientOptions: HttpClientOptions = {}): HttpClient {
+  const configuration = { ...httpConfiguration, ...clientOptions.configuration }
+  let refreshPromise: Promise<boolean> | null = null
+  const refresh = (): Promise<boolean> => {
+    if (!refreshPromise) {
+      const refreshAccessToken = configuration.refreshAccessToken
+      refreshPromise = Promise.resolve(refreshAccessToken ? refreshAccessToken() : false).finally(
+        () => {
+          refreshPromise = null
+        },
+      )
+    }
+    return refreshPromise
+  }
   const client = $fetch.create(
     {
       baseURL,
@@ -171,26 +180,28 @@ export function useHttp(clientOptions: HttpClientOptions = {}): HttpClient {
       retryStatusCodes: [408, 425, 429, 500, 502, 503, 504],
       retryDelay,
     },
-    clientOptions,
+    { fetch: clientOptions.fetch },
   )
   const http = (<T>(request: string, options?: FetchOptions<'json'>) =>
-    executeRequest<T>(client, request, options)) as HttpClient
-  http.get = (url, options) => executeRequest(client, url, { ...options, method: 'GET' })
+    executeRequest<T>(client, configuration, refresh, request, options)) as HttpClient
+  http.get = (url, options) =>
+    executeRequest(client, configuration, refresh, url, { ...options, method: 'GET' })
   http.post = (url, body, options) =>
-    executeRequest(client, url, {
+    executeRequest(client, configuration, refresh, url, {
       ...options,
       method: 'POST',
       body: body as Record<string, unknown>,
     })
   http.put = (url, body, options) =>
-    executeRequest(client, url, {
+    executeRequest(client, configuration, refresh, url, {
       ...options,
       method: 'PUT',
       body: body as Record<string, unknown>,
     })
-  http.delete = (url, options) => executeRequest(client, url, { ...options, method: 'DELETE' })
+  http.delete = (url, options) =>
+    executeRequest(client, configuration, refresh, url, { ...options, method: 'DELETE' })
   http.patch = (url, body, options) =>
-    executeRequest(client, url, {
+    executeRequest(client, configuration, refresh, url, {
       ...options,
       method: 'PATCH',
       body: body as Record<string, unknown>,
