@@ -159,6 +159,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/sandbox/capabilities/http': RouteRecordInfo<
+      '/sandbox/capabilities/http',
+      '/sandbox/capabilities/http',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/sandbox/capabilities/i18n': RouteRecordInfo<
       '/sandbox/capabilities/i18n',
       '/sandbox/capabilities/i18n',
@@ -190,13 +197,6 @@ declare module 'vue-router/auto-routes' {
     '/sandbox/sandbox-dnd': RouteRecordInfo<
       '/sandbox/sandbox-dnd',
       '/sandbox/sandbox-dnd',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
-    '/sandbox/sandbox-http': RouteRecordInfo<
-      '/sandbox/sandbox-http',
-      '/sandbox/sandbox-http',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -360,6 +360,14 @@ declare module 'vue-router/auto-routes' {
       pathParamNames:
         | never
     }
+    'src/modules/sandbox/pages/capabilities/http.vue': {
+      routes:
+        | '/sandbox/capabilities/http'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
     'src/modules/sandbox/pages/capabilities/i18n.vue': {
       routes:
         | '/sandbox/capabilities/i18n'
@@ -395,14 +403,6 @@ declare module 'vue-router/auto-routes' {
     'src/modules/sandbox/pages/sandbox-dnd.vue': {
       routes:
         | '/sandbox/sandbox-dnd'
-      views:
-        | never
-      pathParamNames:
-        | never
-    }
-    'src/modules/sandbox/pages/sandbox-http.vue': {
-      routes:
-        | '/sandbox/sandbox-http'
       views:
         | never
       pathParamNames:

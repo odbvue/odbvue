@@ -23,6 +23,8 @@ export type {
   OdbVueErrors,
 } from './capabilities/errors/index.js'
 export * from './capabilities/http/index.js'
+export { useNetwork } from './capabilities/network/index.js'
+export type { NetworkStatus } from './capabilities/network/index.js'
 export { createOdbVueI18n, resolveOdbVueLocale } from './capabilities/i18n/index.js'
 export { odbVueRuntimeKey, useOdbVue } from './runtime/context.js'
 export { useCapability, useOdbVueConfig } from './runtime/config.js'

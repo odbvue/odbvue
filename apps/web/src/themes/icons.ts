@@ -6,7 +6,7 @@
 
 import {
 	mdiAccount,
-	mdiAccountCowboyHat,
+	mdiAccountGroup,
 	mdiAlert,
 	mdiAlertCircle,
 	mdiArrowLeft,
@@ -38,6 +38,7 @@ import {
 	mdiGithub,
 	mdiHome,
 	mdiInformation,
+	mdiKeyChange,
 	mdiLink,
 	mdiListStatus,
 	mdiMagnify,
@@ -48,6 +49,7 @@ import {
 	mdiMessageText,
 	mdiMinus,
 	mdiMultimedia,
+	mdiNetwork,
 	mdiNetworkOutline,
 	mdiPalette,
 	mdiPencil,
@@ -57,6 +59,7 @@ import {
 	mdiPrinter,
 	mdiProgressCheck,
 	mdiRefresh,
+	mdiReload,
 	mdiRoutes,
 	mdiServer,
 	mdiShape,
@@ -64,15 +67,17 @@ import {
 	mdiStar,
 	mdiSwapHorizontal,
 	mdiTable,
+	mdiTimerSand,
 	mdiTranslate,
 	mdiTune,
 	mdiVuetify,
-	mdiWeb
+	mdiWeb,
+	mdiWifiOff
 } from '@mdi/js'
 
 export default {
 	mdiAccount,
-	mdiAccountCowboyHat,
+	mdiAccountGroup,
 	mdiAlert,
 	mdiAlertCircle,
 	mdiArrowLeft,
@@ -104,6 +109,7 @@ export default {
 	mdiGithub,
 	mdiHome,
 	mdiInformation,
+	mdiKeyChange,
 	mdiLink,
 	mdiListStatus,
 	mdiMagnify,
@@ -114,6 +120,7 @@ export default {
 	mdiMessageText,
 	mdiMinus,
 	mdiMultimedia,
+	mdiNetwork,
 	mdiNetworkOutline,
 	mdiPalette,
 	mdiPencil,
@@ -123,6 +130,7 @@ export default {
 	mdiPrinter,
 	mdiProgressCheck,
 	mdiRefresh,
+	mdiReload,
 	mdiRoutes,
 	mdiServer,
 	mdiShape,
@@ -130,8 +138,10 @@ export default {
 	mdiStar,
 	mdiSwapHorizontal,
 	mdiTable,
+	mdiTimerSand,
 	mdiTranslate,
 	mdiTune,
 	mdiVuetify,
-	mdiWeb
+	mdiWeb,
+	mdiWifiOff
 }
