@@ -38,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { useOdbVue, useSettingsStore } from '@odbvue/web'
+import { useOdbVue, usePreferencesStore } from '@odbvue/web'
 import type { OvTableData, OvTableOptions } from '@odbvue/web/components'
 import { computed } from 'vue'
 import inventory from 'virtual:odbvue-i18n-inventory'
@@ -59,7 +59,7 @@ type I18nGlobal = {
 }
 
 const { config, i18n } = useOdbVue()
-const settings = useSettingsStore()
+const preferences = usePreferencesStore()
 const global = i18n.global as I18nGlobal
 const locales = computed(() => config.i18n?.locales ?? Object.keys(global.messages.value))
 const currentLocale = computed(() => global.locale.value)
@@ -98,6 +98,6 @@ function translationRow(module: string, translations: Record<string, number>): O
 }
 
 function setLocale(locale: string) {
-  settings.setLocale(locale)
+  preferences.setLocale(locale)
 }
 </script>

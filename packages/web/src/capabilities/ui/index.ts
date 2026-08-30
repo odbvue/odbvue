@@ -6,9 +6,9 @@ import { aliases, mdi } from 'vuetify/iconsets/mdi-svg'
 import type { OdbVueUiConfig } from '../../runtime/config.js'
 import { odbVueComponentIcons } from './components/icons.js'
 
-export { useSettingsStore } from './settings.js'
-export { useUiStore } from './store.js'
-export type { AlertOptions } from './store.js'
+export { usePreferencesStore } from './preferences.js'
+export { useUi } from './store.js'
+export type { AlertOptions, UiNotification, UiNotificationType } from './store.js'
 
 type OdbVueVuetify = ReturnType<typeof createVuetify>
 

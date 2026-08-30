@@ -81,6 +81,7 @@ declare global {
   const useLocale: typeof import('vuetify').useLocale
   const useModel: typeof import('vue').useModel
   const usePageMeta: typeof import('@odbvue/web').usePageMeta
+  const usePreferencesStore: typeof import('@odbvue/web').usePreferencesStore
   const useRoute: typeof import('vue-router').useRoute
   const useRouteParams: typeof import('@odbvue/web').useRouteParams
   const useRouter: typeof import('vue-router').useRouter
@@ -91,6 +92,7 @@ declare global {
   const useSlots: typeof import('vue').useSlots
   const useTemplateRef: typeof import('vue').useTemplateRef
   const useTheme: typeof import('vuetify').useTheme
+  const useUi: typeof import('@odbvue/web').useUi
   const useUiStore: typeof import('@odbvue/web').useUiStore
   const watch: typeof import('vue').watch
   const watchEffect: typeof import('vue').watchEffect

@@ -6,7 +6,7 @@ const themes = ['system', 'light', 'dark'] as const
 
 type ThemeName = (typeof themes)[number]
 
-export const useSettingsStore = defineStore(
+export const usePreferencesStore = defineStore(
   'settings',
   () => {
     const { i18n, vuetify } = useOdbVue()
@@ -45,7 +45,7 @@ export const useSettingsStore = defineStore(
 
     watch(locale, (newLocale) => {
       if (!locales.value.includes(newLocale)) {
-        console.warn(`[Settings Store] Invalid locale: ${newLocale}`)
+        console.warn(`[Preferences Store] Invalid locale: ${newLocale}`)
         const firstLocale = locales.value[0]
         if (firstLocale) locale.value = firstLocale
         return
@@ -58,7 +58,7 @@ export const useSettingsStore = defineStore(
 
     function setFontSize(newFontSize: number) {
       if (!fontSizes.includes(newFontSize)) {
-        console.warn(`[Settings Store] Invalid font size: ${newFontSize}`)
+        console.warn(`[Preferences Store] Invalid font size: ${newFontSize}`)
         fontSize.value = 100
         return
       }
@@ -95,5 +95,5 @@ export const useSettingsStore = defineStore(
 )
 
 if (import.meta.hot) {
-  import.meta.hot.accept(acceptHMRUpdate(useSettingsStore, import.meta.hot))
+  import.meta.hot.accept(acceptHMRUpdate(usePreferencesStore, import.meta.hot))
 }

@@ -27,10 +27,10 @@
                 <v-list>
                   <v-list-item
                     link
-                    v-for="item in app.settings.fontSizes"
+                    v-for="item in app.preferences.fontSizes"
                     :key="item"
                     :value="item"
-                    @click="app.settings.setFontSize(item)"
+                    @click="app.preferences.setFontSize(item)"
                   >
                     <v-list-item-title> {{ item }}% </v-list-item-title>
                   </v-list-item>
@@ -39,16 +39,16 @@
             </v-list-item>
             <v-list-item link prepend-icon="$mdiMenuLeft">
               <v-list-item-title>
-                {{ app.settings.locale }}
+                {{ app.preferences.locale }}
               </v-list-item-title>
               <v-menu submenu activator="parent">
                 <v-list>
                   <v-list-item
                     link
-                    v-for="item in app.settings.locales"
+                    v-for="item in app.preferences.locales"
                     :key="item"
                     :value="item"
-                    @click="app.settings.setLocale(item)"
+                    @click="app.preferences.setLocale(item)"
                   >
                     <v-list-item-title>
                       {{ item }}
@@ -57,9 +57,9 @@
                 </v-list>
               </v-menu>
             </v-list-item>
-            <v-list-item @click="app.settings.toggleTheme()">
+            <v-list-item @click="app.preferences.toggleTheme()">
               <v-list-item-title>
-                <v-icon class="ml-10" :icon="app.settings.themeIcon"></v-icon>
+                <v-icon class="ml-10" :icon="app.preferences.themeIcon"></v-icon>
               </v-list-item-title>
             </v-list-item>
           </v-list>
@@ -70,8 +70,8 @@
           <v-btn variant="text" v-bind="props" prepend-icon="$mdiEyePlusOutline"></v-btn>
         </template>
         <v-list>
-          <v-list-item v-for="(item, i) in app.settings.fontSizes" :key="i" :value="i">
-            <v-list-item-title @click="app.settings.setFontSize(item)"
+          <v-list-item v-for="(item, i) in app.preferences.fontSizes" :key="i" :value="i">
+            <v-list-item-title @click="app.preferences.setFontSize(item)"
               >{{ item }}%</v-list-item-title
             >
           </v-list-item>
@@ -79,19 +79,21 @@
       </v-menu>
       <v-menu v-if="!mobile">
         <template #activator="{ props }">
-          <v-btn variant="text" v-bind="props">{{ app.settings.locale }}</v-btn>
+          <v-btn variant="text" v-bind="props">{{ app.preferences.locale }}</v-btn>
         </template>
         <v-list>
-          <v-list-item v-for="(item, i) in app.settings.locales" :key="i" :value="i">
-            <v-list-item-title @click="app.settings.setLocale(item)">{{ item }}</v-list-item-title>
+          <v-list-item v-for="(item, i) in app.preferences.locales" :key="i" :value="i">
+            <v-list-item-title @click="app.preferences.setLocale(item)">{{
+              item
+            }}</v-list-item-title>
           </v-list-item>
         </v-list>
       </v-menu>
       <v-btn
         v-if="!mobile"
         variant="text"
-        :prepend-icon="app.settings.themeIcon"
-        @click="app.settings.toggleTheme()"
+        :prepend-icon="app.preferences.themeIcon"
+        @click="app.preferences.toggleTheme()"
         data-cy="theme-toggle"
       ></v-btn>
       <v-progress-linear
@@ -110,31 +112,22 @@
       </v-breadcrumbs>
     </v-app-bar>
 
-    <v-app-bar class="pa-2" v-if="app.ui.info">
-      <v-alert type="info" :text="app.ui.info ? t(app.ui.info) : ''"></v-alert>
-    </v-app-bar>
-    <v-app-bar class="pa-2" v-if="app.ui.success">
-      <v-alert type="success" :text="app.ui.success ? t(app.ui.success) : ''"></v-alert>
-    </v-app-bar>
-    <v-app-bar class="pa-2" v-if="app.ui.warning">
-      <v-alert type="warning" :text="app.ui.warning ? t(app.ui.warning) : ''"></v-alert>
-    </v-app-bar>
-    <v-app-bar class="pa-2" v-if="app.ui.error">
-      <v-alert type="error" :text="app.ui.error ? t(app.ui.error) : ''"></v-alert>
+    <v-app-bar class="pa-2" v-if="app.ui.notification && !app.ui.snackbar">
+      <v-alert :type="app.ui.notification.type" :text="t(app.ui.notification.message)"></v-alert>
     </v-app-bar>
 
     <v-main class="ma-4">
       <slot />
 
-      <v-snackbar v-model="app.ui.snackbar">
-        {{ app.ui.snack }}
+      <v-snackbar :model-value="app.ui.snackbar" @update:model-value="!$event && app.ui.clear()">
+        {{ app.ui.notification?.message }}
         <template v-slot:actions>
-          <v-btn color="pink" variant="text" @click="app.ui.snack = ''">
+          <v-btn color="pink" variant="text" @click="app.ui.clear()">
             {{ t('close') }}
           </v-btn>
         </template>
       </v-snackbar>
-      <v-overlay v-model="app.ui.loading" contained></v-overlay>
+      <v-overlay :model-value="app.ui.loading" contained></v-overlay>
     </v-main>
     <v-footer app>
       <v-row>

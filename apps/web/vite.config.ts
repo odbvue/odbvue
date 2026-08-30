@@ -84,8 +84,8 @@ export default defineConfig({
             'usePageMeta',
             'useRouteParams',
             'useRouting',
-            'useSettingsStore',
-            'useUiStore',
+            'usePreferencesStore',
+            'useUi',
           ],
         },
         {

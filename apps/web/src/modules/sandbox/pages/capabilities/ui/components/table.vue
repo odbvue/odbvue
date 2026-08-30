@@ -25,7 +25,7 @@ const loading = ref(false)
 const data = ref<OvTableData[]>([])
 const nextCursor = ref<string | undefined>(undefined)
 
-import jsonData from './sandbox-table.json'
+import jsonData from './table.json'
 
 function action(actionName: string, actionData: unknown, value?: unknown) {
   const rows = (Array.isArray(actionData) ? actionData : []) as OvTableData[]

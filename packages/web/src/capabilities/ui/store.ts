@@ -1,46 +1,34 @@
-import { defineStore, acceptHMRUpdate } from 'pinia'
-import { ref, computed } from 'vue'
+import { defineStore, acceptHMRUpdate, storeToRefs } from 'pinia'
+import { ref, computed, readonly } from 'vue'
 
 export interface AlertOptions {
   timeout?: number
-  onRouteChange?: 'keep' | 'clear'
 }
 
-export const useUiStore = defineStore('ui', () => {
+export type UiNotificationType = 'info' | 'success' | 'warning' | 'error'
+
+export interface UiNotification {
+  type: UiNotificationType
+  message: string
+  timeout?: number
+  presentation: 'alert' | 'snackbar'
+}
+
+const useUiStore = defineStore('ui', () => {
   const loading = ref(false)
-  const info = ref('')
-  const success = ref('')
-  const warning = ref('')
-  const error = ref('')
-  const snack = ref('')
-  const snackTimeout = ref(0)
-  const snackbar = computed(() => !!snack.value)
+  const notification = ref<UiNotification | undefined>(undefined)
+  const snackbar = computed(() => notification.value?.presentation === 'snackbar')
   const activeAlertTimeout = ref<number | undefined>(undefined)
-  const routeChangeBehavior = ref<'keep' | 'clear'>('keep')
 
   function clearActiveAlert() {
-    info.value = ''
-    success.value = ''
-    warning.value = ''
-    error.value = ''
-    snack.value = ''
-    snackTimeout.value = 0
+    notification.value = undefined
     if (activeAlertTimeout.value !== undefined) {
       clearTimeout(activeAlertTimeout.value)
       activeAlertTimeout.value = undefined
     }
-    routeChangeBehavior.value = 'keep'
   }
 
   function clearAll() {
-    clearActiveAlert()
-  }
-
-  function clearAlertForRouteChange() {
-    if (routeChangeBehavior.value !== 'clear') {
-      return
-    }
-
     clearActiveAlert()
   }
 
@@ -57,49 +45,15 @@ export const useUiStore = defineStore('ui', () => {
     }
   }
 
-  function setAlertBehavior(options: AlertOptions = {}) {
-    routeChangeBehavior.value = options.onRouteChange ?? 'keep'
-  }
-
-  function setInfo(message: string, options: AlertOptions = {}) {
+  function show(
+    type: UiNotificationType,
+    message: string,
+    presentation: UiNotification['presentation'],
+    options: AlertOptions = {},
+  ) {
     clearAll()
-    info.value = message
-    setAlertBehavior(options)
+    notification.value = { type, message, timeout: options.timeout, presentation }
     scheduleAlertClear(options.timeout ?? 0)
-  }
-
-  function setSuccess(message: string, options: AlertOptions = {}) {
-    clearAll()
-    success.value = message
-    setAlertBehavior(options)
-    scheduleAlertClear(options.timeout ?? 0)
-  }
-
-  function setWarning(message: string, options: AlertOptions = {}) {
-    clearAll()
-    warning.value = message
-    setAlertBehavior(options)
-    scheduleAlertClear(options.timeout ?? 0)
-  }
-
-  function setError(message: string, options: AlertOptions = {}) {
-    clearAll()
-    error.value = message
-    setAlertBehavior(options)
-    scheduleAlertClear(options.timeout ?? 0)
-  }
-
-  function setSnack(message: string, options: AlertOptions = {}) {
-    clearAll()
-    snack.value = message
-    snackTimeout.value = options.timeout ?? 0
-    setAlertBehavior(options)
-    if ((options.timeout ?? 0) > 0) {
-      scheduleAlertClear(options.timeout ?? 0)
-    } else if (activeAlertTimeout.value !== undefined) {
-      clearTimeout(activeAlertTimeout.value)
-      activeAlertTimeout.value = undefined
-    }
   }
 
   function startLoading() {
@@ -112,24 +66,43 @@ export const useUiStore = defineStore('ui', () => {
 
   return {
     loading,
-    info,
-    success,
-    warning,
-    error,
-    snack,
-    snackTimeout,
+    notification,
     snackbar,
     clearAll,
-    clearAlertForRouteChange,
-    setInfo,
-    setSuccess,
-    setWarning,
-    setError,
-    setSnack,
+    show,
     startLoading,
     stopLoading,
   }
 })
+
+function messageFrom(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+/** Provides OdbVue's application-facing feedback API. */
+export function useUi() {
+  const store = useUiStore()
+  const { loading, notification, snackbar } = storeToRefs(store)
+
+  return {
+    loading: readonly(loading),
+    notification: readonly(notification),
+    snackbar: readonly(snackbar),
+    clear: store.clearAll,
+    info: (message: string, options?: AlertOptions) =>
+      store.show('info', message, 'alert', options),
+    success: (message: string, options?: AlertOptions) =>
+      store.show('success', message, 'alert', options),
+    warning: (message: string, options?: AlertOptions) =>
+      store.show('warning', message, 'alert', options),
+    error: (error: unknown, options?: AlertOptions) =>
+      store.show('error', messageFrom(error), 'alert', options),
+    snack: (message: string, options?: AlertOptions) =>
+      store.show('info', message, 'snackbar', options),
+    startLoading: store.startLoading,
+    stopLoading: store.stopLoading,
+  }
+}
 
 if (import.meta.hot) {
   import.meta.hot.accept(acceptHMRUpdate(useUiStore, import.meta.hot))

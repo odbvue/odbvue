@@ -14,7 +14,6 @@ router.beforeEach(async (to) => {
   const appTitle = useAppStore().title || 'OdbVue'
   const pageTitle = to.meta.title
   useHead({ title: pageTitle ? `${appTitle} - ${pageTitle}` : appTitle })
-  useAppStore().ui.clearAlertForRouteChange()
   return true
 })
 
