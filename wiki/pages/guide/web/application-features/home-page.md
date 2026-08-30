@@ -77,12 +77,7 @@ definePage({
 ```vue
 <template>
   <v-row>
-    <v-col
-      cols="12"
-      md="4"
-      v-for="page in navigationPages"
-      :key="page.path"
-    >
+    <v-col cols="12" md="4" v-for="page in navigationPages" :key="page.path">
       <v-card
         hover
         class="h-100"

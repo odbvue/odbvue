@@ -8,23 +8,24 @@ Use it when an application shell, navigation component, breadcrumb trail, or pag
 
 `useRouting()` reads the active Vue Router instance and returns computed values:
 
-| Value           | Description                                                     |
-| --------------- | --------------------------------------------------------------- |
-| `pages`         | Navigable, ordered root-level pages.                            |
-| `allPages`      | Every registered route, adapted to an OdbVue page.              |
-| `currentPage`   | The deepest route record matched by the current URL.            |
-| `currentModule` | The module declared by the current page metadata.               |
-| `breadcrumbs`   | Visible pages along the current URL hierarchy.                  |
-| `title`         | A function that resolves a registered page title by path.       |
-| `params`        | Normalized path and query parameters for the current route.     |
-| `navigate`      | Vue Router's programmatic navigation function.                  |
+| Value           | Description                                                 |
+| --------------- | ----------------------------------------------------------- |
+| `pages`         | Navigable, ordered root-level pages.                        |
+| `allPages`      | Every registered route, adapted to an OdbVue page.          |
+| `currentPage`   | The deepest route record matched by the current URL.        |
+| `currentModule` | The module declared by the current page metadata.           |
+| `breadcrumbs`   | Visible pages along the current URL hierarchy.              |
+| `title`         | A function that resolves a registered page title by path.   |
+| `params`        | Normalized path and query parameters for the current route. |
+| `navigate`      | Vue Router's programmatic navigation function.              |
 
 Each page exposes its route path, the original normalized Vue Router record, `meta`, a derived `title`, and `navigation` metadata. A title comes from `meta.title` when present; otherwise it is derived from the final path segment, so `/customer-orders` becomes `Customer Orders`.
 
 ```ts
 import { useRouting } from '@odbvue/web'
 
-const { allPages, breadcrumbs, currentModule, currentPage, navigate, pages, params, title } = useRouting()
+const { allPages, breadcrumbs, currentModule, currentPage, navigate, pages, params, title } =
+  useRouting()
 ```
 
 The returned values are Vue computed refs. Read their values in script with `.value`; Vue automatically unwraps them in templates.
