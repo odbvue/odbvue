@@ -1,8 +1,21 @@
 import { createI18n } from 'vue-i18n'
 import messages from '@intlify/unplugin-vue-i18n/messages'
+import { defineCapability } from '../../runtime/capability.js'
+import { defineContract } from '../../runtime/contract.js'
 import type { OdbVueI18nConfig } from '../../runtime/config.js'
 
 type OdbVueI18n = ReturnType<typeof createI18n>
+
+export const i18nContract = defineContract<OdbVueI18n>('i18n')
+
+export const i18nCapability = defineCapability({
+  name: 'i18n',
+  setup(context) {
+    const i18n = createOdbVueI18n(context.config.i18n)
+    context.provide(i18nContract, i18n)
+    context.app.use(i18n)
+  },
+})
 
 const defaultLocales = ['en', 'fr', 'de'] as const
 

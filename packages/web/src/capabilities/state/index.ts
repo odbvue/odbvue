@@ -1,7 +1,20 @@
 import { createPinia, type Pinia, type StoreGeneric } from 'pinia'
+import { defineCapability } from '../../runtime/capability.js'
+import { defineContract } from '../../runtime/contract.js'
 import piniaPersistPlugin from './pinia-persist.js'
 
 const storeRegistries = new WeakMap<Pinia, Map<string, StoreGeneric>>()
+
+export const stateContract = defineContract<Pinia>('state')
+
+export const stateCapability = defineCapability({
+  name: 'state',
+  setup(context) {
+    const pinia = createOdbVuePinia()
+    context.provide(stateContract, pinia)
+    context.app.use(pinia)
+  },
+})
 
 /** Creates OdbVue's Pinia runtime with persistence support. */
 export function createOdbVuePinia(): Pinia {

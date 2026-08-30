@@ -1,16 +1,10 @@
-import type { Pinia } from 'pinia'
-import { createVuetify } from 'vuetify'
 import type { OdbVueAppConfig } from './config.js'
-import type { createOdbVueI18n } from '../capabilities/i18n/index.js'
-import type { OdbVueErrors } from '../capabilities/errors/index.js'
-
-type OdbVueVuetify = ReturnType<typeof createVuetify>
-type OdbVueI18n = ReturnType<typeof createOdbVueI18n>
+import type { OdbVueContract } from './contract.js'
+import type { OdbVueHooks } from './hooks.js'
 
 export interface OdbVueRuntime {
   config: OdbVueAppConfig
-  pinia: Pinia
-  vuetify: OdbVueVuetify
-  i18n: OdbVueI18n
-  errors: OdbVueErrors
+  hooks: OdbVueHooks
+  provide<T>(contract: OdbVueContract<T>, value: T): void
+  get<T>(contract: OdbVueContract<T>): T
 }

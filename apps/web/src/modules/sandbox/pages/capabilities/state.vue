@@ -48,7 +48,13 @@
 </template>
 
 <script setup lang="ts">
-import { getOdbVueStores, getPersistOptions, useOdbVue, type PersistOptions } from '@odbvue/web'
+import {
+  getOdbVueStores,
+  getPersistOptions,
+  stateContract,
+  useOdbVue,
+  type PersistOptions,
+} from '@odbvue/web'
 import { onMounted, ref } from 'vue'
 
 definePage({
@@ -66,7 +72,7 @@ type StoreSnapshot = {
   persist?: PersistOptions
 }
 
-const { pinia } = useOdbVue()
+const pinia = useOdbVue().get(stateContract)
 const stores = ref<StoreSnapshot[]>([])
 
 async function refresh() {

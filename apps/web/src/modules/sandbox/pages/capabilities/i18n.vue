@@ -38,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { useOdbVue, usePreferencesStore } from '@odbvue/web'
+import { i18nContract, useOdbVue, usePreferencesStore } from '@odbvue/web'
 import type { OvTableData, OvTableOptions } from '@odbvue/web/components'
 import { computed } from 'vue'
 import inventory from 'virtual:odbvue-i18n-inventory'
@@ -58,7 +58,9 @@ type I18nGlobal = {
   fallbackLocale: { value: unknown }
 }
 
-const { config, i18n } = useOdbVue()
+const runtime = useOdbVue()
+const { config } = runtime
+const i18n = runtime.get(i18nContract)
 const preferences = usePreferencesStore()
 const global = i18n.global as I18nGlobal
 const locales = computed(() => config.i18n?.locales ?? Object.keys(global.messages.value))

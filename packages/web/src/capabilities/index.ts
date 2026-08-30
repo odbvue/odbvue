@@ -13,14 +13,14 @@ export interface CapabilityDefinition {
   configKey?: OdbVueCapabilityName
 }
 
-export function defineCapability<const Definition extends CapabilityDefinition>(
+function defineCapabilityMetadata<const Definition extends CapabilityDefinition>(
   definition: Definition,
 ): Definition {
   return definition
 }
 
 export const odbVueCapabilities: readonly CapabilityDefinition[] = [
-  defineCapability({
+  defineCapabilityMetadata({
     name: 'routing',
     kind: 'core',
     required: true,
@@ -28,7 +28,7 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     description: 'File-based pages, route metadata, and navigation conventions.',
     icon: '$mdiRoutes',
   }),
-  defineCapability({
+  defineCapabilityMetadata({
     name: 'state',
     kind: 'core',
     required: true,
@@ -36,7 +36,7 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     description: 'Application state management, stores, and persistence.',
     icon: '$mdiDatabase',
   }),
-  defineCapability({
+  defineCapabilityMetadata({
     name: 'ui',
     kind: 'core',
     required: true,
@@ -44,7 +44,7 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     description: 'Vuetify integration, themes, and UI defaults.',
     icon: '$mdiPalette',
   }),
-  defineCapability({
+  defineCapabilityMetadata({
     name: 'components',
     kind: 'core',
     required: true,
@@ -53,7 +53,7 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     description: 'Reusable OdbVue form, data, content, and overlay components.',
     icon: '$mdiShape',
   }),
-  defineCapability({
+  defineCapabilityMetadata({
     name: 'i18n',
     kind: 'core',
     required: true,
@@ -61,7 +61,7 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     description: 'Locale resolution and translation support.',
     icon: '$mdiTranslate',
   }),
-  defineCapability({
+  defineCapabilityMetadata({
     name: 'http',
     kind: 'core',
     required: true,
@@ -69,7 +69,7 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     description: 'Configured HTTP client services.',
     icon: '$mdiWeb',
   }),
-  defineCapability({
+  defineCapabilityMetadata({
     name: 'errors',
     kind: 'core',
     required: true,
@@ -77,7 +77,7 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     description: 'Application error capture and reporting.',
     icon: '$mdiAlertCircle',
   }),
-  defineCapability({
+  defineCapabilityMetadata({
     name: 'auth',
     kind: 'feature',
     title: 'Authentication',
@@ -85,7 +85,7 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     icon: '$mdiShieldAccount',
     configKey: 'auth',
   }),
-  defineCapability({
+  defineCapabilityMetadata({
     name: 'audit',
     kind: 'feature',
     title: 'Audit',
@@ -93,7 +93,7 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     icon: '$mdiClipboardTextClock',
     configKey: 'audit',
   }),
-  defineCapability({
+  defineCapabilityMetadata({
     name: 'settings',
     kind: 'feature',
     title: 'Settings',
@@ -101,7 +101,7 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     icon: '$mdiCog',
     configKey: 'settings',
   }),
-  defineCapability({
+  defineCapabilityMetadata({
     name: 'storage',
     kind: 'integration',
     title: 'Storage',
@@ -109,7 +109,7 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     icon: '$mdiFolder',
     configKey: 'storage',
   }),
-  defineCapability({
+  defineCapabilityMetadata({
     name: 'ai',
     kind: 'integration',
     title: 'AI',
@@ -117,7 +117,7 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     icon: '$mdiCreation',
     configKey: 'ai',
   }),
-  defineCapability({
+  defineCapabilityMetadata({
     name: 'email',
     kind: 'integration',
     title: 'Email',

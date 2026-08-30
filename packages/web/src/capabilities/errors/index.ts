@@ -1,3 +1,6 @@
+import { defineCapability } from '../../runtime/capability.js'
+import { defineContract } from '../../runtime/contract.js'
+
 export type ErrorSeverity = 'error' | 'warning'
 
 export interface OdbVueErrorEvent {
@@ -34,6 +37,22 @@ export interface OdbVueErrors {
   clear(): void
 }
 
+export const errorsContract = defineContract<OdbVueErrors>('errors')
+
+export const errorsCapability = defineCapability({
+  name: 'errors',
+  setup(context) {
+    const errors = createOdbVueErrors(context.config.errors, context.hooks)
+    context.provide(errorsContract, errors)
+    context.app.config.errorHandler = (error, instance, info) => {
+      errors.capture(error, {
+        source: 'vue',
+        context: { component: instance?.$options.name, info },
+      })
+    }
+  },
+})
+
 function createErrorId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
@@ -57,7 +76,10 @@ function normalizeError(error: unknown, options: CaptureErrorOptions = {}): OdbV
 }
 
 /** Creates an application-scoped error capture and reporting service. */
-export function createOdbVueErrors(config: OdbVueErrorsConfig = {}): OdbVueErrors {
+export function createOdbVueErrors(
+  config: OdbVueErrorsConfig = {},
+  hooks?: import('../../runtime/hooks.js').OdbVueHooks,
+): OdbVueErrors {
   const reporters = new Set(config.reporters)
   const maxEntries = config.bufferSize ?? 50
   const events: OdbVueErrorEvent[] = []
@@ -78,6 +100,7 @@ export function createOdbVueErrors(config: OdbVueErrorsConfig = {}): OdbVueError
       events.push(event)
       if (events.length > maxEntries) events.splice(0, events.length - maxEntries)
       report(event)
+      void hooks?.emit('error:captured', event)
       return event
     },
     addReporter(reporter) {

@@ -10,6 +10,10 @@ import {
   useCapability,
   useOdbVue,
   useOdbVueConfig,
+  errorsContract,
+  httpContract,
+  stateContract,
+  uiContract,
 } from '../src/index.js'
 
 describe('OdbVue application config', () => {
@@ -61,8 +65,8 @@ describe('OdbVue application config', () => {
     expect(providedConfig).toBe(config)
     expect(auth).toEqual({ local: true })
     expect(audit).toBeUndefined()
-    expect(runtime.vuetify.theme.name.value).toBe('dark')
-    expect(runtime.errors).toBeDefined()
+    expect(runtime.get(uiContract).theme.name.value).toBe('dark')
+    expect(runtime.get(errorsContract)).toBeDefined()
   })
 
   it('creates independent runtimes for independent applications', () => {
@@ -73,7 +77,8 @@ describe('OdbVue application config', () => {
     const runtime2 = installOdbVue(createApp({}), config2)
 
     expect(runtime1).not.toBe(runtime2)
-    expect(runtime1.pinia).not.toBe(runtime2.pinia)
+    expect(runtime1.get(stateContract)).not.toBe(runtime2.get(stateContract))
+    expect(runtime1.get(httpContract)).not.toBe(runtime2.get(httpContract))
     expect(runtime1.config).toBe(config1)
     expect(runtime2.config).toBe(config2)
   })

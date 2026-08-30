@@ -1,6 +1,8 @@
 import type { IconAliases, ThemeDefinition, VuetifyOptions } from 'vuetify'
 import type { I18nOptions } from 'vue-i18n'
+import type { HttpConfiguration } from '../capabilities/http/index.js'
 import { useOdbVue } from './context.js'
+import type { OdbVueHookHandlers } from './hooks.js'
 
 export type OdbVueAuthConfig = boolean | Record<string, unknown>
 export type OdbVueProviderConfig = boolean | { provider: string; [key: string]: unknown }
@@ -44,8 +46,9 @@ export type OdbVueAppConfig = {
   ui?: OdbVueUiConfig
   i18n?: OdbVueI18nConfig
   errors?: OdbVueErrorsConfig
+  http?: HttpConfiguration
   integrations?: Record<string, unknown>
-  hooks?: Record<string, OdbVueHook | OdbVueHook[]>
+  hooks?: OdbVueHookHandlers
   modules?: string[]
   preset?: string
 }

@@ -1,4 +1,7 @@
 import { $fetch, type FetchContext, type FetchOptions } from 'ofetch'
+import { defineCapability } from '../../runtime/capability.js'
+import { defineContract } from '../../runtime/contract.js'
+import type { OdbVueHooks } from '../../runtime/hooks.js'
 
 const baseURL = (import.meta as ImportMeta & { env?: { DEV?: boolean; VITE_API_URI?: string } }).env
   ?.DEV
@@ -39,6 +42,8 @@ export interface HttpClientOptions {
   fetch?: typeof globalThis.fetch
   /** Overrides runtime HTTP configuration for this client only. */
   configuration?: HttpConfiguration
+  /** Emits HTTP lifecycle events to this application's hook dispatcher. */
+  hooks?: OdbVueHooks
 }
 export interface HttpClient {
   <T>(request: string, options?: FetchOptions<'json'>): Promise<HttpResponse<T>>
@@ -49,24 +54,33 @@ export interface HttpClient {
   patch<T>(url: string, body?: unknown, options?: FetchOptions<'json'>): Promise<HttpResponse<T>>
 }
 
-const httpConfiguration: HttpConfiguration = {
+export const httpContract = defineContract<HttpClient>('http')
+
+export const httpCapability = defineCapability({
+  name: 'http',
+  setup(context) {
+    context.provide(httpContract, createOdbVueHttp(context.config.http, context.hooks))
+  },
+})
+
+const defaultHttpConfiguration: HttpConfiguration = {
   shouldRefresh: (request) => !request.includes('refresh/') && !request.includes('login/'),
 }
-export function configureHttp(configuration: HttpConfiguration): void {
-  Object.assign(httpConfiguration, configuration)
-}
 
-/** Configures OdbVue's HTTP client with framework defaults and app overrides. */
-export function configureOdbVueHttp(options: HttpConfiguration = {}): void {
+/** Creates an application-scoped HTTP client with OdbVue defaults. */
+export function createOdbVueHttp(options: HttpConfiguration = {}, hooks?: OdbVueHooks): HttpClient {
   const { onSlowRequest, slowRequestThresholdMs = 3000, ...configuration } = options
-  configureHttp({
-    ...configuration,
-    slowRequestThresholdMs,
-    onSlowRequest:
-      onSlowRequest ??
-      (({ request, duration }) => {
-        console.warn(`Slow API call: ${request} (${Math.round(duration)}ms)`)
-      }),
+  return useHttp({
+    hooks,
+    configuration: {
+      ...configuration,
+      slowRequestThresholdMs,
+      onSlowRequest:
+        onSlowRequest ??
+        (({ request, duration }) => {
+          console.warn(`Slow API call: ${request} (${Math.round(duration)}ms)`)
+        }),
+    },
   })
 }
 
@@ -111,6 +125,7 @@ function requestRetryOptions(options?: FetchOptions<'json'>): FetchOptions<'json
 async function executeRequest<T>(
   client: ReturnType<typeof $fetch.create>,
   configuration: HttpConfiguration,
+  hooks: OdbVueHooks | undefined,
   refresh: () => Promise<boolean>,
   request: string,
   options?: FetchOptions<'json'>,
@@ -131,8 +146,11 @@ async function executeRequest<T>(
     if (
       typeof configuration.slowRequestThresholdMs === 'number' &&
       duration >= configuration.slowRequestThresholdMs
-    )
-      configuration.onSlowRequest?.({ request, duration, options })
+    ) {
+      const context = { request, duration, options }
+      configuration.onSlowRequest?.(context)
+      void hooks?.emit('http:slow', context)
+    }
     return {
       data: response._data ?? null,
       error: null,
@@ -149,18 +167,24 @@ async function executeRequest<T>(
       const expired = new Error('session.expired')
       try {
         if (await refresh())
-          return executeRequest<T>(client, configuration, refresh, request, options, true)
-        configuration.onRefreshFailure?.({ request, error: expired, options })
+          return executeRequest<T>(client, configuration, hooks, refresh, request, options, true)
+        const context = { request, error: expired, options }
+        configuration.onRefreshFailure?.(context)
+        void hooks?.emit('http:refreshFailed', context)
       } catch (refreshError) {
-        configuration.onRefreshFailure?.({ request, error: refreshError, options })
+        const context = { request, error: refreshError, options }
+        configuration.onRefreshFailure?.(context)
+        void hooks?.emit('http:refreshFailed', context)
       }
     }
-    return { data: null, error: createHttpError(error, request, status), status, headers: null }
+    const httpError = createHttpError(error, request, status)
+    void hooks?.emit('http:error', { error: httpError })
+    return { data: null, error: httpError, status, headers: null }
   }
 }
 
 export function useHttp(clientOptions: HttpClientOptions = {}): HttpClient {
-  const configuration = { ...httpConfiguration, ...clientOptions.configuration }
+  const configuration = { ...defaultHttpConfiguration, ...clientOptions.configuration }
   let refreshPromise: Promise<boolean> | null = null
   const refresh = (): Promise<boolean> => {
     if (!refreshPromise) {
@@ -183,25 +207,38 @@ export function useHttp(clientOptions: HttpClientOptions = {}): HttpClient {
     { fetch: clientOptions.fetch },
   )
   const http = (<T>(request: string, options?: FetchOptions<'json'>) =>
-    executeRequest<T>(client, configuration, refresh, request, options)) as HttpClient
+    executeRequest<T>(
+      client,
+      configuration,
+      clientOptions.hooks,
+      refresh,
+      request,
+      options,
+    )) as HttpClient
   http.get = (url, options) =>
-    executeRequest(client, configuration, refresh, url, { ...options, method: 'GET' })
+    executeRequest(client, configuration, clientOptions.hooks, refresh, url, {
+      ...options,
+      method: 'GET',
+    })
   http.post = (url, body, options) =>
-    executeRequest(client, configuration, refresh, url, {
+    executeRequest(client, configuration, clientOptions.hooks, refresh, url, {
       ...options,
       method: 'POST',
       body: body as Record<string, unknown>,
     })
   http.put = (url, body, options) =>
-    executeRequest(client, configuration, refresh, url, {
+    executeRequest(client, configuration, clientOptions.hooks, refresh, url, {
       ...options,
       method: 'PUT',
       body: body as Record<string, unknown>,
     })
   http.delete = (url, options) =>
-    executeRequest(client, configuration, refresh, url, { ...options, method: 'DELETE' })
+    executeRequest(client, configuration, clientOptions.hooks, refresh, url, {
+      ...options,
+      method: 'DELETE',
+    })
   http.patch = (url, body, options) =>
-    executeRequest(client, configuration, refresh, url, {
+    executeRequest(client, configuration, clientOptions.hooks, refresh, url, {
       ...options,
       method: 'PATCH',
       body: body as Record<string, unknown>,

@@ -1,6 +1,8 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
 import { computed, ref, type Ref, watch } from 'vue'
 import { useOdbVue } from '../../runtime/context.js'
+import { i18nContract } from '../i18n/index.js'
+import { uiContract } from './index.js'
 
 const themes = ['system', 'light', 'dark'] as const
 
@@ -9,7 +11,9 @@ type ThemeName = (typeof themes)[number]
 export const usePreferencesStore = defineStore(
   'settings',
   () => {
-    const { i18n, vuetify } = useOdbVue()
+    const runtime = useOdbVue()
+    const i18n = runtime.get(i18nContract)
+    const vuetify = runtime.get(uiContract)
     const theme = ref<ThemeName>('system')
 
     function setTheme(nextTheme: ThemeName) {
