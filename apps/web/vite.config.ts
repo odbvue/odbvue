@@ -1,7 +1,7 @@
 import { fileURLToPath, URL } from 'node:url'
 import { relative, resolve } from 'node:path'
 
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import VueRouter from 'vue-router/vite'
 import vue from '@vitejs/plugin-vue'
 import Vuetify from 'vite-plugin-vuetify'
@@ -21,99 +21,114 @@ import Components from 'unplugin-vue-components/vite'
 import { unheadVueComposablesImports } from '@unhead/vue'
 
 // https://vite.dev/config/
-export default defineConfig({
-  optimizeDeps: {
-    exclude: ['@odbvue/web'],
-  },
-  plugins: [
-    VueRouter({
-      extensions: ['.vue', '.md'],
-      routesFolder: [
-        'src/pages',
-        {
-          src: 'src/modules',
-          path: (filePath) => {
-            const [moduleName, pagesDirectory, ...pagePath] = relative(
-              resolve(process.cwd(), 'src/modules'),
-              filePath,
-            ).split(/[/\\]/)
-            return `${moduleName}/${pagesDirectory === 'pages' ? pagePath.join('/') : ''}`
-          },
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd())
+  const isProduction = mode === 'production'
+
+  return {
+    server: {
+      proxy: {
+        '/api': {
+          target: env.VITE_API_URI,
+          changeOrigin: true,
+          secure: isProduction,
+          rewrite: (path) => path.replace(/^\/api/, ''),
         },
-      ],
-      async extendRoute(route) {
-        const moduleName = moduleFromComponent(route.component)
-        if (route.component?.endsWith('.md')) {
-          const meta = await extractMetaFromMarkdown(route.component)
-          route.meta = { ...route.meta, ...meta }
-        }
-        if (moduleName) {
-          route.meta = {
-            ...route.meta,
-            module: moduleName,
-          }
-        }
       },
-    }),
-    odbVuePagesPlugin(),
-    vue({
-      include: [/\.vue$/, /\.md$/],
-    }),
-    Vuetify(),
-    Markdown({}),
-    autoImportMdiIcons(),
-    odbVueI18nPlugin(),
-    openapiPlugin({
-      source: '../db/dist/openapi.json',
-      dest: 'src/services/openapi.generated.ts',
-    }),
-    AutoImport({
-      imports: [
-        'vue',
-        'vue-router',
-        'vue-i18n',
-        {
-          from: '@odbvue/web',
-          imports: [
-            'computedRouteParam',
-            'computedRouteParams',
-            'computedRouteQuery',
-            'configureHttp',
-            'useAppStore',
-            'useHttp',
-            'usePageMeta',
-            'useRouteParams',
-            'useRouting',
-            'usePreferencesStore',
-            'useUi',
-          ],
-        },
-        {
-          from: 'vuetify',
-          imports: [
-            'useDisplay',
-            'useDate',
-            'useDefaults',
-            'useDisplay',
-            'useGoTo',
-            'useLayout',
-            'useLocale',
-            'useRtl',
-            'useTheme',
-          ],
-        },
-        unheadVueComposablesImports,
-      ],
-      dirs: ['./src/composables/**', './src/modules/*/composables/**'],
-    }),
-    Components({
-      resolvers: [odbVueComponentsResolver],
-    }),
-    vueDevTools(),
-  ],
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
-  },
+    optimizeDeps: {
+      exclude: ['@odbvue/web'],
+    },
+    plugins: [
+      VueRouter({
+        extensions: ['.vue', '.md'],
+        routesFolder: [
+          'src/pages',
+          {
+            src: 'src/modules',
+            path: (filePath) => {
+              const [moduleName, pagesDirectory, ...pagePath] = relative(
+                resolve(process.cwd(), 'src/modules'),
+                filePath,
+              ).split(/[/\\]/)
+              return `${moduleName}/${pagesDirectory === 'pages' ? pagePath.join('/') : ''}`
+            },
+          },
+        ],
+        async extendRoute(route) {
+          const moduleName = moduleFromComponent(route.component)
+          if (route.component?.endsWith('.md')) {
+            const meta = await extractMetaFromMarkdown(route.component)
+            route.meta = { ...route.meta, ...meta }
+          }
+          if (moduleName) {
+            route.meta = {
+              ...route.meta,
+              module: moduleName,
+            }
+          }
+        },
+      }),
+      odbVuePagesPlugin(),
+      vue({
+        include: [/\.vue$/, /\.md$/],
+      }),
+      Vuetify(),
+      Markdown({}),
+      autoImportMdiIcons(),
+      odbVueI18nPlugin(),
+      openapiPlugin({
+        source: '../db/dist/openapi.json',
+        dest: 'src/services/openapi.generated.ts',
+      }),
+      AutoImport({
+        imports: [
+          'vue',
+          'vue-router',
+          'vue-i18n',
+          {
+            from: '@odbvue/web',
+            imports: [
+              'computedRouteParam',
+              'computedRouteParams',
+              'computedRouteQuery',
+              'configureHttp',
+              'useAppStore',
+              'useHttp',
+              'usePageMeta',
+              'useRouteParams',
+              'useRouting',
+              'usePreferencesStore',
+              'useUi',
+            ],
+          },
+          {
+            from: 'vuetify',
+            imports: [
+              'useDisplay',
+              'useDate',
+              'useDefaults',
+              'useDisplay',
+              'useGoTo',
+              'useLayout',
+              'useLocale',
+              'useRtl',
+              'useTheme',
+            ],
+          },
+          unheadVueComposablesImports,
+        ],
+        dirs: ['./src/composables/**', './src/modules/*/composables/**'],
+      }),
+      Components({
+        resolvers: [odbVueComponentsResolver],
+      }),
+      vueDevTools(),
+    ],
+    resolve: {
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
+      },
+    },
+  }
 })
