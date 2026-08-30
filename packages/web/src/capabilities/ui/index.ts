@@ -4,7 +4,7 @@ import { createVuetify, type VuetifyOptions } from 'vuetify'
 import { md3 } from 'vuetify/blueprints'
 import { aliases, mdi } from 'vuetify/iconsets/mdi-svg'
 import type { OdbVueUiConfig } from '../../runtime/config.js'
-import { odbVueComponentIcons } from '../../components/icons.js'
+import { odbVueComponentIcons } from './icons.js'
 
 export { usePreferencesStore } from './preferences.js'
 export { useUi } from './store.js'
