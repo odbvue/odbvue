@@ -1,7 +1,6 @@
 import type { OdbVueCapabilityName } from '../runtime/config.js'
 
 export type CapabilityKind = 'core' | 'ui' | 'feature' | 'integration' | 'infrastructure'
-
 export interface CapabilityDefinition {
   name: string
   kind: CapabilityKind
@@ -64,7 +63,7 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
   }),
   defineCapability({
     name: 'http',
-    kind: 'infrastructure',
+    kind: 'core',
     required: true,
     title: 'HTTP',
     description: 'Configured HTTP client services.',
