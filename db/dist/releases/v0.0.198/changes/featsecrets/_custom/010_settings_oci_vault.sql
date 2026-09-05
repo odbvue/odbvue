@@ -8,8 +8,8 @@ SET DEFINE OFF;
 MERGE INTO app_settings d
 USING (SELECT 
     'APP_SETTINGS_MASTER_KEY_LOCAL' AS id, 
-    'App fallback Master Key value, should not be used in production' AS name, 
-    'f=<?iqW=+{=:fFn&dm:)>*2GFjvcQYNQ' AS value FROM dual) s
+    'App fallback Master Key value, should not be used in production' AS name,
+    'ROTATED_SET_VIA_ENV_OR_VAULT_NOT_IN_GIT' AS value FROM dual) s
 ON (d.id = s.id)
 WHEN MATCHED THEN
     UPDATE SET
@@ -22,8 +22,8 @@ WHEN NOT MATCHED THEN
 MERGE INTO app_settings d
 USING (SELECT 
     'APP_SETTINGS_MASTER_KEY_URI' AS id, 
-    'App Master Key uri in OCI Vault' AS name, 
-    'https://secrets.vaults.eu-stockholm-1.oci.oraclecloud.com/20190301/secretbundles/ocid1.vaultsecret.oc1.eu-stockholm-1.amaaaaaabp6f7sya2gjsmtbyzbyg4ni55pezqkbflszyz73n25ub57djxima' AS value FROM dual) s
+    'App Master Key uri in OCI Vault' AS name,
+    'ROTATED_SET_VIA_ENV_OR_VAULT_NOT_IN_GIT' AS value FROM dual) s
 ON (d.id = s.id)
 WHEN MATCHED THEN
     UPDATE SET

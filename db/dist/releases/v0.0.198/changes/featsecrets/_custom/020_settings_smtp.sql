@@ -8,8 +8,8 @@ SET DEFINE OFF;
 MERGE INTO app_settings d
 USING (SELECT 
     'APP_EMAILS_SMTP_USERNAME' AS id, 
-    'SMTP Username' AS name, 
-    'ocid1.user.oc1..aaaaaaaaihgo2mj4vwgl6ankj5c4fkek7pek7bqhj6hmscryz24zk22wgxna@ocid1.tenancy.oc1..aaaaaaaaqq6caf32ecspmq3gunerzx6f3hrldykufeggxnark467nidnfnhq.xy.com' AS value FROM dual) s
+    'SMTP Username' AS name,
+    'ROTATED_SET_VIA_ENV_OR_VAULT_NOT_IN_GIT' AS value FROM dual) s
 ON (d.id = s.id)
 WHEN MATCHED THEN
     UPDATE SET
@@ -22,8 +22,8 @@ WHEN NOT MATCHED THEN
 MERGE INTO app_settings d
 USING (SELECT 
     'APP_EMAILS_SMTP_PASSWORD' AS id, 
-    'SMTP Password (encrypted with Master Key)' AS name, 
-    'Oy3CXNRofx9yjPOPnzffbhjDvG7dh+/I4vG0kznxRkg=' AS value, 
+    'SMTP Password (encrypted with Master Key)' AS name,
+    'ROTATED_SET_VIA_ENV_OR_VAULT_NOT_IN_GIT' AS value,
     'Y' AS secret FROM dual) s
 ON (d.id = s.id)
 WHEN MATCHED THEN
