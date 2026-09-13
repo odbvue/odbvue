@@ -72,6 +72,9 @@ CREATE OR REPLACE PACKAGE BODY odb_jwt AS
     ) RETURN boolean AS
         v_dot2 PLS_INTEGER;
     BEGIN
+        IF p_token IS NULL THEN
+            RETURN 0;
+        END IF;
         v_dot2 := instr(p_token, '.', 1, 2);
         IF v_dot2 = 0 THEN
             RETURN 0;

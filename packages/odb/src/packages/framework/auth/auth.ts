@@ -132,6 +132,10 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => ({
     const authorization = fn.in('p_authorization', 'VARCHAR2')
     fn.body((body) => {
       const token = body.variable('l_token', 'VARCHAR2', 4000)
+      const subject = body.variable('l_subject', 'VARCHAR2', 32)
+      const sessionId = body.variable('l_session_id', 'VARCHAR2', 32)
+      const tokenVersion = body.variable('l_token_version', 'NUMBER')
+      const activeSessionCount = body.variable('l_active_session_count', 'NUMBER')
       body.assign(
         token,
         `REGEXP_REPLACE(${authorization.name}, '^Bearer[[:space:]]+', '', 1, 1, 'i')`,
@@ -140,7 +144,29 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => ({
         `odb_jwt.verify(${token.name}, '${AUTH_JWT_SECRET_MARKER}') = 0 OR odb_jwt.is_expired(${token.name}) = 1`,
         (then) => then.raw(`raise_application_error(-20001, 'UNAUTHORIZED')`),
       )
-      body.return(`odb_jwt.claim(${token.name}, 'sub')`)
+      body.assign(subject, `odb_jwt.claim(${token.name}, 'sub')`)
+      body.assign(sessionId, `odb_jwt.claim(${token.name}, 'sid')`)
+      body.assign(tokenVersion, `TO_NUMBER(odb_jwt.claim(${token.name}, 'ver'))`)
+      body.query(
+        odbQuery()
+          .selectFrom('odb_auth_sessions s JOIN odb_auth_users u ON u.id = s.user_id')
+          .select('COUNT(*)')
+          .into(activeSessionCount.name)
+          .where((expression) =>
+            expression.and([
+              expression('s.id', '=', sessionId),
+              expression('s.user_id', '=', subject),
+              expression('s.revoked_at', 'IS NULL'),
+              expression.raw('s.expires_at > SYSTIMESTAMP'),
+              expression('u.enabled', '=', 1),
+              expression('u.token_version', '=', tokenVersion),
+            ]),
+          ),
+      )
+      body.ifThen(`${activeSessionCount.name} = 0`, (then) =>
+        then.raw(`raise_application_error(-20001, 'UNAUTHORIZED')`),
+      )
+      body.return(subject.name)
     })
   }),
 }))

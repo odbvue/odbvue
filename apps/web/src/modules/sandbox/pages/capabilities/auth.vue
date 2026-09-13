@@ -22,6 +22,7 @@
             <v-list density="compact">
               <v-list-item title="Ready" :subtitle="String(auth.ready.value)" />
               <v-list-item title="Access token" :subtitle="auth.accessToken.value ?? 'None'" />
+              <v-list-item title="Refresh token" :subtitle="auth.refreshToken.value ?? 'None'" />
               <v-list-item
                 title="Roles"
                 :subtitle="auth.user.value?.roles?.join(', ') ?? 'Not returned by this endpoint'"
@@ -35,10 +36,15 @@
             <v-btn :loading="auth.loading.value" prepend-icon="$mdiRefresh" @click="restore"
               >Restore</v-btn
             >
-            <v-btn :disabled="!auth.accessToken.value" prepend-icon="$mdiAccountSearch" @click="me"
-              >Get authenticated user</v-btn
+            <v-btn :loading="callingMe" prepend-icon="$mdiAccountSearch" @click="me"
+              >Call /me</v-btn
             >
-            <v-btn :disabled="!auth.accessToken.value" prepend-icon="$mdiLogout" @click="logout"
+            <v-btn
+              :disabled="!auth.accessToken.value"
+              :loading="auth.loading.value"
+              color="error"
+              prepend-icon="$mdiLogout"
+              @click="logout"
               >Logout</v-btn
             >
           </v-card-actions>
@@ -73,6 +79,7 @@ definePage({
 
 const events = ref<string[]>([])
 const auth = useAuth()
+const callingMe = ref(false)
 
 async function login() {
   events.value.push('POST /auth/login')
@@ -83,11 +90,18 @@ async function restore() {
   await auth.restore()
 }
 async function me() {
-  events.value.push('GET /auth/me')
-  await auth.me()
+  callingMe.value = true
+  try {
+    await auth.me()
+    events.value.push('GET /auth/me -> 200')
+  } catch (error) {
+    events.value.push(`GET /auth/me -> ${error instanceof Error ? error.message : 'network error'}`)
+  } finally {
+    callingMe.value = false
+  }
 }
 async function logout() {
-  events.value.push('POST /auth/logout')
+  events.value.push('POST /auth/logout -> session revoked')
   await auth.logout()
 }
 </script>

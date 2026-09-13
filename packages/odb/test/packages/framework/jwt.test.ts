@@ -8,6 +8,8 @@ describe('odbJwt (framework package odb_jwt)', () => {
       expect(sql).toContain('CREATE OR REPLACE PACKAGE odb_jwt AS')
       expect(sql).toContain('CREATE OR REPLACE PACKAGE BODY odb_jwt AS')
       expect(sql).toContain('hmac_sh256')
+      expect(sql).toContain('IF p_token IS NULL THEN')
+      expect(sql).toContain('RETURN 0;')
       expect(sql).not.toContain('pck_api_auth')
     })
 

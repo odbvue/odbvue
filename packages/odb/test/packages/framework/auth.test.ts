@@ -26,6 +26,16 @@ describe('odbAuth framework package', () => {
     )
     expect(sql).toContain('odb_auth_crypto.hash_token')
     expect(sql).toContain('FOR UPDATE')
+    expect(sql).toContain("l_subject := odb_jwt.claim(l_token, 'sub')")
+    expect(sql).toContain("l_session_id := odb_jwt.claim(l_token, 'sid')")
+    expect(sql).toContain("l_token_version := TO_NUMBER(odb_jwt.claim(l_token, 'ver'))")
+    expect(sql).toContain('FROM odb_auth_sessions s JOIN odb_auth_users u ON u.id = s.user_id')
+    expect(sql).toContain('s.id = l_session_id')
+    expect(sql).toContain('s.user_id = l_subject')
+    expect(sql).toContain('s.revoked_at IS NULL')
+    expect(sql).toContain('s.expires_at > SYSTIMESTAMP')
+    expect(sql).toContain('u.enabled = 1')
+    expect(sql).toContain('u.token_version = l_token_version')
   })
 
   it('registers the auth API with ORDS when installed by a migration', () => {

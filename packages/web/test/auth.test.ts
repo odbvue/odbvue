@@ -40,7 +40,9 @@ describe('authentication capability', () => {
 
     await auth.login({ username: 'ada', password: 'password' })
     expect(auth.authenticated.value).toBe(false)
+    expect(auth.refreshToken.value).toBe('refresh-token')
     await expect(auth.refresh()).resolves.toBe(true)
+    expect(auth.refreshToken.value).toBe('next-refresh-token')
     await expect(auth.me()).resolves.toMatchObject({ id: 7, username: 'ada' })
 
     expect(auth.authenticated.value).toBe(true)
