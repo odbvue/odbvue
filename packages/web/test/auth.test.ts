@@ -10,7 +10,7 @@ function response<T>(data: T | null, status = 200) {
 }
 
 describe('authentication capability', () => {
-  it('loads the authenticated user separately from token issuance', async () => {
+  it('hydrates the authenticated user after token issuance', async () => {
     const post = vi.fn<HttpPostMock>()
     post
       .mockResolvedValueOnce(
@@ -43,7 +43,8 @@ describe('authentication capability', () => {
       { username: 'ada', password: 'password' },
       { credentials: 'include' },
     )
-    expect(auth.authenticated.value).toBe(false)
+    expect(auth.authenticated.value).toBe(true)
+    expect(auth.user.value?.username).toBe('ada')
     await expect(auth.refresh()).resolves.toBe(true)
     await expect(auth.me()).resolves.toMatchObject({ id: 7, username: 'ada' })
 
@@ -74,7 +75,8 @@ describe('authentication capability', () => {
     post
       .mockResolvedValueOnce(response({ accessToken: 'access-token' }))
       .mockResolvedValueOnce(response(null, 401))
-    const auth = createOdbVueAuth({ http: { post } as unknown as HttpClient })
+    const get = vi.fn<HttpGetMock>().mockResolvedValue(response({ userId: 7, username: 'ada' }))
+    const auth = createOdbVueAuth({ http: { post, get } as unknown as HttpClient })
 
     await auth.login({ username: 'ada', password: 'password' })
     await expect(auth.refresh()).resolves.toBe(false)
@@ -101,10 +103,9 @@ describe('authentication capability', () => {
     await auth.login({ username: 'ada', password: 'password' })
 
     expect(auth.accessToken.value).toBe('access-token')
-    expect(auth.authenticated.value).toBe(false)
-    await auth.me()
     expect(auth.authenticated.value).toBe(true)
     expect(auth.user.value).toMatchObject({ id: 7, username: 'ada', displayName: 'Ada Lovelace' })
+    expect(get).toHaveBeenCalledWith('/auth/me')
   })
 
   it('restores an authenticated user using the browser refresh cookie', async () => {
@@ -136,12 +137,13 @@ describe('authentication capability', () => {
       })
     const http = {
       post,
+      get: vi.fn<HttpGetMock>().mockResolvedValue(response({ userId: 7, username: 'ada' })),
     } as unknown as HttpClient
     const auth = createOdbVueAuth({ http })
     await auth.login({ username: 'ada', password: 'password' })
 
     await expect(auth.refresh()).resolves.toBe(false)
     expect(auth.accessToken.value).toBe('access-token')
-    expect(auth.authenticated.value).toBe(false)
+    expect(auth.authenticated.value).toBe(true)
   })
 })

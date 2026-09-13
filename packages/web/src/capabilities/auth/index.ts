@@ -147,7 +147,7 @@ export function createOdbVueAuth<User extends AuthUser = AuthUser>(
         })
         if (!response.data) throw toError(response.error, 'Authentication failed.')
         applyTokens(response.data)
-        user.value = null
+        await this.me()
       } finally {
         loading.value = false
       }
