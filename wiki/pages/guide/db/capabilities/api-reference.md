@@ -73,7 +73,9 @@ const { token } = proc.parameters({ out: { token: 'VARCHAR2' } })
 
 proc.body((body) => {
   const { vPayload } = body.variables({ vPayload: odbType.string(2000) })
-  body.raw(`${vPayload.name} := JSON_OBJECT('sub' VALUE 'u1', 'exp' VALUE odb_jwt.to_epoch() + 3600)`)
+  body.raw(
+    `${vPayload.name} := JSON_OBJECT('sub' VALUE 'u1', 'exp' VALUE odb_jwt.to_epoch() + 3600)`,
+  )
   body.raw(`${token.name} := ${odbJwt.encode(vPayload.name, `'my-secret'`)}`)
 })
 ```
