@@ -1,4 +1,4 @@
-import { defineMigration, odbAuth, odbEnv, odbSchema } from '@odbvue/odb'
+import { defineMigration, odbAuth, odbEnv, odbRateLimit, odbSchema } from '@odbvue/odb'
 
 const schemaName = odbEnv.read('ODBVUE_ADB_SCHEMA_USERNAME')
 const schemaPassword = odbEnv.read('ODBVUE_ADB_SCHEMA_PASSWORD')
@@ -10,6 +10,7 @@ export const schema = odbSchema(schemaName, schemaPassword, (definition) => {
 export const migration = defineMigration('00000000000000_bootstrap', {
   schema: schemaName,
 })
+  .install(odbRateLimit)
   .install(odbAuth)
   .install(
     odbAuth.seedUser({

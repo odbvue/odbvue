@@ -176,6 +176,7 @@ export type StatementNode =
   | { kind: 'assign'; target: string; value: string }
   | { kind: 'return'; value?: string }
   | { kind: 'null' }
+  | { kind: 'commit' }
   | { kind: 'raw'; sql: string }
   | { kind: 'if'; branches: IfBranchNode[]; elseStatements?: StatementNode[] }
 
@@ -204,6 +205,7 @@ export type ProcedureNode = {
   kind: 'procedure'
   name: string
   params: ParamNode[]
+  autonomous?: boolean
   body?: ProcedureBodyNode
   service?: ServiceNode
 }
@@ -387,6 +389,12 @@ export class ProcedureBody {
   /** `NULL;` */
   null(): this {
     this._statements.push({ kind: 'null' })
+    return this
+  }
+
+  /** `COMMIT;` */
+  commit(): this {
+    this._statements.push({ kind: 'commit' })
     return this
   }
 
@@ -789,6 +797,7 @@ export class Procedure {
   private _params: Param[] = []
   private _body?: ProcedureBody
   private _service?: ServiceNode
+  private _autonomous = false
 
   constructor(readonly name: string) {}
 
@@ -859,6 +868,12 @@ export class Procedure {
     return this.param(name, type, 'IN OUT')
   }
 
+  /** Execute this procedure as an autonomous transaction. */
+  autonomous(): this {
+    this._autonomous = true
+    return this
+  }
+
   /**
    * Define the procedure body (local variables + executable statements).
    * If omitted the body will emit `NULL;`.
@@ -896,6 +911,7 @@ export class Procedure {
       kind: 'procedure',
       name: this.name,
       params: this._params.map((p) => p.toNode()),
+      autonomous: this._autonomous || undefined,
       body: this._body?.toNode(),
       service: this._service
         ? {
@@ -1170,6 +1186,8 @@ function emitProcedureImpl(proc: ProcedureNode): string {
 
   const lines: string[] = [sig]
 
+  if (proc.autonomous) lines.push('    PRAGMA AUTONOMOUS_TRANSACTION;')
+
   for (const decl of proc.body.declarations) {
     lines.push(`    ${emitLocalVarDecl(decl)}`)
   }
@@ -1237,6 +1255,8 @@ function emitStatement(stmt: StatementNode, indent: string): string[] {
       return [stmt.value !== undefined ? `${indent}RETURN ${stmt.value};` : `${indent}RETURN;`]
     case 'null':
       return [`${indent}NULL;`]
+    case 'commit':
+      return [`${indent}COMMIT;`]
     case 'raw':
       return [`${indent}${stmt.sql.trimEnd().endsWith(';') ? stmt.sql : `${stmt.sql};`}`]
     case 'if': {

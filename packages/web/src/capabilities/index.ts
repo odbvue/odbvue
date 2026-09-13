@@ -102,6 +102,14 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     configKey: 'settings',
   }),
   defineCapabilityMetadata({
+    name: 'rate-limit',
+    kind: 'infrastructure',
+    required: true,
+    title: 'Rate limiting',
+    description: 'Database-backed throttling for sensitive package procedures.',
+    icon: '$mdiSpeedometer',
+  }),
+  defineCapabilityMetadata({
     name: 'storage',
     kind: 'integration',
     title: 'Storage',

@@ -180,6 +180,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/sandbox/capabilities/rate-limit': RouteRecordInfo<
+      '/sandbox/capabilities/rate-limit',
+      '/sandbox/capabilities/rate-limit',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/sandbox/capabilities/routing': RouteRecordInfo<
       '/sandbox/capabilities/routing',
       '/sandbox/capabilities/routing',
@@ -386,6 +393,14 @@ declare module 'vue-router/auto-routes' {
     'src/modules/sandbox/pages/capabilities/i18n.vue': {
       routes:
         | '/sandbox/capabilities/i18n'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/modules/sandbox/pages/capabilities/rate-limit.vue': {
+      routes:
+        | '/sandbox/capabilities/rate-limit'
       views:
         | never
       pathParamNames:

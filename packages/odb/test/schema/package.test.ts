@@ -177,6 +177,13 @@ describe('ProcedureBody control flow and exceptions', () => {
     expect(sql).toContain("      r_out := 'error';")
   })
 
+  it('emits autonomous transaction procedures and commits', () => {
+    const sql = bodyLines((proc) => proc.autonomous().body((body) => body.commit()))
+
+    expect(sql).toContain('PRAGMA AUTONOMOUS_TRANSACTION;')
+    expect(sql).toContain('COMMIT;')
+  })
+
   it('hoists locals declared inside nested blocks to the enclosing body', () => {
     const sql = bodyLines((proc) => {
       proc.body((body) =>

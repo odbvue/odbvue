@@ -1,9 +1,11 @@
+import { pbkdf2Sync } from 'node:crypto'
 import { odbPackage, odbType } from '../../../schema/package.js'
 import { PlsqlExpression } from '../../../schema/attribute.js'
 import { odbTable } from '../../../schema/table.js'
 import { odbQuery } from '../../../query/index.js'
 import { odbHttp } from '../http/http.js'
 import { odbJwt } from '../jwt/jwt.js'
+import { odbRateLimit } from '../rate-limit/rate-limit.js'
 
 const AUTH_JWT_SECRET_MARKER = '__ODB_AUTH_JWT_SECRET__'
 const DEFAULT_JWT_SECRET = 'change-this-development-only-odbvue-auth-secret-2026'
@@ -12,6 +14,7 @@ const PASSWORD_HASH_ITERATIONS = 210000
 const PASSWORD_HASH_BYTES = 64
 const REFRESH_TOKEN_BYTES = 64
 const REFRESH_TOKEN_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
+const DUMMY_PASSWORD_HASH_MARKER = '__ODB_AUTH_DUMMY_PASSWORD_HASH__'
 const authCookieOptions = {
   refreshCookieName: '__Host-odb_refresh',
   refreshCookieSecure: true,
@@ -19,6 +22,18 @@ const authCookieOptions = {
 
 function literal(value: string): string {
   return `'${value.replace(/'/g, "''")}'`
+}
+
+function dummyPasswordHash(): string {
+  const salt = Buffer.alloc(16)
+  const hash = pbkdf2Sync(
+    'odbvue-invalid-user',
+    salt,
+    PASSWORD_HASH_ITERATIONS,
+    PASSWORD_HASH_BYTES,
+    'sha512',
+  )
+  return `${PASSWORD_HASH_ALGORITHM}$${PASSWORD_HASH_ITERATIONS}$${salt.toString('hex').toUpperCase()}$${hash.toString('hex').toUpperCase()}`
 }
 
 function qualify(name: string, schema?: string): string {
@@ -222,10 +237,13 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
             sessionId: authSessions.id,
             refreshToken: odbType.string(512),
           })
+        const loginSubject = statements.variable('l_login_subject', 'VARCHAR2', 128)
+        statements.assign(loginSubject, `LOWER(TRIM(${loginUsername.name}))`)
+        statements.raw(odbRateLimit.check("'AUTH_LOGIN_USERNAME'", loginSubject.name))
         statements.query(
           odbQuery()
             .selectFrom(authUsers)
-            .select([authUsers.id, authUsers.passwordHash, authUsers.tokenVersion])
+            .select(['MAX(id)', 'MAX(password_hash)', 'MAX(token_version)'])
             .into(userId, passwordHash, tokenVersion)
             .where((expression) =>
               expression.and([
@@ -238,10 +256,18 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
               ]),
             ),
         )
-        statements.ifThen(
-          `odb_auth_crypto.verify_password(${password.name}, ${passwordHash.name}) = 0`,
-          (then) => then.unauthorized('INVALID_CREDENTIALS'),
+        statements.assign(
+          passwordHash,
+          `NVL(${passwordHash.name}, '${DUMMY_PASSWORD_HASH_MARKER}')`,
         )
+        statements.ifThen(
+          `odb_auth_crypto.verify_password(${password.name}, ${passwordHash.name}) = 0 OR ${userId.name} IS NULL`,
+          (then) => {
+            then.raw(odbRateLimit.failure("'AUTH_LOGIN_USERNAME'", loginSubject.name))
+            then.unauthorized('INVALID_CREDENTIALS')
+          },
+        )
+        statements.raw(odbRateLimit.success("'AUTH_LOGIN_USERNAME'", loginSubject.name))
         statements.assign(sessionId, 'LOWER(RAWTOHEX(SYS_GUID()))')
         statements.assign(refreshToken, `odb_auth_crypto.random_token(${REFRESH_TOKEN_BYTES})`)
         statements.insertInto(authSessions, {
@@ -433,7 +459,7 @@ export const odbAuth = {
       odbHttp.toSQLUp(options),
       odbAuthCrypto.toSQLUp(options),
       odbAuthJwt.toSQLUp(options).replaceAll(AUTH_JWT_SECRET_MARKER, secret.replace(/'/g, "''")),
-      odbAuthApi.toSQLUp(options),
+      odbAuthApi.toSQLUp(options).replaceAll(DUMMY_PASSWORD_HASH_MARKER, dummyPasswordHash()),
     ].join('\n')
   },
   toSQLDown(options: { schema?: string } = {}): string {
