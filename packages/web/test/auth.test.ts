@@ -16,13 +16,11 @@ describe('authentication capability', () => {
       .mockResolvedValueOnce(
         response({
           accessToken: 'access-token',
-          refreshToken: 'refresh-token',
         }),
       )
       .mockResolvedValueOnce(
         response({
           accessToken: 'next-access-token',
-          refreshToken: 'next-refresh-token',
         }),
       )
     const get = vi.fn<HttpGetMock>().mockResolvedValue(
@@ -40,9 +38,7 @@ describe('authentication capability', () => {
 
     await auth.login({ username: 'ada', password: 'password' })
     expect(auth.authenticated.value).toBe(false)
-    expect(auth.refreshToken.value).toBe('refresh-token')
     await expect(auth.refresh()).resolves.toBe(true)
-    expect(auth.refreshToken.value).toBe('next-refresh-token')
     await expect(auth.me()).resolves.toMatchObject({ id: 7, username: 'ada' })
 
     expect(auth.authenticated.value).toBe(true)
@@ -51,13 +47,15 @@ describe('authentication capability', () => {
     expect(auth.can('orders.write')).toBe(false)
     expect(http.get).toHaveBeenCalledWith('/auth/me')
     expect(http.post).toHaveBeenLastCalledWith('/auth/refresh', undefined, {
-      headers: { 'presented-refresh-token': 'refresh-token' },
+      credentials: 'include',
     })
   })
 
-  it('becomes ready anonymously when no persisted refresh credential exists', async () => {
+  it('becomes ready anonymously when the refresh cookie is invalid', async () => {
     const auth = createOdbVueAuth({
-      http: { post: vi.fn<HttpPostMock>() } as unknown as HttpClient,
+      http: {
+        post: vi.fn<HttpPostMock>().mockResolvedValue(response(null, 401)),
+      } as unknown as HttpClient,
     })
 
     await expect(auth.restore()).resolves.toBe(false)
@@ -69,7 +67,6 @@ describe('authentication capability', () => {
     const post = vi.fn<HttpPostMock>().mockResolvedValue(
       response({
         'access-token': 'access-token',
-        'refresh-token': 'refresh-token',
       }),
     )
     const get = vi.fn<HttpGetMock>().mockResolvedValue(
@@ -90,13 +87,25 @@ describe('authentication capability', () => {
     expect(auth.user.value).toMatchObject({ id: 7, username: 'ada', displayName: 'Ada Lovelace' })
   })
 
+  it('restores an authenticated user using the browser refresh cookie', async () => {
+    const post = vi.fn<HttpPostMock>().mockResolvedValue(response({ accessToken: 'access-token' }))
+    const get = vi.fn<HttpGetMock>().mockResolvedValue(response({ 'user-id': 7, username: 'ada' }))
+    const auth = createOdbVueAuth({ http: { post, get } as unknown as HttpClient })
+
+    await expect(auth.restore()).resolves.toBe(true)
+
+    expect(auth.ready.value).toBe(true)
+    expect(auth.authenticated.value).toBe(true)
+    expect(post).toHaveBeenCalledWith('/auth/refresh', undefined, { credentials: 'include' })
+    expect(get).toHaveBeenCalledWith('/auth/me')
+  })
+
   it('preserves the session when refresh fails without an HTTP response', async () => {
     const post = vi.fn<HttpPostMock>()
     post
       .mockResolvedValueOnce(
         response({
           accessToken: 'access-token',
-          refreshToken: 'refresh-token',
         }),
       )
       .mockResolvedValueOnce({

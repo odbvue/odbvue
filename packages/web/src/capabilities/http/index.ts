@@ -220,6 +220,7 @@ export function useHttp(clientOptions: HttpClientOptions = {}): HttpClient {
   const client = $fetch.create(
     {
       baseURL,
+      credentials: 'include',
       retry: 0,
       retryStatusCodes: [408, 425, 429, 500, 502, 503, 504],
       retryDelay,

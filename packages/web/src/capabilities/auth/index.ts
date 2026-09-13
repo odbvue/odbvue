@@ -14,18 +14,15 @@ export interface AuthUser {
 
 export interface AuthSession<User extends AuthUser = AuthUser> {
   accessToken: string
-  refreshToken?: string
   user: User
 }
 
 interface AuthTokens {
   accessToken: string
-  refreshToken?: string
 }
 
 interface OrdsAuthTokens {
   'access-token': string
-  'refresh-token'?: string
 }
 
 interface OrdsAuthUser {
@@ -55,7 +52,6 @@ export interface OdbVueAuthOptions {
 export interface OdbVueAuth<User extends AuthUser = AuthUser> {
   user: Readonly<Ref<User | null>>
   accessToken: Readonly<Ref<string | null>>
-  refreshToken: Readonly<Ref<string | null>>
   loading: Readonly<Ref<boolean>>
   ready: Readonly<Ref<boolean>>
   authenticated: ComputedRef<boolean>
@@ -94,7 +90,6 @@ export function createOdbVueAuth<User extends AuthUser = AuthUser>(
   const endpoints = { ...defaultEndpoints, ...options.endpoints }
   const user = shallowRef<User | null>(null)
   const accessToken = ref<string | null>(null)
-  const refreshToken = ref<string | null>(null)
   const loading = ref(false)
   const ready = ref(false)
   let http = options.http
@@ -107,7 +102,6 @@ export function createOdbVueAuth<User extends AuthUser = AuthUser>(
   function clear(): void {
     user.value = null
     accessToken.value = null
-    refreshToken.value = null
   }
 
   function applyTokens(tokens: AuthTokens | OrdsAuthTokens): void {
@@ -115,12 +109,10 @@ export function createOdbVueAuth<User extends AuthUser = AuthUser>(
       'access-token' in tokens
         ? {
             accessToken: tokens['access-token'],
-            refreshToken: tokens['refresh-token'],
           }
         : tokens
 
     accessToken.value = normalizedTokens.accessToken
-    refreshToken.value = normalizedTokens.refreshToken ?? refreshToken.value
   }
 
   function applyUser(response: OrdsAuthUser): User {
@@ -137,13 +129,10 @@ export function createOdbVueAuth<User extends AuthUser = AuthUser>(
   async function refresh(): Promise<boolean> {
     loading.value = true
     try {
-      if (!refreshToken.value) return false
       const response = await requireHttp().post<AuthTokens | OrdsAuthTokens>(
         endpoints.refresh,
         undefined,
-        {
-          headers: { 'presented-refresh-token': refreshToken.value },
-        },
+        { credentials: 'include' },
       )
       if (response.data) {
         applyTokens(response.data)
@@ -160,7 +149,6 @@ export function createOdbVueAuth<User extends AuthUser = AuthUser>(
   return {
     user: readonly(user) as Readonly<Ref<User | null>>,
     accessToken: readonly(accessToken),
-    refreshToken: readonly(refreshToken),
     loading: readonly(loading),
     ready: readonly(ready),
     authenticated: computed(() => !!user.value && !!accessToken.value),
@@ -172,6 +160,7 @@ export function createOdbVueAuth<User extends AuthUser = AuthUser>(
           undefined,
           {
             headers: { 'login-username': credentials.username, password: credentials.password },
+            credentials: 'include',
           },
         )
         if (!response.data) throw toError(response.error, 'Authentication failed.')
@@ -184,11 +173,7 @@ export function createOdbVueAuth<User extends AuthUser = AuthUser>(
     async logout() {
       loading.value = true
       try {
-        await requireHttp().post(endpoints.logout, undefined, {
-          headers: refreshToken.value
-            ? { 'presented-refresh-token': refreshToken.value }
-            : undefined,
-        })
+        await requireHttp().post(endpoints.logout, undefined, { credentials: 'include' })
       } finally {
         clear()
         loading.value = false
@@ -197,7 +182,9 @@ export function createOdbVueAuth<User extends AuthUser = AuthUser>(
     refresh,
     async restore() {
       try {
-        return await refresh()
+        if (!(await refresh())) return false
+        await this.me()
+        return true
       } finally {
         ready.value = true
       }

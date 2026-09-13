@@ -22,7 +22,6 @@
             <v-list density="compact">
               <v-list-item title="Ready" :subtitle="String(auth.ready.value)" />
               <v-list-item title="Access token" :subtitle="auth.accessToken.value ?? 'None'" />
-              <v-list-item title="Refresh token" :subtitle="auth.refreshToken.value ?? 'None'" />
               <v-list-item
                 title="Roles"
                 :subtitle="auth.user.value?.roles?.join(', ') ?? 'Not returned by this endpoint'"

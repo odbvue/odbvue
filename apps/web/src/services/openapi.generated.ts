@@ -111,11 +111,9 @@ export interface components {
     schemas: {
         OdbAuthLoginResponse: {
             accessToken: string;
-            refreshToken: string;
         };
         OdbAuthRefreshResponse: {
             accessToken: string;
-            refreshToken: string;
         };
         OdbAuthLogoutResponse: Record<string, never>;
         OdbAuthMeResponse: {
@@ -163,7 +161,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "presented-refresh-token"?: string;
+                Cookie?: string;
             };
             path?: never;
             cookie?: never;
@@ -185,7 +183,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "presented-refresh-token"?: string;
+                Cookie?: string;
             };
             path?: never;
             cookie?: never;

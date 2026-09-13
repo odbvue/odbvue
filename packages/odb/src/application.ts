@@ -125,7 +125,9 @@ export function generateApplicationsOpenApi(
       const requiredOutputs: string[] = []
 
       for (const param of endpoint.params.filter(
-        (value) => value.direction === 'OUT' || value.direction === 'IN OUT',
+        (value) =>
+          (value.direction === 'OUT' || value.direction === 'IN OUT') &&
+          value.sourceType === 'RESPONSE',
       )) {
         const outputName = oracleParameterName(param.plsqlArg)
         requiredOutputs.push(outputName)

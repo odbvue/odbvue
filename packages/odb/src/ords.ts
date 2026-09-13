@@ -77,6 +77,8 @@ export class OrdsParam {
     readonly comment?: string,
     readonly resultColumns?: OrdsResultColumnNode[],
     readonly odbType?: OdbType,
+    private readonly nameOverride?: string,
+    private readonly sourceTypeOverride?: 'HEADER' | 'RESPONSE' | 'URI',
   ) {}
 
   /**
@@ -85,15 +87,15 @@ export class OrdsParam {
    * e.g. P_USER_NAME → user-name
    */
   get name(): string {
-    return oracleParameterName(this.plsqlArg, { style: 'kebab' })
+    return this.nameOverride ?? oracleParameterName(this.plsqlArg, { style: 'kebab' })
   }
 
   get bindVariable(): string {
     return oracleParameterName(this.plsqlArg)
   }
 
-  get sourceType(): 'HEADER' | 'RESPONSE' {
-    return this.direction === 'OUT' ? 'RESPONSE' : 'HEADER'
+  get sourceType(): 'HEADER' | 'RESPONSE' | 'URI' {
+    return this.sourceTypeOverride ?? (this.direction === 'OUT' ? 'RESPONSE' : 'HEADER')
   }
 
   toNode(sourceType: OrdsParamNode['sourceType'] = this.sourceType): OrdsParamNode {
@@ -174,8 +176,21 @@ export class OrdsEndpoint {
     comment?: string,
     resultColumns?: OrdsResultColumnNode[],
     odbType?: OdbType,
+    nameOverride?: string,
+    sourceTypeOverride?: 'HEADER' | 'RESPONSE' | 'URI',
   ): this {
-    this._params.push(new OrdsParam(plsqlArg, direction, type, comment, resultColumns, odbType))
+    this._params.push(
+      new OrdsParam(
+        plsqlArg,
+        direction,
+        type,
+        comment,
+        resultColumns,
+        odbType,
+        nameOverride,
+        sourceTypeOverride,
+      ),
+    )
     return this
   }
 
@@ -234,7 +249,8 @@ export class OrdsEndpoint {
   }
 
   private paramSourceType(param: OrdsParam): OrdsParamNode['sourceType'] {
-    if (param.direction === 'OUT') return 'RESPONSE'
+    if (param.sourceType === 'RESPONSE' || param.sourceType === 'URI') return param.sourceType
+    if (param.direction === 'OUT') return 'HEADER'
     const pathParams = new Set(
       [...this.effectivePattern.matchAll(/:([a-zA-Z0-9_-]+)\??/g)].map((match) => match[1]),
     )

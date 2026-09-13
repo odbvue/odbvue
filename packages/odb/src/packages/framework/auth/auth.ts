@@ -9,6 +9,12 @@ const DEFAULT_JWT_SECRET = 'change-this-development-only-odbvue-auth-secret-2026
 const PASSWORD_HASH_ALGORITHM = 'pbkdf2-sha512'
 const PASSWORD_HASH_ITERATIONS = 210000
 const PASSWORD_HASH_BYTES = 64
+const REFRESH_TOKEN_BYTES = 64
+const REFRESH_TOKEN_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
+const authCookieOptions = {
+  refreshCookieName: '__Host-odb_refresh',
+  refreshCookieSecure: true,
+} as const
 
 function literal(value: string): string {
   return `'${value.replace(/'/g, "''")}'`
@@ -20,6 +26,29 @@ function qualify(name: string, schema?: string): string {
 
 function block(statement: string): string {
   return ['BEGIN', `  ${statement};`, 'END;', '/'].join('\n')
+}
+
+function refreshCookie(
+  token: string,
+  options: Required<Pick<OdbAuthOptions, 'refreshCookieName' | 'refreshCookieSecure'>>,
+): string {
+  return [
+    `'${options.refreshCookieName}=' || ${token}`,
+    "'Path=/'",
+    "'HttpOnly'",
+    ...(options.refreshCookieSecure ? ["'Secure'"] : []),
+    "'SameSite=Lax'",
+    `'Max-Age=${REFRESH_TOKEN_MAX_AGE_SECONDS}'`,
+  ].join(" || '; ' || ")
+}
+
+function expiredRefreshCookie(
+  options: Required<Pick<OdbAuthOptions, 'refreshCookieName' | 'refreshCookieSecure'>>,
+): string {
+  return refreshCookie("''", options).replace(
+    `'Max-Age=${REFRESH_TOKEN_MAX_AGE_SECONDS}'`,
+    "'Max-Age=0'",
+  )
 }
 
 export const authUsers = odbTable('odb_auth_users', (t) => ({
@@ -179,7 +208,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
       password: 'string',
     })
     const accessToken = proc.out('p_access_token', 'CLOB')
-    const refreshTokenOutput = proc.out('p_refresh_token', 'VARCHAR2')
+    const setCookie = proc.out('p_set_cookie', 'VARCHAR2')
     proc
       .body((statements) => {
         const userId = statements.variable('l_user_id', 'VARCHAR2', 32)
@@ -208,7 +237,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
           (then) => then.raw(`raise_application_error(-20001, 'INVALID_CREDENTIALS')`),
         )
         statements.assign(sessionId, 'LOWER(RAWTOHEX(SYS_GUID()))')
-        statements.assign(refreshToken, 'odb_auth_crypto.random_token(64)')
+        statements.assign(refreshToken, `odb_auth_crypto.random_token(${REFRESH_TOKEN_BYTES})`)
         statements.insertInto(authSessions, {
           id: sessionId,
           userId,
@@ -219,25 +248,41 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
           accessToken,
           `odb_auth_jwt.create_access_token(${userId.name}, ${sessionId.name}, ${tokenVersion.name})`,
         )
-        statements.assign(refreshTokenOutput, refreshToken)
+        statements.assign(setCookie, refreshCookie(refreshToken.name, authCookieOptions))
       })
       .service({
         method: 'POST',
         path: '/login',
         basePath: '/auth',
         summary: 'Authenticate using username and password',
+        params: {
+          P_SET_COOKIE: { transport: 'header', name: 'Set-Cookie' },
+        },
       })
   }),
   refresh: pkg.proc('refresh', (proc) => {
-    const { presentedRefreshToken } = proc.inputs({ presentedRefreshToken: 'string' })
+    const cookieHeader = proc.in('p_cookie_header', 'VARCHAR2')
     const accessToken = proc.out('p_access_token', 'CLOB')
-    const refreshTokenOutput = proc.out('p_refresh_token', 'VARCHAR2')
+    const setCookie = proc.out('p_set_cookie', 'VARCHAR2')
     proc
       .body((statements) => {
         const sessionId = statements.variable('l_session_id', 'VARCHAR2', 32)
         const userId = statements.variable('l_user_id', 'VARCHAR2', 32)
         const tokenVersion = statements.variable('l_token_version', 'NUMBER')
+        const presentedRefreshToken = statements.variable(
+          'l_presented_refresh_token',
+          'VARCHAR2',
+          512,
+        )
         const nextToken = statements.variable('l_next_refresh_token', 'VARCHAR2', 512)
+        statements.assign(
+          presentedRefreshToken,
+          `REGEXP_SUBSTR(${cookieHeader.name}, '(^|;[[:space:]]*)${authCookieOptions.refreshCookieName}=([^;]*)', 1, 1, NULL, 2)`,
+        )
+        statements.ifThen(
+          `NOT REGEXP_LIKE(${presentedRefreshToken.name}, '^[[:xdigit:]]{128}$')`,
+          (then) => then.raw(`raise_application_error(-20001, 'UNAUTHORIZED')`),
+        )
         statements.query(
           odbQuery()
             .selectFrom('odb_auth_sessions s JOIN odb_auth_users u ON u.id = s.user_id')
@@ -257,7 +302,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
             )
             .forUpdate(),
         )
-        statements.assign(nextToken, 'odb_auth_crypto.random_token(64)')
+        statements.assign(nextToken, `odb_auth_crypto.random_token(${REFRESH_TOKEN_BYTES})`)
         statements.query(
           odbQuery()
             .updateTable(authSessions)
@@ -271,19 +316,33 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
           accessToken,
           `odb_auth_jwt.create_access_token(${userId.name}, ${sessionId.name}, ${tokenVersion.name})`,
         )
-        statements.assign(refreshTokenOutput, nextToken)
+        statements.assign(setCookie, refreshCookie(nextToken.name, authCookieOptions))
       })
       .service({
         method: 'POST',
         path: '/refresh',
         basePath: '/auth',
         summary: 'Rotate a refresh token and issue an access token',
+        params: {
+          P_COOKIE_HEADER: { transport: 'header', name: 'Cookie' },
+          P_SET_COOKIE: { transport: 'header', name: 'Set-Cookie' },
+        },
       })
   }),
   logout: pkg.proc('logout', (proc) => {
-    const { presentedRefreshToken } = proc.inputs({ presentedRefreshToken: 'string' })
+    const cookieHeader = proc.in('p_cookie_header', 'VARCHAR2')
+    const setCookie = proc.out('p_set_cookie', 'VARCHAR2')
     proc
       .body((statements) => {
+        const presentedRefreshToken = statements.variable(
+          'l_presented_refresh_token',
+          'VARCHAR2',
+          512,
+        )
+        statements.assign(
+          presentedRefreshToken,
+          `REGEXP_SUBSTR(${cookieHeader.name}, '(^|;[[:space:]]*)${authCookieOptions.refreshCookieName}=([^;]*)', 1, 1, NULL, 2)`,
+        )
         statements.query(
           odbQuery()
             .updateTable(authSessions)
@@ -299,12 +358,17 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
               ]),
             ),
         )
+        statements.assign(setCookie, expiredRefreshCookie(authCookieOptions))
       })
       .service({
         method: 'POST',
         path: '/logout',
         basePath: '/auth',
         summary: 'Revoke an authentication session',
+        params: {
+          P_COOKIE_HEADER: { transport: 'header', name: 'Cookie' },
+          P_SET_COOKIE: { transport: 'header', name: 'Set-Cookie' },
+        },
       })
   }),
   me: pkg.proc('me', (proc) => {
@@ -340,6 +404,8 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
 
 export interface OdbAuthOptions {
   jwtSecret?: string
+  refreshCookieName?: string
+  refreshCookieSecure?: boolean
 }
 
 /** Installable framework artifact: tables, primitives, ORDS API, and auth OpenAPI contract. */

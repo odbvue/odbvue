@@ -26,6 +26,9 @@ describe('odbAuth framework package', () => {
     )
     expect(sql).toContain('odb_auth_crypto.hash_token')
     expect(sql).toContain('FOR UPDATE')
+    expect(sql).toContain("'__Host-odb_refresh=' || l_refresh_token")
+    expect(sql).toContain("'Max-Age=2592000'")
+    expect(sql).toContain("'Max-Age=0'")
     expect(sql).toContain("l_subject := odb_jwt.claim(l_token, 'sub')")
     expect(sql).toContain("l_session_id := odb_jwt.claim(l_token, 'sid')")
     expect(sql).toContain("l_token_version := TO_NUMBER(odb_jwt.claim(l_token, 'ver'))")
@@ -48,17 +51,24 @@ describe('odbAuth framework package', () => {
     expect(sql).toContain("p_pattern        => 'login'")
     expect(sql).toContain("p_pattern        => 'refresh'")
     expect(sql).toContain("p_pattern        => 'me'")
+    expect(sql).toContain("p_name               => 'Cookie'")
+    expect(sql).toContain("p_name               => 'Set-Cookie'")
   })
 
-  it('publishes token-only login and refresh response contracts to OpenAPI', () => {
+  it('publishes access-token-only response contracts and keeps refresh cookies as headers', () => {
     const openapi = generateApplicationOpenApi(odbAuth.application()) as {
       components: { schemas: Record<string, { properties: Record<string, unknown> }> }
     }
 
     expect(openapi.components.schemas.OdbAuthLoginResponse.properties).toMatchObject({
       accessToken: { type: 'string' },
-      refreshToken: { type: 'string' },
     })
+    expect(openapi.components.schemas.OdbAuthLoginResponse.properties).not.toHaveProperty(
+      'setCookie',
+    )
+    expect(openapi.components.schemas.OdbAuthLoginResponse.properties).not.toHaveProperty(
+      'refreshToken',
+    )
     expect(openapi.components.schemas.OdbAuthLoginResponse.properties).not.toHaveProperty('userId')
     expect(openapi.components.schemas.OdbAuthLoginResponse.properties).not.toHaveProperty(
       'username',

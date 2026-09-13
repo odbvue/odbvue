@@ -108,6 +108,7 @@ export type ServiceNode = {
   module?: string
   basePath?: string
   paramTypes?: Record<string, OrdsParamType>
+  params?: Record<string, OrdsParameterTransport>
 }
 
 export type ProcedureNode = {
@@ -561,6 +562,15 @@ export type OrdsServiceDefinition = {
   basePath?: string
   /** Overrides for automatically mapped ORDS parameter types, keyed by PL/SQL argument name. */
   paramTypes?: Record<string, OrdsParamType>
+  /** HTTP transport overrides, keyed by PL/SQL argument name. */
+  params?: Record<string, OrdsParameterTransport>
+}
+
+export type OrdsParameterTransport = {
+  /** `body` maps OUT values to JSON, `header` maps HTTP headers, and `uri` maps route values. */
+  transport: 'body' | 'header' | 'uri'
+  /** HTTP header or URI parameter name. Defaults to the generated kebab-case parameter name. */
+  name?: string
 }
 
 /** Compile a procedure's service metadata into an ORDS endpoint. */
@@ -581,8 +591,15 @@ function buildOrdsEndpoint(
   const typeOverrides = new Map(
     Object.entries(service.paramTypes ?? {}).map(([name, type]) => [name.toUpperCase(), type]),
   )
+  const transportOverrides = new Map(
+    Object.entries(service.params ?? {}).map(([name, transport]) => [
+      name.toUpperCase(),
+      transport,
+    ]),
+  )
   for (const param of procedure.params) {
     const overriddenType = typeOverrides.get(param.name.toUpperCase())
+    const transport = transportOverrides.get(param.name.toUpperCase())
     const ordsType = overriddenType ?? plsqlToOrdsType(param.type)
     endpoint.param(
       param.name,
@@ -593,6 +610,12 @@ function buildOrdsEndpoint(
         ? procedure.body?.resultSets?.[param.name.toUpperCase()]?.map((column) => ({ ...column }))
         : undefined,
       overriddenType === undefined ? odbTypeFromPlsql(param.type) : undefined,
+      transport?.name,
+      transport?.transport === 'header'
+        ? 'HEADER'
+        : transport?.transport === 'uri'
+          ? 'URI'
+          : undefined,
     )
   }
 
@@ -683,6 +706,7 @@ export class Procedure {
       path: normalizeServicePath(definition.path),
       basePath: definition.basePath ? normalizeBasePath(definition.basePath) : undefined,
       paramTypes: definition.paramTypes ? { ...definition.paramTypes } : undefined,
+      params: definition.params ? { ...definition.params } : undefined,
     }
     return this
   }
@@ -697,6 +721,7 @@ export class Procedure {
         ? {
             ...this._service,
             paramTypes: this._service.paramTypes ? { ...this._service.paramTypes } : undefined,
+            params: this._service.params ? { ...this._service.params } : undefined,
           }
         : undefined,
     }
