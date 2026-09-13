@@ -254,7 +254,23 @@ export class OrdsEndpoint {
     const declaration = this._params.some((param) => this.paramSourceType(param) === 'BODY')
       ? 'DECLARE v_body CLOB := :body_text; '
       : ''
-    return `${declaration}BEGIN ${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args}); END;`
+    const call = `${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args});`
+    const envelope = "'ODB_HTTP\\|([4-5][0-9]{2})\\|([A-Z][A-Z0-9_]{0,99})'"
+    const status = `REGEXP_SUBSTR(SQLERRM, ${envelope}, 1, 1, NULL, 1)`
+    const code = `REGEXP_SUBSTR(SQLERRM, ${envelope}, 1, 1, NULL, 2)`
+    const explicitResponse = [
+      `:status_code := TO_NUMBER(${status});`,
+      "owa_util.mime_header('application/json', FALSE);",
+      'owa_util.http_header_close;',
+      `htp.p(JSON_OBJECT('code' VALUE ${code}));`,
+    ].join(' ')
+    const fallbackResponse = [
+      ':status_code := 500;',
+      "owa_util.mime_header('application/json', FALSE);",
+      'owa_util.http_header_close;',
+      `htp.p('{"code":"INTERNAL_SERVER_ERROR"}');`,
+    ].join(' ')
+    return `${declaration}BEGIN ${call} EXCEPTION WHEN OTHERS THEN IF SQLCODE = -20999 THEN ${explicitResponse} ELSE ${fallbackResponse} END IF; END;`
   }
 
   private paramSourceType(param: OrdsParam): OrdsParamNode['sourceType'] {

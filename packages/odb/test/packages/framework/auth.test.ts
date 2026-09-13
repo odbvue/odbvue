@@ -10,6 +10,7 @@ describe('odbAuth framework package', () => {
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_auth_crypto AS')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_auth_jwt AS')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_auth AS')
+    expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_http AS')
     expect(sql).toContain("'pbkdf2-sha512$210000$' || l_salt || '$' || l_hash")
     expect(sql).toContain(
       "DBMS_CRYPTO.MAC(UTL_RAW.CONCAT(HEXTORAW(l_salt), HEXTORAW('00000001')), DBMS_CRYPTO.HMAC_SH512, l_password_raw)",
@@ -39,6 +40,9 @@ describe('odbAuth framework package', () => {
     expect(sql).toContain('s.expires_at > SYSTIMESTAMP')
     expect(sql).toContain('u.enabled = 1')
     expect(sql).toContain('u.token_version = l_token_version')
+    expect(sql).toContain("odb_http.raise_error(401, 'INVALID_CREDENTIALS')")
+    expect(sql).toContain("odb_http.raise_error(401, 'UNAUTHORIZED')")
+    expect(sql).toContain('WHEN NO_DATA_FOUND THEN')
   })
 
   it('registers the auth API with ORDS when installed by a migration', () => {

@@ -279,6 +279,32 @@ export class ProcedureBody {
     return this
   }
 
+  /** Raise an explicit HTTP response handled by generated ORDS services. */
+  httpError(status: number, code: string): this {
+    if (!Number.isInteger(status) || status < 400 || status > 599) {
+      throw new Error('httpError: status must be an integer from 400 through 599.')
+    }
+    if (!/^[A-Z][A-Z0-9_]{0,99}$/.test(code)) {
+      throw new Error('httpError: code must be uppercase alphanumeric with optional underscores.')
+    }
+    return this.raw(`odb_http.raise_error(${status}, '${code}')`)
+  }
+
+  /** Raise a 401 HTTP response handled by generated ORDS services. */
+  unauthorized(code = 'UNAUTHORIZED'): this {
+    return this.httpError(401, code)
+  }
+
+  /** Raise a 403 HTTP response handled by generated ORDS services. */
+  forbidden(code = 'FORBIDDEN'): this {
+    return this.httpError(403, code)
+  }
+
+  /** Raise a 429 HTTP response handled by generated ORDS services. */
+  tooManyRequests(code = 'TOO_MANY_REQUESTS'): this {
+    return this.httpError(429, code)
+  }
+
   /**
    * Emit an `odb_audit` log statement. `message` is a plain text body (quoted
    * automatically); `attributes` is a JSON object whose keys are OTel attribute

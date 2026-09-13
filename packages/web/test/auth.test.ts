@@ -69,6 +69,20 @@ describe('authentication capability', () => {
     expect(auth.authenticated.value).toBe(false)
   })
 
+  it('clears an existing session when refresh returns unauthorized', async () => {
+    const post = vi.fn<HttpPostMock>()
+    post
+      .mockResolvedValueOnce(response({ accessToken: 'access-token' }))
+      .mockResolvedValueOnce(response(null, 401))
+    const auth = createOdbVueAuth({ http: { post } as unknown as HttpClient })
+
+    await auth.login({ username: 'ada', password: 'password' })
+    await expect(auth.refresh()).resolves.toBe(false)
+
+    expect(auth.accessToken.value).toBeNull()
+    expect(auth.authenticated.value).toBe(false)
+  })
+
   it('normalizes kebab-case ORDS token and user responses', async () => {
     const post = vi.fn<HttpPostMock>().mockResolvedValue(
       response({

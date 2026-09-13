@@ -49,6 +49,18 @@ describe('HTTP capability', () => {
     expect(result.status).toBe(401)
   })
 
+  it('does not refresh a failed refresh-token request', async () => {
+    const refreshAccessToken = vi.fn<RefreshMock>(async () => true)
+    const fetch = vi.fn<FetchMock>(() => Promise.resolve(response(401)))
+    const http = useHttp({ fetch, configuration: { refreshAccessToken } })
+
+    const result = await http.post('/auth/refresh')
+
+    expect(result.status).toBe(401)
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(refreshAccessToken).not.toHaveBeenCalled()
+  })
+
   it('retries retryable GET responses', async () => {
     let attempts = 0
     const http = useHttp({

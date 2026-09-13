@@ -83,8 +83,13 @@ export const httpCapability = defineCapability({
   },
 })
 
+function isTokenEndpoint(request: string): boolean {
+  const pathname = request.split(/[?#]/, 1)[0].replace(/\/+$/, '')
+  return /(?:^|\/)(?:refresh|login)$/.test(pathname)
+}
+
 const defaultHttpConfiguration: HttpConfiguration = {
-  shouldRefresh: (request) => !request.includes('refresh/') && !request.includes('login/'),
+  shouldRefresh: (request) => !isTokenEndpoint(request),
 }
 
 /** Creates an application-scoped HTTP client with OdbVue defaults. */

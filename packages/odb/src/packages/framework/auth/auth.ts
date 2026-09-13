@@ -2,6 +2,7 @@ import { odbPackage } from '../../../schema/package.js'
 import { PlsqlExpression } from '../../../schema/attribute.js'
 import { odbTable } from '../../../schema/table.js'
 import { odbQuery } from '../../../query/index.js'
+import { odbHttp } from '../http/http.js'
 import { odbJwt } from '../jwt/jwt.js'
 
 const AUTH_JWT_SECRET_MARKER = '__ODB_AUTH_JWT_SECRET__'
@@ -171,7 +172,7 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => ({
       )
       body.ifThen(
         `odb_jwt.verify(${token.name}, '${AUTH_JWT_SECRET_MARKER}') = 0 OR odb_jwt.is_expired(${token.name}) = 1`,
-        (then) => then.raw(`raise_application_error(-20001, 'UNAUTHORIZED')`),
+        (then) => then.unauthorized(),
       )
       body.assign(subject, `odb_jwt.claim(${token.name}, 'sub')`)
       body.assign(sessionId, `odb_jwt.claim(${token.name}, 'sid')`)
@@ -192,9 +193,7 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => ({
             ]),
           ),
       )
-      body.ifThen(`${activeSessionCount.name} = 0`, (then) =>
-        then.raw(`raise_application_error(-20001, 'UNAUTHORIZED')`),
-      )
+      body.ifThen(`${activeSessionCount.name} = 0`, (then) => then.unauthorized())
       body.return(subject.name)
     })
   }),
@@ -234,7 +233,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
         )
         statements.ifThen(
           `odb_auth_crypto.verify_password(${password.name}, ${passwordHash.name}) = 0`,
-          (then) => then.raw(`raise_application_error(-20001, 'INVALID_CREDENTIALS')`),
+          (then) => then.unauthorized('INVALID_CREDENTIALS'),
         )
         statements.assign(sessionId, 'LOWER(RAWTOHEX(SYS_GUID()))')
         statements.assign(refreshToken, `odb_auth_crypto.random_token(${REFRESH_TOKEN_BYTES})`)
@@ -249,6 +248,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
           `odb_auth_jwt.create_access_token(${userId.name}, ${sessionId.name}, ${tokenVersion.name})`,
         )
         statements.assign(setCookie, refreshCookie(refreshToken.name, authCookieOptions))
+        statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized('INVALID_CREDENTIALS'))
       })
       .service({
         method: 'POST',
@@ -282,7 +282,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
         )
         statements.ifThen(
           `NOT REGEXP_LIKE(${presentedRefreshToken.name}, '^[[:xdigit:]]{128}$')`,
-          (then) => then.raw(`raise_application_error(-20001, 'UNAUTHORIZED')`),
+          (then) => then.unauthorized(),
         )
         statements.query(
           odbQuery()
@@ -318,6 +318,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
           `odb_auth_jwt.create_access_token(${userId.name}, ${sessionId.name}, ${tokenVersion.name})`,
         )
         statements.assign(setCookie, refreshCookie(nextToken.name, authCookieOptions))
+        statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized())
       })
       .service({
         method: 'POST',
@@ -359,6 +360,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
               ]),
             ),
         )
+        statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized())
         statements.assign(setCookie, expiredRefreshCookie(authCookieOptions))
       })
       .service({
@@ -418,13 +420,14 @@ export const odbAuth = {
       authUsers.toSQLUp(options),
       authSessions.toSQLUp(options),
       odbJwt.toSQLUp(options),
+      odbHttp.toSQLUp(options),
       odbAuthCrypto.toSQLUp(options),
       odbAuthJwt.toSQLUp(options).replaceAll(AUTH_JWT_SECRET_MARKER, secret.replace(/'/g, "''")),
       odbAuthApi.toSQLUp(options),
     ].join('\n')
   },
   toSQLDown(options: { schema?: string } = {}): string {
-    return [odbAuthApi, odbAuthJwt, odbAuthCrypto, odbJwt, authSessions, authUsers]
+    return [odbAuthApi, odbAuthJwt, odbAuthCrypto, odbHttp, odbJwt, authSessions, authUsers]
       .map((artifact) => artifact.toSQLDown(options))
       .join('\n')
   },
