@@ -252,7 +252,7 @@ export function emitPlsqlType(type: PlsqlType | string, options: { length?: numb
     case 'TIMESTAMP':
       return 'TIMESTAMP'
     default:
-      return type
+      return options.length === undefined ? type : `${type}(${options.length})`
   }
 }
 

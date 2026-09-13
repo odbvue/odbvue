@@ -142,8 +142,14 @@ export const odbType = {
   string(length?: number): OdbTypeDescriptor<'VARCHAR2'> {
     return { type: 'VARCHAR2', length }
   },
+  raw(length?: number): OdbTypeDescriptor<'RAW'> {
+    return { type: 'RAW', length }
+  },
   number(): OdbTypeDescriptor<'NUMBER'> {
     return { type: 'NUMBER' }
+  },
+  integer(): OdbTypeDescriptor<'PLS_INTEGER'> {
+    return { type: 'PLS_INTEGER' }
   },
   guid(): OdbTypeDescriptor<'VARCHAR2'> {
     return { type: 'VARCHAR2', length: 32 }
@@ -286,23 +292,26 @@ export class ProcedureBody {
    * - anything else → plain `LocalVar`
    *
    * @example
-   * body.variable('v_name', 'VARCHAR2', 100).assign("'hello'")
-   * body.variable('v_lob', 'CLOB').assign("'text'")
-   * body.set(pOut, body.variable('v_lob', 'CLOB').toBase64())
+   * body.variable('v_name', odbType.string(100)).assign("'hello'")
+   * body.variable('v_lob', odbType.clob()).assign("'text'")
+   * body.set(pOut, body.variable('v_lob', odbType.clob()).toBase64())
    */
-  variable(name: string, type: 'CLOB', length?: number): ClobVar
-  variable(name: string, type: 'BLOB', length?: number): BlobVar
-  variable(name: string, type: 'VARCHAR2', length?: number): Varchar2Var
-  variable<T extends PlsqlType | string>(name: string, type: T, length?: number): LocalVar<T>
-  variable(name: string, type: PlsqlType | string, length?: number): LocalVar {
-    const opts = length !== undefined ? { length } : {}
+  variable<T extends PlsqlType | string>(
+    name: string,
+    definition: OdbTypeDescriptor<T>,
+  ): LocalVariableForType<T> {
+    return this.declareVariable(name, definition.type, definition.length) as LocalVariableForType<T>
+  }
+
+  private declareVariable(name: string, type: PlsqlType | string, length?: number): LocalVar {
+    const opts = length === undefined ? {} : { length }
     const v =
       type === 'CLOB'
-        ? new ClobVar(name, type, opts)
+        ? new ClobVar(name, 'CLOB', opts)
         : type === 'BLOB'
-          ? new BlobVar(name, type, opts)
+          ? new BlobVar(name, 'BLOB', opts)
           : type === 'VARCHAR2'
-            ? new Varchar2Var(name, type, opts)
+            ? new Varchar2Var(name, 'VARCHAR2', opts)
             : new LocalVar(name, type, opts)
     this._declarations.push(v)
     return v
@@ -332,7 +341,7 @@ export class ProcedureBody {
         typeof definition === 'object' && !(definition instanceof Column)
           ? definition.length
           : undefined
-      variables[key as keyof TInputs] = this.variable(
+      variables[key as keyof TInputs] = this.declareVariable(
         localVariableName(key),
         type,
         length,
@@ -503,7 +512,7 @@ export class ProcedureBody {
     }
     const name = this._returnCounter === 0 ? 'l_return' : `l_return${this._returnCounter}`
     this._returnCounter++
-    const result = this.variable(name, this._returnType, this._returnLength)
+    const result = this.declareVariable(name, this._returnType, this._returnLength)
     qb.into(result)
     this.query(qb)
     return this.return(result)
@@ -779,10 +788,11 @@ export class Procedure {
   /** Add a parameter (default direction IN). */
   param<T extends PlsqlType | string>(
     name: string,
-    type: T,
+    type: T | OdbTypeDescriptor<T>,
     direction: ParameterDirection = 'IN',
   ): Param<T> {
-    const p = new Param(name, type, direction)
+    const definition = typeof type === 'object' ? type : { type }
+    const p = new Param(name, definition.type, direction, { length: definition.length })
     this._params.push(p)
     return p
   }
@@ -880,7 +890,10 @@ export class PlsqlFunction<TReturnType extends PlsqlType | string = PlsqlType | 
   constructor(
     readonly name: string,
     readonly returnType: TReturnType,
-  ) {}
+    returnTypeOptions: { length?: number } = {},
+  ) {
+    this._returnTypeOptions = { ...returnTypeOptions }
+  }
 
   /** Set the length qualifier on the return type (e.g. for VARCHAR2). */
   returnLength(n: number): this {
@@ -889,8 +902,13 @@ export class PlsqlFunction<TReturnType extends PlsqlType | string = PlsqlType | 
   }
 
   /** Add a parameter (default direction IN). */
-  param(name: string, type: PlsqlType | string, direction: ParameterDirection = 'IN'): Param {
-    const p = new Param(name, type, direction)
+  param<T extends PlsqlType | string>(
+    name: string,
+    type: T | OdbTypeDescriptor<T>,
+    direction: ParameterDirection = 'IN',
+  ): Param<T> {
+    const definition = typeof type === 'object' ? type : { type }
+    const p = new Param(name, definition.type, direction, { length: definition.length })
     this._params.push(p)
     return p
   }
@@ -928,7 +946,7 @@ export type Package<
   proc(name: string, build?: (proc: Procedure) => void): Procedure
   func<TReturnType extends PlsqlType | string = PlsqlType | string>(
     name: string,
-    returnType: TReturnType,
+    returnType: TReturnType | OdbTypeDescriptor<TReturnType>,
     build?: (fn: PlsqlFunction<TReturnType>) => void,
   ): PlsqlFunction<TReturnType>
   call<TMemberName extends keyof TMembers>(
@@ -1001,10 +1019,11 @@ export class PackageImpl<
 
   func<TReturnType extends PlsqlType | string = PlsqlType | string>(
     name: string,
-    returnType: TReturnType,
+    returnType: TReturnType | OdbTypeDescriptor<TReturnType>,
     build?: (fn: PlsqlFunction<TReturnType>) => void,
   ): PlsqlFunction<TReturnType> {
-    const f = new PlsqlFunction(name, returnType)
+    const definition = typeof returnType === 'object' ? returnType : { type: returnType }
+    const f = new PlsqlFunction(name, definition.type, { length: definition.length })
     build?.(f)
     this._functions.push(f)
     return f

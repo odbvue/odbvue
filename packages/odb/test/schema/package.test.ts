@@ -189,7 +189,7 @@ describe('ProcedureBody control flow and exceptions', () => {
     const sql = bodyLines((proc) => {
       proc.body((body) =>
         body.ifThen('1 = 1', (t) => {
-          const v = t.variable('v_inner', 'VARCHAR2', 10)
+          const v = t.variable('v_inner', odbType.string(10))
           t.assign(v, odbLiteral('x'))
         }),
       )

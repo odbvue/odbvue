@@ -1,6 +1,6 @@
 import { pbkdf2Sync } from 'node:crypto'
 import { odbPackage, odbType } from '../../../schema/package.js'
-import { PlsqlExpression } from '../../../schema/attribute.js'
+import { odbLiteral, PlsqlExpression } from '../../../schema/attribute.js'
 import { odbTable } from '../../../schema/table.js'
 import { odbQuery } from '../../../query/index.js'
 import { odbHttp } from '../http/http.js'
@@ -95,15 +95,17 @@ export const authSessions = odbTable('odb_auth_sessions', (t) => ({
 
 /** Password and opaque token primitives used by `odb_auth`. */
 export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
-  hashPassword: pkg.func('hash_password', 'VARCHAR2', (fn) => {
-    const password = fn.param('p_password', 'VARCHAR2')
-    fn.returnLength(512).body((body) => {
-      const salt = body.variable('l_salt', 'VARCHAR2', 32)
-      const passwordRaw = body.variable('l_password_raw', 'RAW(2000)')
-      const round = body.variable('l_round', 'PLS_INTEGER')
-      const roundBlock = body.variable('l_block', `RAW(${PASSWORD_HASH_BYTES})`)
-      const derivedKey = body.variable('l_derived_key', `RAW(${PASSWORD_HASH_BYTES})`)
-      const hash = body.variable('l_hash', 'VARCHAR2', 128)
+  hashPassword: pkg.func('hash_password', odbType.string(512), (fn) => {
+    const password = fn.param('p_password', odbType.string())
+    fn.body((body) => {
+      const { salt, passwordRaw, round, roundBlock, derivedKey, hash } = body.variables({
+        salt: odbType.string(32),
+        passwordRaw: odbType.raw(2000),
+        round: odbType.integer(),
+        roundBlock: odbType.raw(PASSWORD_HASH_BYTES),
+        derivedKey: odbType.raw(PASSWORD_HASH_BYTES),
+        hash: odbType.string(128),
+      })
       body.assign(salt, 'RAWTOHEX(DBMS_CRYPTO.RANDOMBYTES(16))')
       body.assign(passwordRaw, `UTL_I18N.STRING_TO_RAW(${password.name}, 'AL32UTF8')`)
       body.raw(
@@ -115,18 +117,29 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
       )
     })
   }),
-  verifyPassword: pkg.func('verify_password', 'NUMBER', (fn) => {
-    const password = fn.param('p_password', 'VARCHAR2')
-    const storedHash = fn.param('p_password_hash', 'VARCHAR2')
+  verifyPassword: pkg.func('verify_password', odbType.number(), (fn) => {
+    const password = fn.param('p_password', odbType.string())
+    const storedHash = fn.param('p_password_hash', odbType.string())
     fn.body((body) => {
-      const iterations = body.variable('l_iterations', 'NUMBER')
-      const salt = body.variable('l_salt', 'VARCHAR2', 32)
-      const expectedHash = body.variable('l_expected_hash', 'VARCHAR2', 128)
-      const passwordRaw = body.variable('l_password_raw', 'RAW(2000)')
-      const round = body.variable('l_round', 'PLS_INTEGER')
-      const roundBlock = body.variable('l_block', `RAW(${PASSWORD_HASH_BYTES})`)
-      const derivedKey = body.variable('l_derived_key', `RAW(${PASSWORD_HASH_BYTES})`)
-      const derivedHash = body.variable('l_derived_hash', 'VARCHAR2', 128)
+      const {
+        iterations,
+        salt,
+        expectedHash,
+        passwordRaw,
+        round,
+        roundBlock,
+        derivedKey,
+        derivedHash,
+      } = body.variables({
+        iterations: odbType.number(),
+        salt: odbType.string(32),
+        expectedHash: odbType.string(128),
+        passwordRaw: odbType.raw(2000),
+        round: odbType.integer(),
+        roundBlock: odbType.raw(PASSWORD_HASH_BYTES),
+        derivedKey: odbType.raw(PASSWORD_HASH_BYTES),
+        derivedHash: odbType.string(128),
+      })
       body.ifThen(
         `NOT REGEXP_LIKE(${storedHash.name}, '^${PASSWORD_HASH_ALGORITHM}\\$[1-9][0-9]*\\$[[:xdigit:]]{32}\\$[[:xdigit:]]{128}$')`,
         (then) => then.return('0'),
@@ -146,15 +159,13 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
       body.return('0')
     })
   }),
-  randomToken: pkg.func('random_token', 'VARCHAR2', (fn) => {
-    const bytes = fn.param('p_bytes', 'NUMBER')
-    fn.returnLength(512).body((body) =>
-      body.return(`RAWTOHEX(DBMS_CRYPTO.RANDOMBYTES(${bytes.name}))`),
-    )
+  randomToken: pkg.func('random_token', odbType.string(512), (fn) => {
+    const bytes = fn.param('p_bytes', odbType.number())
+    fn.body((body) => body.return(`RAWTOHEX(DBMS_CRYPTO.RANDOMBYTES(${bytes.name}))`))
   }),
-  hashToken: pkg.func('hash_token', 'VARCHAR2', (fn) => {
-    const token = fn.param('p_token', 'VARCHAR2')
-    fn.returnLength(128).body((body) =>
+  hashToken: pkg.func('hash_token', odbType.string(128), (fn) => {
+    const token = fn.param('p_token', odbType.string())
+    fn.body((body) =>
       body.return(
         `RAWTOHEX(DBMS_CRYPTO.HASH(UTL_RAW.CAST_TO_RAW(${token.name}), DBMS_CRYPTO.HASH_SH256))`,
       ),
@@ -164,24 +175,26 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
 
 /** Access-token wrapper around ODB's generic HS256 JWT implementation. */
 export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => ({
-  createAccessToken: pkg.func('create_access_token', 'VARCHAR2', (fn) => {
-    const userId = fn.param('p_user_id', 'VARCHAR2')
-    const sessionId = fn.param('p_session_id', 'VARCHAR2')
-    const tokenVersion = fn.param('p_token_version', 'NUMBER')
-    fn.returnLength(4000).body((body) =>
+  createAccessToken: pkg.func('create_access_token', odbType.string(4000), (fn) => {
+    const userId = fn.param('p_user_id', odbType.guid())
+    const sessionId = fn.param('p_session_id', odbType.guid())
+    const tokenVersion = fn.param('p_token_version', odbType.number())
+    fn.body((body) =>
       body.return(
         `odb_jwt.encode(JSON_OBJECT('sub' VALUE ${userId.name}, 'sid' VALUE ${sessionId.name}, 'ver' VALUE ${tokenVersion.name}, 'iat' VALUE odb_jwt.to_epoch(), 'exp' VALUE odb_jwt.to_epoch() + 900 RETURNING VARCHAR2), '${AUTH_JWT_SECRET_MARKER}')`,
       ),
     )
   }),
-  requireUser: pkg.func('require_user', 'VARCHAR2', (fn) => {
-    const authorization = fn.param('p_authorization', 'VARCHAR2')
+  requireUser: pkg.func('require_user', odbType.guid(), (fn) => {
+    const authorization = fn.param('p_authorization', odbType.string())
     fn.body((body) => {
-      const token = body.variable('l_token', 'VARCHAR2', 4000)
-      const subject = body.variable('l_subject', 'VARCHAR2', 32)
-      const sessionId = body.variable('l_session_id', 'VARCHAR2', 32)
-      const tokenVersion = body.variable('l_token_version', 'NUMBER')
-      const activeSessionCount = body.variable('l_active_session_count', 'NUMBER')
+      const { token, subject, sessionId, tokenVersion, activeSessionCount } = body.variables({
+        token: odbType.string(4000),
+        subject: authUsers.id,
+        sessionId: authSessions.id,
+        tokenVersion: authUsers.tokenVersion,
+        activeSessionCount: odbType.number(),
+      })
       body.assign(
         token,
         `REGEXP_REPLACE(${authorization.name}, '^Bearer[[:space:]]+', '', 1, 1, 'i')`,
@@ -221,7 +234,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
     const { loginUsername, password, accessToken, setCookie } = proc.parameters({
       in: {
         loginUsername: authUsers.username,
-        password: odbType.string(),
+        password: odbType.string(512),
       },
       out: {
         accessToken: odbType.clob(),
@@ -230,15 +243,15 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
     })
     proc
       .body((statements) => {
-        const { userId, passwordHash, tokenVersion, sessionId, refreshToken } =
+        const { userId, passwordHash, tokenVersion, sessionId, refreshToken, loginSubject } =
           statements.variables({
             userId: authUsers.id,
             passwordHash: authUsers.passwordHash,
             tokenVersion: authUsers.tokenVersion,
             sessionId: authSessions.id,
             refreshToken: odbType.string(512),
+            loginSubject: odbType.string(128),
           })
-        const loginSubject = statements.variable('l_login_subject', 'VARCHAR2', 128)
         statements.assign(loginSubject, `LOWER(TRIM(${loginUsername.name}))`)
         statements.raw(odbRateLimit.check("'AUTH_LOGIN_USERNAME'", loginSubject.name))
         statements.query(
@@ -262,7 +275,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
           `NVL(${passwordHash.name}, '${DUMMY_PASSWORD_HASH_MARKER}')`,
         )
         statements.ifThen(
-          `odb_auth_crypto.verify_password(${password.name}, ${passwordHash.name}) = 0 OR ${userId.name} IS NULL`,
+          `${odbAuthCrypto.verifyPassword(password, passwordHash).toSQL()} = 0 OR ${userId.name} IS NULL`,
           (then) => {
             then.raw(odbRateLimit.failure("'AUTH_LOGIN_USERNAME'", loginSubject.name))
             then.unauthorized('INVALID_CREDENTIALS')
@@ -270,7 +283,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
         )
         statements.raw(odbRateLimit.success("'AUTH_LOGIN_USERNAME'", loginSubject.name))
         statements.assign(sessionId, 'LOWER(RAWTOHEX(SYS_GUID()))')
-        statements.assign(refreshToken, `odb_auth_crypto.random_token(${REFRESH_TOKEN_BYTES})`)
+        statements.set(refreshToken, odbAuthCrypto.randomToken(odbLiteral(REFRESH_TOKEN_BYTES)))
         statements.insertInto(authSessions, {
           id: sessionId,
           userId,
@@ -279,7 +292,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
         })
         statements.assign(
           accessToken,
-          `odb_auth_jwt.create_access_token(${userId.name}, ${sessionId.name}, ${tokenVersion.name})`,
+          odbAuthJwt.createAccessToken(userId, sessionId, tokenVersion),
         )
         statements.assign(setCookie, refreshCookie(refreshToken.name, authCookieOptions))
         statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized('INVALID_CREDENTIALS'))
@@ -298,30 +311,28 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
   }),
   refresh: pkg.proc('refresh', (proc) => {
     const { cookieHeader, accessToken, setCookie } = proc.parameters({
-      in: { cookieHeader: 'VARCHAR2' },
-      out: { accessToken: 'CLOB', setCookie: 'VARCHAR2' },
+      in: { cookieHeader: odbType.string(4000) },
+      out: { accessToken: odbType.clob(), setCookie: odbType.string() },
     })
     proc
       .body((statements) => {
-        const sessionId = statements.variable('l_session_id', 'VARCHAR2', 32)
-        const userId = statements.variable('l_user_id', 'VARCHAR2', 32)
-        const tokenVersion = statements.variable('l_token_version', 'NUMBER')
-        const previousRefreshTokenHash = statements.variable(
-          'l_previous_refresh_token_hash',
-          'VARCHAR2',
-          128,
-        )
-        const presentedRefreshToken = statements.variable(
-          'l_presented_refresh_token',
-          'VARCHAR2',
-          512,
-        )
-        const presentedRefreshTokenHash = statements.variable(
-          'l_presented_refresh_token_hash',
-          'VARCHAR2',
-          128,
-        )
-        const nextToken = statements.variable('l_next_refresh_token', 'VARCHAR2', 512)
+        const {
+          sessionId,
+          userId,
+          tokenVersion,
+          previousRefreshTokenHash,
+          presentedRefreshToken,
+          presentedRefreshTokenHash,
+          nextRefreshToken,
+        } = statements.variables({
+          sessionId: authSessions.id,
+          userId: authUsers.id,
+          tokenVersion: authUsers.tokenVersion,
+          previousRefreshTokenHash: authSessions.previousRefreshTokenHash,
+          presentedRefreshToken: odbType.string(512),
+          presentedRefreshTokenHash: authSessions.refreshTokenHash,
+          nextRefreshToken: odbType.string(512),
+        })
         statements.assign(
           presentedRefreshToken,
           `REGEXP_SUBSTR(${cookieHeader.name}, '(^|;[[:space:]]*)${authCookieOptions.refreshCookieName}=([^;]*)', 1, 1, NULL, 2)`,
@@ -372,22 +383,22 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
             then.unauthorized()
           },
         )
-        statements.assign(nextToken, `odb_auth_crypto.random_token(${REFRESH_TOKEN_BYTES})`)
+        statements.set(nextRefreshToken, odbAuthCrypto.randomToken(odbLiteral(REFRESH_TOKEN_BYTES)))
         statements.query(
           odbQuery()
             .updateTable(authSessions)
             .set({
               previousRefreshTokenHash: presentedRefreshTokenHash,
-              refreshTokenHash: odbAuthCrypto.hashToken(nextToken),
+              refreshTokenHash: odbAuthCrypto.hashToken(nextRefreshToken),
               lastUsedAt: new PlsqlExpression('TIMESTAMP', 'SYSTIMESTAMP'),
             })
             .where((expression) => expression(authSessions.id, '=', sessionId)),
         )
         statements.assign(
           accessToken,
-          `odb_auth_jwt.create_access_token(${userId.name}, ${sessionId.name}, ${tokenVersion.name})`,
+          odbAuthJwt.createAccessToken(userId, sessionId, tokenVersion),
         )
-        statements.assign(setCookie, refreshCookie(nextToken.name, authCookieOptions))
+        statements.assign(setCookie, refreshCookie(nextRefreshToken.name, authCookieOptions))
         statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized())
       })
       .service({
@@ -403,16 +414,14 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
   }),
   logout: pkg.proc('logout', (proc) => {
     const { cookieHeader, setCookie } = proc.parameters({
-      in: { cookieHeader: 'VARCHAR2' },
-      out: { setCookie: 'VARCHAR2' },
+      in: { cookieHeader: odbType.string(4000) },
+      out: { setCookie: odbType.string() },
     })
     proc
       .body((statements) => {
-        const presentedRefreshToken = statements.variable(
-          'l_presented_refresh_token',
-          'VARCHAR2',
-          512,
-        )
+        const { presentedRefreshToken } = statements.variables({
+          presentedRefreshToken: odbType.string(512),
+        })
         statements.assign(
           presentedRefreshToken,
           `REGEXP_SUBSTR(${cookieHeader.name}, '(^|;[[:space:]]*)${authCookieOptions.refreshCookieName}=([^;]*)', 1, 1, NULL, 2)`,
@@ -447,13 +456,17 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
   }),
   me: pkg.proc('me', (proc) => {
     const { authorization, userId, username, displayName } = proc.parameters({
-      in: { authorization: 'VARCHAR2' },
-      out: { userId: 'VARCHAR2', username: 'VARCHAR2', displayName: 'VARCHAR2' },
+      in: { authorization: odbType.string(4000) },
+      out: {
+        userId: authUsers.id,
+        username: authUsers.username,
+        displayName: authUsers.displayName,
+      },
     })
     proc
       .body((statements) => {
-        const subject = statements.variable('l_user_id', 'VARCHAR2', 32)
-        statements.assign(subject, `odb_auth_jwt.require_user(${authorization.name})`)
+        const { subject } = statements.variables({ subject: authUsers.id })
+        statements.set(subject, odbAuthJwt.requireUser(authorization))
         statements.query(
           odbQuery()
             .selectFrom(authUsers)

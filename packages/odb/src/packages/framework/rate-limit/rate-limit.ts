@@ -1,4 +1,4 @@
-import { odbPackage } from '../../../schema/package.js'
+import { odbPackage, odbType } from '../../../schema/package.js'
 import { PlsqlExpression } from '../../../schema/attribute.js'
 import { odbTable } from '../../../schema/table.js'
 import { odbQuery } from '../../../query/index.js'
@@ -29,8 +29,10 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
       in: { scope: 'VARCHAR2', subject: 'VARCHAR2' },
     })
     proc.body((body) => {
-      const subjectHash = body.variable('l_subject_hash', 'VARCHAR2', 64)
-      const blockedUntil = body.variable('l_blocked_until', 'TIMESTAMP')
+      const { subjectHash, blockedUntil } = body.variables({
+        subjectHash: odbType.string(64),
+        blockedUntil: odbType.timestamp(),
+      })
       body.set(subjectHash, new PlsqlExpression('VARCHAR2', `hash_subject(${subject.name})`))
       body.query(
         odbQuery()
@@ -53,9 +55,11 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
       in: { scope: 'VARCHAR2', subject: 'VARCHAR2' },
     })
     proc.autonomous().body((body) => {
-      const subjectHash = body.variable('l_subject_hash', 'VARCHAR2', 64)
-      const windowStartedAt = body.variable('l_window_started_at', 'TIMESTAMP')
-      const failureCount = body.variable('l_failure_count', 'NUMBER')
+      const { subjectHash, windowStartedAt, failureCount } = body.variables({
+        subjectHash: odbType.string(64),
+        windowStartedAt: odbType.timestamp(),
+        failureCount: odbType.number(),
+      })
       body.set(subjectHash, new PlsqlExpression('VARCHAR2', `hash_subject(${subject.name})`))
       body.query(
         odbQuery()
@@ -115,7 +119,7 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
       in: { scope: 'VARCHAR2', subject: 'VARCHAR2' },
     })
     proc.autonomous().body((body) => {
-      const subjectHash = body.variable('l_subject_hash', 'VARCHAR2', 64)
+      const { subjectHash } = body.variables({ subjectHash: odbType.string(64) })
       body.set(subjectHash, new PlsqlExpression('VARCHAR2', `hash_subject(${subject.name})`))
       body.query(
         odbQuery()

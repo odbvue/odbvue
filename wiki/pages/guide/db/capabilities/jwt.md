@@ -37,7 +37,7 @@ const appPackage = odbPackage('pck_app', (p) => {
 
     proc.body((body) => {
       const vPayload = body
-        .variable('v_payload', 'VARCHAR2', 2000)
+        .variable('v_payload', odbType.string(2000))
         .assign(
           `JSON_OBJECT('sub' VALUE p_uuid, 'iss' VALUE 'odbvue', ` +
             `'iat' VALUE odb_jwt.to_epoch(), 'exp' VALUE odb_jwt.to_epoch() + 3600)`,
@@ -56,7 +56,7 @@ const appPackage = odbPackage('pck_app', (p) => {
 const { uuid } = proc.parameters({ out: { uuid: 'VARCHAR2' } })
 
 proc.body((body) => {
-  const vToken = body.variable('v_token', 'VARCHAR2', 2000).value('...')
+  const vToken = body.variable('v_token', odbType.string(2000)).value('...')
 
   body.raw(
     `IF ${odbJwt.verify('v_token', `'my-secret'`)} = 1 ` +

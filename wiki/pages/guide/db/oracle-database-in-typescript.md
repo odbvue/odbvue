@@ -44,7 +44,7 @@ const appPackage = odbPackage('pck_app', (p) => {
     const { version } = proc.parameters({ out: { version: 'VARCHAR2' } })
 
     proc.body((body) => {
-      const vVersion = body.variable('v_version', 'VARCHAR2', 200).value('1.0.1')
+      const vVersion = body.variable('v_version', odbType.string(200)).value('1.0.1')
       body.set(version, vVersion)
     })
 
@@ -251,7 +251,7 @@ const appPackage = odbPackage('pck_app', (pkg) => {
     const { version } = proc.parameters({ out: { version: 'VARCHAR2' } })
 
     proc.body((body) => {
-      const vVersion = body.variable('v_version', 'VARCHAR2', 200).value('1.0.1')
+      const vVersion = body.variable('v_version', odbType.string(200)).value('1.0.1')
       body.set(version, vVersion)
     })
   })
