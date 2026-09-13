@@ -18,6 +18,7 @@ import { registerInfraStatusCommand } from './commands/infra-status.js'
 import { registerDbScaffoldCommand } from './commands/db-scaffold.js'
 import { registerDbExecCommand } from './commands/db-exec.js'
 import { registerDbUpCommand } from './commands/db-up.js'
+import { registerDbLatestCommand } from './commands/db-latest.js'
 import { registerDbDownCommand } from './commands/db-down.js'
 import { registerDbPlanCommand } from './commands/db-plan.js'
 import { registerDbMigrationsCommand } from './commands/db-migrations.js'
@@ -46,6 +47,7 @@ registerInfraStatusCommand(program)
 registerDbExecCommand(program)
 registerDbScaffoldCommand(program)
 registerDbUpCommand(program)
+registerDbLatestCommand(program)
 registerDbDownCommand(program)
 registerDbPlanCommand(program)
 registerDbMigrationsCommand(program)
