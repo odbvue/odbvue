@@ -32,11 +32,11 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
       const subjectHash = body.variable('l_subject_hash', 'VARCHAR2', 64)
       const blockedUntil = body.variable('l_blocked_until', 'TIMESTAMP')
       body.set(subjectHash, new PlsqlExpression('VARCHAR2', `hash_subject(${subject.name})`))
-      body.selectInto(
-        blockedUntil,
+      body.query(
         odbQuery()
           .selectFrom(rateLimitBuckets)
           .select(rateLimitBuckets.blockedUntil)
+          .into(blockedUntil)
           .where((expression) =>
             expression.and([
               expression(rateLimitBuckets.scope, '=', scope),
@@ -57,11 +57,11 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
       const windowStartedAt = body.variable('l_window_started_at', 'TIMESTAMP')
       const failureCount = body.variable('l_failure_count', 'NUMBER')
       body.set(subjectHash, new PlsqlExpression('VARCHAR2', `hash_subject(${subject.name})`))
-      body.selectInto(
-        [windowStartedAt, failureCount],
+      body.query(
         odbQuery()
           .selectFrom(rateLimitBuckets)
           .select([rateLimitBuckets.windowStartedAt, rateLimitBuckets.failureCount])
+          .into(windowStartedAt, failureCount)
           .where((expression) =>
             expression.and([
               expression(rateLimitBuckets.scope, '=', scope),

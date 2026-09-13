@@ -237,7 +237,7 @@ proc.body((body) => {
 })
 ```
 
-The generated statement is `SELECT id, username INTO p_user_id, p_username ...`. `body.selectInto([userId, username], query)` remains available when composing the target list separately.
+The generated statement is `SELECT id, username INTO p_user_id, p_username ...`.
 
 ### PL/SQL Packages and Procedures
 

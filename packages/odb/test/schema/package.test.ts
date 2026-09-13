@@ -223,7 +223,7 @@ describe('ProcedureBody control flow and exceptions', () => {
     )
   })
 
-  it('emits SELECT INTO for multiple target references', () => {
+  it('emits SELECT INTO for multiple query targets', () => {
     const users = odbTable('APP_USERS', (t) => ({
       id: t.number('ID').notNull(),
       username: t.string('USERNAME').notNull(),
@@ -232,9 +232,8 @@ describe('ProcedureBody control flow and exceptions', () => {
       const userId = proc.param('p_user_id', 'NUMBER', 'OUT')
       const username = proc.param('p_username', 'VARCHAR2', 'OUT')
       proc.body((body) =>
-        body.selectInto(
-          [userId, username],
-          odbQuery().selectFrom(users).select([users.id, users.username]),
+        body.query(
+          odbQuery().selectFrom(users).select([users.id, users.username]).into(userId, username),
         ),
       )
     })

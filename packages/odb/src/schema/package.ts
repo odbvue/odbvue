@@ -488,21 +488,6 @@ export class ProcedureBody {
   }
 
   /**
-   * Emit `SELECT ... INTO <targets> ...;` for target references (OUT params or
-   * local variables), wiring the query's INTO clause automatically.
-   *
-   * @example
-   * body.selectInto([pId, pVersion], odbQuery().selectFrom('dual').select(['...', '...']))
-   */
-  selectInto(
-    targets: PlsqlReference | readonly PlsqlReference[],
-    qb: AnyQueryBuilder & { into(...targets: PlsqlReference[]): unknown },
-  ): this {
-    qb.into(...(Array.isArray(targets) ? targets : [targets]))
-    return this.query(qb)
-  }
-
-  /**
    * Emit `SELECT ... INTO <result>;` followed by `RETURN <result>;` for a
    * function that returns a single queried value. A result variable typed to
    * the function's return type is declared automatically — no intermediate
@@ -1032,8 +1017,8 @@ export class PackageImpl<
    * package by name and rely on definer rights for schema resolution.
    *
    * @example
-   * body.selectInto(pVersion,
-   *   odbQuery().selectFrom('dual').select(settings.call('get_value', odbLiteral('APP_VERSION'))))
+   * body.query(
+   *   odbQuery().selectFrom('dual').select(settings.call('get_value', odbLiteral('APP_VERSION'))).into(pVersion))
    */
   call<TMemberName extends keyof TMembers>(
     member: TMemberName,
