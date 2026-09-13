@@ -25,9 +25,9 @@ describe('authentication capability', () => {
       )
     const get = vi.fn<HttpGetMock>().mockResolvedValue(
       response({
-        'user-id': 7,
+        userId: 7,
         username: 'ada',
-        'display-name': 'Ada Lovelace',
+        displayName: 'Ada Lovelace',
       }),
     )
     const http = {
@@ -83,17 +83,17 @@ describe('authentication capability', () => {
     expect(auth.authenticated.value).toBe(false)
   })
 
-  it('normalizes kebab-case ORDS token and user responses', async () => {
+  it('consumes camelCase ORDS token and user responses', async () => {
     const post = vi.fn<HttpPostMock>().mockResolvedValue(
       response({
-        'access-token': 'access-token',
+        accessToken: 'access-token',
       }),
     )
     const get = vi.fn<HttpGetMock>().mockResolvedValue(
       response({
-        'user-id': 7,
+        userId: 7,
         username: 'ada',
-        'display-name': 'Ada Lovelace',
+        displayName: 'Ada Lovelace',
       }),
     )
     const auth = createOdbVueAuth({ http: { post, get } as unknown as HttpClient })
@@ -109,7 +109,7 @@ describe('authentication capability', () => {
 
   it('restores an authenticated user using the browser refresh cookie', async () => {
     const post = vi.fn<HttpPostMock>().mockResolvedValue(response({ accessToken: 'access-token' }))
-    const get = vi.fn<HttpGetMock>().mockResolvedValue(response({ 'user-id': 7, username: 'ada' }))
+    const get = vi.fn<HttpGetMock>().mockResolvedValue(response({ userId: 7, username: 'ada' }))
     const auth = createOdbVueAuth({ http: { post, get } as unknown as HttpClient })
 
     await expect(auth.restore()).resolves.toBe(true)

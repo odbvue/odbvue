@@ -21,14 +21,10 @@ interface AuthTokens {
   accessToken: string
 }
 
-interface OrdsAuthTokens {
-  'access-token': string
-}
-
-interface OrdsAuthUser {
-  'user-id': string | number
+interface AuthUserResponse {
+  userId: string | number
   username: string
-  'display-name'?: string | null
+  displayName?: string | null
 }
 
 export interface AuthCredentials {
@@ -104,24 +100,17 @@ export function createOdbVueAuth<User extends AuthUser = AuthUser>(
     accessToken.value = null
   }
 
-  function applyTokens(tokens: AuthTokens | OrdsAuthTokens): void {
-    const normalizedTokens: AuthTokens =
-      'access-token' in tokens
-        ? {
-            accessToken: tokens['access-token'],
-          }
-        : tokens
-
-    accessToken.value = normalizedTokens.accessToken
+  function applyTokens(tokens: AuthTokens): void {
+    accessToken.value = tokens.accessToken
   }
 
-  function applyUser(response: OrdsAuthUser): User {
+  function applyUser(response: AuthUserResponse): User {
     user.value = {
-      id: response['user-id'],
+      id: response.userId,
       username: response.username,
-      ...(response['display-name'] === undefined || response['display-name'] === null
+      ...(response.displayName === undefined || response.displayName === null
         ? {}
-        : { displayName: response['display-name'] }),
+        : { displayName: response.displayName }),
     } as User
     return user.value
   }
@@ -129,11 +118,9 @@ export function createOdbVueAuth<User extends AuthUser = AuthUser>(
   async function refresh(): Promise<boolean> {
     loading.value = true
     try {
-      const response = await requireHttp().post<AuthTokens | OrdsAuthTokens>(
-        endpoints.refresh,
-        undefined,
-        { credentials: 'include' },
-      )
+      const response = await requireHttp().post<AuthTokens>(endpoints.refresh, undefined, {
+        credentials: 'include',
+      })
       if (response.data) {
         applyTokens(response.data)
         return true
@@ -155,13 +142,9 @@ export function createOdbVueAuth<User extends AuthUser = AuthUser>(
     async login(credentials) {
       loading.value = true
       try {
-        const response = await requireHttp().post<AuthTokens | OrdsAuthTokens>(
-          endpoints.login,
-          credentials,
-          {
-            credentials: 'include',
-          },
-        )
+        const response = await requireHttp().post<AuthTokens>(endpoints.login, credentials, {
+          credentials: 'include',
+        })
         if (!response.data) throw toError(response.error, 'Authentication failed.')
         applyTokens(response.data)
         user.value = null
@@ -191,7 +174,7 @@ export function createOdbVueAuth<User extends AuthUser = AuthUser>(
     async me() {
       loading.value = true
       try {
-        const response = await requireHttp().get<OrdsAuthUser>(endpoints.me)
+        const response = await requireHttp().get<AuthUserResponse>(endpoints.me)
         if (!response.data)
           throw toError(response.error, 'Unable to retrieve the authenticated user.')
         return applyUser(response.data)

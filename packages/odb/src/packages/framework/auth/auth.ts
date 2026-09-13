@@ -257,6 +257,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
         summary: 'Authenticate using username and password',
         params: {
           P_LOGIN_USERNAME: { transport: 'body', name: 'username' },
+          P_ACCESS_TOKEN: { transport: 'response', name: 'accessToken' },
           P_SET_COOKIE: { transport: 'header', name: 'Set-Cookie' },
         },
       })
@@ -327,6 +328,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
         summary: 'Rotate a refresh token and issue an access token',
         params: {
           P_COOKIE_HEADER: { transport: 'header', name: 'Cookie' },
+          P_ACCESS_TOKEN: { transport: 'response', name: 'accessToken' },
           P_SET_COOKIE: { transport: 'header', name: 'Set-Cookie' },
         },
       })
@@ -401,6 +403,10 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
         path: '/me',
         basePath: '/auth',
         summary: 'Return the authenticated user',
+        params: {
+          P_USER_ID: { transport: 'response', name: 'userId' },
+          P_DISPLAY_NAME: { transport: 'response', name: 'displayName' },
+        },
       })
   }),
 }))
