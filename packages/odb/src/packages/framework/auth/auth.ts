@@ -106,12 +106,12 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
         derivedKey: odbType.raw(PASSWORD_HASH_BYTES),
         hash: odbType.string(128),
       })
-      body.assign(salt, 'RAWTOHEX(DBMS_CRYPTO.RANDOMBYTES(16))')
-      body.assign(passwordRaw, `UTL_I18N.STRING_TO_RAW(${password.name}, 'AL32UTF8')`)
+      body.raw(`${salt.name} := RAWTOHEX(DBMS_CRYPTO.RANDOMBYTES(16))`)
+      body.raw(`${passwordRaw.name} := UTL_I18N.STRING_TO_RAW(${password.name}, 'AL32UTF8')`)
       body.raw(
         `${roundBlock.name} := DBMS_CRYPTO.MAC(UTL_RAW.CONCAT(HEXTORAW(${salt.name}), HEXTORAW('00000001')), DBMS_CRYPTO.HMAC_SH512, ${passwordRaw.name});\n${derivedKey.name} := ${roundBlock.name};\nFOR ${round.name} IN 2..${PASSWORD_HASH_ITERATIONS} LOOP\n  ${roundBlock.name} := DBMS_CRYPTO.MAC(${roundBlock.name}, DBMS_CRYPTO.HMAC_SH512, ${passwordRaw.name});\n  ${derivedKey.name} := UTL_RAW.BIT_XOR(${derivedKey.name}, ${roundBlock.name});\nEND LOOP`,
       )
-      body.assign(hash, `RAWTOHEX(${derivedKey.name})`)
+      body.raw(`${hash.name} := RAWTOHEX(${derivedKey.name})`)
       body.return(
         `'${PASSWORD_HASH_ALGORITHM}$${PASSWORD_HASH_ITERATIONS}$' || ${salt.name} || '$' || ${hash.name}`,
       )
@@ -144,17 +144,18 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
         `NOT REGEXP_LIKE(${storedHash.name}, '^${PASSWORD_HASH_ALGORITHM}\\$[1-9][0-9]*\\$[[:xdigit:]]{32}\\$[[:xdigit:]]{128}$')`,
         (then) => then.return('0'),
       )
-      body.assign(
-        iterations,
-        `TO_NUMBER(REGEXP_SUBSTR(${storedHash.name}, '^${PASSWORD_HASH_ALGORITHM}\\$([1-9][0-9]*)\\$', 1, 1, NULL, 1))`,
+      body.raw(
+        `${iterations.name} := TO_NUMBER(REGEXP_SUBSTR(${storedHash.name}, '^${PASSWORD_HASH_ALGORITHM}\\$([1-9][0-9]*)\\$', 1, 1, NULL, 1))`,
       )
-      body.assign(salt, `REGEXP_SUBSTR(${storedHash.name}, '[[:xdigit:]]{32}', 1, 1)`)
-      body.assign(expectedHash, `REGEXP_SUBSTR(${storedHash.name}, '[[:xdigit:]]{128}', 1, 1)`)
-      body.assign(passwordRaw, `UTL_I18N.STRING_TO_RAW(${password.name}, 'AL32UTF8')`)
+      body.raw(`${salt.name} := REGEXP_SUBSTR(${storedHash.name}, '[[:xdigit:]]{32}', 1, 1)`)
+      body.raw(
+        `${expectedHash.name} := REGEXP_SUBSTR(${storedHash.name}, '[[:xdigit:]]{128}', 1, 1)`,
+      )
+      body.raw(`${passwordRaw.name} := UTL_I18N.STRING_TO_RAW(${password.name}, 'AL32UTF8')`)
       body.raw(
         `${roundBlock.name} := DBMS_CRYPTO.MAC(UTL_RAW.CONCAT(HEXTORAW(${salt.name}), HEXTORAW('00000001')), DBMS_CRYPTO.HMAC_SH512, ${passwordRaw.name});\n${derivedKey.name} := ${roundBlock.name};\nFOR ${round.name} IN 2..${iterations.name} LOOP\n  ${roundBlock.name} := DBMS_CRYPTO.MAC(${roundBlock.name}, DBMS_CRYPTO.HMAC_SH512, ${passwordRaw.name});\n  ${derivedKey.name} := UTL_RAW.BIT_XOR(${derivedKey.name}, ${roundBlock.name});\nEND LOOP`,
       )
-      body.assign(derivedHash, `RAWTOHEX(${derivedKey.name})`)
+      body.raw(`${derivedHash.name} := RAWTOHEX(${derivedKey.name})`)
       body.ifThen(`${derivedHash.name} = ${expectedHash.name}`, (then) => then.return('1'))
       body.return('0')
     })
@@ -195,17 +196,16 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => ({
         tokenVersion: authUsers.tokenVersion,
         activeSessionCount: odbType.number(),
       })
-      body.assign(
-        token,
-        `REGEXP_REPLACE(${authorization.name}, '^Bearer[[:space:]]+', '', 1, 1, 'i')`,
+      body.raw(
+        `${token.name} := REGEXP_REPLACE(${authorization.name}, '^Bearer[[:space:]]+', '', 1, 1, 'i')`,
       )
       body.ifThen(
         `odb_jwt.verify(${token.name}, '${AUTH_JWT_SECRET_MARKER}') = 0 OR odb_jwt.is_expired(${token.name}) = 1`,
         (then) => then.unauthorized(),
       )
-      body.assign(subject, `odb_jwt.claim(${token.name}, 'sub')`)
-      body.assign(sessionId, `odb_jwt.claim(${token.name}, 'sid')`)
-      body.assign(tokenVersion, `TO_NUMBER(odb_jwt.claim(${token.name}, 'ver'))`)
+      body.raw(`${subject.name} := odb_jwt.claim(${token.name}, 'sub')`)
+      body.raw(`${sessionId.name} := odb_jwt.claim(${token.name}, 'sid')`)
+      body.raw(`${tokenVersion.name} := TO_NUMBER(odb_jwt.claim(${token.name}, 'ver'))`)
       body.query(
         odbQuery()
           .selectFrom('odb_auth_sessions s JOIN odb_auth_users u ON u.id = s.user_id')
@@ -252,7 +252,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
             refreshToken: odbType.string(512),
             loginSubject: odbType.string(128),
           })
-        statements.assign(loginSubject, `LOWER(TRIM(${loginUsername.name}))`)
+        statements.raw(`${loginSubject.name} := LOWER(TRIM(${loginUsername.name}))`)
         statements.raw(odbRateLimit.check("'AUTH_LOGIN_USERNAME'", loginSubject.name))
         statements.query(
           odbQuery()
@@ -270,9 +270,8 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
               ]),
             ),
         )
-        statements.assign(
-          passwordHash,
-          `NVL(${passwordHash.name}, '${DUMMY_PASSWORD_HASH_MARKER}')`,
+        statements.raw(
+          `${passwordHash.name} := NVL(${passwordHash.name}, '${DUMMY_PASSWORD_HASH_MARKER}')`,
         )
         statements.ifThen(
           `${odbAuthCrypto.verifyPassword(password, passwordHash).toSQL()} = 0 OR ${userId.name} IS NULL`,
@@ -282,7 +281,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
           },
         )
         statements.raw(odbRateLimit.success("'AUTH_LOGIN_USERNAME'", loginSubject.name))
-        statements.assign(sessionId, 'LOWER(RAWTOHEX(SYS_GUID()))')
+        statements.raw(`${sessionId.name} := LOWER(RAWTOHEX(SYS_GUID()))`)
         statements.set(refreshToken, odbAuthCrypto.randomToken(odbLiteral(REFRESH_TOKEN_BYTES)))
         statements.insertInto(authSessions, {
           id: sessionId,
@@ -290,11 +289,12 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
           refreshTokenHash: odbAuthCrypto.hashToken(refreshToken),
           expiresAt: new PlsqlExpression('TIMESTAMP', "SYSTIMESTAMP + INTERVAL '30' DAY"),
         })
-        statements.assign(
-          accessToken,
-          odbAuthJwt.createAccessToken(userId, sessionId, tokenVersion),
+        statements.raw(
+          `${accessToken.name} := ${odbAuthJwt.createAccessToken(userId, sessionId, tokenVersion).toSQL()}`,
         )
-        statements.assign(setCookie, refreshCookie(refreshToken.name, authCookieOptions))
+        statements.raw(
+          `${setCookie.name} := ${refreshCookie(refreshToken.name, authCookieOptions)}`,
+        )
         statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized('INVALID_CREDENTIALS'))
       })
       .service({
@@ -333,9 +333,8 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
           presentedRefreshTokenHash: authSessions.refreshTokenHash,
           nextRefreshToken: odbType.string(512),
         })
-        statements.assign(
-          presentedRefreshToken,
-          `REGEXP_SUBSTR(${cookieHeader.name}, '(^|;[[:space:]]*)${authCookieOptions.refreshCookieName}=([^;]*)', 1, 1, NULL, 2)`,
+        statements.raw(
+          `${presentedRefreshToken.name} := REGEXP_SUBSTR(${cookieHeader.name}, '(^|;[[:space:]]*)${authCookieOptions.refreshCookieName}=([^;]*)', 1, 1, NULL, 2)`,
         )
         statements.ifThen(
           `NOT REGEXP_LIKE(${presentedRefreshToken.name}, '^[[:xdigit:]]{128}$')`,
@@ -394,11 +393,12 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
             })
             .where((expression) => expression(authSessions.id, '=', sessionId)),
         )
-        statements.assign(
-          accessToken,
-          odbAuthJwt.createAccessToken(userId, sessionId, tokenVersion),
+        statements.raw(
+          `${accessToken.name} := ${odbAuthJwt.createAccessToken(userId, sessionId, tokenVersion).toSQL()}`,
         )
-        statements.assign(setCookie, refreshCookie(nextRefreshToken.name, authCookieOptions))
+        statements.raw(
+          `${setCookie.name} := ${refreshCookie(nextRefreshToken.name, authCookieOptions)}`,
+        )
         statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized())
       })
       .service({
@@ -422,9 +422,8 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
         const { presentedRefreshToken } = statements.variables({
           presentedRefreshToken: odbType.string(512),
         })
-        statements.assign(
-          presentedRefreshToken,
-          `REGEXP_SUBSTR(${cookieHeader.name}, '(^|;[[:space:]]*)${authCookieOptions.refreshCookieName}=([^;]*)', 1, 1, NULL, 2)`,
+        statements.raw(
+          `${presentedRefreshToken.name} := REGEXP_SUBSTR(${cookieHeader.name}, '(^|;[[:space:]]*)${authCookieOptions.refreshCookieName}=([^;]*)', 1, 1, NULL, 2)`,
         )
         statements.query(
           odbQuery()
@@ -442,7 +441,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
             ),
         )
         statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized())
-        statements.assign(setCookie, expiredRefreshCookie(authCookieOptions))
+        statements.raw(`${setCookie.name} := ${expiredRefreshCookie(authCookieOptions)}`)
       })
       .service({
         method: 'POST',

@@ -71,20 +71,20 @@ describe('ProcedureBody control flow and exceptions', () => {
 
   it('emits an IF/ELSE block with nested statements', () => {
     const sql = bodyLines((proc) => {
-      proc.param('R_OUT', 'VARCHAR2', 'OUT')
+      const result = proc.param('R_OUT', 'VARCHAR2', 'OUT')
       proc.body((body) =>
         body.ifThen(
           'v_status = 200',
-          (t) => t.assign('r_out', odbLiteral('ok')),
-          (e) => e.assign('r_out', odbLiteral('fail')),
+          (t) => t.set(result, 'ok'),
+          (e) => e.set(result, 'fail'),
         ),
       )
     })
 
     expect(sql).toContain('IF v_status = 200 THEN')
-    expect(sql).toContain("      r_out := 'ok';")
+    expect(sql).toContain("      R_OUT := 'ok';")
     expect(sql).toContain('    ELSE')
-    expect(sql).toContain("      r_out := 'fail';")
+    expect(sql).toContain("      R_OUT := 'fail';")
     expect(sql).toContain('    END IF;')
   })
 
@@ -165,17 +165,13 @@ describe('ProcedureBody control flow and exceptions', () => {
 
   it('emits an EXCEPTION section with a WHEN OTHERS handler', () => {
     const sql = bodyLines((proc) => {
-      proc.param('R_OUT', 'VARCHAR2', 'OUT')
-      proc.body((body) =>
-        body
-          .assign('r_out', odbLiteral('ok'))
-          .whenOthers((h) => h.assign('r_out', odbLiteral('error'))),
-      )
+      const result = proc.param('R_OUT', 'VARCHAR2', 'OUT')
+      proc.body((body) => body.set(result, 'ok').whenOthers((h) => h.set(result, 'error')))
     })
 
     expect(sql).toContain('  EXCEPTION')
     expect(sql).toContain('    WHEN OTHERS THEN')
-    expect(sql).toContain("      r_out := 'error';")
+    expect(sql).toContain("      R_OUT := 'error';")
   })
 
   it('emits autonomous transaction procedures and commits', () => {
@@ -189,14 +185,40 @@ describe('ProcedureBody control flow and exceptions', () => {
     const sql = bodyLines((proc) => {
       proc.body((body) =>
         body.ifThen('1 = 1', (t) => {
-          const v = t.variable('v_inner', odbType.string(10))
-          t.assign(v, odbLiteral('x'))
+          const { inner } = t.variables({ inner: odbType.string(10) })
+          t.set(inner, 'x')
         }),
       )
     })
 
-    expect(sql).toContain('    v_inner VARCHAR2(10);')
-    expect(sql).toContain('      v_inner := ')
+    expect(sql).toContain('    l_inner VARCHAR2(10);')
+    expect(sql).toContain('      l_inner := ')
+  })
+
+  it('assigns compatible JavaScript literals with Oracle quoting', () => {
+    const sql = bodyLines((proc) => {
+      proc.body((body) => {
+        const { text, count, enabled } = body.variables({
+          text: odbType.string(10),
+          count: odbType.integer(),
+          enabled: odbType.boolean(),
+        })
+        body.set(text, "Ada's version")
+        body.set(count, 2)
+        body.set(enabled, true)
+        body.set(text, null)
+
+        // @ts-expect-error string literals cannot be assigned to integer targets
+        body.set(count, 'two')
+        // @ts-expect-error number literals cannot be assigned to boolean targets
+        body.set(enabled, 1)
+      })
+    })
+
+    expect(sql).toContain("l_text := 'Ada''s version';")
+    expect(sql).toContain('l_count := 2;')
+    expect(sql).toContain('l_enabled := TRUE;')
+    expect(sql).toContain('l_text := NULL;')
   })
 
   it('emits a typed insert and preserves body chaining', () => {

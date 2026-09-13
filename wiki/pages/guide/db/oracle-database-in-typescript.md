@@ -44,8 +44,7 @@ const appPackage = odbPackage('pck_app', (p) => {
     const { version } = proc.parameters({ out: { version: 'VARCHAR2' } })
 
     proc.body((body) => {
-      const vVersion = body.variable('v_version', odbType.string(200)).value('1.0.1')
-      body.set(version, vVersion)
+      body.set(version, '1.0.1')
     })
 
     proc.service({
@@ -251,8 +250,7 @@ const appPackage = odbPackage('pck_app', (pkg) => {
     const { version } = proc.parameters({ out: { version: 'VARCHAR2' } })
 
     proc.body((body) => {
-      const vVersion = body.variable('v_version', odbType.string(200)).value('1.0.1')
-      body.set(version, vVersion)
+      body.set(version, '1.0.1')
     })
   })
 })
@@ -281,8 +279,8 @@ const usersApi = odbPackage('pck_users', (pkg) => {
 
     proc.body((body) => {
       const { normalizedId } = body.variables({ normalizedId: odbType.guid() })
-      body.assign(normalizedId, userId)
-      body.assign(displayName, "'Ada Lovelace'")
+      body.set(normalizedId, userId)
+      body.set(displayName, 'Ada Lovelace')
     })
   })
 })

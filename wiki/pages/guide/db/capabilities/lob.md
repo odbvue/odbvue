@@ -29,7 +29,8 @@ const appPackage = odbPackage('pck_app', (p) => {
     const { test } = proc.parameters({ out: { test: 'CLOB' } })
 
     proc.body((body) => {
-      const vVersion = body.variable('v_version', odbType.string(200)).value('1.0.1')
+      const { vVersion } = body.variables({ vVersion: odbType.string(200) })
+      body.set(vVersion, '1.0.1')
       body.set(test, vVersion.toBase64())
     })
   })
@@ -47,15 +48,19 @@ const { textResult, clobResult } = proc.parameters({
 })
 
 proc.body((body) => {
-  const vText = body.variable('v_text', odbType.string(200)).value('hello')
-  const vClob = body.variable('v_clob', odbType.clob()).assign('empty_clob()')
+  const { vText, vClob } = body.variables({
+    vText: odbType.string(200),
+    vClob: odbType.clob(),
+  })
+  body.set(vText, 'hello')
+  body.raw(`${vClob.name} := empty_clob()`)
 
   body.set(textResult, vText.toBase64())
   body.set(clobResult, vClob.toBase64())
 })
 ```
 
-Use `body.assign()` and the functional `odbLob` helpers only as escape hatches for raw PL/SQL expressions.
+Use `body.raw()` only as an escape hatch for raw PL/SQL statements.
 
 Supported typed helpers:
 

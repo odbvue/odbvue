@@ -8,7 +8,7 @@
 //
 // 2. `odbLob.<fn>(expr)` \u2014 pure functions returning PL/SQL expression strings
 //    that call into `odb_lob.*`. Use them anywhere a PL/SQL expression is
-//    accepted (e.g. `body.assign('v_out', odbLob.clobToBase64('v_in'))`).
+//    accepted as explicit `body.raw(...)` assignments when a typed expression is unavailable.
 //
 // Typed-var counterparts (`ClobVar.toBase64()`, etc.) are defined next to
 // `LocalVar` in `../../../schema/attribute.ts` to keep the schema layer free of
@@ -36,7 +36,7 @@ function qualify(name: string, schema?: string): string {
  * and `odbLob.toSQLDown()` from `.down()` to drop it.
  *
  * The `<fn>(expr)` helpers return PL/SQL expression strings suitable for
- * `body.assign(target, rawSql)`. `rawSql` should be a valid PL/SQL expression
+ * `body.raw(...)`. Raw SQL should be a valid PL/SQL statement
  * (bare variable name, literal, or nested call).
  */
 export const odbLob = {

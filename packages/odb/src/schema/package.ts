@@ -95,6 +95,16 @@ type LocalVariables<TInputs extends Record<string, LocalVariableInput>> = {
   [TKey in keyof TInputs]: LocalVariableForType<ResolvedLocalVariableType<TInputs[TKey]>>
 }
 
+type PlsqlLiteral<TType extends PlsqlType | string> =
+  | null
+  | (TType extends 'VARCHAR2' | 'CLOB'
+      ? string
+      : TType extends 'NUMBER' | 'PLS_INTEGER' | 'INTEGER' | 'BINARY_INTEGER'
+        ? number
+        : TType extends 'BOOLEAN'
+          ? boolean
+          : never)
+
 export type ProcedureParameters = {
   in?: Record<string, ParameterInput>
   out?: Record<string, ParameterInput>
@@ -129,6 +139,18 @@ function inputParameterName(key: string): string {
 function localVariableName(key: string): string {
   const snakeCase = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()
   return `l_${snakeCase}`
+}
+
+function isPlsqlValue(value: unknown): value is PlsqlValue {
+  return typeof value === 'object' && value !== null && 'toSQL' in value
+}
+
+function renderPlsqlLiteral(value: string | number | boolean | null): string {
+  if (value === null) return 'NULL'
+  if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`
+  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE'
+  if (!Number.isFinite(value)) throw new Error('set: number literals must be finite.')
+  return String(value)
 }
 
 function inputParameterType(input: ParameterInput): PlsqlType | string {
@@ -285,28 +307,6 @@ export class ProcedureBody {
     private readonly _returnLength?: number,
   ) {}
 
-  /**
-   * Declare a local variable. Returns the LocalVar so you can chain
-   * `.assign(value)` or `.length(n)` on it.
-   *
-   * The concrete return type depends on the PL/SQL type literal:
-   * - `'CLOB'`   → `ClobVar`  (with `.toBase64()`, `.toBlob()`)
-   * - `'BLOB'`   → `BlobVar`  (with `.toBase64()`, `.toClob()`)
-   * - `'VARCHAR2'` → `Varchar2Var` (with `.toBase64()`)
-   * - anything else → plain `LocalVar`
-   *
-   * @example
-   * body.variable('v_name', odbType.string(100)).assign("'hello'")
-   * body.variable('v_lob', odbType.clob()).assign("'text'")
-   * body.set(pOut, body.variable('v_lob', odbType.clob()).toBase64())
-   */
-  variable<T extends PlsqlType | string>(
-    name: string,
-    definition: OdbTypeDescriptor<T>,
-  ): LocalVariableForType<T> {
-    return this.declareVariable(name, definition.type, definition.length) as LocalVariableForType<T>
-  }
-
   private declareVariable(name: string, type: PlsqlType | string, length?: number): LocalVar {
     const opts = length === undefined ? {} : { length }
     const v =
@@ -354,28 +354,20 @@ export class ProcedureBody {
     return variables
   }
 
-  /** `target := value;` */
-  assign(target: string | PlsqlReference, value: PlsqlRenderable): this {
-    this._statements.push({
-      kind: 'assign',
-      target: typeof target === 'string' ? target : target.toSQL(),
-      value: renderPlsql(value),
-    })
-    return this
-  }
-
-  /**
-   * Assign one typed PL/SQL value to another. Unlike `assign()`, this rejects
-   * incompatible typed references and expressions at compile time.
-   */
+  /** Assign a compatible typed PL/SQL value or JavaScript literal. */
+  set<T extends PlsqlType | string>(target: PlsqlReference<T>, value: PlsqlValue<NoInfer<T>>): this
   set<T extends PlsqlType | string>(
     target: PlsqlReference<T>,
-    value: PlsqlValue<NoInfer<T>>,
+    value: PlsqlLiteral<NoInfer<T>>,
+  ): this
+  set<T extends PlsqlType | string>(
+    target: PlsqlReference<T>,
+    value: PlsqlValue<NoInfer<T>> | PlsqlLiteral<NoInfer<T>>,
   ): this {
     this._statements.push({
       kind: 'assign',
       target: target.toSQL(),
-      value: value.toSQL(),
+      value: isPlsqlValue(value) ? value.toSQL() : renderPlsqlLiteral(value),
     })
     return this
   }

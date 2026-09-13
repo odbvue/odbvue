@@ -163,16 +163,6 @@ export class LocalVar<
     this.options = { ...options }
   }
 
-  length(n: number): this {
-    this.options.length = n
-    return this
-  }
-
-  assign(val: PlsqlRenderable): this {
-    this.options.value = renderPlsql(val)
-    return this
-  }
-
   toSQL(): string {
     return this.name
   }
@@ -221,11 +211,6 @@ export class BlobVar extends LocalVar<'BLOB'> {
 }
 
 export class Varchar2Var extends LocalVar<'VARCHAR2'> {
-  /** Assign a safely quoted VARCHAR2 literal as the variable's initial value. */
-  value(value: string): this {
-    return this.assign(`'${value.replace(/'/g, "''")}'`)
-  }
-
   /** `odb_lob.varchar2_to_base64(<this>)` — returns CLOB. */
   toBase64(): PlsqlExpression<'CLOB'> {
     return new PlsqlExpression('CLOB', `odb_lob.varchar2_to_base64(${this.name})`)

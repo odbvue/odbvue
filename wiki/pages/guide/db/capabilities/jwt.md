@@ -36,13 +36,12 @@ const appPackage = odbPackage('pck_app', (p) => {
     })
 
     proc.body((body) => {
-      const vPayload = body
-        .variable('v_payload', odbType.string(2000))
-        .assign(
-          `JSON_OBJECT('sub' VALUE p_uuid, 'iss' VALUE 'odbvue', ` +
-            `'iat' VALUE odb_jwt.to_epoch(), 'exp' VALUE odb_jwt.to_epoch() + 3600)`,
-        )
-      body.set(token, odbJwt.encode('v_payload', `'my-secret'`))
+      const { vPayload } = body.variables({ vPayload: odbType.string(2000) })
+      body.raw(
+        `${vPayload.name} := JSON_OBJECT('sub' VALUE p_uuid, 'iss' VALUE 'odbvue', ` +
+          `'iat' VALUE odb_jwt.to_epoch(), 'exp' VALUE odb_jwt.to_epoch() + 3600)`,
+      )
+      body.raw(`${token.name} := ${odbJwt.encode(vPayload.name, `'my-secret'`)}`)
     })
   })
 })
@@ -56,13 +55,14 @@ const appPackage = odbPackage('pck_app', (p) => {
 const { uuid } = proc.parameters({ out: { uuid: 'VARCHAR2' } })
 
 proc.body((body) => {
-  const vToken = body.variable('v_token', odbType.string(2000)).value('...')
+  const { vToken } = body.variables({ vToken: odbType.string(2000) })
+  body.set(vToken, '...')
 
   body.raw(
-    `IF ${odbJwt.verify('v_token', `'my-secret'`)} = 1 ` +
-      `AND ${odbJwt.isExpired('v_token')} = 0 THEN`,
+    `IF ${odbJwt.verify(vToken.name, `'my-secret'`)} = 1 ` +
+      `AND ${odbJwt.isExpired(vToken.name)} = 0 THEN`,
   )
-  body.set(uuid, odbJwt.claim('v_token', `'sub'`))
+  body.raw(`${uuid.name} := ${odbJwt.claim(vToken.name, `'sub'`)}`)
   body.raw(`END IF;`)
 })
 ```

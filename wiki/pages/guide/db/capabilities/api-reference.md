@@ -32,7 +32,8 @@ odbLob.base64ToVarchar2('v_b64')
 const { result } = proc.parameters({ out: { result: 'CLOB' } })
 
 proc.body((body) => {
-  const vText = body.variable('v_text', odbType.string(200)).value('hello')
+  const { vText } = body.variables({ vText: odbType.string(200) })
+  body.set(vText, 'hello')
   body.set(result, vText.toBase64())
 })
 ```
@@ -71,10 +72,9 @@ odbJwt.fromEpoch('v_epoch')
 const { token } = proc.parameters({ out: { token: 'VARCHAR2' } })
 
 proc.body((body) => {
-  const vPayload = body
-    .variable('v_payload', odbType.string(2000))
-    .assign(`JSON_OBJECT('sub' VALUE 'u1', 'exp' VALUE odb_jwt.to_epoch() + 3600)`)
-  body.set(token, odbJwt.encode('v_payload', `'my-secret'`))
+  const { vPayload } = body.variables({ vPayload: odbType.string(2000) })
+  body.raw(`${vPayload.name} := JSON_OBJECT('sub' VALUE 'u1', 'exp' VALUE odb_jwt.to_epoch() + 3600)`)
+  body.raw(`${token.name} := ${odbJwt.encode(vPayload.name, `'my-secret'`)}`)
 })
 ```
 
