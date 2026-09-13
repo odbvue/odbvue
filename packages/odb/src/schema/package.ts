@@ -23,7 +23,7 @@ import {
   type OrdsParamType,
   type OrdsResultColumnNode,
 } from '../ords.js'
-import { odbTypeFromPlsql, ordsTypeFromPlsql } from '../model.js'
+import { odbTypeFromPlsql, oracleParameterName, ordsTypeFromPlsql } from '../model.js'
 import { Column, type ColumnNode } from './column.js'
 import { odbQuery } from '../query/index.js'
 import type { Insertable, Table } from './table.js'
@@ -38,7 +38,7 @@ export type AnyQueryBuilder = {
 
 type ParameterTypeAlias = 'string' | 'number' | 'boolean' | 'date' | 'timestamp' | 'clob'
 
-export type OdbTypeDefinition<TType extends PlsqlType | string> = {
+export type OdbTypeDescriptor<TType extends PlsqlType | string> = {
   type: TType
   length?: number
 }
@@ -47,10 +47,10 @@ type ParameterInput =
   | PlsqlType
   | string
   | Column<any, string, any, any, any, any, any>
-  | OdbTypeDefinition<PlsqlType | string>
+  | OdbTypeDescriptor<PlsqlType | string>
 
 type ResolvedParameterType<TInput extends ParameterInput> =
-  TInput extends OdbTypeDefinition<infer TType>
+  TInput extends OdbTypeDescriptor<infer TType>
     ? TType
     : TInput extends Column<any, any, any, any, any, any, any>
       ? string
@@ -72,7 +72,7 @@ type InputParameters<TInputs extends Record<string, ParameterInput>> = {
   [TKey in keyof TInputs]: Param<ResolvedParameterType<TInputs[TKey]>>
 }
 
-export type LocalVariableDefinition<TType extends PlsqlType | string> = OdbTypeDefinition<TType>
+export type LocalVariableDefinition<TType extends PlsqlType | string> = OdbTypeDescriptor<TType>
 
 type LocalVariableInput = ParameterInput
 
@@ -137,10 +137,34 @@ function inputParameterType(input: ParameterInput): PlsqlType | string {
   return parameterTypeAliases[input as ParameterTypeAlias] ?? input
 }
 
-/** PL/SQL type descriptors for use with named parameters and local variables. */
-export const odbTypes = {
-  varchar2(length?: number): OdbTypeDefinition<'VARCHAR2'> {
+/** ODB type descriptors for use with named parameters and local variables. */
+export const odbType = {
+  string(length?: number): OdbTypeDescriptor<'VARCHAR2'> {
     return { type: 'VARCHAR2', length }
+  },
+  number(): OdbTypeDescriptor<'NUMBER'> {
+    return { type: 'NUMBER' }
+  },
+  guid(): OdbTypeDescriptor<'VARCHAR2'> {
+    return { type: 'VARCHAR2', length: 32 }
+  },
+  boolean(): OdbTypeDescriptor<'BOOLEAN'> {
+    return { type: 'BOOLEAN' }
+  },
+  date(): OdbTypeDescriptor<'DATE'> {
+    return { type: 'DATE' }
+  },
+  timestamp(): OdbTypeDescriptor<'TIMESTAMP'> {
+    return { type: 'TIMESTAMP' }
+  },
+  clob(): OdbTypeDescriptor<'CLOB'> {
+    return { type: 'CLOB' }
+  },
+  blob(): OdbTypeDescriptor<'BLOB'> {
+    return { type: 'BLOB' }
+  },
+  resultset(): OdbTypeDescriptor<'SYS_REFCURSOR'> {
+    return { type: 'SYS_REFCURSOR' }
   },
 }
 
@@ -173,7 +197,7 @@ export type ServiceNode = {
   module?: string
   basePath?: string
   paramTypes?: Record<string, OrdsParamType>
-  params?: Record<string, OrdsParameterTransport>
+  params?: OrdsServiceParameterGroups
 }
 
 export type ProcedureNode = {
@@ -289,7 +313,7 @@ export class ProcedureBody {
    * @example
    * const { userId, token } = body.variables({
    *   userId: users.id,
-   *   token: varchar2(128),
+   *   token: odbType.string(128),
    * })
    */
   variables<TInputs extends Record<string, LocalVariableInput>>(
@@ -313,11 +337,6 @@ export class ProcedureBody {
       ) as LocalVariables<TInputs>[keyof TInputs]
     }
     return variables
-  }
-
-  /** Declare a VARCHAR2 variable using the type-specific fluent API. */
-  varchar2(name: string, length?: number): Varchar2Var {
-    return this.variable(name, 'VARCHAR2', length)
   }
 
   /** Declare a CLOB variable using the type-specific fluent API. */
@@ -684,17 +703,21 @@ export type OrdsServiceDefinition = {
   module?: string
   /** ORDS module base path. Defaults to `<module>/`. */
   basePath?: string
-  /** Overrides for automatically mapped ORDS parameter types, keyed by PL/SQL argument name. */
+  /** Overrides for automatically mapped ORDS parameter types, keyed by a PL/SQL argument or its derived camel-case name. */
   paramTypes?: Record<string, OrdsParamType>
-  /** HTTP transport overrides, keyed by PL/SQL argument name. */
-  params?: Record<string, OrdsParameterTransport>
+  /** HTTP parameter bindings, grouped by transport and keyed by public name. */
+  params?: OrdsServiceParameterGroups
 }
 
-export type OrdsParameterTransport = {
-  /** `body` maps IN values from JSON, `header` maps HTTP headers, `uri` maps route values, and `response` maps OUT values to JSON. */
-  transport: 'body' | 'header' | 'uri' | 'response'
-  /** Public HTTP or JSON property name. Defaults to the generated kebab-case parameter name. */
-  name?: string
+export type OrdsServiceParameterGroups = {
+  /** IN values read from a JSON request body. */
+  body?: Record<string, PlsqlReference>
+  /** Values read from HTTP headers. */
+  header?: Record<string, PlsqlReference>
+  /** Values read from route parameters. */
+  uri?: Record<string, PlsqlReference>
+  /** OUT values returned in the JSON response. */
+  response?: Record<string, PlsqlReference>
 }
 
 /** Compile a procedure's service metadata into an ORDS endpoint. */
@@ -715,15 +738,17 @@ function buildOrdsEndpoint(
   const typeOverrides = new Map(
     Object.entries(service.paramTypes ?? {}).map(([name, type]) => [name.toUpperCase(), type]),
   )
-  const transportOverrides = new Map(
-    Object.entries(service.params ?? {}).map(([name, transport]) => [
-      name.toUpperCase(),
-      transport,
-    ]),
-  )
+  const transportOverrides = new Map<string, { name: string; transport: string }>()
+  for (const [transport, parameters] of Object.entries(service.params ?? {})) {
+    for (const [name, parameter] of Object.entries(parameters ?? {})) {
+      transportOverrides.set(parameter.name.toUpperCase(), { name, transport })
+    }
+  }
   for (const param of procedure.params) {
-    const overriddenType = typeOverrides.get(param.name.toUpperCase())
-    const transport = transportOverrides.get(param.name.toUpperCase())
+    const parameterName = param.name.toUpperCase()
+    const derivedName = oracleParameterName(param.name).toUpperCase()
+    const overriddenType = typeOverrides.get(parameterName) ?? typeOverrides.get(derivedName)
+    const transport = transportOverrides.get(parameterName)
     const ordsType = overriddenType ?? plsqlToOrdsType(param.type)
     endpoint.param(
       param.name,

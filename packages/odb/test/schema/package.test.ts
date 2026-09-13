@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { MigrationApplicationArtifact, MigrationSqlArtifact } from '../../src/migration.js'
 import { odbQuery } from '../../src/query/index.js'
 import { odbLiteral, type PlsqlExpression } from '../../src/schema/attribute.js'
-import { odbPackage, odbTypes } from '../../src/schema/package.js'
+import { odbPackage, odbType } from '../../src/schema/package.js'
 import { odbTable } from '../../src/schema/table.js'
 describe('odbPackage member typing', () => {
   it('exposes typed package member invokers and rejects unknown members', () => {
@@ -119,7 +119,7 @@ describe('ProcedureBody control flow and exceptions', () => {
         const { userId, tokenVersion, refreshToken } = body.variables({
           userId: users.id,
           tokenVersion: users.tokenVersion,
-          refreshToken: odbTypes.varchar2(128),
+          refreshToken: odbType.string(128),
         })
         expect(userId.name).toBe('l_user_id')
         expect(tokenVersion.name).toBe('l_token_version')
@@ -139,7 +139,7 @@ describe('ProcedureBody control flow and exceptions', () => {
     const sql = bodyLines((proc) => {
       const { userId, result, retryCount } = proc.parameters({
         in: { userId: users.id },
-        out: { result: odbTypes.varchar2(200) },
+        out: { result: odbType.string(200) },
         inOut: { retryCount: 'number' },
       })
       expect(userId.name).toBe('p_user_id')

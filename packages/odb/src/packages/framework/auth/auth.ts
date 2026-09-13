@@ -1,4 +1,4 @@
-import { odbPackage, odbTypes } from '../../../schema/package.js'
+import { odbPackage, odbType } from '../../../schema/package.js'
 import { PlsqlExpression } from '../../../schema/attribute.js'
 import { odbTable } from '../../../schema/table.js'
 import { odbQuery } from '../../../query/index.js'
@@ -202,12 +202,16 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => ({
 /** ORDS-facing authentication API. Refresh tokens never enter access JWTs. */
 export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
   login: pkg.proc('login', (proc) => {
-    const { loginUsername, password } = proc.inputs({
-      loginUsername: authUsers.username,
-      password: 'string',
+    const { loginUsername, password, accessToken, setCookie } = proc.parameters({
+      in: {
+        loginUsername: authUsers.username,
+        password: odbType.string(),
+      },
+      out: {
+        accessToken: odbType.clob(),
+        setCookie: odbType.string(),
+      },
     })
-    const accessToken = proc.out('p_access_token', 'CLOB')
-    const setCookie = proc.out('p_set_cookie', 'VARCHAR2')
     proc
       .body((statements) => {
         const { userId, passwordHash, tokenVersion, sessionId, refreshToken } =
@@ -216,7 +220,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
             passwordHash: authUsers.passwordHash,
             tokenVersion: authUsers.tokenVersion,
             sessionId: authSessions.id,
-            refreshToken: odbTypes.varchar2(512),
+            refreshToken: odbType.string(512),
           })
         statements.query(
           odbQuery()
@@ -259,9 +263,9 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
         basePath: '/auth',
         summary: 'Authenticate using username and password',
         params: {
-          P_LOGIN_USERNAME: { transport: 'body', name: 'username' },
-          P_ACCESS_TOKEN: { transport: 'response', name: 'accessToken' },
-          P_SET_COOKIE: { transport: 'header', name: 'Set-Cookie' },
+          body: { username: loginUsername },
+          response: { accessToken },
+          header: { 'Set-Cookie': setCookie },
         },
       })
   }),
@@ -330,9 +334,8 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
         basePath: '/auth',
         summary: 'Rotate a refresh token and issue an access token',
         params: {
-          P_COOKIE_HEADER: { transport: 'header', name: 'Cookie' },
-          P_ACCESS_TOKEN: { transport: 'response', name: 'accessToken' },
-          P_SET_COOKIE: { transport: 'header', name: 'Set-Cookie' },
+          header: { Cookie: cookieHeader, 'Set-Cookie': setCookie },
+          response: { accessToken },
         },
       })
   }),
@@ -374,8 +377,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
         basePath: '/auth',
         summary: 'Revoke an authentication session',
         params: {
-          P_COOKIE_HEADER: { transport: 'header', name: 'Cookie' },
-          P_SET_COOKIE: { transport: 'header', name: 'Set-Cookie' },
+          header: { Cookie: cookieHeader, 'Set-Cookie': setCookie },
         },
       })
   }),
@@ -407,8 +409,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
         basePath: '/auth',
         summary: 'Return the authenticated user',
         params: {
-          P_USER_ID: { transport: 'response', name: 'userId' },
-          P_DISPLAY_NAME: { transport: 'response', name: 'displayName' },
+          response: { userId, displayName },
         },
       })
   }),
