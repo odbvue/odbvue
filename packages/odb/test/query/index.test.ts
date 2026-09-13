@@ -29,6 +29,25 @@ describe('odbQuery', () => {
     expect(compiled.bindings).toEqual({ w0: 42 })
   })
 
+  it('renders SELECT INTO for multiple typed targets', () => {
+    const users = odbTable('APP_USERS', (t) => ({
+      id: t.number('ID').notNull(),
+      username: t.string('USERNAME').notNull(),
+    }))
+    const userId = new Param('p_user_id', 'NUMBER')
+    const username = new Param('p_username', 'VARCHAR2')
+
+    const query = odbQuery()
+      .selectFrom(users)
+      .select([users.id, users.username])
+      .into(userId, username)
+
+    expect(query.toSQL()).toBe('SELECT ID, USERNAME INTO p_user_id, p_username FROM APP_USERS')
+    expect(query.compile().sql).toBe(
+      'SELECT ID, USERNAME INTO p_user_id, p_username FROM APP_USERS',
+    )
+  })
+
   it('rejects mismatched where values at compile time', () => {
     const users = odbTable('APP_USERS', (t) => ({
       id: t.number('id').notNull(),

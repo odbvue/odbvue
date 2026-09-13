@@ -471,17 +471,17 @@ export class ProcedureBody {
   }
 
   /**
-   * Emit `SELECT ... INTO <target> ...;` for a target reference (OUT param or
-   * local variable), wiring the query's INTO clause automatically.
+   * Emit `SELECT ... INTO <targets> ...;` for target references (OUT params or
+   * local variables), wiring the query's INTO clause automatically.
    *
    * @example
-   * body.selectInto(pVersion, odbQuery().selectFrom('dual').select('...'))
+   * body.selectInto([pId, pVersion], odbQuery().selectFrom('dual').select(['...', '...']))
    */
   selectInto(
-    target: PlsqlReference,
-    qb: AnyQueryBuilder & { into(target: string): unknown },
+    targets: PlsqlReference | readonly PlsqlReference[],
+    qb: AnyQueryBuilder & { into(...targets: PlsqlReference[]): unknown },
   ): this {
-    qb.into(target.name)
+    qb.into(...(Array.isArray(targets) ? targets : [targets]))
     return this.query(qb)
   }
 
@@ -495,14 +495,14 @@ export class ProcedureBody {
    * fn.body((body) =>
    *   body.returnQuery(odbQuery().selectFrom(usersTable).select('name').where('id', '=', pId)))
    */
-  returnQuery(qb: AnyQueryBuilder & { into(target: string): unknown }): this {
+  returnQuery(qb: AnyQueryBuilder & { into(...targets: PlsqlReference[]): unknown }): this {
     if (this._returnType === undefined) {
       throw new Error('returnQuery() can only be used inside a function body')
     }
     const name = this._returnCounter === 0 ? 'l_return' : `l_return${this._returnCounter}`
     this._returnCounter++
     const result = this.variable(name, this._returnType, this._returnLength)
-    qb.into(name)
+    qb.into(result)
     this.query(qb)
     return this.return(result)
   }

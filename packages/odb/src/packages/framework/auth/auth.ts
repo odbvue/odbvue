@@ -222,7 +222,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
           odbQuery()
             .selectFrom(authUsers)
             .select([authUsers.id, authUsers.passwordHash, authUsers.tokenVersion])
-            .into([userId.name, passwordHash.name, tokenVersion.name].join(', '))
+            .into(userId, passwordHash, tokenVersion)
             .where((expression) =>
               expression.and([
                 expression(
@@ -292,7 +292,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
           odbQuery()
             .selectFrom('odb_auth_sessions s JOIN odb_auth_users u ON u.id = s.user_id')
             .select(['s.id', 's.user_id', 'u.token_version'])
-            .into([sessionId.name, userId.name, tokenVersion.name].join(', '))
+            .into(sessionId, userId, tokenVersion)
             .where((expression) =>
               expression.and([
                 expression(
@@ -392,7 +392,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
           odbQuery()
             .selectFrom(authUsers)
             .select([authUsers.id, authUsers.username, authUsers.displayName])
-            .into([userId.name, username.name, displayName.name].join(', '))
+            .into(userId, username, displayName)
             .where((expression) =>
               expression.and([
                 expression(authUsers.id, '=', subject),

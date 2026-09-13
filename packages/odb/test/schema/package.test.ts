@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { MigrationApplicationArtifact, MigrationSqlArtifact } from '../../src/migration.js'
+import { odbQuery } from '../../src/query/index.js'
 import { odbLiteral, type PlsqlExpression } from '../../src/schema/attribute.js'
 import { odbPackage, odbTypes } from '../../src/schema/package.js'
 import { odbTable } from '../../src/schema/table.js'
@@ -212,5 +213,24 @@ describe('ProcedureBody control flow and exceptions', () => {
     expect(sql).toContain(
       `odb_audit.info('User created', odb_audit.attributes('user.name', p_username));`,
     )
+  })
+
+  it('emits SELECT INTO for multiple target references', () => {
+    const users = odbTable('APP_USERS', (t) => ({
+      id: t.number('ID').notNull(),
+      username: t.string('USERNAME').notNull(),
+    }))
+    const sql = bodyLines((proc) => {
+      const userId = proc.out('p_user_id', 'NUMBER')
+      const username = proc.out('p_username', 'VARCHAR2')
+      proc.body((body) =>
+        body.selectInto(
+          [userId, username],
+          odbQuery().selectFrom(users).select([users.id, users.username]),
+        ),
+      )
+    })
+
+    expect(sql).toContain('SELECT ID, USERNAME INTO p_user_id, p_username FROM APP_USERS;')
   })
 })

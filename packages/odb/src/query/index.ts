@@ -188,8 +188,9 @@ export class SelectQueryBuilder<
     return this
   }
 
-  into(target: string | NamedRef): this {
-    this._into = refName(target)
+  /** Assign selected values into one or more PL/SQL variables or parameters. */
+  into(...targets: (string | NamedRef)[]): this {
+    this._into = targets.map(refName).join(', ')
     return this
   }
 
