@@ -24,7 +24,7 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
       ),
     )
   }),
-  check: pkg.proc('check', (proc) => {
+  enforce: pkg.proc('enforce', (proc) => {
     const scope = proc.in('p_scope', 'VARCHAR2')
     const subject = proc.in('p_subject', 'VARCHAR2')
     proc.body((body) => {
@@ -137,8 +137,18 @@ export const odbRateLimit = {
   toSQLDown(options: { schema?: string } = {}): string {
     return [odbRateLimitPackage.toSQLDown(options), rateLimitBuckets.toSQLDown(options)].join('\n')
   },
+  upgrade() {
+    return {
+      toSQLUp(options: { schema?: string } = {}): string {
+        return odbRateLimitPackage.toSQLUp(options)
+      },
+      toSQLDown() {
+        return ''
+      },
+    }
+  },
   check(scope: string, subject: string): string {
-    return `odb_rate_limit.check(${scope}, ${subject})`
+    return `odb_rate_limit.enforce(${scope}, ${subject})`
   },
   failure(scope: string, subject: string): string {
     return `odb_rate_limit.failure(${scope}, ${subject})`

@@ -26,14 +26,23 @@ describe('odbAuth framework package', () => {
       'PROCEDURE login(p_login_username IN odb_auth_users.username%TYPE, p_password IN VARCHAR2',
     )
     expect(sql).toContain('odb_auth_crypto.hash_token')
+    expect(sql).toContain('odb_rate_limit.enforce')
     expect(sql).toContain('FOR UPDATE')
+    expect(sql).toContain('previous_refresh_token_hash VARCHAR2(128 CHAR)')
+    expect(sql).toContain(
+      's.refresh_token_hash = l_presented_refresh_token_hash OR s.previous_refresh_token_hash = l_presented_refresh_token_hash',
+    )
+    expect(sql).toContain('IF l_presented_refresh_token_hash = l_previous_refresh_token_hash THEN')
+    expect(sql).toContain('SET revoked_at = SYSTIMESTAMP')
+    expect(sql).toContain('previous_refresh_token_hash = l_presented_refresh_token_hash')
     expect(sql).toContain("'__Host-odb_refresh=' || l_refresh_token")
     expect(sql).toContain("'Max-Age=2592000'")
     expect(sql).toContain("'Max-Age=0'")
     expect(sql).toContain("l_subject := odb_jwt.claim(l_token, 'sub')")
     expect(sql).toContain("l_session_id := odb_jwt.claim(l_token, 'sid')")
     expect(sql).toContain("l_token_version := TO_NUMBER(odb_jwt.claim(l_token, 'ver'))")
-    expect(sql).toContain('FROM odb_auth_sessions s JOIN odb_auth_users u ON u.id = s.user_id')
+    expect(sql).toContain('FROM odb_auth_sessions s WHERE')
+    expect(sql).toContain('SELECT token_version INTO l_token_version FROM odb_auth_users')
     expect(sql).toContain('s.id = l_session_id')
     expect(sql).toContain('s.user_id = l_subject')
     expect(sql).toContain('s.revoked_at IS NULL')
@@ -68,6 +77,20 @@ describe('odbAuth framework package', () => {
     expect(sql).toContain("p_name               => 'displayName'")
     expect(sql).toContain("p_name               => 'Cookie'")
     expect(sql).toContain("p_name               => 'Set-Cookie'")
+  })
+
+  it('upgrades deployed auth sessions before recompiling the refresh API', () => {
+    const sql = defineMigration('auth-upgrade', { schema: 'APP' })
+      .install(odbAuth.upgrade())
+      .compile()
+      .up()
+      .join('\n')
+
+    expect(sql).toContain(
+      'ALTER TABLE APP.odb_auth_sessions ADD (previous_refresh_token_hash VARCHAR2(128 CHAR))',
+    )
+    expect(sql).toContain('IF SQLCODE != -1430 THEN RAISE; END IF;')
+    expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_auth AS')
   })
 
   it('publishes access-token-only response contracts and keeps refresh cookies as headers', () => {

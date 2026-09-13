@@ -82,6 +82,7 @@ export const authSessions = odbTable('odb_auth_sessions', (t) => ({
   id: t.guid().primaryKey().defaultSysGuid(),
   userId: t.guid().notNull(),
   refreshTokenHash: t.string(128).notNull(),
+  previousRefreshTokenHash: t.string(128),
   expiresAt: t.timestamp().notNull(),
   revokedAt: t.timestamp(),
   createdAt: t.timestamp().notNull().defaultSysTimestamp(),
@@ -304,10 +305,20 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
         const sessionId = statements.variable('l_session_id', 'VARCHAR2', 32)
         const userId = statements.variable('l_user_id', 'VARCHAR2', 32)
         const tokenVersion = statements.variable('l_token_version', 'NUMBER')
+        const previousRefreshTokenHash = statements.variable(
+          'l_previous_refresh_token_hash',
+          'VARCHAR2',
+          128,
+        )
         const presentedRefreshToken = statements.variable(
           'l_presented_refresh_token',
           'VARCHAR2',
           512,
+        )
+        const presentedRefreshTokenHash = statements.variable(
+          'l_presented_refresh_token_hash',
+          'VARCHAR2',
+          128,
         )
         const nextToken = statements.variable('l_next_refresh_token', 'VARCHAR2', 512)
         statements.assign(
@@ -318,30 +329,54 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
           `NOT REGEXP_LIKE(${presentedRefreshToken.name}, '^[[:xdigit:]]{128}$')`,
           (then) => then.unauthorized(),
         )
+        statements.assign(presentedRefreshTokenHash, odbAuthCrypto.hashToken(presentedRefreshToken))
         statements.query(
           odbQuery()
-            .selectFrom('odb_auth_sessions s JOIN odb_auth_users u ON u.id = s.user_id')
-            .select(['s.id', 's.user_id', 'u.token_version'])
-            .into(sessionId, userId, tokenVersion)
+            .selectFrom('odb_auth_sessions s')
+            .select(['s.id', 's.user_id', 's.previous_refresh_token_hash'])
+            .into(sessionId, userId, previousRefreshTokenHash)
             .where((expression) =>
               expression.and([
-                expression(
-                  's.refresh_token_hash',
-                  '=',
-                  odbAuthCrypto.hashToken(presentedRefreshToken),
-                ),
+                expression.or([
+                  expression('s.refresh_token_hash', '=', presentedRefreshTokenHash),
+                  expression('s.previous_refresh_token_hash', '=', presentedRefreshTokenHash),
+                ]),
                 expression('s.revoked_at', 'IS NULL'),
                 expression.raw('s.expires_at > SYSTIMESTAMP'),
-                expression('u.enabled', '=', 1),
               ]),
             )
             .forUpdate(),
+        )
+        statements.query(
+          odbQuery()
+            .selectFrom(authUsers)
+            .select(authUsers.tokenVersion)
+            .into(tokenVersion)
+            .where((expression) =>
+              expression.and([
+                expression(authUsers.id, '=', userId),
+                expression(authUsers.enabled, '=', 1),
+              ]),
+            ),
+        )
+        statements.ifThen(
+          `${presentedRefreshTokenHash.name} = ${previousRefreshTokenHash.name}`,
+          (then) => {
+            then.query(
+              odbQuery()
+                .updateTable(authSessions)
+                .set({ revokedAt: new PlsqlExpression('TIMESTAMP', 'SYSTIMESTAMP') })
+                .where((expression) => expression(authSessions.id, '=', sessionId)),
+            )
+            then.unauthorized()
+          },
         )
         statements.assign(nextToken, `odb_auth_crypto.random_token(${REFRESH_TOKEN_BYTES})`)
         statements.query(
           odbQuery()
             .updateTable(authSessions)
             .set({
+              previousRefreshTokenHash: presentedRefreshTokenHash,
               refreshTokenHash: odbAuthCrypto.hashToken(nextToken),
               lastUsedAt: new PlsqlExpression('TIMESTAMP', 'SYSTIMESTAMP'),
             })
@@ -461,6 +496,29 @@ export const odbAuth = {
       odbAuthJwt.toSQLUp(options).replaceAll(AUTH_JWT_SECRET_MARKER, secret.replace(/'/g, "''")),
       odbAuthApi.toSQLUp(options).replaceAll(DUMMY_PASSWORD_HASH_MARKER, dummyPasswordHash()),
     ].join('\n')
+  },
+  upgrade() {
+    return {
+      toSQLUp(options: { schema?: string } = {}): string {
+        const sessions = qualify('odb_auth_sessions', options.schema)
+        return [
+          odbRateLimit.upgrade().toSQLUp(options),
+          'BEGIN',
+          `  EXECUTE IMMEDIATE 'ALTER TABLE ${sessions} ADD (previous_refresh_token_hash VARCHAR2(128 CHAR))';`,
+          'EXCEPTION WHEN OTHERS THEN',
+          '  IF SQLCODE != -1430 THEN RAISE; END IF;',
+          'END;',
+          '/',
+          odbAuthApi.toSQLUp(options).replaceAll(DUMMY_PASSWORD_HASH_MARKER, dummyPasswordHash()),
+        ].join('\n')
+      },
+      toSQLDown() {
+        return ''
+      },
+      application() {
+        return odbAuthApi.application()
+      },
+    }
   },
   toSQLDown(options: { schema?: string } = {}): string {
     return [odbAuthApi, odbAuthJwt, odbAuthCrypto, odbHttp, odbJwt, authSessions, authUsers]
