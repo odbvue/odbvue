@@ -219,6 +219,26 @@ compiled.bindings
 
 This is DML and read-query generation, not schema generation.
 
+Inside a package body, send selected values directly to PL/SQL variables or parameters with `into(...)`:
+
+```ts
+proc.body((body) => {
+  const { userId, username } = proc.parameters({
+    out: { userId: odbType.guid(), username: odbType.string(128) },
+  })
+
+  body.query(
+    odbQuery()
+      .selectFrom(users)
+      .select([users.id, users.username])
+      .into(userId, username)
+      .where(users.email, '=', 'ada@example.com'),
+  )
+})
+```
+
+The generated statement is `SELECT id, username INTO p_user_id, p_username ...`. `body.selectInto([userId, username], query)` remains available when composing the target list separately.
+
 ### PL/SQL Packages and Procedures
 
 `odbPackage()` models Oracle package specs and bodies in TypeScript.
@@ -246,6 +266,29 @@ This emits both:
 - `CREATE OR REPLACE PACKAGE BODY ...`
 
 This is the main way to keep database business logic close to the data while still authoring it in TypeScript.
+
+For concise, type-aware declarations, use named parameter and variable groups. Object keys become camelCase TypeScript identifiers and snake_case PL/SQL names, while table columns retain their `%TYPE` declarations.
+
+```ts
+import { odbPackage, odbType } from '@odbvue/odb'
+
+const usersApi = odbPackage('pck_users', (pkg) => {
+  pkg.proc('get_user', (proc) => {
+    const { userId, displayName } = proc.parameters({
+      in: { userId: odbType.guid() },
+      out: { displayName: odbType.string(256) },
+    })
+
+    proc.body((body) => {
+      const { normalizedId } = body.variables({ normalizedId: odbType.guid() })
+      body.assign(normalizedId, userId)
+      body.assign(displayName, "'Ada Lovelace'")
+    })
+  })
+})
+```
+
+This emits `p_user_id`, `p_display_name`, and `l_normalized_id`. `odbType` supplies descriptors for strings, numbers, GUIDs, booleans, dates, timestamps, LOBs, and result sets; pass a table column instead when the declaration should use `<table>.<column>%TYPE`.
 
 ### Oracle Built-in Packages
 
@@ -288,6 +331,8 @@ export const migration = defineMigration('20260704120000_lob', {
 Once installed, call them from your own package bodies (`odbLob.varchar2ToBase64('v_text')`) or through the typed variable helpers (`ClobVar.toBase64()`). See the LOB capability page for details.
 
 Other framework packages follow the same pattern — for example `odb_jwt` (`odbJwt`) signs and verifies JSON Web Tokens with HS256, `odb_audit` (`odbAudit`) writes OpenTelemetry-aligned audit logs, and `odb_settings` (`odbSettings`) is a key/value store with AES-256 encryption for secrets. See the JWT, Audit, and Settings capability pages for details.
+
+`odbAuth` installs an ORDS-ready authentication API with user and session storage, password hashing, access JWTs, and rotating refresh-token cookies. See the [Authentication capability](./capabilities/auth) for its migration and web-runtime setup.
 
 ### ORDS: REST Endpoints From PL/SQL
 
@@ -390,6 +435,15 @@ What it does:
 ov du
 ov du latest
 ov du 1.0.0
+```
+
+### `ov db-latest` / `ov dl`
+
+Applies every pending migration. `ov dl` is the short alias for `ov db-latest`, equivalent to `ov db-up latest`.
+
+```bash
+ov db-latest
+ov dl
 ```
 
 ### `ov db-down`

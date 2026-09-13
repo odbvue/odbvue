@@ -16,6 +16,7 @@
     "build:odb": "pnpm --filter @odbvue/odb run check && pnpm --filter @odbvue/odb run build && pnpm --filter @odbvue/db run check && pnpm --filter @odbvue/db run build",
     "build:web": "pnpm --filter @odbvue/web run check && pnpm --filter @odbvue/web run build && pnpm --filter apps run check && pnpm --filter apps run build",
     "build:cli": "pnpm --filter @odbvue/cli run check && pnpm --filter @odbvue/cli run build",
+    "build:wiki": "pnpm --filter @odbvue/wiki run check && pnpm --filter @odbvue/wiki run build",
     "link:cli": "pnpm --filter @odbvue/cli run build && pnpm -C packages/cli run link"
   },
   "devDependencies": {

@@ -6,7 +6,7 @@
 import { defineOdbVueApp } from '@odbvue/web'
 
 export default defineOdbVueApp({
-  auth: false,
+  auth: true,
   audit: false,
   settings: false,
   storage: false,
@@ -41,3 +41,19 @@ const audit = useCapability('audit')
 ```
 
 Application-specific behavior should remain in application source files. Do not put business rules into the configuration object.
+
+## Authentication
+
+Set `auth: true` after installing the database-side `odbAuth` migration. At startup, the capability sends the refresh cookie to `/auth/refresh`; when that succeeds it fetches `/auth/me`. The HTTP capability adds the access token to protected requests and refreshes it when needed.
+
+```ts
+import { useAuth } from '@odbvue/web'
+
+const auth = useAuth()
+
+await auth.login({ username: 'ada', password: 'correct horse battery staple' })
+await auth.me()
+await auth.logout()
+```
+
+`login()` and `refresh()` receive only an access token in the response body. The refresh token is an `HttpOnly`, `Secure`, `SameSite=Lax` cookie, so browser requests must remain on a compatible HTTPS origin. Override the default `/auth/login`, `/auth/refresh`, `/auth/logout`, and `/auth/me` routes with `auth: { endpoints: { ... } }` when necessary.
