@@ -4,7 +4,7 @@ const schemaName = process.env.ODBVUE_ADB_SCHEMA_USERNAME ?? ''
 
 const testPackage = odbPackage('pck_test', (pkg) => {
   pkg.proc('test', (proc) => {
-    const result = proc.out('R_RESULT', 'VARCHAR2')
+    const { result } = proc.parameters({ out: { result: 'string' } })
     proc.body((body) => body.set(result, odbLiteral('OK')))
     proc.service({ method: 'GET', path: '/test' })
   })

@@ -37,28 +37,80 @@ export type AnyQueryBuilder = {
 }
 
 type ParameterTypeAlias = 'string' | 'number' | 'boolean' | 'date' | 'timestamp' | 'clob'
-type ParameterInput = PlsqlType | string | Column<any, string, any, any, any, any, any>
+
+export type OdbTypeDefinition<TType extends PlsqlType | string> = {
+  type: TType
+  length?: number
+}
+
+type ParameterInput =
+  | PlsqlType
+  | string
+  | Column<any, string, any, any, any, any, any>
+  | OdbTypeDefinition<PlsqlType | string>
 
 type ResolvedParameterType<TInput extends ParameterInput> =
-  TInput extends Column<any, any, any, any, any, any, any>
-    ? string
-    : TInput extends 'string'
-      ? 'VARCHAR2'
-      : TInput extends 'number'
-        ? 'NUMBER'
-        : TInput extends 'boolean'
-          ? 'BOOLEAN'
-          : TInput extends 'date'
-            ? 'DATE'
-            : TInput extends 'timestamp'
-              ? 'TIMESTAMP'
-              : TInput extends 'clob'
-                ? 'CLOB'
-                : TInput
+  TInput extends OdbTypeDefinition<infer TType>
+    ? TType
+    : TInput extends Column<any, any, any, any, any, any, any>
+      ? string
+      : TInput extends 'string'
+        ? 'VARCHAR2'
+        : TInput extends 'number'
+          ? 'NUMBER'
+          : TInput extends 'boolean'
+            ? 'BOOLEAN'
+            : TInput extends 'date'
+              ? 'DATE'
+              : TInput extends 'timestamp'
+                ? 'TIMESTAMP'
+                : TInput extends 'clob'
+                  ? 'CLOB'
+                  : TInput
 
 type InputParameters<TInputs extends Record<string, ParameterInput>> = {
   [TKey in keyof TInputs]: Param<ResolvedParameterType<TInputs[TKey]>>
 }
+
+export type LocalVariableDefinition<TType extends PlsqlType | string> = OdbTypeDefinition<TType>
+
+type LocalVariableInput = ParameterInput
+
+type ResolvedLocalVariableType<TInput extends LocalVariableInput> =
+  TInput extends LocalVariableDefinition<infer TType>
+    ? TType
+    : TInput extends ParameterInput
+      ? ResolvedParameterType<TInput>
+      : never
+
+type LocalVariableForType<TType extends PlsqlType | string> = TType extends 'CLOB'
+  ? ClobVar
+  : TType extends 'BLOB'
+    ? BlobVar
+    : TType extends 'VARCHAR2'
+      ? Varchar2Var
+      : LocalVar<TType>
+
+type LocalVariables<TInputs extends Record<string, LocalVariableInput>> = {
+  [TKey in keyof TInputs]: LocalVariableForType<ResolvedLocalVariableType<TInputs[TKey]>>
+}
+
+export type ProcedureParameters = {
+  in?: Record<string, ParameterInput>
+  out?: Record<string, ParameterInput>
+  inOut?: Record<string, ParameterInput>
+}
+
+type ParameterGroup<TParameters, TDirection extends keyof ProcedureParameters> =
+  TParameters extends Record<TDirection, infer TInputs>
+    ? TInputs extends Record<string, ParameterInput>
+      ? InputParameters<TInputs>
+      : {}
+    : {}
+
+type NamedParameters<TParameters extends ProcedureParameters> = ParameterGroup<TParameters, 'in'> &
+  ParameterGroup<TParameters, 'out'> &
+  ParameterGroup<TParameters, 'inOut'>
 
 const parameterTypeAliases: Record<ParameterTypeAlias, PlsqlType> = {
   string: 'VARCHAR2',
@@ -74,9 +126,22 @@ function inputParameterName(key: string): string {
   return `p_${snakeCase}`
 }
 
+function localVariableName(key: string): string {
+  const snakeCase = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()
+  return `l_${snakeCase}`
+}
+
 function inputParameterType(input: ParameterInput): PlsqlType | string {
   if (input instanceof Column) return input.typeReference()
+  if (typeof input === 'object') return input.type
   return parameterTypeAliases[input as ParameterTypeAlias] ?? input
+}
+
+/** PL/SQL type descriptors for use with named parameters and local variables. */
+export const odbTypes = {
+  varchar2(length?: number): OdbTypeDefinition<'VARCHAR2'> {
+    return { type: 'VARCHAR2', length }
+  },
 }
 
 // ── Statement types ──────────────────────────────────────────────────────────
@@ -215,6 +280,39 @@ export class ProcedureBody {
             : new LocalVar(name, type, opts)
     this._declarations.push(v)
     return v
+  }
+
+  /**
+   * Declare named local variables using automatic `l_` names and optional
+   * column `%TYPE` anchors.
+   *
+   * @example
+   * const { userId, token } = body.variables({
+   *   userId: users.id,
+   *   token: varchar2(128),
+   * })
+   */
+  variables<TInputs extends Record<string, LocalVariableInput>>(
+    definitions: TInputs,
+  ): LocalVariables<TInputs> {
+    const variables = {} as LocalVariables<TInputs>
+    for (const [key, input] of Object.entries(definitions)) {
+      const definition = input as LocalVariableInput
+      const type =
+        typeof definition === 'object' && !(definition instanceof Column)
+          ? definition.type
+          : inputParameterType(definition as ParameterInput)
+      const length =
+        typeof definition === 'object' && !(definition instanceof Column)
+          ? definition.length
+          : undefined
+      variables[key as keyof TInputs] = this.variable(
+        localVariableName(key),
+        type,
+        length,
+      ) as LocalVariables<TInputs>[keyof TInputs]
+    }
+    return variables
   }
 
   /** Declare a VARCHAR2 variable using the type-specific fluent API. */
@@ -695,6 +793,33 @@ export class Procedure {
         inputParameterName(key),
         inputParameterType(input),
       ) as InputParameters<TInputs>[keyof TInputs]
+    }
+    return parameters
+  }
+
+  /**
+   * Declare named IN, OUT, and IN OUT parameters with automatic `p_` names
+   * and optional column `%TYPE` anchors.
+   *
+   * @example
+   * const { userId, result } = proc.parameters({
+   *   in: { userId: users.id },
+   *   out: { result: 'string' },
+   * })
+   */
+  parameters<TParameters extends ProcedureParameters>(
+    definitions: TParameters,
+  ): NamedParameters<TParameters> {
+    const parameters = {} as NamedParameters<TParameters>
+    for (const [direction, inputs] of Object.entries(definitions)) {
+      for (const [key, input] of Object.entries(inputs ?? {})) {
+        const parameter = this.param(
+          inputParameterName(key),
+          inputParameterType(input as ParameterInput),
+          direction === 'out' ? 'OUT' : direction === 'inOut' ? 'IN OUT' : 'IN',
+        )
+        Object.assign(parameters, { [key]: parameter })
+      }
     }
     return parameters
   }

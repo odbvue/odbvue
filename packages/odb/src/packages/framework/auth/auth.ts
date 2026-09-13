@@ -1,4 +1,4 @@
-import { odbPackage } from '../../../schema/package.js'
+import { odbPackage, odbTypes } from '../../../schema/package.js'
 import { PlsqlExpression } from '../../../schema/attribute.js'
 import { odbTable } from '../../../schema/table.js'
 import { odbQuery } from '../../../query/index.js'
@@ -210,11 +210,14 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
     const setCookie = proc.out('p_set_cookie', 'VARCHAR2')
     proc
       .body((statements) => {
-        const userId = statements.variable('l_user_id', 'VARCHAR2', 32)
-        const passwordHash = statements.variable('l_password_hash', 'VARCHAR2', 512)
-        const tokenVersion = statements.variable('l_token_version', 'NUMBER')
-        const sessionId = statements.variable('l_session_id', 'VARCHAR2', 32)
-        const refreshToken = statements.variable('l_refresh_token', 'VARCHAR2', 512)
+        const { userId, passwordHash, tokenVersion, sessionId, refreshToken } =
+          statements.variables({
+            userId: authUsers.id,
+            passwordHash: authUsers.passwordHash,
+            tokenVersion: authUsers.tokenVersion,
+            sessionId: authSessions.id,
+            refreshToken: odbTypes.varchar2(512),
+          })
         statements.query(
           odbQuery()
             .selectFrom(authUsers)

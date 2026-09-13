@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { MigrationApplicationArtifact, MigrationSqlArtifact } from '../../src/migration.js'
 import { odbLiteral, type PlsqlExpression } from '../../src/schema/attribute.js'
-import { odbPackage } from '../../src/schema/package.js'
+import { odbPackage, odbTypes } from '../../src/schema/package.js'
 import { odbTable } from '../../src/schema/table.js'
 describe('odbPackage member typing', () => {
   it('exposes typed package member invokers and rejects unknown members', () => {
@@ -105,6 +105,49 @@ describe('ProcedureBody control flow and exceptions', () => {
 
     expect(sql).toContain(
       'PROCEDURE DO_IT(p_username IN APP_USERS.USERNAME%TYPE, p_retry_count IN NUMBER, p_enabled IN BOOLEAN);',
+    )
+  })
+
+  it('derives local names and types from columns and descriptors', () => {
+    const users = odbTable('APP_USERS', (t) => ({
+      id: t.guid().primaryKey(),
+      tokenVersion: t.number().notNull(),
+    }))
+    const sql = bodyLines((proc) => {
+      proc.body((body) => {
+        const { userId, tokenVersion, refreshToken } = body.variables({
+          userId: users.id,
+          tokenVersion: users.tokenVersion,
+          refreshToken: odbTypes.varchar2(128),
+        })
+        expect(userId.name).toBe('l_user_id')
+        expect(tokenVersion.name).toBe('l_token_version')
+        expect(refreshToken.name).toBe('l_refresh_token')
+      })
+    })
+
+    expect(sql).toContain('    l_user_id APP_USERS.id%TYPE;')
+    expect(sql).toContain('    l_token_version APP_USERS.token_version%TYPE;')
+    expect(sql).toContain('    l_refresh_token VARCHAR2(128);')
+  })
+
+  it('derives IN, OUT, and IN OUT parameters from named definitions', () => {
+    const users = odbTable('APP_USERS', (t) => ({
+      id: t.guid().primaryKey(),
+    }))
+    const sql = bodyLines((proc) => {
+      const { userId, result, retryCount } = proc.parameters({
+        in: { userId: users.id },
+        out: { result: odbTypes.varchar2(200) },
+        inOut: { retryCount: 'number' },
+      })
+      expect(userId.name).toBe('p_user_id')
+      expect(result.name).toBe('p_result')
+      expect(retryCount.name).toBe('p_retry_count')
+    })
+
+    expect(sql).toContain(
+      'PROCEDURE DO_IT(p_user_id IN APP_USERS.id%TYPE, p_result OUT VARCHAR2, p_retry_count IN OUT NUMBER);',
     )
   })
 
