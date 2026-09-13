@@ -288,7 +288,7 @@ export class ProcedureBody {
    * @example
    * body.variable('v_name', 'VARCHAR2', 100).assign("'hello'")
    * body.variable('v_lob', 'CLOB').assign("'text'")
-   * body.assign('v_out', body.variable('v_lob', 'CLOB').toBase64())
+   * body.set(pOut, body.variable('v_lob', 'CLOB').toBase64())
    */
   variable(name: string, type: 'CLOB', length?: number): ClobVar
   variable(name: string, type: 'BLOB', length?: number): BlobVar
@@ -572,7 +572,7 @@ export class ProcedureBody {
    * @example
    * body.ifThen(
    *   'v_status = 200',
-   *   (t) => t.assign(rToken, issueToken),
+   *   (t) => t.set(rToken, issueToken),
    *   (e) => e.auditWarn('login failed'),
    * )
    */
@@ -599,7 +599,7 @@ export class ProcedureBody {
    * the body statements, in the order they are declared.
    *
    * @example
-   * body.when('no_data_found', (h) => h.assign(rError, odbLiteral('not found')))
+   * body.when('no_data_found', (h) => h.set(rError, odbLiteral('not found')))
    */
   when(exceptionName: string, build: (body: ProcedureBody) => void): this {
     this._exceptionHandlers.push({ when: exceptionName, statements: this.childStatements(build) })

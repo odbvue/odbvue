@@ -186,7 +186,7 @@ export class LocalVar<
 //
 // These extend LocalVar with PL/SQL expression helpers whose implementation
 // lives in the pre-installed `odb_lob` package. Each helper returns a
-// PL/SQL expression string that can be passed to `body.assign(target, expr)`.
+// PL/SQL expression that can be passed to `body.set(target, expr)`.
 //
 // Kept alongside LocalVar (rather than in packages/framework/lob/lob.ts) so
 // `ProcedureBody` can dispatch on the type literal without introducing a

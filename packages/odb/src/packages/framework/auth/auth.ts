@@ -330,7 +330,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
           `NOT REGEXP_LIKE(${presentedRefreshToken.name}, '^[[:xdigit:]]{128}$')`,
           (then) => then.unauthorized(),
         )
-        statements.assign(presentedRefreshTokenHash, odbAuthCrypto.hashToken(presentedRefreshToken))
+        statements.set(presentedRefreshTokenHash, odbAuthCrypto.hashToken(presentedRefreshToken))
         statements.query(
           odbQuery()
             .selectFrom('odb_auth_sessions s')

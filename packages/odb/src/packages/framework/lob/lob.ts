@@ -36,7 +36,7 @@ function qualify(name: string, schema?: string): string {
  * and `odbLob.toSQLDown()` from `.down()` to drop it.
  *
  * The `<fn>(expr)` helpers return PL/SQL expression strings suitable for
- * `body.assign(target, expr)`. `expr` should be a valid PL/SQL expression
+ * `body.assign(target, rawSql)`. `rawSql` should be a valid PL/SQL expression
  * (bare variable name, literal, or nested call).
  */
 export const odbLob = {

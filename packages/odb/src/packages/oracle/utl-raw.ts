@@ -13,7 +13,7 @@
 //
 // @example
 // body.set(pOut, odbUtlRaw.castToVarchar2(pRaw))
-// body.assign('v_len', odbUtlRaw.length('v_raw'))
+// body.set(vLen, odbUtlRaw.length(vRaw))
 
 import { PlsqlExpression, renderPlsql, type PlsqlRenderable } from '../../schema/attribute.js'
 

@@ -34,7 +34,7 @@ function qualify(name: string, schema?: string): string {
  * and `odbJwt.toSQLDown()` from `.down()` to drop it.
  *
  * The `<fn>(...)` helpers return PL/SQL expression strings suitable for
- * `body.set(target, expr)` / `body.assign(target, expr)`. Every argument
+ * `body.set(target, expr)`. Every argument
  * should be a valid PL/SQL expression (bare variable name, literal, or
  * nested call).
  */

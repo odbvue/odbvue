@@ -31,7 +31,7 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
     proc.body((body) => {
       const subjectHash = body.variable('l_subject_hash', 'VARCHAR2', 64)
       const blockedUntil = body.variable('l_blocked_until', 'TIMESTAMP')
-      body.assign(subjectHash, new PlsqlExpression('VARCHAR2', `hash_subject(${subject.name})`))
+      body.set(subjectHash, new PlsqlExpression('VARCHAR2', `hash_subject(${subject.name})`))
       body.selectInto(
         blockedUntil,
         odbQuery()
@@ -56,7 +56,7 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
       const subjectHash = body.variable('l_subject_hash', 'VARCHAR2', 64)
       const windowStartedAt = body.variable('l_window_started_at', 'TIMESTAMP')
       const failureCount = body.variable('l_failure_count', 'NUMBER')
-      body.assign(subjectHash, new PlsqlExpression('VARCHAR2', `hash_subject(${subject.name})`))
+      body.set(subjectHash, new PlsqlExpression('VARCHAR2', `hash_subject(${subject.name})`))
       body.selectInto(
         [windowStartedAt, failureCount],
         odbQuery()
@@ -73,11 +73,11 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
       body.ifThen(
         `${windowStartedAt.name} + NUMTODSINTERVAL(60, 'SECOND') <= SYSTIMESTAMP`,
         (then) => {
-          then.assign(windowStartedAt, new PlsqlExpression('TIMESTAMP', 'SYSTIMESTAMP'))
-          then.assign(failureCount, new PlsqlExpression('NUMBER', '1'))
+          then.set(windowStartedAt, new PlsqlExpression('TIMESTAMP', 'SYSTIMESTAMP'))
+          then.set(failureCount, new PlsqlExpression('NUMBER', '1'))
         },
         (otherwise) =>
-          otherwise.assign(failureCount, new PlsqlExpression('NUMBER', `${failureCount.name} + 1`)),
+          otherwise.set(failureCount, new PlsqlExpression('NUMBER', `${failureCount.name} + 1`)),
       )
       body.query(
         odbQuery()
@@ -116,7 +116,7 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
     })
     proc.autonomous().body((body) => {
       const subjectHash = body.variable('l_subject_hash', 'VARCHAR2', 64)
-      body.assign(subjectHash, new PlsqlExpression('VARCHAR2', `hash_subject(${subject.name})`))
+      body.set(subjectHash, new PlsqlExpression('VARCHAR2', `hash_subject(${subject.name})`))
       body.query(
         odbQuery()
           .deleteFrom(rateLimitBuckets)

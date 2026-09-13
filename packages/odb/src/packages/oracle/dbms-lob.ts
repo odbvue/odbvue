@@ -6,7 +6,7 @@
 // This module splits the package by shape:
 //
 // - **Functions** (return a value) are exposed as typed `PlsqlExpression<T>`
-//   builders — compose them with `body.set(...)` / `body.assign(...)`.
+//   builders — compose them with `body.set(...)`.
 // - **Procedures** (with OUT / IN OUT parameters) are exposed as builders that
 //   return the raw call *string*; pass the result to `body.raw(...)`, which
 //   emits it as a statement.
@@ -17,7 +17,7 @@
 // Reference: https://docs.oracle.com/en/database/oracle/oracle-database/21/arpls/DBMS_LOB.html
 //
 // @example
-// body.assign('v_len', odbDbmsLob.getLength('v_clob'))
+// body.set(vLen, odbDbmsLob.getLength(vClob))
 // body.raw(odbDbmsLob.createTemporary('v_tmp', true, odbDbmsLob.SESSION))
 // body.raw(odbDbmsLob.append('v_dest', 'v_src'))
 
