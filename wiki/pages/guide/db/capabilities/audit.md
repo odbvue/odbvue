@@ -30,7 +30,7 @@ import { odbPackage } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (p) => {
   p.proc('login', (proc) => {
-    const uuid = proc.in('uuid', 'VARCHAR2')
+    const { uuid } = proc.parameters({ in: { uuid: 'VARCHAR2' } })
 
     proc.body((body) => {
       body.auditEvent('user logged in', { 'user.id': 'p_uuid' })

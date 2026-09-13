@@ -26,7 +26,7 @@ import { odbPackage } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (p) => {
   p.proc('version', (proc) => {
-    const test = proc.out('test', 'CLOB')
+    const { test } = proc.parameters({ out: { test: 'CLOB' } })
 
     proc.body((body) => {
       const vVersion = body.varchar2('v_version', 200).value('1.0.1')
@@ -42,8 +42,9 @@ Capture parameter and variable handles, then use `body.set()` for compile-time t
 Local variables expose convenience methods based on their PL/SQL type:
 
 ```ts
-const textResult = proc.out('text_result', 'CLOB')
-const clobResult = proc.out('clob_result', 'CLOB')
+const { textResult, clobResult } = proc.parameters({
+  out: { textResult: 'CLOB', clobResult: 'CLOB' },
+})
 
 proc.body((body) => {
   const vText = body.varchar2('v_text', 200).value('hello')

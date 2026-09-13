@@ -30,8 +30,10 @@ import { odbPackage } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (p) => {
   p.proc('login', (proc) => {
-    const uuid = proc.in('uuid', 'VARCHAR2')
-    const token = proc.out('token', 'VARCHAR2')
+    const { uuid, token } = proc.parameters({
+      in: { uuid: 'VARCHAR2' },
+      out: { token: 'VARCHAR2' },
+    })
 
     proc.body((body) => {
       const vPayload = body
@@ -51,7 +53,7 @@ const appPackage = odbPackage('pck_app', (p) => {
 `verify` returns `1`/`0` for a valid signature; `claim` reads a single claim (after you have verified the token):
 
 ```ts
-const uuid = proc.out('uuid', 'VARCHAR2')
+const { uuid } = proc.parameters({ out: { uuid: 'VARCHAR2' } })
 
 proc.body((body) => {
   const vToken = body.varchar2('v_token', 2000).value('...')

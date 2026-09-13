@@ -18,8 +18,10 @@ const users = odbTable('APP_USERS', (table) => ({
 
 const application = odbPackage('PCK_USERS', (p) => {
   p.proc('GET_USER', (proc) => {
-    proc.in('P_ID', 'NUMBER')
-    const result = proc.out('R_RESULT', 'SYS_REFCURSOR')
+    const { result } = proc.parameters({
+      in: { id: 'NUMBER' },
+      out: { result: 'SYS_REFCURSOR' },
+    })
     proc.body((body) =>
       body.openFor(
         result,
@@ -34,7 +36,7 @@ const application = odbPackage('PCK_USERS', (p) => {
   })
 
   p.proc('POST_USER', (proc) => {
-    proc.in('P_BODY', 'CLOB')
+    proc.parameters({ in: { body: 'CLOB' } })
     proc.service({ method: 'POST', path: '/users' })
   })
 })
@@ -51,9 +53,9 @@ describe('ODB application contract', () => {
     })
     expect(procedure.body?.statements[0]).toEqual({
       kind: 'raw',
-      sql: 'OPEN R_RESULT FOR SELECT ID, UUID, CREATED_AT, EMAIL FROM APP_USERS',
+      sql: 'OPEN p_result FOR SELECT ID, UUID, CREATED_AT, EMAIL FROM APP_USERS',
     })
-    expect(procedure.body?.resultSets?.R_RESULT).toEqual([
+    expect(procedure.body?.resultSets?.P_RESULT).toEqual([
       { name: 'ID', type: 'number', nullable: false },
       { name: 'UUID', type: 'guid', nullable: false },
       { name: 'CREATED_AT', type: 'timestamp', nullable: false },
@@ -98,8 +100,7 @@ describe('ODB application contract', () => {
   it('maps POST inputs from a JSON request body instead of HTTP headers', () => {
     const login = odbPackage('PCK_AUTH', (p) => {
       p.proc('POST_LOGIN', (proc) => {
-        proc.in('P_USERNAME', 'VARCHAR2')
-        proc.in('P_PASSWORD', 'VARCHAR2')
+        proc.parameters({ in: { username: 'VARCHAR2', password: 'VARCHAR2' } })
         proc.service({ method: 'POST', path: '/login' })
       })
     })
@@ -136,7 +137,7 @@ describe('ODB application contract', () => {
   it('uses identifier-safe bind variables for kebab-case ORDS parameters', () => {
     const output = odbPackage('PCK_OUTPUT', (p) => {
       p.proc('POST_VALUE', (proc) => {
-        proc.out('P_ACCESS_TOKEN', 'VARCHAR2')
+        proc.parameters({ out: { accessToken: 'VARCHAR2' } })
         proc.service({ method: 'POST', path: '/value' })
       })
     })

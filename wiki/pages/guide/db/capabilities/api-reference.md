@@ -29,7 +29,7 @@ odbLob.base64ToVarchar2('v_b64')
 ### Example
 
 ```ts
-const result = proc.out('p_result', 'CLOB')
+const { result } = proc.parameters({ out: { result: 'CLOB' } })
 
 proc.body((body) => {
   const vText = body.varchar2('v_text', 200).value('hello')
@@ -68,7 +68,7 @@ odbJwt.fromEpoch('v_epoch')
 ### Example
 
 ```ts
-const token = proc.out('p_token', 'VARCHAR2')
+const { token } = proc.parameters({ out: { token: 'VARCHAR2' } })
 
 proc.body((body) => {
   const vPayload = body
@@ -150,7 +150,7 @@ odbSettings.seed({ id: 'APP_VERSION', name: 'Application version', value: '1.0.0
 ### Example
 
 ```ts
-const url = proc.out('p_url', 'VARCHAR2')
+const { url } = proc.parameters({ out: { url: 'VARCHAR2' } })
 
 proc.body((body) => {
   body.set(url, odbSettings.read(odbLiteral('API_URL')))

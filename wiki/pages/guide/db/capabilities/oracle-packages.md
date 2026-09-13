@@ -80,7 +80,7 @@ import { odbDbmsCrypto, odbPackage } from '@odbvue/odb'
 
 const secure = odbPackage('pck_secure', (pkg) => {
   pkg.func('sha256', 'RAW', (fn) => {
-    const pData = fn.in('p_data', 'RAW')
+    const pData = fn.param('p_data', 'RAW')
     fn.body((body) => {
       body.return(odbDbmsCrypto.hash(pData, odbDbmsCrypto.HASH_SH256))
     })

@@ -19,7 +19,7 @@ describe('generatePackageContract', () => {
   it('generates a function contract with an input object and a Promise return', () => {
     const pkg = odbPackage('PCK_USERS', (p) => {
       p.func('GET_USER', 'VARCHAR2', (fn) => {
-        fn.in('P_ID', 'NUMBER')
+        fn.param('P_ID', 'NUMBER')
       })
     })
 
@@ -32,8 +32,7 @@ describe('generatePackageContract', () => {
   it('generates a procedure contract with OUT params as the response shape', () => {
     const pkg = odbPackage('PCK_USERS', (p) => {
       p.proc('CREATE_USER', (proc) => {
-        proc.in('P_NAME', 'VARCHAR2')
-        proc.out('P_ID', 'NUMBER')
+        proc.parameters({ in: { name: 'VARCHAR2' }, out: { id: 'NUMBER' } })
       })
     })
 
@@ -44,7 +43,7 @@ describe('generatePackageContract', () => {
   it('omits the input argument when a procedure has no IN parameters', () => {
     const pkg = odbPackage('PCK_APP', (p) => {
       p.proc('ME', (proc) => {
-        proc.out('P_VERSION', 'VARCHAR2')
+        proc.parameters({ out: { version: 'VARCHAR2' } })
       })
     })
 
@@ -55,7 +54,7 @@ describe('generatePackageContract', () => {
   it('returns Promise<void> for a procedure without OUT parameters', () => {
     const pkg = odbPackage('PCK_APP', (p) => {
       p.proc('PING', (proc) => {
-        proc.in('P_MESSAGE', 'VARCHAR2')
+        proc.parameters({ in: { message: 'VARCHAR2' } })
       })
     })
 
@@ -66,7 +65,7 @@ describe('generatePackageContract', () => {
   it('treats IN OUT parameters as both input and response fields', () => {
     const pkg = odbPackage('PCK_COUNTER', (p) => {
       p.proc('BUMP', (proc) => {
-        proc.inOut('P_VALUE', 'NUMBER')
+        proc.parameters({ inOut: { value: 'NUMBER' } })
       })
     })
 
@@ -77,7 +76,7 @@ describe('generatePackageContract', () => {
   it('allows overriding the generated interface name', () => {
     const pkg = odbPackage('PCK_USERS', (p) => {
       p.func('GET_USER', 'VARCHAR2', (fn) => {
-        fn.in('P_ID', 'NUMBER')
+        fn.param('P_ID', 'NUMBER')
       })
     })
 

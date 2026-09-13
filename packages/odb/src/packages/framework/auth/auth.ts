@@ -96,7 +96,7 @@ export const authSessions = odbTable('odb_auth_sessions', (t) => ({
 /** Password and opaque token primitives used by `odb_auth`. */
 export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
   hashPassword: pkg.func('hash_password', 'VARCHAR2', (fn) => {
-    const password = fn.in('p_password', 'VARCHAR2')
+    const password = fn.param('p_password', 'VARCHAR2')
     fn.returnLength(512).body((body) => {
       const salt = body.variable('l_salt', 'VARCHAR2', 32)
       const passwordRaw = body.variable('l_password_raw', 'RAW(2000)')
@@ -116,8 +116,8 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
     })
   }),
   verifyPassword: pkg.func('verify_password', 'NUMBER', (fn) => {
-    const password = fn.in('p_password', 'VARCHAR2')
-    const storedHash = fn.in('p_password_hash', 'VARCHAR2')
+    const password = fn.param('p_password', 'VARCHAR2')
+    const storedHash = fn.param('p_password_hash', 'VARCHAR2')
     fn.body((body) => {
       const iterations = body.variable('l_iterations', 'NUMBER')
       const salt = body.variable('l_salt', 'VARCHAR2', 32)
@@ -147,13 +147,13 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
     })
   }),
   randomToken: pkg.func('random_token', 'VARCHAR2', (fn) => {
-    const bytes = fn.in('p_bytes', 'NUMBER')
+    const bytes = fn.param('p_bytes', 'NUMBER')
     fn.returnLength(512).body((body) =>
       body.return(`RAWTOHEX(DBMS_CRYPTO.RANDOMBYTES(${bytes.name}))`),
     )
   }),
   hashToken: pkg.func('hash_token', 'VARCHAR2', (fn) => {
-    const token = fn.in('p_token', 'VARCHAR2')
+    const token = fn.param('p_token', 'VARCHAR2')
     fn.returnLength(128).body((body) =>
       body.return(
         `RAWTOHEX(DBMS_CRYPTO.HASH(UTL_RAW.CAST_TO_RAW(${token.name}), DBMS_CRYPTO.HASH_SH256))`,
@@ -165,9 +165,9 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
 /** Access-token wrapper around ODB's generic HS256 JWT implementation. */
 export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => ({
   createAccessToken: pkg.func('create_access_token', 'VARCHAR2', (fn) => {
-    const userId = fn.in('p_user_id', 'VARCHAR2')
-    const sessionId = fn.in('p_session_id', 'VARCHAR2')
-    const tokenVersion = fn.in('p_token_version', 'NUMBER')
+    const userId = fn.param('p_user_id', 'VARCHAR2')
+    const sessionId = fn.param('p_session_id', 'VARCHAR2')
+    const tokenVersion = fn.param('p_token_version', 'NUMBER')
     fn.returnLength(4000).body((body) =>
       body.return(
         `odb_jwt.encode(JSON_OBJECT('sub' VALUE ${userId.name}, 'sid' VALUE ${sessionId.name}, 'ver' VALUE ${tokenVersion.name}, 'iat' VALUE odb_jwt.to_epoch(), 'exp' VALUE odb_jwt.to_epoch() + 900 RETURNING VARCHAR2), '${AUTH_JWT_SECRET_MARKER}')`,
@@ -175,7 +175,7 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => ({
     )
   }),
   requireUser: pkg.func('require_user', 'VARCHAR2', (fn) => {
-    const authorization = fn.in('p_authorization', 'VARCHAR2')
+    const authorization = fn.param('p_authorization', 'VARCHAR2')
     fn.body((body) => {
       const token = body.variable('l_token', 'VARCHAR2', 4000)
       const subject = body.variable('l_subject', 'VARCHAR2', 32)
@@ -297,9 +297,10 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
       })
   }),
   refresh: pkg.proc('refresh', (proc) => {
-    const cookieHeader = proc.in('p_cookie_header', 'VARCHAR2')
-    const accessToken = proc.out('p_access_token', 'CLOB')
-    const setCookie = proc.out('p_set_cookie', 'VARCHAR2')
+    const { cookieHeader, accessToken, setCookie } = proc.parameters({
+      in: { cookieHeader: 'VARCHAR2' },
+      out: { accessToken: 'CLOB', setCookie: 'VARCHAR2' },
+    })
     proc
       .body((statements) => {
         const sessionId = statements.variable('l_session_id', 'VARCHAR2', 32)
@@ -401,8 +402,10 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
       })
   }),
   logout: pkg.proc('logout', (proc) => {
-    const cookieHeader = proc.in('p_cookie_header', 'VARCHAR2')
-    const setCookie = proc.out('p_set_cookie', 'VARCHAR2')
+    const { cookieHeader, setCookie } = proc.parameters({
+      in: { cookieHeader: 'VARCHAR2' },
+      out: { setCookie: 'VARCHAR2' },
+    })
     proc
       .body((statements) => {
         const presentedRefreshToken = statements.variable(
@@ -443,10 +446,10 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
       })
   }),
   me: pkg.proc('me', (proc) => {
-    const authorization = proc.in('p_authorization', 'VARCHAR2')
-    const userId = proc.out('p_user_id', 'VARCHAR2')
-    const username = proc.out('p_username', 'VARCHAR2')
-    const displayName = proc.out('p_display_name', 'VARCHAR2')
+    const { authorization, userId, username, displayName } = proc.parameters({
+      in: { authorization: 'VARCHAR2' },
+      out: { userId: 'VARCHAR2', username: 'VARCHAR2', displayName: 'VARCHAR2' },
+    })
     proc
       .body((statements) => {
         const subject = statements.variable('l_user_id', 'VARCHAR2', 32)

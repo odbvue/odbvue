@@ -8,11 +8,10 @@ describe('odbPackage member typing', () => {
   it('exposes typed package member invokers and rejects unknown members', () => {
     const settings = odbPackage('PCK_SETTINGS', (p) => ({
       getValue: p.func('GET_VALUE', 'VARCHAR2', (fn) => {
-        fn.in('P_KEY', 'VARCHAR2')
+        fn.param('P_KEY', 'VARCHAR2')
       }),
       setValue: p.proc('SET_VALUE', (proc) => {
-        proc.in('P_KEY', 'VARCHAR2')
-        proc.in('P_VALUE', 'VARCHAR2')
+        proc.parameters({ in: { key: 'VARCHAR2', value: 'VARCHAR2' } })
       }),
     }))
 
@@ -33,10 +32,10 @@ describe('odbPackage member typing', () => {
   it('rejects procedure members passed to call()', () => {
     const settings = odbPackage('PCK_SETTINGS', (p) => ({
       getValue: p.func('GET_VALUE', 'VARCHAR2', (fn) => {
-        fn.in('P_KEY', 'VARCHAR2')
+        fn.param('P_KEY', 'VARCHAR2')
       }),
       setValue: p.proc('SET_VALUE', (proc) => {
-        proc.in('P_KEY', 'VARCHAR2')
+        proc.parameters({ in: { key: 'VARCHAR2' } })
       }),
     }))
 
@@ -48,7 +47,7 @@ describe('odbPackage member typing', () => {
   it('is compatible with migration artifact interfaces', () => {
     const settings = odbPackage('PCK_SETTINGS', (p) => ({
       getValue: p.func('GET_VALUE', 'VARCHAR2', (fn) => {
-        fn.in('P_KEY', 'VARCHAR2')
+        fn.param('P_KEY', 'VARCHAR2')
       }),
     }))
 
@@ -72,7 +71,7 @@ describe('ProcedureBody control flow and exceptions', () => {
 
   it('emits an IF/ELSE block with nested statements', () => {
     const sql = bodyLines((proc) => {
-      proc.out('R_OUT', 'VARCHAR2')
+      proc.param('R_OUT', 'VARCHAR2', 'OUT')
       proc.body((body) =>
         body.ifThen(
           'v_status = 200',
@@ -89,15 +88,17 @@ describe('ProcedureBody control flow and exceptions', () => {
     expect(sql).toContain('    END IF;')
   })
 
-  it('derives input names and column anchored types', () => {
+  it('derives named input parameter names and column anchored types', () => {
     const users = odbTable('APP_USERS', (t) => ({
       username: t.string('USERNAME').notNull(),
     }))
     const sql = bodyLines((proc) => {
-      const { username, retryCount, enabled } = proc.inputs({
-        username: users.username,
-        retryCount: 'number',
-        enabled: 'boolean',
+      const { username, retryCount, enabled } = proc.parameters({
+        in: {
+          username: users.username,
+          retryCount: 'number',
+          enabled: 'boolean',
+        },
       })
       expect(username.name).toBe('p_username')
       expect(retryCount.name).toBe('p_retry_count')
@@ -164,7 +165,7 @@ describe('ProcedureBody control flow and exceptions', () => {
 
   it('emits an EXCEPTION section with a WHEN OTHERS handler', () => {
     const sql = bodyLines((proc) => {
-      proc.out('R_OUT', 'VARCHAR2')
+      proc.param('R_OUT', 'VARCHAR2', 'OUT')
       proc.body((body) =>
         body
           .assign('r_out', odbLiteral('ok'))
@@ -206,7 +207,7 @@ describe('ProcedureBody control flow and exceptions', () => {
     }))
 
     const sql = bodyLines((proc) => {
-      const username = proc.in('p_username', 'APP_USERS.USERNAME%TYPE')
+      const username = proc.param('p_username', 'APP_USERS.USERNAME%TYPE')
       proc.body((body) =>
         body
           .insertInto(users, { username, fullname: 'Bootstrap Admin', attempts: 0 })
@@ -228,8 +229,8 @@ describe('ProcedureBody control flow and exceptions', () => {
       username: t.string('USERNAME').notNull(),
     }))
     const sql = bodyLines((proc) => {
-      const userId = proc.out('p_user_id', 'NUMBER')
-      const username = proc.out('p_username', 'VARCHAR2')
+      const userId = proc.param('p_user_id', 'NUMBER', 'OUT')
+      const username = proc.param('p_username', 'VARCHAR2', 'OUT')
       proc.body((body) =>
         body.selectInto(
           [userId, username],

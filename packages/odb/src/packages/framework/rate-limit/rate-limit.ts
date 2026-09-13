@@ -13,7 +13,7 @@ export const rateLimitBuckets = odbTable('odb_rate_limit_buckets', (t) => ({
 
 const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
   hashSubject: pkg.func('hash_subject', 'VARCHAR2', (fn) => {
-    const subject = fn.in('p_subject', 'VARCHAR2')
+    const subject = fn.param('p_subject', 'VARCHAR2')
     fn.returnLength(64).body((body) =>
       body.returnQuery(
         odbQuery()
@@ -25,8 +25,9 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
     )
   }),
   enforce: pkg.proc('enforce', (proc) => {
-    const scope = proc.in('p_scope', 'VARCHAR2')
-    const subject = proc.in('p_subject', 'VARCHAR2')
+    const { scope, subject } = proc.parameters({
+      in: { scope: 'VARCHAR2', subject: 'VARCHAR2' },
+    })
     proc.body((body) => {
       const subjectHash = body.variable('l_subject_hash', 'VARCHAR2', 64)
       const blockedUntil = body.variable('l_blocked_until', 'TIMESTAMP')
@@ -48,8 +49,9 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
     })
   }),
   failure: pkg.proc('failure', (proc) => {
-    const scope = proc.in('p_scope', 'VARCHAR2')
-    const subject = proc.in('p_subject', 'VARCHAR2')
+    const { scope, subject } = proc.parameters({
+      in: { scope: 'VARCHAR2', subject: 'VARCHAR2' },
+    })
     proc.autonomous().body((body) => {
       const subjectHash = body.variable('l_subject_hash', 'VARCHAR2', 64)
       const windowStartedAt = body.variable('l_window_started_at', 'TIMESTAMP')
@@ -109,8 +111,9 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
     })
   }),
   success: pkg.proc('success', (proc) => {
-    const scope = proc.in('p_scope', 'VARCHAR2')
-    const subject = proc.in('p_subject', 'VARCHAR2')
+    const { scope, subject } = proc.parameters({
+      in: { scope: 'VARCHAR2', subject: 'VARCHAR2' },
+    })
     proc.autonomous().body((body) => {
       const subjectHash = body.variable('l_subject_hash', 'VARCHAR2', 64)
       body.assign(subjectHash, new PlsqlExpression('VARCHAR2', `hash_subject(${subject.name})`))

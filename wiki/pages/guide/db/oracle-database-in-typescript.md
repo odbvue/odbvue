@@ -41,7 +41,7 @@ const schemaName = odbEnv.read('ODBVUE_ADB_SCHEMA_USERNAME')
 
 const appPackage = odbPackage('pck_app', (p) => {
   p.proc('version', (proc) => {
-    const version = proc.out('version', 'VARCHAR2')
+    const { version } = proc.parameters({ out: { version: 'VARCHAR2' } })
 
     proc.body((body) => {
       const vVersion = body.varchar2('v_version', 200).value('1.0.1')
@@ -248,7 +248,7 @@ import { odbPackage } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (pkg) => {
   pkg.proc('version', (proc) => {
-    const version = proc.out('version', 'VARCHAR2')
+    const { version } = proc.parameters({ out: { version: 'VARCHAR2' } })
 
     proc.body((body) => {
       const vVersion = body.varchar2('v_version', 200).value('1.0.1')
@@ -299,7 +299,7 @@ import { odbDbmsCrypto, odbPackage } from '@odbvue/odb'
 
 const secure = odbPackage('pck_secure', (pkg) => {
   pkg.func('sha256', 'RAW', (fn) => {
-    const pData = fn.in('p_data', 'RAW')
+    const pData = fn.param('p_data', 'RAW')
     fn.body((body) => {
       body.return(odbDbmsCrypto.hash(pData, odbDbmsCrypto.HASH_SH256))
     })
@@ -345,10 +345,12 @@ import { generateApplication, odbPackage } from '@odbvue/odb'
 
 const usersApi = odbPackage('pck_users', (pkg) => {
   pkg.proc('get_user', (proc) => {
-    proc.in('p_user_id', 'NUMBER')
-    proc.out('r_user', 'SYS_REFCURSOR')
+    const { userId, user } = proc.parameters({
+      in: { userId: 'NUMBER' },
+      out: { user: 'SYS_REFCURSOR' },
+    })
     proc.body((body) => {
-      body.raw('OPEN r_user FOR SELECT id, email FROM app_users WHERE id = p_user_id')
+      body.raw(`OPEN ${user.name} FOR SELECT id, email FROM app_users WHERE id = ${userId.name}`)
     })
     proc.service({
       method: 'GET',

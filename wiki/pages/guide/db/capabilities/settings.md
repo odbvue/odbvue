@@ -51,7 +51,7 @@ import { odbLiteral, odbPackage } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (p) => {
   p.proc('configure', (proc) => {
-    const apiKey = proc.in('api_key', 'VARCHAR2')
+    const { apiKey } = proc.parameters({ in: { apiKey: 'VARCHAR2' } })
 
     proc.body((body) => {
       body.raw(

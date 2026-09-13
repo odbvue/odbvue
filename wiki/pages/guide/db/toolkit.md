@@ -71,7 +71,7 @@ const files = odbTable('app_files', (t) => ({
 ```ts
 const settings = odbPackage('PCK_SETTINGS', (p) => ({
   getValue: p.func('GET_VALUE', 'VARCHAR2', (fn) => {
-    fn.in('P_KEY', 'VARCHAR2')
+    fn.param('P_KEY', 'VARCHAR2')
   }),
 }))
 
@@ -99,7 +99,7 @@ await withConnection(config, async (_conn, db) => {
 Use `p.proc()`, `proc.body()`, and `proc.service()` to define a service. A typed table query passed to `body.openFor()` carries its selected row shape into the generated response.
 
 ```ts
-const result = proc.out('result', 'SYS_REFCURSOR')
+const { result } = proc.parameters({ out: { result: 'SYS_REFCURSOR' } })
 proc.body((body) =>
   body.openFor(result, odbQuery().selectFrom(users).select([users.id, users.email])),
 )

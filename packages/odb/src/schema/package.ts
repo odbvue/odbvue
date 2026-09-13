@@ -812,25 +812,6 @@ export class Procedure {
     return p
   }
 
-  /** Shorthand: add an IN parameter. */
-  in<T extends PlsqlType | string>(name: string, type: T): Param<T> {
-    return this.param(name, type, 'IN')
-  }
-
-  /** Add named IN parameters using automatic `p_` names and optional column `%TYPE` anchors. */
-  inputs<TInputs extends Record<string, ParameterInput>>(
-    definitions: TInputs,
-  ): InputParameters<TInputs> {
-    const parameters = {} as InputParameters<TInputs>
-    for (const [key, input] of Object.entries(definitions)) {
-      parameters[key as keyof TInputs] = this.in(
-        inputParameterName(key),
-        inputParameterType(input),
-      ) as InputParameters<TInputs>[keyof TInputs]
-    }
-    return parameters
-  }
-
   /**
    * Declare named IN, OUT, and IN OUT parameters with automatic `p_` names
    * and optional column `%TYPE` anchors.
@@ -838,7 +819,7 @@ export class Procedure {
    * @example
    * const { userId, result } = proc.parameters({
    *   in: { userId: users.id },
-   *   out: { result: 'string' },
+   *   out: { result: odbType.string() },
    * })
    */
   parameters<TParameters extends ProcedureParameters>(
@@ -856,16 +837,6 @@ export class Procedure {
       }
     }
     return parameters
-  }
-
-  /** Shorthand: add an OUT parameter. */
-  out<T extends PlsqlType | string>(name: string, type: T): Param<T> {
-    return this.param(name, type, 'OUT')
-  }
-
-  /** Shorthand: add an IN OUT parameter. */
-  inOut<T extends PlsqlType | string>(name: string, type: T): Param<T> {
-    return this.param(name, type, 'IN OUT')
   }
 
   /** Execute this procedure as an autonomous transaction. */
@@ -947,21 +918,6 @@ export class PlsqlFunction<TReturnType extends PlsqlType | string = PlsqlType | 
     const p = new Param(name, type, direction)
     this._params.push(p)
     return p
-  }
-
-  /** Shorthand: add an IN parameter. */
-  in(name: string, type: PlsqlType | string): Param {
-    return this.param(name, type, 'IN')
-  }
-
-  /** Shorthand: add an OUT parameter. */
-  out(name: string, type: PlsqlType | string): Param {
-    return this.param(name, type, 'OUT')
-  }
-
-  /** Shorthand: add an IN OUT parameter. */
-  inOut(name: string, type: PlsqlType | string): Param {
-    return this.param(name, type, 'IN OUT')
   }
 
   /**

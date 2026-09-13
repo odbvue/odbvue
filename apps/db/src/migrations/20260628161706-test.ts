@@ -29,9 +29,11 @@ export const appUsersTable = odbTable('app_users', (t) => ({
 
 const appPackage = odbPackage('pck_app', (p) => {
   p.proc('bootstrap', (proc) => {
-    const { username, password } = proc.inputs({
-      username: appUsersTable.username,
-      password: appUsersTable.password,
+    const { username, password } = proc.parameters({
+      in: {
+        username: appUsersTable.username,
+        password: appUsersTable.password,
+      },
     })
 
     proc
