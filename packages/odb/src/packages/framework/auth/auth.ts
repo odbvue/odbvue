@@ -6,6 +6,9 @@ import { odbJwt } from '../jwt/jwt.js'
 
 const AUTH_JWT_SECRET_MARKER = '__ODB_AUTH_JWT_SECRET__'
 const DEFAULT_JWT_SECRET = 'change-this-development-only-odbvue-auth-secret-2026'
+const PASSWORD_HASH_ALGORITHM = 'pbkdf2-sha512'
+const PASSWORD_HASH_ITERATIONS = 210000
+const PASSWORD_HASH_BYTES = 64
 
 function literal(value: string): string {
   return `'${value.replace(/'/g, "''")}'`
@@ -50,25 +53,50 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
     const password = fn.in('p_password', 'VARCHAR2')
     fn.returnLength(512).body((body) => {
       const salt = body.variable('l_salt', 'VARCHAR2', 32)
-      const hash = body.variable('l_hash', 'VARCHAR2', 64)
+      const passwordRaw = body.variable('l_password_raw', 'RAW(2000)')
+      const round = body.variable('l_round', 'PLS_INTEGER')
+      const roundBlock = body.variable('l_block', `RAW(${PASSWORD_HASH_BYTES})`)
+      const derivedKey = body.variable('l_derived_key', `RAW(${PASSWORD_HASH_BYTES})`)
+      const hash = body.variable('l_hash', 'VARCHAR2', 128)
       body.assign(salt, 'RAWTOHEX(DBMS_CRYPTO.RANDOMBYTES(16))')
-      body.assign(
-        hash,
-        `RAWTOHEX(DBMS_CRYPTO.HASH(UTL_RAW.CAST_TO_RAW(${salt.name} || ':' || ${password.name}), DBMS_CRYPTO.HASH_SH256))`,
+      body.assign(passwordRaw, `UTL_I18N.STRING_TO_RAW(${password.name}, 'AL32UTF8')`)
+      body.raw(
+        `${roundBlock.name} := DBMS_CRYPTO.MAC(UTL_RAW.CONCAT(HEXTORAW(${salt.name}), HEXTORAW('00000001')), DBMS_CRYPTO.HMAC_SH512, ${passwordRaw.name});\n${derivedKey.name} := ${roundBlock.name};\nFOR ${round.name} IN 2..${PASSWORD_HASH_ITERATIONS} LOOP\n  ${roundBlock.name} := DBMS_CRYPTO.MAC(${roundBlock.name}, DBMS_CRYPTO.HMAC_SH512, ${passwordRaw.name});\n  ${derivedKey.name} := UTL_RAW.BIT_XOR(${derivedKey.name}, ${roundBlock.name});\nEND LOOP`,
       )
-      body.return(`${salt.name} || '$' || ${hash.name}`)
+      body.assign(hash, `RAWTOHEX(${derivedKey.name})`)
+      body.return(
+        `'${PASSWORD_HASH_ALGORITHM}$${PASSWORD_HASH_ITERATIONS}$' || ${salt.name} || '$' || ${hash.name}`,
+      )
     })
   }),
   verifyPassword: pkg.func('verify_password', 'NUMBER', (fn) => {
     const password = fn.in('p_password', 'VARCHAR2')
     const storedHash = fn.in('p_password_hash', 'VARCHAR2')
     fn.body((body) => {
+      const iterations = body.variable('l_iterations', 'NUMBER')
       const salt = body.variable('l_salt', 'VARCHAR2', 32)
-      body.assign(salt, `SUBSTR(${storedHash.name}, 1, INSTR(${storedHash.name}, '$') - 1)`)
+      const expectedHash = body.variable('l_expected_hash', 'VARCHAR2', 128)
+      const passwordRaw = body.variable('l_password_raw', 'RAW(2000)')
+      const round = body.variable('l_round', 'PLS_INTEGER')
+      const roundBlock = body.variable('l_block', `RAW(${PASSWORD_HASH_BYTES})`)
+      const derivedKey = body.variable('l_derived_key', `RAW(${PASSWORD_HASH_BYTES})`)
+      const derivedHash = body.variable('l_derived_hash', 'VARCHAR2', 128)
       body.ifThen(
-        `${storedHash.name} = ${salt.name} || '$' || RAWTOHEX(DBMS_CRYPTO.HASH(UTL_RAW.CAST_TO_RAW(${salt.name} || ':' || ${password.name}), DBMS_CRYPTO.HASH_SH256))`,
-        (then) => then.return('1'),
+        `NOT REGEXP_LIKE(${storedHash.name}, '^${PASSWORD_HASH_ALGORITHM}\\$[1-9][0-9]*\\$[[:xdigit:]]{32}\\$[[:xdigit:]]{128}$')`,
+        (then) => then.return('0'),
       )
+      body.assign(
+        iterations,
+        `TO_NUMBER(REGEXP_SUBSTR(${storedHash.name}, '^${PASSWORD_HASH_ALGORITHM}\\$([1-9][0-9]*)\\$', 1, 1, NULL, 1))`,
+      )
+      body.assign(salt, `REGEXP_SUBSTR(${storedHash.name}, '[[:xdigit:]]{32}', 1, 1)`)
+      body.assign(expectedHash, `REGEXP_SUBSTR(${storedHash.name}, '[[:xdigit:]]{128}', 1, 1)`)
+      body.assign(passwordRaw, `UTL_I18N.STRING_TO_RAW(${password.name}, 'AL32UTF8')`)
+      body.raw(
+        `${roundBlock.name} := DBMS_CRYPTO.MAC(UTL_RAW.CONCAT(HEXTORAW(${salt.name}), HEXTORAW('00000001')), DBMS_CRYPTO.HMAC_SH512, ${passwordRaw.name});\n${derivedKey.name} := ${roundBlock.name};\nFOR ${round.name} IN 2..${iterations.name} LOOP\n  ${roundBlock.name} := DBMS_CRYPTO.MAC(${roundBlock.name}, DBMS_CRYPTO.HMAC_SH512, ${passwordRaw.name});\n  ${derivedKey.name} := UTL_RAW.BIT_XOR(${derivedKey.name}, ${roundBlock.name});\nEND LOOP`,
+      )
+      body.assign(derivedHash, `RAWTOHEX(${derivedKey.name})`)
+      body.ifThen(`${derivedHash.name} = ${expectedHash.name}`, (then) => then.return('1'))
       body.return('0')
     })
   }),

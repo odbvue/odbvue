@@ -10,6 +10,17 @@ describe('odbAuth framework package', () => {
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_auth_crypto AS')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_auth_jwt AS')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_auth AS')
+    expect(sql).toContain("'pbkdf2-sha512$210000$' || l_salt || '$' || l_hash")
+    expect(sql).toContain(
+      "DBMS_CRYPTO.MAC(UTL_RAW.CONCAT(HEXTORAW(l_salt), HEXTORAW('00000001')), DBMS_CRYPTO.HMAC_SH512, l_password_raw)",
+    )
+    expect(sql).toContain('FOR l_round IN 2..210000 LOOP')
+    expect(sql).toContain('l_password_raw RAW(2000)')
+    expect(sql).toContain('l_derived_key RAW(64)')
+    expect(sql).toContain("UTL_I18N.STRING_TO_RAW(p_password, 'AL32UTF8')")
+    expect(sql).toContain("'^pbkdf2-sha512\\$([1-9][0-9]*)\\$'")
+    expect(sql).not.toContain('DBMS_CRYPTO.PBKDF2')
+    expect(sql).not.toContain('DBMS_CRYPTO.HASH(UTL_RAW.CAST_TO_RAW(l_salt ||')
     expect(sql).toContain(
       'PROCEDURE login(p_login_username IN odb_auth_users.username%TYPE, p_password IN VARCHAR2',
     )
