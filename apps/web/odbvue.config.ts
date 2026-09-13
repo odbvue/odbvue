@@ -6,7 +6,7 @@ import icons from './src/themes/icons'
 export default defineOdbVueApp({
   title: 'OdbVue',
   version: '1.0.0',
-  auth: false,
+  auth: true,
   audit: false,
   settings: false,
   storage: false,

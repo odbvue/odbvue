@@ -22,6 +22,20 @@ export type {
   OdbVueErrorEvent,
   OdbVueErrors,
 } from './capabilities/errors/index.js'
+export {
+  authCapability,
+  authContract,
+  createOdbVueAuth,
+  useAuth,
+} from './capabilities/auth/index.js'
+export type {
+  AuthCredentials,
+  AuthSession,
+  AuthUser,
+  OdbVueAuth,
+  OdbVueAuthEndpoints,
+  OdbVueAuthOptions,
+} from './capabilities/auth/index.js'
 export * from './capabilities/http/index.js'
 export { useNetwork } from './capabilities/network/index.js'
 export type { NetworkStatus } from './capabilities/network/index.js'

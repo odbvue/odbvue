@@ -2,6 +2,7 @@ import { createHead } from '@unhead/vue/client'
 import type { App } from 'vue'
 import type { Router } from 'vue-router'
 import type { OdbVueAppConfig } from './config.js'
+import { authCapability } from '../capabilities/auth/index.js'
 import { errorsCapability } from '../capabilities/errors/index.js'
 import { httpCapability } from '../capabilities/http/index.js'
 import { i18nCapability } from '../capabilities/i18n/index.js'
@@ -15,6 +16,7 @@ import type { OdbVueRuntime } from './types.js'
 const coreCapabilities: readonly OdbVueCapability[] = [
   errorsCapability,
   stateCapability,
+  authCapability,
   httpCapability,
   i18nCapability,
   uiCapability,

@@ -89,7 +89,7 @@ export class OrdsParam {
   }
 
   get bindVariable(): string {
-    return this.name
+    return oracleParameterName(this.plsqlArg)
   }
 
   get sourceType(): 'HEADER' | 'RESPONSE' {

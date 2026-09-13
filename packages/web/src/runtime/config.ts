@@ -4,7 +4,11 @@ import type { HttpConfiguration } from '../capabilities/http/index.js'
 import { useOdbVue } from './context.js'
 import type { OdbVueHookHandlers } from './hooks.js'
 
-export type OdbVueAuthConfig = boolean | Record<string, unknown>
+export type OdbVueAuthConfig =
+  | boolean
+  | {
+      endpoints?: Partial<import('../capabilities/auth/index.js').OdbVueAuthEndpoints>
+    }
 export type OdbVueProviderConfig = boolean | { provider: string; [key: string]: unknown }
 export type OdbVueHook = (...args: unknown[]) => unknown | Promise<unknown>
 

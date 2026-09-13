@@ -2,6 +2,7 @@ import { $fetch, type FetchContext, type FetchOptions } from 'ofetch'
 import { defineCapability } from '../../runtime/capability.js'
 import { defineContract } from '../../runtime/contract.js'
 import type { OdbVueHooks } from '../../runtime/hooks.js'
+import { authContract } from '../auth/index.js'
 
 const baseURL = (import.meta as ImportMeta & { env?: { DEV?: boolean; VITE_API_URI?: string } }).env
   ?.DEV
@@ -58,8 +59,27 @@ export const httpContract = defineContract<HttpClient>('http')
 
 export const httpCapability = defineCapability({
   name: 'http',
+  requires: ['auth'],
   setup(context) {
-    context.provide(httpContract, createOdbVueHttp(context.config.http, context.hooks))
+    const auth = context.get(authContract)
+    const authEnabled = context.config.auth === true || typeof context.config.auth === 'object'
+    const http = createOdbVueHttp(
+      {
+        ...context.config.http,
+        ...(authEnabled
+          ? {
+              getAccessToken: () => auth.accessToken.value,
+              refreshAccessToken: () => auth.refresh(),
+              onRefreshFailure: (refreshContext: HttpRefreshFailureContext) => {
+                context.config.http?.onRefreshFailure?.(refreshContext)
+              },
+            }
+          : {}),
+      },
+      context.hooks,
+    )
+    auth.setHttp(http)
+    context.provide(httpContract, http)
   },
 })
 

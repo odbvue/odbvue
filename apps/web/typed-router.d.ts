@@ -66,6 +66,13 @@ declare module 'vue-router/auto-routes' {
       { capability: ParamValue<false> },
       | never
     >,
+    '/sandbox/capabilities/auth': RouteRecordInfo<
+      '/sandbox/capabilities/auth',
+      '/sandbox/capabilities/auth',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/sandbox/capabilities/components': RouteRecordInfo<
       '/sandbox/capabilities/components',
       '/sandbox/capabilities/components',
@@ -253,6 +260,14 @@ declare module 'vue-router/auto-routes' {
         | never
       pathParamNames:
         | 'capability'
+    }
+    'src/modules/sandbox/pages/capabilities/auth.vue': {
+      routes:
+        | '/sandbox/capabilities/auth'
+      views:
+        | never
+      pathParamNames:
+        | never
     }
     'src/modules/sandbox/pages/capabilities/components.vue': {
       routes:

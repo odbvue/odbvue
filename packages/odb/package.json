@@ -8,6 +8,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./auth": {
+      "types": "./dist/packages/framework/auth/index.d.ts",
+      "import": "./dist/packages/framework/auth/index.js"
     }
   },
   "scripts": {

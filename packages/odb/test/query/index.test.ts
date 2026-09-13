@@ -21,10 +21,11 @@ describe('odbQuery', () => {
       .selectFrom(users)
       .select([users.id, users.username])
       .where(users.id, '=', 42)
+      .forUpdate()
 
-    expect(query.toSQL()).toBe('SELECT id, username FROM APP_USERS WHERE id = 42')
+    expect(query.toSQL()).toBe('SELECT id, username FROM APP_USERS WHERE id = 42 FOR UPDATE')
     const compiled = query.compile()
-    expect(compiled.sql).toBe('SELECT id, username FROM APP_USERS WHERE id = :w0')
+    expect(compiled.sql).toBe('SELECT id, username FROM APP_USERS WHERE id = :w0 FOR UPDATE')
     expect(compiled.bindings).toEqual({ w0: 42 })
   })
 

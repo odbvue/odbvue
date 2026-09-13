@@ -109,11 +109,7 @@ CREATE OR REPLACE PACKAGE BODY odb_jwt AS
         IF v_payload IS NULL THEN
             RETURN NULL;
         END IF;
-        SELECT
-            json_value(v_payload, '$.' || p_name)
-        INTO v_value
-        FROM
-            dual;
+        v_value := json_object_t.parse(v_payload).get_string(p_name);
         RETURN v_value;
     END;
 

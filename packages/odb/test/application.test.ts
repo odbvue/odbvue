@@ -95,6 +95,20 @@ describe('ODB application contract', () => {
     expect(emitApplicationOrdsSql(application)).toContain('p_body => :body')
   })
 
+  it('uses identifier-safe bind variables for kebab-case ORDS parameters', () => {
+    const output = odbPackage('PCK_OUTPUT', (p) => {
+      p.proc('POST_VALUE', (proc) => {
+        proc.out('P_ACCESS_TOKEN', 'VARCHAR2')
+        proc.service({ method: 'POST', path: '/value' })
+      })
+    })
+
+    const sql = emitApplicationOrdsSql(output)
+    expect(sql).toContain('p_access_token => :accessToken')
+    expect(sql).toContain("p_name               => 'access-token'")
+    expect(sql).toContain("p_bind_variable_name => 'accessToken'")
+  })
+
   it('places typed cursor rows in reusable OpenAPI schemas', () => {
     const document = generateApplicationsOpenApi([application]) as {
       components: { schemas: Record<string, Record<string, any>> }
