@@ -341,16 +341,6 @@ export class ProcedureBody {
     return variables
   }
 
-  /** Declare a CLOB variable using the type-specific fluent API. */
-  clob(name: string): ClobVar {
-    return this.variable(name, 'CLOB')
-  }
-
-  /** Declare a BLOB variable using the type-specific fluent API. */
-  blob(name: string): BlobVar {
-    return this.variable(name, 'BLOB')
-  }
-
   /** `target := value;` */
   assign(target: string | PlsqlReference, value: PlsqlRenderable): this {
     this._statements.push({

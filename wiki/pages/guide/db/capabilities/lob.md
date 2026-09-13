@@ -29,7 +29,7 @@ const appPackage = odbPackage('pck_app', (p) => {
     const { test } = proc.parameters({ out: { test: 'CLOB' } })
 
     proc.body((body) => {
-      const vVersion = body.varchar2('v_version', 200).value('1.0.1')
+      const vVersion = body.variable('v_version', 'VARCHAR2', 200).value('1.0.1')
       body.set(test, vVersion.toBase64())
     })
   })
@@ -47,7 +47,7 @@ const { textResult, clobResult } = proc.parameters({
 })
 
 proc.body((body) => {
-  const vText = body.varchar2('v_text', 200).value('hello')
+  const vText = body.variable('v_text', 'VARCHAR2', 200).value('hello')
   const vClob = body.variable('v_clob', 'CLOB').assign('empty_clob()')
 
   body.set(textResult, vText.toBase64())

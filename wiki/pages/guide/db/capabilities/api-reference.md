@@ -32,7 +32,7 @@ odbLob.base64ToVarchar2('v_b64')
 const { result } = proc.parameters({ out: { result: 'CLOB' } })
 
 proc.body((body) => {
-  const vText = body.varchar2('v_text', 200).value('hello')
+  const vText = body.variable('v_text', 'VARCHAR2', 200).value('hello')
   body.set(result, vText.toBase64())
 })
 ```
@@ -72,7 +72,7 @@ const { token } = proc.parameters({ out: { token: 'VARCHAR2' } })
 
 proc.body((body) => {
   const vPayload = body
-    .varchar2('v_payload', 2000)
+    .variable('v_payload', 'VARCHAR2', 2000)
     .assign(`JSON_OBJECT('sub' VALUE 'u1', 'exp' VALUE odb_jwt.to_epoch() + 3600)`)
   body.set(token, odbJwt.encode('v_payload', `'my-secret'`))
 })
