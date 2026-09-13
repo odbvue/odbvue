@@ -111,6 +111,10 @@ describe('odbAuth framework package', () => {
     expect(openapi.components.schemas.OdbAuthLoginResponse.properties).not.toHaveProperty(
       'username',
     )
+    expect(openapi.components.schemas.OdbAuthMeResponse.properties).toMatchObject({
+      userId: { type: 'string' },
+      displayName: { type: 'string' },
+    })
   })
 
   it('seeds an idempotent default user through the crypto package', () => {

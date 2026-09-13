@@ -1,3 +1,5 @@
+import type { OdbType } from '../model.js'
+
 export type PlsqlType =
   | 'VARCHAR2'
   | 'PLS_INTEGER'
@@ -75,6 +77,7 @@ export type ParamNode = {
   kind: 'param'
   name: string
   type: PlsqlType | string
+  odbType?: OdbType
   direction: ParameterDirection
   options: ParamOptions
 }
@@ -88,6 +91,7 @@ export class Param<T extends PlsqlType | string = PlsqlType | string> implements
     readonly type: T,
     direction: ParameterDirection = 'IN',
     options: ParamOptions = {},
+    readonly odbType?: OdbType,
   ) {
     this._direction = direction
     this.options = { ...options }
@@ -127,6 +131,7 @@ export class Param<T extends PlsqlType | string = PlsqlType | string> implements
       kind: 'param',
       name: this.name,
       type: this.type,
+      odbType: this.odbType,
       direction: this._direction,
       options: { ...this.options },
     }

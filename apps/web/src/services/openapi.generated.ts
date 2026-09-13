@@ -144,7 +144,7 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
-                    username?: unknown;
+                    username?: string;
                     password?: string;
                 };
             };
@@ -237,8 +237,8 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
-                    username?: unknown;
-                    password?: unknown;
+                    username?: string;
+                    password?: string;
                 };
             };
         };

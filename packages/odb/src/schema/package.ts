@@ -23,7 +23,7 @@ import {
   type OrdsParamType,
   type OrdsResultColumnNode,
 } from '../ords.js'
-import { odbTypeFromPlsql, oracleParameterName, ordsTypeFromPlsql } from '../model.js'
+import { odbTypeFromPlsql, oracleParameterName, ordsTypeFromPlsql, type OdbType } from '../model.js'
 import { Column, type ColumnNode } from './column.js'
 import { odbQuery } from '../query/index.js'
 import type { Insertable, Table } from './table.js'
@@ -135,6 +135,10 @@ function inputParameterType(input: ParameterInput): PlsqlType | string {
   if (input instanceof Column) return input.typeReference()
   if (typeof input === 'object') return input.type
   return parameterTypeAliases[input as ParameterTypeAlias] ?? input
+}
+
+function inputParameterOdbType(input: ParameterInput): OdbType {
+  return input instanceof Column ? input.type : odbTypeFromPlsql(inputParameterType(input))
 }
 
 /** ODB type descriptors for use with named parameters and local variables. */
@@ -750,7 +754,7 @@ function buildOrdsEndpoint(
       ordsType === 'RESULTSET'
         ? procedure.body?.resultSets?.[param.name.toUpperCase()]?.map((column) => ({ ...column }))
         : undefined,
-      overriddenType === undefined ? odbTypeFromPlsql(param.type) : undefined,
+      overriddenType === undefined ? (param.odbType ?? odbTypeFromPlsql(param.type)) : undefined,
       transport?.name,
       transport?.transport === 'header'
         ? 'HEADER'
@@ -792,7 +796,13 @@ export class Procedure {
     direction: ParameterDirection = 'IN',
   ): Param<T> {
     const definition = typeof type === 'object' ? type : { type }
-    const p = new Param(name, definition.type, direction, { length: definition.length })
+    const p = new Param(
+      name,
+      definition.type,
+      direction,
+      { length: definition.length },
+      odbTypeFromPlsql(definition.type),
+    )
     this._params.push(p)
     return p
   }
@@ -813,11 +823,20 @@ export class Procedure {
     const parameters = {} as NamedParameters<TParameters>
     for (const [direction, inputs] of Object.entries(definitions)) {
       for (const [key, input] of Object.entries(inputs ?? {})) {
-        const parameter = this.param(
+        const definition = input as ParameterInput
+        const parameter = new Param(
           inputParameterName(key),
-          inputParameterType(input as ParameterInput),
+          inputParameterType(definition),
           direction === 'out' ? 'OUT' : direction === 'inOut' ? 'IN OUT' : 'IN',
+          {
+            length:
+              typeof definition === 'object' && !(definition instanceof Column)
+                ? definition.length
+                : undefined,
+          },
+          inputParameterOdbType(definition),
         )
+        this._params.push(parameter)
         Object.assign(parameters, { [key]: parameter })
       }
     }
