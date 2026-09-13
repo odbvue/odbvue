@@ -29,7 +29,7 @@ export type OrdsParamNode = {
   direction: OrdsParamDirection
   paramType: OrdsParamType
   odbType?: OdbType
-  sourceType: 'HEADER' | 'RESPONSE' | 'URI'
+  sourceType: 'BODY' | 'HEADER' | 'RESPONSE' | 'URI'
   comment?: string
   resultColumns?: OrdsResultColumnNode[]
 }
@@ -78,7 +78,7 @@ export class OrdsParam {
     readonly resultColumns?: OrdsResultColumnNode[],
     readonly odbType?: OdbType,
     private readonly nameOverride?: string,
-    private readonly sourceTypeOverride?: 'HEADER' | 'RESPONSE' | 'URI',
+    private readonly sourceTypeOverride?: 'BODY' | 'HEADER' | 'RESPONSE' | 'URI',
   ) {}
 
   /**
@@ -94,8 +94,12 @@ export class OrdsParam {
     return oracleParameterName(this.plsqlArg)
   }
 
-  get sourceType(): 'HEADER' | 'RESPONSE' | 'URI' {
+  get sourceType(): 'BODY' | 'HEADER' | 'RESPONSE' | 'URI' {
     return this.sourceTypeOverride ?? (this.direction === 'OUT' ? 'RESPONSE' : 'HEADER')
+  }
+
+  get hasSourceTypeOverride(): boolean {
+    return this.sourceTypeOverride !== undefined
   }
 
   toNode(sourceType: OrdsParamNode['sourceType'] = this.sourceType): OrdsParamNode {
@@ -177,7 +181,7 @@ export class OrdsEndpoint {
     resultColumns?: OrdsResultColumnNode[],
     odbType?: OdbType,
     nameOverride?: string,
-    sourceTypeOverride?: 'HEADER' | 'RESPONSE' | 'URI',
+    sourceTypeOverride?: 'BODY' | 'HEADER' | 'RESPONSE' | 'URI',
   ): this {
     this._params.push(
       new OrdsParam(
@@ -242,19 +246,27 @@ export class OrdsEndpoint {
       .map((p) =>
         p.plsqlArg.toUpperCase() === 'P_BODY'
           ? `${p.plsqlArg.toLowerCase()} => :body`
-          : `${p.plsqlArg.toLowerCase()} => :${p.bindVariable}`,
+          : this.paramSourceType(p) === 'BODY'
+            ? `${p.plsqlArg.toLowerCase()} => ${jsonValueExpression(p)}`
+            : `${p.plsqlArg.toLowerCase()} => :${p.bindVariable}`,
       )
       .join(', ')
-    return `BEGIN ${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args}); END;`
+    const declaration = this._params.some((param) => this.paramSourceType(param) === 'BODY')
+      ? 'DECLARE v_body CLOB := :body_text; '
+      : ''
+    return `${declaration}BEGIN ${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args}); END;`
   }
 
   private paramSourceType(param: OrdsParam): OrdsParamNode['sourceType'] {
-    if (param.sourceType === 'RESPONSE' || param.sourceType === 'URI') return param.sourceType
-    if (param.direction === 'OUT') return 'HEADER'
+    if (param.hasSourceTypeOverride) {
+      return param.sourceType
+    }
+    if (param.direction === 'OUT') return 'RESPONSE'
     const pathParams = new Set(
       [...this.effectivePattern.matchAll(/:([a-zA-Z0-9_-]+)\??/g)].map((match) => match[1]),
     )
-    return pathParams.has(param.name) ? 'URI' : 'HEADER'
+    if (pathParams.has(param.name)) return 'URI'
+    return this.effectiveMethod === 'POST' || this.effectiveMethod === 'PUT' ? 'BODY' : 'HEADER'
   }
 
   toNode(): OrdsEndpointNode {
@@ -310,7 +322,7 @@ export class OrdsEndpoint {
       `  );`,
       `  COMMIT;`,
       ...this._params.flatMap((p) => {
-        if (p.plsqlArg.toUpperCase() === 'P_BODY') return []
+        if (p.plsqlArg.toUpperCase() === 'P_BODY' || this.paramSourceType(p) === 'BODY') return []
         return [
           '',
           `  ords.define_parameter(`,
@@ -362,6 +374,27 @@ export class OrdsEndpoint {
       tempOrdsProcedureName(this.module, this.procedureName, 'down'),
       body,
     )
+  }
+}
+
+function jsonValueExpression(param: OrdsParam): string {
+  const path = `$.${param.name}`
+  if (param.paramType === 'BOOLEAN') {
+    return `CASE JSON_VALUE(v_body, '${path}' RETURNING VARCHAR2(5)) WHEN 'true' THEN TRUE WHEN 'false' THEN FALSE END`
+  }
+  return `JSON_VALUE(v_body, '${path}' RETURNING ${jsonValueType(param.paramType)})`
+}
+
+function jsonValueType(paramType: OrdsParamType): string {
+  switch (paramType) {
+    case 'INT':
+    case 'LONG':
+    case 'DOUBLE':
+      return 'NUMBER'
+    case 'TIMESTAMP':
+      return 'TIMESTAMP'
+    default:
+      return 'VARCHAR2(32767)'
   }
 }
 

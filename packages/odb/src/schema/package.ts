@@ -567,7 +567,7 @@ export type OrdsServiceDefinition = {
 }
 
 export type OrdsParameterTransport = {
-  /** `body` maps OUT values to JSON, `header` maps HTTP headers, and `uri` maps route values. */
+  /** `body` maps IN values from JSON, `header` maps HTTP headers, and `uri` maps route values. */
   transport: 'body' | 'header' | 'uri'
   /** HTTP header or URI parameter name. Defaults to the generated kebab-case parameter name. */
   name?: string
@@ -615,7 +615,9 @@ function buildOrdsEndpoint(
         ? 'HEADER'
         : transport?.transport === 'uri'
           ? 'URI'
-          : undefined,
+          : transport?.transport === 'body'
+            ? 'BODY'
+            : undefined,
     )
   }
 

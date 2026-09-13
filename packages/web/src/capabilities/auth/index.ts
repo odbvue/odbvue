@@ -157,9 +157,8 @@ export function createOdbVueAuth<User extends AuthUser = AuthUser>(
       try {
         const response = await requireHttp().post<AuthTokens | OrdsAuthTokens>(
           endpoints.login,
-          undefined,
+          credentials,
           {
-            headers: { 'login-username': credentials.username, password: credentials.password },
             credentials: 'include',
           },
         )

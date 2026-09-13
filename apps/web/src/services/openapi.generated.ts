@@ -137,14 +137,18 @@ export interface operations {
     "odb-auth_login": {
         parameters: {
             query?: never;
-            header?: {
-                "login-username"?: unknown;
-                password?: string;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    username?: unknown;
+                    password?: string;
+                };
+            };
+        };
         responses: {
             /** @description Successful response */
             200: {
@@ -226,14 +230,18 @@ export interface operations {
     app_bootstrap: {
         parameters: {
             query?: never;
-            header?: {
-                username?: unknown;
-                password?: unknown;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    username?: unknown;
+                    password?: unknown;
+                };
+            };
+        };
         responses: {
             /** @description Successful response */
             200: {

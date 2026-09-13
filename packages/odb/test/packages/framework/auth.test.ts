@@ -51,6 +51,14 @@ describe('odbAuth framework package', () => {
     expect(sql).toContain("p_pattern        => 'login'")
     expect(sql).toContain("p_pattern        => 'refresh'")
     expect(sql).toContain("p_pattern        => 'me'")
+    expect(sql).toContain(
+      "p_login_username => JSON_VALUE(v_body, ''$.username'' RETURNING VARCHAR2(32767))",
+    )
+    expect(sql).toContain(
+      "p_password => JSON_VALUE(v_body, ''$.password'' RETURNING VARCHAR2(32767))",
+    )
+    expect(sql).not.toContain("p_bind_variable_name => 'loginUsername'")
+    expect(sql).not.toContain("p_bind_variable_name => 'password'")
     expect(sql).toContain("p_name               => 'Cookie'")
     expect(sql).toContain("p_name               => 'Set-Cookie'")
   })

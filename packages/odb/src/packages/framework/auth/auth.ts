@@ -256,6 +256,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
         basePath: '/auth',
         summary: 'Authenticate using username and password',
         params: {
+          P_LOGIN_USERNAME: { transport: 'body', name: 'username' },
           P_SET_COOKIE: { transport: 'header', name: 'Set-Cookie' },
         },
       })

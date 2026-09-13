@@ -95,6 +95,44 @@ describe('ODB application contract', () => {
     expect(emitApplicationOrdsSql(application)).toContain('p_body => :body')
   })
 
+  it('maps POST inputs from a JSON request body instead of HTTP headers', () => {
+    const login = odbPackage('PCK_AUTH', (p) => {
+      p.proc('POST_LOGIN', (proc) => {
+        proc.in('P_USERNAME', 'VARCHAR2')
+        proc.in('P_PASSWORD', 'VARCHAR2')
+        proc.service({ method: 'POST', path: '/login' })
+      })
+    })
+
+    const sql = emitApplicationOrdsSql(login)
+    const document = generateApplicationOpenApi(login) as {
+      paths: Record<string, Record<string, any>>
+    }
+
+    expect(sql).toContain('DECLARE v_body CLOB := :body_text;')
+    expect(sql).toContain(
+      "p_username => JSON_VALUE(v_body, ''$.username'' RETURNING VARCHAR2(32767))",
+    )
+    expect(sql).toContain(
+      "p_password => JSON_VALUE(v_body, ''$.password'' RETURNING VARCHAR2(32767))",
+    )
+    expect(sql).not.toContain("p_name               => 'username'")
+    expect(sql).not.toContain("p_name               => 'password'")
+    expect(document.paths['/auth/login']?.post).toMatchObject({
+      parameters: [],
+      requestBody: {
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: { username: { type: 'string' }, password: { type: 'string' } },
+            },
+          },
+        },
+      },
+    })
+  })
+
   it('uses identifier-safe bind variables for kebab-case ORDS parameters', () => {
     const output = odbPackage('PCK_OUTPUT', (p) => {
       p.proc('POST_VALUE', (proc) => {

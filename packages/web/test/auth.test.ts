@@ -37,6 +37,12 @@ describe('authentication capability', () => {
     const auth = createOdbVueAuth({ http })
 
     await auth.login({ username: 'ada', password: 'password' })
+    expect(http.post).toHaveBeenNthCalledWith(
+      1,
+      '/auth/login',
+      { username: 'ada', password: 'password' },
+      { credentials: 'include' },
+    )
     expect(auth.authenticated.value).toBe(false)
     await expect(auth.refresh()).resolves.toBe(true)
     await expect(auth.me()).resolves.toMatchObject({ id: 7, username: 'ada' })

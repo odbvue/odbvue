@@ -170,3 +170,5 @@ proc.service({
 ```
 
 Optional `module`, `basePath`, and `paramTypes` properties override derived ORDS configuration. `proc.service()` stores this metadata directly in the application contract used by ORDS, client, and OpenAPI generators.
+
+For `POST` and `PUT` services, IN parameters are JSON request-body fields by default. Configure `params` when a parameter must instead use a header or URI binding.

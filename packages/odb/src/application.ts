@@ -107,7 +107,8 @@ export function generateApplicationsOpenApi(
         .filter(
           (param) =>
             (param.direction === 'IN' || param.direction === 'IN OUT') &&
-            param.plsqlArg.toUpperCase() !== 'P_BODY',
+            param.plsqlArg.toUpperCase() !== 'P_BODY' &&
+            param.sourceType !== 'BODY',
         )
         .map((param) => ({
           name: param.name,
@@ -115,10 +116,10 @@ export function generateApplicationsOpenApi(
           required: param.sourceType === 'URI',
           schema: openApiSchema(param.paramType, param.odbType),
         }))
-      const bodyParam = endpoint.params.find(
+      const bodyParams = endpoint.params.filter(
         (param) =>
           (param.direction === 'IN' || param.direction === 'IN OUT') &&
-          param.plsqlArg.toUpperCase() === 'P_BODY',
+          (param.plsqlArg.toUpperCase() === 'P_BODY' || param.sourceType === 'BODY'),
       )
       const operationName = toPascalCase(`${endpoint.module}_${endpoint.procedureName}`)
       const outputs: Record<string, Record<string, unknown>> = {}
@@ -162,10 +163,24 @@ export function generateApplicationsOpenApi(
         operationId: `${endpoint.module}_${endpoint.procedureName}`,
         summary: endpoint.comment,
         parameters,
-        ...(bodyParam
+        ...(bodyParams.length > 0
           ? {
               requestBody: {
-                content: { 'application/json': { schema: {} } },
+                content: {
+                  'application/json': {
+                    schema: bodyParams.some((param) => param.plsqlArg.toUpperCase() === 'P_BODY')
+                      ? {}
+                      : objectSchema(
+                          Object.fromEntries(
+                            bodyParams.map((param) => [
+                              param.name,
+                              openApiSchema(param.paramType, param.odbType),
+                            ]),
+                          ),
+                          [],
+                        ),
+                  },
+                },
               },
             }
           : {}),

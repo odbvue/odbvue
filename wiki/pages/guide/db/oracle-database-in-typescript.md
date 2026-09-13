@@ -323,6 +323,18 @@ The service contract makes the HTTP method and route visible during code review.
 
 - package name becomes the ORDS module name
 - PL/SQL parameters map to ORDS parameters
+- `POST` and `PUT` IN parameters map to fields in an `application/json` request body; `GET` parameters remain route or header bindings
+
+For example, a login procedure with `P_USERNAME` and `P_PASSWORD` receives:
+
+```json
+{
+  "username": "admin",
+  "password": "..."
+}
+```
+
+Use `params` to override a parameter's transport when an endpoint needs an explicit header or route binding.
 
 Service metadata belongs in `.service({ method, path })`, making the application contract explicit and reusable by ORDS, client, and OpenAPI generators.
 
