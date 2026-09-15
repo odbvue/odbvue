@@ -204,6 +204,14 @@ export const odbType = {
 
 export type IfBranchNode = { condition: string; statements: StatementNode[] }
 
+export type ForRangeNode = {
+  kind: 'for-range'
+  index: string
+  from: string
+  to: string
+  statements: StatementNode[]
+}
+
 export type StatementNode =
   | { kind: 'assign'; target: string; value: string }
   | { kind: 'return'; value?: string }
@@ -211,6 +219,7 @@ export type StatementNode =
   | { kind: 'commit' }
   | { kind: 'raw'; sql: string }
   | { kind: 'if'; branches: IfBranchNode[]; elseStatements?: StatementNode[] }
+  | ForRangeNode
 
 export type ExceptionHandlerNode = { when: string; statements: StatementNode[] }
 
@@ -581,6 +590,34 @@ export class ProcedureBody {
       node.elseStatements = this.childStatements(buildElse)
     }
     this._statements.push(node)
+    return this
+  }
+
+  /**
+   * Emit `FOR <index> IN <from>..<to> LOOP ... END LOOP;`. The loop index is
+   * an implicit `PLS_INTEGER` variable and is not separately declared.
+   *
+   * @example
+   * body.forRange('attempt', 1, pRetries, (attempt, loop) =>
+   *   loop.set(vResult, calculate(attempt)),
+   * )
+   */
+  forRange(
+    index: string,
+    from: PlsqlRenderable | number,
+    to: PlsqlRenderable | number,
+    build: (index: LocalVar<'PLS_INTEGER'>, body: ProcedureBody) => void,
+  ): this {
+    const loopIndex = new LocalVar(localVariableName(index), 'PLS_INTEGER')
+    const renderBound = (value: PlsqlRenderable | number) =>
+      typeof value === 'number' ? String(value) : renderPlsql(value)
+    this._statements.push({
+      kind: 'for-range',
+      index: loopIndex.name,
+      from: renderBound(from),
+      to: renderBound(to),
+      statements: this.childStatements((body) => build(loopIndex, body)),
+    })
     return this
   }
 
@@ -1233,6 +1270,12 @@ function emitStatement(stmt: StatementNode, indent: string): string[] {
       lines.push(`${indent}END IF;`)
       return lines
     }
+    case 'for-range':
+      return [
+        `${indent}FOR ${stmt.index} IN ${stmt.from}..${stmt.to} LOOP`,
+        ...emitStatementBlock(stmt.statements, `${indent}  `),
+        `${indent}END LOOP;`,
+      ]
   }
 }
 

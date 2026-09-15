@@ -99,10 +99,9 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
   hashPassword: pkg.func('hash_password', odbType.string(512), (fn) => {
     const password = fn.param('p_password', odbType.string())
     fn.body((body) => {
-      const { salt, passwordRaw, round, roundBlock, derivedKey, hash } = body.variables({
+      const { salt, passwordRaw, roundBlock, derivedKey, hash } = body.variables({
         salt: odbType.string(32),
         passwordRaw: odbType.raw(2000),
-        round: odbType.integer(),
         roundBlock: odbType.raw(PASSWORD_HASH_BYTES),
         derivedKey: odbType.raw(PASSWORD_HASH_BYTES),
         hash: odbType.string(128),
@@ -118,9 +117,10 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
         ),
       )
       body.set(derivedKey, roundBlock)
-      body.raw(
-        `FOR ${round.name} IN 2..${PASSWORD_HASH_ITERATIONS} LOOP\n  ${roundBlock.name} := ${odbDbmsCrypto.mac(roundBlock, odbDbmsCrypto.HMAC_SH512, passwordRaw).toSQL()};\n  ${derivedKey.name} := ${odbUtlRaw.bitXor(derivedKey, roundBlock).toSQL()};\nEND LOOP`,
-      )
+      body.forRange('round', 2, PASSWORD_HASH_ITERATIONS, (_round, loop) => {
+        loop.set(roundBlock, odbDbmsCrypto.mac(roundBlock, odbDbmsCrypto.HMAC_SH512, passwordRaw))
+        loop.set(derivedKey, odbUtlRaw.bitXor(derivedKey, roundBlock))
+      })
       body.set(hash, odbOracle.rawToHex(derivedKey))
       body.return(
         `'${PASSWORD_HASH_ALGORITHM}$${PASSWORD_HASH_ITERATIONS}$' || ${salt.name} || '$' || ${hash.name}`,
@@ -131,25 +131,16 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
     const password = fn.param('p_password', odbType.string())
     const storedHash = fn.param('p_password_hash', odbType.string())
     fn.body((body) => {
-      const {
-        iterations,
-        salt,
-        expectedHash,
-        passwordRaw,
-        round,
-        roundBlock,
-        derivedKey,
-        derivedHash,
-      } = body.variables({
-        iterations: odbType.number(),
-        salt: odbType.string(32),
-        expectedHash: odbType.string(128),
-        passwordRaw: odbType.raw(2000),
-        round: odbType.integer(),
-        roundBlock: odbType.raw(PASSWORD_HASH_BYTES),
-        derivedKey: odbType.raw(PASSWORD_HASH_BYTES),
-        derivedHash: odbType.string(128),
-      })
+      const { iterations, salt, expectedHash, passwordRaw, roundBlock, derivedKey, derivedHash } =
+        body.variables({
+          iterations: odbType.number(),
+          salt: odbType.string(32),
+          expectedHash: odbType.string(128),
+          passwordRaw: odbType.raw(2000),
+          roundBlock: odbType.raw(PASSWORD_HASH_BYTES),
+          derivedKey: odbType.raw(PASSWORD_HASH_BYTES),
+          derivedHash: odbType.string(128),
+        })
       body.ifThen(
         `NOT REGEXP_LIKE(${storedHash.name}, '^${PASSWORD_HASH_ALGORITHM}\\$[1-9][0-9]*\\$[[:xdigit:]]{32}\\$[[:xdigit:]]{128}$')`,
         (then) => then.return('0'),
@@ -182,9 +173,10 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
         ),
       )
       body.set(derivedKey, roundBlock)
-      body.raw(
-        `FOR ${round.name} IN 2..${iterations.name} LOOP\n  ${roundBlock.name} := ${odbDbmsCrypto.mac(roundBlock, odbDbmsCrypto.HMAC_SH512, passwordRaw).toSQL()};\n  ${derivedKey.name} := ${odbUtlRaw.bitXor(derivedKey, roundBlock).toSQL()};\nEND LOOP`,
-      )
+      body.forRange('round', 2, iterations, (_round, loop) => {
+        loop.set(roundBlock, odbDbmsCrypto.mac(roundBlock, odbDbmsCrypto.HMAC_SH512, passwordRaw))
+        loop.set(derivedKey, odbUtlRaw.bitXor(derivedKey, roundBlock))
+      })
       body.set(derivedHash, odbOracle.rawToHex(derivedKey))
       body.ifThen(`${derivedHash.name} = ${expectedHash.name}`, (then) => then.return('1'))
       body.return('0')

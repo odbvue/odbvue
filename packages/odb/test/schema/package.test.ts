@@ -163,6 +163,26 @@ describe('ProcedureBody control flow and exceptions', () => {
     expect(sql).toContain('END IF;')
   })
 
+  it('emits a typed FOR range with its implicit index', () => {
+    const sql = bodyLines((proc) => {
+      proc.body((body) => {
+        const { total, limit } = body.variables({
+          total: odbType.integer(),
+          limit: odbType.integer(),
+        })
+        body.forRange('attempt', 2, limit, (attempt, loop) => {
+          expect(attempt.name).toBe('l_attempt')
+          loop.set(total, attempt)
+        })
+      })
+    })
+
+    expect(sql).toContain('FOR l_attempt IN 2..l_limit LOOP')
+    expect(sql).toContain('l_total := l_attempt;')
+    expect(sql).not.toContain('l_attempt PLS_INTEGER;')
+    expect(sql).toContain('END LOOP;')
+  })
+
   it('emits an EXCEPTION section with a WHEN OTHERS handler', () => {
     const sql = bodyLines((proc) => {
       const result = proc.param('R_OUT', 'VARCHAR2', 'OUT')
