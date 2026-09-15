@@ -54,52 +54,56 @@ describe('odbDbmsLob', () => {
 
   describe('procedures (statement strings)', () => {
     it('append', () => {
-      expect(odbDbmsLob.append('v_dest', 'v_src')).toBe('DBMS_LOB.APPEND(v_dest, v_src)')
+      expect(odbDbmsLob.append('v_dest', 'v_src').toSQL()).toBe('DBMS_LOB.APPEND(v_dest, v_src)')
     })
 
     it('copy with optional offsets', () => {
-      expect(odbDbmsLob.copy('v_dest', 'v_src', 100)).toBe('DBMS_LOB.COPY(v_dest, v_src, 100)')
-      expect(odbDbmsLob.copy('v_dest', 'v_src', 100, 1, 1)).toBe(
+      expect(odbDbmsLob.copy('v_dest', 'v_src', 100).toSQL()).toBe(
+        'DBMS_LOB.COPY(v_dest, v_src, 100)',
+      )
+      expect(odbDbmsLob.copy('v_dest', 'v_src', 100, 1, 1).toSQL()).toBe(
         'DBMS_LOB.COPY(v_dest, v_src, 100, 1, 1)',
       )
     })
 
     it('createTemporary renders a boolean cache flag as TRUE/FALSE', () => {
-      expect(odbDbmsLob.createTemporary('v_tmp', true, odbDbmsLob.SESSION)).toBe(
+      expect(odbDbmsLob.createTemporary('v_tmp', true, odbDbmsLob.SESSION).toSQL()).toBe(
         'DBMS_LOB.CREATETEMPORARY(v_tmp, TRUE, DBMS_LOB.SESSION)',
       )
-      expect(odbDbmsLob.createTemporary('v_tmp', false)).toBe(
+      expect(odbDbmsLob.createTemporary('v_tmp', false).toSQL()).toBe(
         'DBMS_LOB.CREATETEMPORARY(v_tmp, FALSE)',
       )
     })
 
     it('freeTemporary / open / close / trim / erase', () => {
-      expect(odbDbmsLob.freeTemporary('v_tmp')).toBe('DBMS_LOB.FREETEMPORARY(v_tmp)')
-      expect(odbDbmsLob.open('v_lob', odbDbmsLob.LOB_READWRITE)).toBe(
+      expect(odbDbmsLob.freeTemporary('v_tmp').toSQL()).toBe('DBMS_LOB.FREETEMPORARY(v_tmp)')
+      expect(odbDbmsLob.open('v_lob', odbDbmsLob.LOB_READWRITE).toSQL()).toBe(
         'DBMS_LOB.OPEN(v_lob, DBMS_LOB.LOB_READWRITE)',
       )
-      expect(odbDbmsLob.close('v_lob')).toBe('DBMS_LOB.CLOSE(v_lob)')
-      expect(odbDbmsLob.trim('v_lob', 10)).toBe('DBMS_LOB.TRIM(v_lob, 10)')
-      expect(odbDbmsLob.erase('v_lob', 5, 1)).toBe('DBMS_LOB.ERASE(v_lob, 5, 1)')
+      expect(odbDbmsLob.close('v_lob').toSQL()).toBe('DBMS_LOB.CLOSE(v_lob)')
+      expect(odbDbmsLob.trim('v_lob', 10).toSQL()).toBe('DBMS_LOB.TRIM(v_lob, 10)')
+      expect(odbDbmsLob.erase('v_lob', 5, 1).toSQL()).toBe('DBMS_LOB.ERASE(v_lob, 5, 1)')
     })
 
     it('write / writeAppend / read', () => {
-      expect(odbDbmsLob.write('v_lob', 5, 1, 'v_buf')).toBe('DBMS_LOB.WRITE(v_lob, 5, 1, v_buf)')
-      expect(odbDbmsLob.writeAppend('v_lob', 5, 'v_buf')).toBe(
+      expect(odbDbmsLob.write('v_lob', 5, 1, 'v_buf').toSQL()).toBe(
+        'DBMS_LOB.WRITE(v_lob, 5, 1, v_buf)',
+      )
+      expect(odbDbmsLob.writeAppend('v_lob', 5, 'v_buf').toSQL()).toBe(
         'DBMS_LOB.WRITEAPPEND(v_lob, 5, v_buf)',
       )
-      expect(odbDbmsLob.read('v_lob', 'v_amt', 1, 'v_buf')).toBe(
+      expect(odbDbmsLob.read('v_lob', 'v_amt', 1, 'v_buf').toSQL()).toBe(
         'DBMS_LOB.READ(v_lob, v_amt, 1, v_buf)',
       )
     })
 
     it('fileOpen / fileClose / fileCloseAll', () => {
-      expect(odbDbmsLob.fileOpen('v_bfile')).toBe('DBMS_LOB.FILEOPEN(v_bfile)')
-      expect(odbDbmsLob.fileOpen('v_bfile', odbDbmsLob.FILE_READONLY)).toBe(
+      expect(odbDbmsLob.fileOpen('v_bfile').toSQL()).toBe('DBMS_LOB.FILEOPEN(v_bfile)')
+      expect(odbDbmsLob.fileOpen('v_bfile', odbDbmsLob.FILE_READONLY).toSQL()).toBe(
         'DBMS_LOB.FILEOPEN(v_bfile, DBMS_LOB.FILE_READONLY)',
       )
-      expect(odbDbmsLob.fileClose('v_bfile')).toBe('DBMS_LOB.FILECLOSE(v_bfile)')
-      expect(odbDbmsLob.fileCloseAll()).toBe('DBMS_LOB.FILECLOSEALL')
+      expect(odbDbmsLob.fileClose('v_bfile').toSQL()).toBe('DBMS_LOB.FILECLOSE(v_bfile)')
+      expect(odbDbmsLob.fileCloseAll().toSQL()).toBe('DBMS_LOB.FILECLOSEALL')
     })
   })
 

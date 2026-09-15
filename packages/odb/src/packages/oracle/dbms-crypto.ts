@@ -8,7 +8,7 @@
 // The RAW-returning subprograms are exposed here as typed `PlsqlExpression<T>`
 // expression builders. The LOB (BLOB/CLOB) ENCRYPT/DECRYPT *procedure*
 // overloads are not wrapped — convert LOB data to RAW and use the function
-// forms, or emit the procedure call via `body.raw(...)`.
+// forms. Procedure overloads are intentionally not wrapped yet.
 //
 // Algorithm/modifier constants are exposed as `PlsqlExpression<'PLS_INTEGER'>`
 // so they pass straight into the `typ` argument. Block-cipher suites are the

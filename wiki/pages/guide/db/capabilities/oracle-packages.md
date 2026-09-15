@@ -4,6 +4,32 @@ OdbVue provides typed TypeScript wrappers for Oracle's built-in PL/SQL packages.
 
 Each wrapper function returns a typed expression whose PL/SQL return type flows into `body.set()`, so mismatches are caught at compile time.
 
+Wrappers for Oracle procedures return typed statements instead. Pass these to `body.call()`; reserve `body.raw()` for SQL that does not yet have a structured ODB representation.
+
+## `odbOracle` — Standard Oracle Expressions
+
+Common Oracle built-ins and pseudocolumns are typed expressions too.
+
+```ts
+import { odbDbmsCrypto, odbOracle } from '@odbvue/odb'
+
+body.set(salt, odbOracle.rawToHex(odbDbmsCrypto.randomBytes(16)))
+body.set(sessionId, odbOracle.lower(odbOracle.rawToHex(odbOracle.sysGuid())))
+body.set(now, odbOracle.sysTimestamp())
+```
+
+Includes `rawToHex`, `hexToRaw`, `sysGuid`, `sysTimestamp`, `lower`, `trim`, `nvl`, `toNumber`, `regexpReplace`, and `regexpSubstr`.
+
+## `odbUtlI18n` — `UTL_I18N`
+
+Character-set-aware conversion from text to RAW.
+
+```ts
+import { odbLiteral, odbUtlI18n } from '@odbvue/odb'
+
+body.set(passwordRaw, odbUtlI18n.stringToRaw(password, odbLiteral('AL32UTF8')))
+```
+
 ## `odbUtlRaw` — `UTL_RAW`
 
 RAW manipulation, bitwise operations, and casts.
@@ -46,12 +72,12 @@ odbDbmsLob.getLength('v_clob') // DBMS_LOB.GETLENGTH(v_clob)
 odbDbmsLob.substr('v_clob', 100, 1) // → VARCHAR2
 odbDbmsLob.instr('v_clob', 'v_pat') // → INTEGER
 
-// Procedures return a call string for body.raw(...):
-body.raw(odbDbmsLob.createTemporary('v_tmp', true, odbDbmsLob.SESSION))
-body.raw(odbDbmsLob.append('v_dest', 'v_src'))
+// Procedures return typed statements:
+body.call(odbDbmsLob.createTemporary('v_tmp', true, odbDbmsLob.SESSION))
+body.call(odbDbmsLob.append('v_dest', 'v_src'))
 ```
 
-Functions (expressions): `getLength`, `getChunkSize`, `compare`, `instr`, `substr`/`substrRaw`, `isOpen`, `isTemporary`, `fileExists`, … Procedures (statement strings for `body.raw(...)`): `append`, `copy`, `createTemporary`, `freeTemporary`, `open`/`close`, `trim`, `erase`, `write`/`writeAppend`/`read`, and the `FILE*` helpers. Constants include `LOB_READONLY`, `LOB_READWRITE`, `SESSION`, `CALL`, and `LOBMAXSIZE`.
+Functions (expressions): `getLength`, `getChunkSize`, `compare`, `instr`, `substr`/`substrRaw`, `isOpen`, `isTemporary`, `fileExists`, … Procedures (typed statements for `body.call(...)`): `append`, `copy`, `createTemporary`, `freeTemporary`, `open`/`close`, `trim`, `erase`, `write`/`writeAppend`/`read`, and the `FILE*` helpers. Constants include `LOB_READONLY`, `LOB_READWRITE`, `SESSION`, `CALL`, and `LOBMAXSIZE`.
 
 ## `odbDbmsCrypto` — `DBMS_CRYPTO`
 
@@ -85,5 +111,15 @@ const secure = odbPackage('pck_secure', (pkg) => {
       body.return(odbDbmsCrypto.hash(pData, odbDbmsCrypto.HASH_SH256))
     })
   })
+})
+```
+
+## Example: typed control flow
+
+`forRange()` renders a numeric PL/SQL `FOR` loop. Its index is an implicit `PLS_INTEGER`, so no separate local declaration is needed.
+
+```ts
+body.forRange('attempt', 1, retryLimit, (attempt, loop) => {
+  loop.set(lastAttempt, attempt)
 })
 ```

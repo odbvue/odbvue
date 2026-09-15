@@ -8,7 +8,7 @@
 //
 // 2. `odbAudit.<fn>(...)` — pure functions returning PL/SQL call/expression
 //    strings that invoke `odb_audit.*`. Use them anywhere a PL/SQL statement
-//    or expression is accepted (e.g. `body.raw(odbAudit.info("'started'"))`).
+//    or expression is accepted. Use `body.auditInfo('started')` for the common case.
 //    For the common case prefer the `body.audit*` helpers, e.g.
 //    `body.auditEvent('user logged in', { 'user.id': 'p_uuid' })`.
 //

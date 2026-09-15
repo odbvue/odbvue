@@ -40,6 +40,15 @@ export class PlsqlExpression<T extends PlsqlType | string> implements PlsqlValue
   }
 }
 
+/** A typed PL/SQL statement produced by a procedure-call wrapper. */
+export class PlsqlStatement {
+  constructor(private readonly sql: string) {}
+
+  toSQL(): string {
+    return this.sql
+  }
+}
+
 export type PlsqlRenderable = string | PlsqlValue
 
 export function renderPlsql(value: PlsqlRenderable): string {

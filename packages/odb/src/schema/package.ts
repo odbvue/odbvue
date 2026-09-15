@@ -12,6 +12,7 @@ import {
   type PlsqlRenderable,
   type PlsqlType,
   type PlsqlValue,
+  PlsqlStatement,
   emitLocalVarDecl,
   emitParamDef,
   emitParamType,
@@ -217,6 +218,7 @@ export type StatementNode =
   | { kind: 'return'; value?: string }
   | { kind: 'null' }
   | { kind: 'commit' }
+  | { kind: 'call'; sql: string }
   | { kind: 'raw'; sql: string }
   | { kind: 'if'; branches: IfBranchNode[]; elseStatements?: StatementNode[] }
   | ForRangeNode
@@ -399,6 +401,12 @@ export class ProcedureBody {
   /** `COMMIT;` */
   commit(): this {
     this._statements.push({ kind: 'commit' })
+    return this
+  }
+
+  /** Emit a typed PL/SQL procedure-call statement. */
+  call(statement: PlsqlStatement): this {
+    this._statements.push({ kind: 'call', sql: statement.toSQL() })
     return this
   }
 
@@ -1255,6 +1263,8 @@ function emitStatement(stmt: StatementNode, indent: string): string[] {
       return [`${indent}NULL;`]
     case 'commit':
       return [`${indent}COMMIT;`]
+    case 'call':
+      return [`${indent}${stmt.sql};`]
     case 'raw':
       return [`${indent}${stmt.sql.trimEnd().endsWith(';') ? stmt.sql : `${stmt.sql};`}`]
     case 'if': {

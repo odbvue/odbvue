@@ -7,9 +7,8 @@
 //
 // - **Functions** (return a value) are exposed as typed `PlsqlExpression<T>`
 //   builders — compose them with `body.set(...)`.
-// - **Procedures** (with OUT / IN OUT parameters) are exposed as builders that
-//   return the raw call *string*; pass the result to `body.raw(...)`, which
-//   emits it as a statement.
+// - **Procedures** (with OUT / IN OUT parameters) are exposed as typed
+//   `PlsqlStatement` builders; pass the result to `body.call(...)`.
 //
 // Constants (open modes, durations, LOBMAXSIZE, conversion defaults) are
 // exposed as `PlsqlExpression` values.
@@ -18,10 +17,15 @@
 //
 // @example
 // body.set(vLen, odbDbmsLob.getLength(vClob))
-// body.raw(odbDbmsLob.createTemporary('v_tmp', true, odbDbmsLob.SESSION))
-// body.raw(odbDbmsLob.append('v_dest', 'v_src'))
+// body.call(odbDbmsLob.createTemporary('v_tmp', true, odbDbmsLob.SESSION))
+// body.call(odbDbmsLob.append('v_dest', 'v_src'))
 
-import { PlsqlExpression, renderPlsql, type PlsqlRenderable } from '../../schema/attribute.js'
+import {
+  PlsqlExpression,
+  PlsqlStatement,
+  renderPlsql,
+  type PlsqlRenderable,
+} from '../../schema/attribute.js'
 
 function arg(value: PlsqlRenderable | number): string {
   return typeof value === 'number' ? String(value) : renderPlsql(value)
@@ -36,9 +40,9 @@ function fn<T extends string>(type: T, name: string, args: string[]): PlsqlExpre
   return new PlsqlExpression(type, `DBMS_LOB.${name}(${args.join(', ')})`)
 }
 
-/** Build a `DBMS_LOB.<NAME>(...)` procedure-call string for `body.raw(...)`. */
-function proc(name: string, args: string[]): string {
-  return `DBMS_LOB.${name}(${args.join(', ')})`
+/** Build a typed `DBMS_LOB.<NAME>(...)` procedure-call statement. */
+function proc(name: string, args: string[]): PlsqlStatement {
+  return new PlsqlStatement(`DBMS_LOB.${name}(${args.join(', ')})`)
 }
 
 function konst<T extends string>(type: T, name: string): PlsqlExpression<T> {
@@ -148,10 +152,10 @@ export const odbDbmsLob = {
     return fn('INTEGER', 'FILEISOPEN', [renderPlsql(fileLoc)])
   },
 
-  // ── Procedures (statements — pass to body.raw) ─────────────────────────────
+  // ── Procedures (statements — pass to body.call) ────────────────────────────
 
   /** `DBMS_LOB.APPEND(<dest_lob>, <src_lob>)` */
-  append(destLob: PlsqlRenderable, srcLob: PlsqlRenderable): string {
+  append(destLob: PlsqlRenderable, srcLob: PlsqlRenderable): PlsqlStatement {
     return proc('APPEND', [renderPlsql(destLob), renderPlsql(srcLob)])
   },
 
@@ -162,7 +166,7 @@ export const odbDbmsLob = {
     amount: PlsqlRenderable | number,
     destOffset?: PlsqlRenderable | number,
     srcOffset?: PlsqlRenderable | number,
-  ): string {
+  ): PlsqlStatement {
     const args = [renderPlsql(destLob), renderPlsql(srcLob), arg(amount)]
     if (destOffset !== undefined) args.push(arg(destOffset))
     if (srcOffset !== undefined) args.push(arg(srcOffset))
@@ -174,29 +178,29 @@ export const odbDbmsLob = {
     lobLoc: PlsqlRenderable,
     cache: PlsqlRenderable | boolean,
     dur?: PlsqlRenderable,
-  ): string {
+  ): PlsqlStatement {
     const args = [renderPlsql(lobLoc), boolArg(cache)]
     if (dur !== undefined) args.push(renderPlsql(dur))
     return proc('CREATETEMPORARY', args)
   },
 
   /** `DBMS_LOB.FREETEMPORARY(<lob_loc>)` */
-  freeTemporary(lobLoc: PlsqlRenderable): string {
+  freeTemporary(lobLoc: PlsqlRenderable): PlsqlStatement {
     return proc('FREETEMPORARY', [renderPlsql(lobLoc)])
   },
 
   /** `DBMS_LOB.OPEN(<lob_loc>, <open_mode>)` */
-  open(lobLoc: PlsqlRenderable, openMode: PlsqlRenderable): string {
+  open(lobLoc: PlsqlRenderable, openMode: PlsqlRenderable): PlsqlStatement {
     return proc('OPEN', [renderPlsql(lobLoc), renderPlsql(openMode)])
   },
 
   /** `DBMS_LOB.CLOSE(<lob_loc>)` */
-  close(lobLoc: PlsqlRenderable): string {
+  close(lobLoc: PlsqlRenderable): PlsqlStatement {
     return proc('CLOSE', [renderPlsql(lobLoc)])
   },
 
   /** `DBMS_LOB.TRIM(<lob_loc>, <newlen>)` */
-  trim(lobLoc: PlsqlRenderable, newlen: PlsqlRenderable | number): string {
+  trim(lobLoc: PlsqlRenderable, newlen: PlsqlRenderable | number): PlsqlStatement {
     return proc('TRIM', [renderPlsql(lobLoc), arg(newlen)])
   },
 
@@ -205,7 +209,7 @@ export const odbDbmsLob = {
     lobLoc: PlsqlRenderable,
     amount: PlsqlRenderable | number,
     offset?: PlsqlRenderable | number,
-  ): string {
+  ): PlsqlStatement {
     const args = [renderPlsql(lobLoc), arg(amount)]
     if (offset !== undefined) args.push(arg(offset))
     return proc('ERASE', args)
@@ -217,7 +221,7 @@ export const odbDbmsLob = {
     amount: PlsqlRenderable | number,
     offset: PlsqlRenderable | number,
     buffer: PlsqlRenderable,
-  ): string {
+  ): PlsqlStatement {
     return proc('WRITE', [renderPlsql(lobLoc), arg(amount), arg(offset), renderPlsql(buffer)])
   },
 
@@ -226,7 +230,7 @@ export const odbDbmsLob = {
     lobLoc: PlsqlRenderable,
     amount: PlsqlRenderable | number,
     buffer: PlsqlRenderable,
-  ): string {
+  ): PlsqlStatement {
     return proc('WRITEAPPEND', [renderPlsql(lobLoc), arg(amount), renderPlsql(buffer)])
   },
 
@@ -236,7 +240,7 @@ export const odbDbmsLob = {
     amount: PlsqlRenderable,
     offset: PlsqlRenderable | number,
     buffer: PlsqlRenderable,
-  ): string {
+  ): PlsqlStatement {
     return proc('READ', [
       renderPlsql(lobLoc),
       renderPlsql(amount),
@@ -246,20 +250,20 @@ export const odbDbmsLob = {
   },
 
   /** `DBMS_LOB.FILEOPEN(<file_loc>[, <open_mode>])` */
-  fileOpen(fileLoc: PlsqlRenderable, openMode?: PlsqlRenderable): string {
+  fileOpen(fileLoc: PlsqlRenderable, openMode?: PlsqlRenderable): PlsqlStatement {
     const args = [renderPlsql(fileLoc)]
     if (openMode !== undefined) args.push(renderPlsql(openMode))
     return proc('FILEOPEN', args)
   },
 
   /** `DBMS_LOB.FILECLOSE(<file_loc>)` */
-  fileClose(fileLoc: PlsqlRenderable): string {
+  fileClose(fileLoc: PlsqlRenderable): PlsqlStatement {
     return proc('FILECLOSE', [renderPlsql(fileLoc)])
   },
 
   /** `DBMS_LOB.FILECLOSEALL` */
-  fileCloseAll(): string {
-    return 'DBMS_LOB.FILECLOSEALL'
+  fileCloseAll(): PlsqlStatement {
+    return new PlsqlStatement('DBMS_LOB.FILECLOSEALL')
   },
 
   // ── Constants ──────────────────────────────────────────────────────────────

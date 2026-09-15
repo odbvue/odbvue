@@ -1,5 +1,5 @@
 import { odbPackage, odbType } from '../../../schema/package.js'
-import { PlsqlExpression } from '../../../schema/attribute.js'
+import { PlsqlExpression, PlsqlStatement } from '../../../schema/attribute.js'
 import { odbTable } from '../../../schema/table.js'
 import { odbQuery } from '../../../query/index.js'
 
@@ -154,13 +154,13 @@ export const odbRateLimit = {
       },
     }
   },
-  check(scope: string, subject: string): string {
-    return `odb_rate_limit.enforce(${scope}, ${subject})`
+  check(scope: string, subject: string): PlsqlStatement {
+    return new PlsqlStatement(`odb_rate_limit.enforce(${scope}, ${subject})`)
   },
-  failure(scope: string, subject: string): string {
-    return `odb_rate_limit.failure(${scope}, ${subject})`
+  failure(scope: string, subject: string): PlsqlStatement {
+    return new PlsqlStatement(`odb_rate_limit.failure(${scope}, ${subject})`)
   },
-  success(scope: string, subject: string): string {
-    return `odb_rate_limit.success(${scope}, ${subject})`
+  success(scope: string, subject: string): PlsqlStatement {
+    return new PlsqlStatement(`odb_rate_limit.success(${scope}, ${subject})`)
   },
 }

@@ -251,7 +251,7 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => ({
               expression('s.id', '=', sessionId),
               expression('s.user_id', '=', subject),
               expression('s.revoked_at', 'IS NULL'),
-              expression.raw('s.expires_at > SYSTIMESTAMP'),
+              expression('s.expires_at', '>', expression.ref('SYSTIMESTAMP')),
               expression('u.enabled', '=', 1),
               expression('u.token_version', '=', tokenVersion),
             ]),
@@ -288,7 +288,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
             loginSubject: odbType.string(128),
           })
         statements.set(loginSubject, odbOracle.lower(odbOracle.trim(loginUsername)))
-        statements.raw(odbRateLimit.check("'AUTH_LOGIN_USERNAME'", loginSubject.name))
+        statements.call(odbRateLimit.check("'AUTH_LOGIN_USERNAME'", loginSubject.name))
         statements.query(
           odbQuery()
             .selectFrom(authUsers)
@@ -299,7 +299,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
                 expression(
                   expression.fn('LOWER', expression.ref(authUsers.username.name)),
                   '=',
-                  expression.fn('LOWER', expression.raw(loginUsername.name)),
+                  expression.fn('LOWER', expression.ref(loginUsername.name)),
                 ),
                 expression(authUsers.enabled, '=', 1),
               ]),
@@ -312,11 +312,11 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
         statements.ifThen(
           `${odbAuthCrypto.verifyPassword(password, passwordHash).toSQL()} = 0 OR ${userId.name} IS NULL`,
           (then) => {
-            then.raw(odbRateLimit.failure("'AUTH_LOGIN_USERNAME'", loginSubject.name))
+            then.call(odbRateLimit.failure("'AUTH_LOGIN_USERNAME'", loginSubject.name))
             then.unauthorized('INVALID_CREDENTIALS')
           },
         )
-        statements.raw(odbRateLimit.success("'AUTH_LOGIN_USERNAME'", loginSubject.name))
+        statements.call(odbRateLimit.success("'AUTH_LOGIN_USERNAME'", loginSubject.name))
         statements.set(sessionId, odbOracle.lower(odbOracle.rawToHex(odbOracle.sysGuid())))
         statements.set(refreshToken, odbAuthCrypto.randomToken(odbLiteral(REFRESH_TOKEN_BYTES)))
         statements.insertInto(authSessions, {
@@ -402,7 +402,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
                   expression('s.previous_refresh_token_hash', '=', presentedRefreshTokenHash),
                 ]),
                 expression('s.revoked_at', 'IS NULL'),
-                expression.raw('s.expires_at > SYSTIMESTAMP'),
+                expression('s.expires_at', '>', expression.ref('SYSTIMESTAMP')),
               ]),
             )
             .forUpdate(),

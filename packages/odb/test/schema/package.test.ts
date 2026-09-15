@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { MigrationApplicationArtifact, MigrationSqlArtifact } from '../../src/migration.js'
 import { odbQuery } from '../../src/query/index.js'
-import { odbLiteral, type PlsqlExpression } from '../../src/schema/attribute.js'
+import { odbLiteral, PlsqlStatement, type PlsqlExpression } from '../../src/schema/attribute.js'
 import { odbPackage, odbType } from '../../src/schema/package.js'
 import { odbTable } from '../../src/schema/table.js'
 describe('odbPackage member typing', () => {
@@ -181,6 +181,14 @@ describe('ProcedureBody control flow and exceptions', () => {
     expect(sql).toContain('l_total := l_attempt;')
     expect(sql).not.toContain('l_attempt PLS_INTEGER;')
     expect(sql).toContain('END LOOP;')
+  })
+
+  it('emits typed procedure-call statements', () => {
+    const sql = bodyLines((proc) => {
+      proc.body((body) => body.call(new PlsqlStatement('pck_job.run(p_id)')))
+    })
+
+    expect(sql).toContain('pck_job.run(p_id);')
   })
 
   it('emits an EXCEPTION section with a WHEN OTHERS handler', () => {

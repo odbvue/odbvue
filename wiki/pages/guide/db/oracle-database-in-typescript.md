@@ -288,9 +288,26 @@ const usersApi = odbPackage('pck_users', (pkg) => {
 
 This emits `p_user_id`, `p_display_name`, and `l_normalized_id`. `odbType` supplies descriptors for strings, numbers, GUIDs, booleans, dates, timestamps, LOBs, and result sets; pass a table column instead when the declaration should use `<table>.<column>%TYPE`.
 
+For numeric PL/SQL loops, use `forRange()`. The callback receives the implicit `PLS_INTEGER` loop index and a nested typed statement body.
+
+```ts
+proc.body((body) => {
+  const { total, limit } = body.variables({
+    total: odbType.integer(),
+    limit: odbType.integer(),
+  })
+
+  body.forRange('attempt', 1, limit, (attempt, loop) => {
+    loop.set(total, attempt)
+  })
+})
+```
+
+This emits `FOR l_attempt IN 1..l_limit LOOP` without declaring `l_attempt` separately.
+
 ### Oracle Built-in Packages
 
-Oracle ships many built-in packages (`UTL_RAW`, `UTL_ENCODE`, `DBMS_LOB`, `DBMS_CRYPTO`, and so on). OdbVue provides typed TypeScript wrappers for the most common ones so you can compose calls inside a package body without hand-writing PL/SQL call strings. These packages already exist in every database, so there is no install step.
+Oracle ships many built-in packages (`UTL_RAW`, `UTL_ENCODE`, `UTL_I18N`, `DBMS_LOB`, `DBMS_CRYPTO`, and so on). OdbVue provides typed TypeScript wrappers for the most common ones and for standard Oracle expressions, so you can compose calls inside a package body without hand-writing PL/SQL strings. These packages already exist in every database, so there is no install step.
 
 ```ts
 import { odbDbmsCrypto, odbPackage } from '@odbvue/odb'
@@ -305,12 +322,21 @@ const secure = odbPackage('pck_secure', (pkg) => {
 })
 ```
 
-Each wrapper returns a typed expression whose PL/SQL return type flows into `body.set()`, so type mismatches are caught at compile time. Algorithm constants (`odbDbmsCrypto.HASH_SH256`) and helpers (`odbDbmsCrypto.cipherSuite(...)`) are provided too. `DBMS_LOB` and `DBMS_CRYPTO` procedures — the ones with `OUT` parameters — return the call string for use with `body.raw(...)` instead of an expression.
+Functions return typed expressions whose PL/SQL return type flows into `body.set()`, so type mismatches are caught at compile time. Algorithm constants (`odbDbmsCrypto.HASH_SH256`) and helpers (`odbDbmsCrypto.cipherSuite(...)`) are provided too. Procedures with `OUT` parameters return typed statements for `body.call(...)`; `body.raw()` remains the escape hatch for unsupported SQL.
+
+```ts
+import { odbDbmsCrypto, odbOracle, odbUtlI18n, odbLiteral } from '@odbvue/odb'
+
+body.set(salt, odbOracle.rawToHex(odbDbmsCrypto.randomBytes(16)))
+body.set(passwordRaw, odbUtlI18n.stringToRaw(password, odbLiteral('AL32UTF8')))
+```
 
 Available wrappers:
 
 - `odbUtlRaw` — RAW manipulation, bitwise operations, and casts (`UTL_RAW`)
 - `odbUtlEncode` — Base64, quoted-printable, and uuencode (`UTL_ENCODE`)
+- `odbUtlI18n` — character-set-aware text/RAW conversion (`UTL_I18N`)
+- `odbOracle` — standard functions and pseudocolumns such as `RAWTOHEX`, `SYS_GUID()`, and `SYSTIMESTAMP`
 - `odbDbmsLob` — LOB length/substr/compare functions and read/write procedures (`DBMS_LOB`)
 - `odbDbmsCrypto` — hashing, MAC, encrypt/decrypt, sign/verify, and random generators (`DBMS_CRYPTO`)
 
