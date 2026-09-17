@@ -757,7 +757,7 @@ export class ProcedureBody {
    * the body statements, in the order they are declared.
    *
    * @example
-   * body.when('no_data_found', (h) => h.set(rError, odbLiteral('not found')))
+   * body.when('NO_DATA_FOUND', (h) => h.set(rError, 'not found'))
    */
   when(
     exceptionName: OraclePredefinedException | 'OTHERS',

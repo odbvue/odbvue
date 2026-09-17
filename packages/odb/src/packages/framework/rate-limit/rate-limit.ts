@@ -85,7 +85,7 @@ export const odbRateLimitApi = odbPackage('odb_rate_limit', (pkg) => {
           ),
           (then) => {
             then.set(windowStartedAt, odbOracle.sysTimestamp())
-            then.set(failureCount, odbLiteral(1))
+            then.set(failureCount, 1)
           },
           (otherwise) => otherwise.set(failureCount, odbOracle.plus(failureCount, 1)),
         )
