@@ -70,8 +70,8 @@ const files = odbTable('app_files', (t) => ({
 
 ```ts
 const settings = odbPackage('PCK_SETTINGS', (p) => ({
-  getValue: p.func('GET_VALUE', 'VARCHAR2', (fn) => {
-    fn.param('P_KEY', 'VARCHAR2')
+  getValue: p.func('GET_VALUE', odbType.string(), (fn) => {
+    fn.parameters({ in: { key: odbType.string() } })
   }),
 }))
 

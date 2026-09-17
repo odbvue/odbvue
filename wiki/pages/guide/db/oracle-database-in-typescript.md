@@ -310,13 +310,13 @@ This emits `FOR l_attempt IN 1..l_limit LOOP` without declaring `l_attempt` sepa
 Oracle ships many built-in packages (`UTL_RAW`, `UTL_ENCODE`, `UTL_I18N`, `DBMS_LOB`, `DBMS_CRYPTO`, and so on). OdbVue provides typed TypeScript wrappers for the most common ones and for standard Oracle expressions, so you can compose calls inside a package body without hand-writing PL/SQL strings. These packages already exist in every database, so there is no install step.
 
 ```ts
-import { odbDbmsCrypto, odbPackage } from '@odbvue/odb'
+import { odbDbmsCrypto, odbPackage, odbType } from '@odbvue/odb'
 
 const secure = odbPackage('pck_secure', (pkg) => {
-  pkg.func('sha256', 'RAW', (fn) => {
-    const pData = fn.param('p_data', 'RAW')
+  pkg.func('sha256', odbType.raw(), (fn) => {
+    const { data } = fn.parameters({ in: { data: odbType.raw() } })
     fn.body((body) => {
-      body.return(odbDbmsCrypto.hash(pData, odbDbmsCrypto.HASH_SH256))
+      body.return(odbDbmsCrypto.hash(data, odbDbmsCrypto.HASH_SH256))
     })
   })
 })

@@ -8,7 +8,6 @@ import {
   Varchar2Var,
   type LocalVarNode,
   type ParamNode,
-  type ParameterDirection,
   type PlsqlReference,
   type PlsqlRenderable,
   type PlsqlType,
@@ -171,6 +170,10 @@ function inputParameterOdbType(input: ParameterInput): OdbType {
 
 /** ODB type descriptors for use with named parameters and local variables. */
 export const odbType = {
+  /** Use a database-specific type not covered by the built-in descriptors. */
+  custom<TType extends string>(type: TType, length?: number): OdbTypeDescriptor<TType> {
+    return { type, length }
+  },
   string(length?: number): OdbTypeDescriptor<'VARCHAR2'> {
     return { type: 'VARCHAR2', length }
   },
@@ -840,24 +843,6 @@ export class Procedure {
 
   constructor(readonly name: string) {}
 
-  /** Add a parameter (default direction IN). */
-  param<T extends PlsqlType | string>(
-    name: string,
-    type: T | OdbTypeDescriptor<T>,
-    direction: ParameterDirection = 'IN',
-  ): Param<T> {
-    const definition = typeof type === 'object' ? type : { type }
-    const p = new Param(
-      name,
-      definition.type,
-      direction,
-      { length: definition.length },
-      odbTypeFromPlsql(definition.type),
-    )
-    this._params.push(p)
-    return p
-  }
-
   /**
    * Declare named IN, OUT, and IN OUT parameters with automatic `p_` names
    * and optional column `%TYPE` anchors.
@@ -1025,18 +1010,6 @@ export class PlsqlFunction<TReturnType extends PlsqlType | string = PlsqlType | 
   returnLength(n: number): this {
     this._returnTypeOptions.length = n
     return this
-  }
-
-  /** Add a parameter (default direction IN). */
-  param<T extends PlsqlType | string>(
-    name: string,
-    type: T | OdbTypeDescriptor<T>,
-    direction: ParameterDirection = 'IN',
-  ): Param<T> {
-    const definition = typeof type === 'object' ? type : { type }
-    const p = new Param(name, definition.type, direction, { length: definition.length })
-    this._params.push(p)
-    return p
   }
 
   /**

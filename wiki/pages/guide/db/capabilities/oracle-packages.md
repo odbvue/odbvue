@@ -102,13 +102,13 @@ Functions: `hash`, `mac`, `encrypt`/`decrypt`, `pkEncrypt`/`pkDecrypt`, `sign`/`
 ## Example: hashing inside a package
 
 ```ts
-import { odbDbmsCrypto, odbPackage } from '@odbvue/odb'
+import { odbDbmsCrypto, odbPackage, odbType } from '@odbvue/odb'
 
 const secure = odbPackage('pck_secure', (pkg) => {
-  pkg.func('sha256', 'RAW', (fn) => {
-    const pData = fn.param('p_data', 'RAW')
+  pkg.func('sha256', odbType.raw(), (fn) => {
+    const { data } = fn.parameters({ in: { data: odbType.raw() } })
     fn.body((body) => {
-      body.return(odbDbmsCrypto.hash(pData, odbDbmsCrypto.HASH_SH256))
+      body.return(odbDbmsCrypto.hash(data, odbDbmsCrypto.HASH_SH256))
     })
   })
 })

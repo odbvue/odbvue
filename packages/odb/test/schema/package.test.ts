@@ -14,11 +14,11 @@ import { odbTable } from '../../src/schema/table.js'
 describe('odbPackage member typing', () => {
   it('exposes typed package member invokers and rejects unknown members', () => {
     const settings = odbPackage('PCK_SETTINGS', (p) => ({
-      getValue: p.func('GET_VALUE', 'VARCHAR2', (fn) => {
-        fn.param('P_KEY', 'VARCHAR2')
+      getValue: p.func('GET_VALUE', odbType.string(), (fn) => {
+        fn.parameters({ in: { key: odbType.string() } })
       }),
       setValue: p.proc('SET_VALUE', (proc) => {
-        proc.parameters({ in: { key: 'VARCHAR2', value: 'VARCHAR2' } })
+        proc.parameters({ in: { key: odbType.string(), value: odbType.string() } })
       }),
     }))
 
@@ -38,11 +38,11 @@ describe('odbPackage member typing', () => {
 
   it('renders procedure members as typed call statements', () => {
     const settings = odbPackage('PCK_SETTINGS', (p) => ({
-      getValue: p.func('GET_VALUE', 'VARCHAR2', (fn) => {
-        fn.param('P_KEY', 'VARCHAR2')
+      getValue: p.func('GET_VALUE', odbType.string(), (fn) => {
+        fn.parameters({ in: { key: odbType.string() } })
       }),
       setValue: p.proc('SET_VALUE', (proc) => {
-        proc.parameters({ in: { key: 'VARCHAR2' } })
+        proc.parameters({ in: { key: odbType.string() } })
       }),
     }))
 
@@ -53,8 +53,8 @@ describe('odbPackage member typing', () => {
 
   it('is compatible with migration artifact interfaces', () => {
     const settings = odbPackage('PCK_SETTINGS', (p) => ({
-      getValue: p.func('GET_VALUE', 'VARCHAR2', (fn) => {
-        fn.param('P_KEY', 'VARCHAR2')
+      getValue: p.func('GET_VALUE', odbType.string(), (fn) => {
+        fn.parameters({ in: { key: odbType.string() } })
       }),
     }))
 
@@ -106,7 +106,7 @@ describe('private package members', () => {
   it('emits private members in the body and supports local typed calls', () => {
     const pkg = odbPackage('PCK_PRIVATE', (p) => {
       const normalize = p.privateFunc('NORMALIZE', odbType.string(), (fn) => {
-        const value = fn.param('P_VALUE', odbType.string())
+        const { value } = fn.parameters({ in: { value: odbType.string() } })
         fn.body((body) => body.return(value))
       })
       p.func('PUBLIC_VALUE', odbType.string(), (fn) => {
@@ -115,8 +115,8 @@ describe('private package members', () => {
     })
 
     const sql = pkg.toSQLUp()
-    expect(sql).not.toContain('FUNCTION NORMALIZE(P_VALUE IN VARCHAR2);')
-    expect(sql).toContain('FUNCTION NORMALIZE(P_VALUE IN VARCHAR2) RETURN VARCHAR2 IS')
+    expect(sql).not.toContain('FUNCTION NORMALIZE(p_value IN VARCHAR2);')
+    expect(sql).toContain('FUNCTION NORMALIZE(p_value IN VARCHAR2) RETURN VARCHAR2 IS')
     expect(sql).toContain("RETURN NORMALIZE('value');")
   })
 
@@ -150,6 +150,18 @@ describe('function parameters', () => {
 
     expect(pkg.toSQLUp()).toContain(
       'FUNCTION GET_USER(p_user_id IN APP_USERS.id%TYPE, p_name IN VARCHAR2) RETURN VARCHAR2;',
+    )
+  })
+
+  it('has an explicit escape hatch for database-specific types', () => {
+    const pkg = odbPackage('PCK_USERS', (p) => {
+      p.func('NORMALIZE', odbType.custom('APP_USER_ID'), (fn) => {
+        fn.parameters({ in: { userId: odbType.custom('APP_USER_ID') } })
+      })
+    })
+
+    expect(pkg.toSQLUp()).toContain(
+      'FUNCTION NORMALIZE(p_user_id IN APP_USER_ID) RETURN APP_USER_ID;',
     )
   })
 })
@@ -186,7 +198,7 @@ describe('ProcedureBody control flow and exceptions', () => {
 
   it('emits an IF/ELSE block with nested statements', () => {
     const sql = bodyLines((proc) => {
-      const result = proc.param('R_OUT', 'VARCHAR2', 'OUT')
+      const { result } = proc.parameters({ out: { result: odbType.string() } })
       proc.body((body) => {
         const { status } = body.variables({ status: odbType.integer() })
         body.ifThen(
@@ -198,9 +210,9 @@ describe('ProcedureBody control flow and exceptions', () => {
     })
 
     expect(sql).toContain('IF l_status = 200 THEN')
-    expect(sql).toContain("      R_OUT := 'ok';")
+    expect(sql).toContain("      p_result := 'ok';")
     expect(sql).toContain('    ELSE')
-    expect(sql).toContain("      R_OUT := 'fail';")
+    expect(sql).toContain("      p_result := 'fail';")
     expect(sql).toContain('    END IF;')
   })
 
@@ -212,8 +224,8 @@ describe('ProcedureBody control flow and exceptions', () => {
       const { username, retryCount, enabled } = proc.parameters({
         in: {
           username: users.username,
-          retryCount: 'number',
-          enabled: 'boolean',
+          retryCount: odbType.number(),
+          enabled: odbType.boolean(),
         },
       })
       expect(username.name).toBe('p_username')
@@ -257,7 +269,7 @@ describe('ProcedureBody control flow and exceptions', () => {
       const { userId, result, retryCount } = proc.parameters({
         in: { userId: users.id },
         out: { result: odbType.string(200) },
-        inOut: { retryCount: 'number' },
+        inOut: { retryCount: odbType.number() },
       })
       expect(userId.name).toBe('p_user_id')
       expect(result.name).toBe('p_result')
@@ -312,13 +324,13 @@ describe('ProcedureBody control flow and exceptions', () => {
 
   it('emits an EXCEPTION section with a WHEN OTHERS handler', () => {
     const sql = bodyLines((proc) => {
-      const result = proc.param('R_OUT', 'VARCHAR2', 'OUT')
+      const { result } = proc.parameters({ out: { result: odbType.string() } })
       proc.body((body) => body.set(result, 'ok').whenOthers((h) => h.set(result, 'error')))
     })
 
     expect(sql).toContain('  EXCEPTION')
     expect(sql).toContain('    WHEN OTHERS THEN')
-    expect(sql).toContain("      R_OUT := 'error';")
+    expect(sql).toContain("      p_result := 'error';")
   })
 
   it('emits autonomous transaction procedures and commits', () => {
@@ -377,7 +389,7 @@ describe('ProcedureBody control flow and exceptions', () => {
     }))
 
     const sql = bodyLines((proc) => {
-      const username = proc.param('p_username', 'APP_USERS.USERNAME%TYPE')
+      const { username } = proc.parameters({ in: { username: users.username } })
       proc.body((body) =>
         body
           .insertInto(users, { username, fullname: 'Bootstrap Admin', attempts: 0 })
@@ -399,8 +411,9 @@ describe('ProcedureBody control flow and exceptions', () => {
       username: t.string('USERNAME').notNull(),
     }))
     const sql = bodyLines((proc) => {
-      const userId = proc.param('p_user_id', 'NUMBER', 'OUT')
-      const username = proc.param('p_username', 'VARCHAR2', 'OUT')
+      const { userId, username } = proc.parameters({
+        out: { userId: odbType.number(), username: odbType.string() },
+      })
       proc.body((body) =>
         body.query(
           odbQuery().selectFrom(users).select([users.id, users.username]).into(userId, username),
