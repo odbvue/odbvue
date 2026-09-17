@@ -216,6 +216,40 @@ describe('ProcedureBody control flow and exceptions', () => {
     expect(sql).toContain('    END IF;')
   })
 
+  it('emits ELSIF, WHILE, CASE, and local subprograms', () => {
+    const sql = bodyLines((proc) => {
+      const { result } = proc.parameters({ out: { result: odbType.string() } })
+      proc.body((body) => {
+        const { count } = body.variables({ count: odbType.integer() })
+        const normalize = body.localFunc('NORMALIZE', odbType.string(), (fn) => {
+          const { value } = fn.parameters({ in: { value: odbType.string() } })
+          fn.body((local) => local.return(value))
+        })
+        const reset = body.localProc('RESET', (local) =>
+          local.body((nested) => nested.set(count, 0)),
+        )
+        body
+          .ifThen(cond.eq(count, 0), (then) => then.set(result, 'empty'))
+          .elsif(cond.lt(count, 3), (then) => then.set(result, 'small'))
+        body.while(cond.lt(count, 10), (loop) => loop.set(count, 10))
+        body.case((cases) =>
+          cases
+            .when(cond.eq(count, 10), (branch) => branch.set(result, normalize.invoke(result)))
+            .else((branch) => branch.call(reset.invoke())),
+        )
+      })
+    })
+
+    expect(sql).toContain('FUNCTION NORMALIZE(p_value IN VARCHAR2) RETURN VARCHAR2 IS')
+    expect(sql).toContain('PROCEDURE RESET() IS')
+    expect(sql).toContain('ELSIF l_count < 3 THEN')
+    expect(sql).toContain('WHILE l_count < 10 LOOP')
+    expect(sql).toContain('CASE')
+    expect(sql).toContain('WHEN l_count = 10 THEN')
+    expect(sql).toContain('END CASE;')
+    expect(sql).toContain('RESET();')
+  })
+
   it('derives named input parameter names and column anchored types', () => {
     const users = odbTable('APP_USERS', (t) => ({
       username: t.string('USERNAME').notNull(),

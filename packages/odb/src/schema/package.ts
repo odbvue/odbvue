@@ -221,6 +221,20 @@ export type ForRangeNode = {
   statements: StatementNode[]
 }
 
+export type WhileNode = {
+  kind: 'while'
+  condition: string
+  statements: StatementNode[]
+}
+
+export type CaseBranchNode = { condition: string; statements: StatementNode[] }
+
+export type CaseNode = {
+  kind: 'case'
+  branches: CaseBranchNode[]
+  elseStatements?: StatementNode[]
+}
+
 export type StatementNode =
   | { kind: 'assign'; target: string; value: string }
   | { kind: 'return'; value?: string }
@@ -230,6 +244,8 @@ export type StatementNode =
   | { kind: 'raw'; sql: string }
   | { kind: 'if'; branches: IfBranchNode[]; elseStatements?: StatementNode[] }
   | ForRangeNode
+  | WhileNode
+  | CaseNode
 
 export type ExceptionHandlerNode = { when: string; statements: StatementNode[] }
 
@@ -237,6 +253,8 @@ export type ExceptionHandlerNode = { when: string; statements: StatementNode[] }
 
 export type ProcedureBodyNode = {
   declarations: LocalVarNode[]
+  localProcedures?: ProcedureNode[]
+  localFunctions?: FunctionNode[]
   statements: StatementNode[]
   resultSets?: Record<string, OrdsResultColumnNode[]>
   exceptionHandlers?: ExceptionHandlerNode[]
@@ -318,10 +336,38 @@ type PackageShape<TMembers extends Record<string, PackageMemberDefinition>> = {
   [TKey in keyof TMembers]: PackageMemberInvoker<TMembers[TKey]>
 }
 
+/** Builder for a searched PL/SQL `CASE` statement. */
+export class CaseStatementBuilder {
+  private readonly branches: CaseBranchNode[] = []
+  private elseStatements?: StatementNode[]
+
+  constructor(
+    private readonly buildStatements: (build: (body: ProcedureBody) => void) => StatementNode[],
+  ) {}
+
+  when(condition: PlsqlBooleanExpression, build: (body: ProcedureBody) => void): this {
+    this.branches.push({ condition: condition.toSQL(), statements: this.buildStatements(build) })
+    return this
+  }
+
+  else(build: (body: ProcedureBody) => void): this {
+    if (this.elseStatements) throw new Error('case: ELSE branch is already defined.')
+    this.elseStatements = this.buildStatements(build)
+    return this
+  }
+
+  toNode(): CaseNode {
+    if (this.branches.length === 0) throw new Error('case: at least one WHEN branch is required.')
+    return { kind: 'case', branches: this.branches, elseStatements: this.elseStatements }
+  }
+}
+
 // ── ProcedureBody ─────────────────────────────────────────────────────────────
 
 export class ProcedureBody {
   private _declarations: LocalVar[] = []
+  private _localProcedures: Procedure[] = []
+  private _localFunctions: PlsqlFunction<any>[] = []
   private _statements: StatementNode[] = []
   private _returnCounter = 0
   private _cursorResultColumns = new Map<string, OrdsResultColumnNode[]>()
@@ -403,10 +449,17 @@ export class ProcedureBody {
   }
 
   /** `RETURN [value];` */
-  return(value?: PlsqlRenderable): this {
+  return(value?: PlsqlRenderable | number | boolean | null): this {
     this._statements.push({
       kind: 'return',
-      value: value === undefined ? undefined : renderPlsql(value),
+      value:
+        value === undefined
+          ? undefined
+          : isPlsqlValue(value)
+            ? value.toSQL()
+            : typeof value === 'string'
+              ? value
+              : renderPlsqlLiteral(value),
     })
     return this
   }
@@ -618,6 +671,20 @@ export class ProcedureBody {
     return this
   }
 
+  /** Add an `ELSIF` branch to the most recently declared `IF` statement. */
+  elsif(condition: PlsqlBooleanExpression, build: (body: ProcedureBody) => void): this {
+    const statement = this._statements.at(-1)
+    if (!statement || statement.kind !== 'if') {
+      throw new Error('elsif: must immediately follow ifThen() or another elsif().')
+    }
+    if (statement.elseStatements) throw new Error('elsif: cannot follow an ELSE branch.')
+    statement.branches.push({
+      condition: condition.toSQL(),
+      statements: this.childStatements(build),
+    })
+    return this
+  }
+
   /**
    * Emit `FOR <index> IN <from>..<to> LOOP ... END LOOP;`. The loop index is
    * an implicit `PLS_INTEGER` variable and is not separately declared.
@@ -646,6 +713,45 @@ export class ProcedureBody {
     return this
   }
 
+  /** Emit `WHILE <condition> LOOP ... END LOOP;`. */
+  while(condition: PlsqlBooleanExpression, build: (body: ProcedureBody) => void): this {
+    this._statements.push({
+      kind: 'while',
+      condition: condition.toSQL(),
+      statements: this.childStatements(build),
+    })
+    return this
+  }
+
+  /** Emit a searched `CASE WHEN ... THEN ... [ELSE ...] END CASE;` statement. */
+  case(build: (cases: CaseStatementBuilder) => void): this {
+    const cases = new CaseStatementBuilder((branch) => this.childStatements(branch))
+    build(cases)
+    this._statements.push(cases.toNode())
+    return this
+  }
+
+  /** Declare a procedure local to the enclosing procedure or function. */
+  localProc(name: string, build?: (proc: Procedure) => void): Procedure {
+    const procedure = new Procedure(name)
+    build?.(procedure)
+    this._localProcedures.push(procedure)
+    return procedure
+  }
+
+  /** Declare a function local to the enclosing procedure or function. */
+  localFunc<TReturnType extends PlsqlType | string>(
+    name: string,
+    returnType: TReturnType | OdbTypeDescriptor<TReturnType>,
+    build?: (fn: PlsqlFunction<TReturnType>) => void,
+  ): PlsqlFunction<TReturnType> {
+    const definition = typeof returnType === 'object' ? returnType : { type: returnType }
+    const fn = new PlsqlFunction(name, definition.type, { length: definition.length })
+    build?.(fn)
+    this._localFunctions.push(fn)
+    return fn
+  }
+
   /**
    * Add an `EXCEPTION` handler for a named exception. Handlers are emitted after
    * the body statements, in the order they are declared.
@@ -671,6 +777,12 @@ export class ProcedureBody {
   toNode(): ProcedureBodyNode {
     return {
       declarations: this._declarations.map((v) => v.toNode()),
+      localProcedures:
+        this._localProcedures.length > 0
+          ? this._localProcedures.map((procedure) => procedure.toNode())
+          : undefined,
+      localFunctions:
+        this._localFunctions.length > 0 ? this._localFunctions.map((fn) => fn.toNode()) : undefined,
       statements: [...this._statements],
       resultSets:
         this._cursorResultColumns.size > 0
@@ -893,6 +1005,11 @@ export class Procedure {
     this._body = new ProcedureBody()
     build(this._body)
     return this
+  }
+
+  /** Build an unqualified call suitable for a local procedure declaration. */
+  invoke(...args: PlsqlRenderable[]): PlsqlStatement {
+    return new PlsqlStatement(`${this.name}(${args.map(renderPlsql).join(', ')})`)
   }
 
   /**
@@ -1328,53 +1445,73 @@ function emitPackageBody(pkg: OdbApplication, options: PackageSqlOptions = {}): 
 }
 
 function emitProcedureImpl(proc: ProcedureNode): string {
+  return emitProcedureImplAt(proc, '  ')
+}
+
+function emitProcedureImplAt(proc: ProcedureNode, indent: string): string {
   const params = proc.params.map(emitParamDef).join(', ')
-  const sig = `  PROCEDURE ${proc.name}(${params}) IS`
+  const sig = `${indent}PROCEDURE ${proc.name}(${params}) IS`
 
   if (!proc.body) {
-    return [sig, '  BEGIN', '    NULL;', `  END ${proc.name};`].join('\n')
+    return [sig, `${indent}BEGIN`, `${indent}  NULL;`, `${indent}END ${proc.name};`].join('\n')
   }
 
   const lines: string[] = [sig]
 
-  if (proc.autonomous) lines.push('    PRAGMA AUTONOMOUS_TRANSACTION;')
+  if (proc.autonomous) lines.push(`${indent}  PRAGMA AUTONOMOUS_TRANSACTION;`)
 
   for (const decl of proc.body.declarations) {
-    lines.push(`    ${emitLocalVarDecl(decl)}`)
+    lines.push(`${indent}  ${emitLocalVarDecl(decl)}`)
+  }
+  for (const localProcedure of proc.body.localProcedures ?? []) {
+    lines.push(emitProcedureImplAt(localProcedure, `${indent}  `))
+  }
+  for (const localFunction of proc.body.localFunctions ?? []) {
+    lines.push(emitFunctionImplAt(localFunction, `${indent}  `))
   }
 
-  lines.push('  BEGIN')
-  lines.push(...emitStatementBlock(proc.body.statements, '    '))
-  emitExceptionSection(lines, proc.body.exceptionHandlers, '  ')
-  lines.push(`  END ${proc.name};`)
+  lines.push(`${indent}BEGIN`)
+  lines.push(...emitStatementBlock(proc.body.statements, `${indent}  `))
+  emitExceptionSection(lines, proc.body.exceptionHandlers, indent)
+  lines.push(`${indent}END ${proc.name};`)
   return lines.join('\n')
 }
 
 function emitFunctionImpl(fn: FunctionNode): string {
+  return emitFunctionImplAt(fn, '  ')
+}
+
+function emitFunctionImplAt(fn: FunctionNode, indent: string): string {
   const params = fn.params.map(emitParamDef).join(', ')
   const ret = emitParamType(fn.returnType)
-  const sig = `  FUNCTION ${fn.name}(${params}) RETURN ${ret} IS`
+  const sig = `${indent}FUNCTION ${fn.name}(${params}) RETURN ${ret} IS`
 
   if (!fn.body) {
-    return [sig, '  BEGIN', '    RETURN NULL;', `  END ${fn.name};`].join('\n')
+    return [sig, `${indent}BEGIN`, `${indent}  RETURN NULL;`, `${indent}END ${fn.name};`].join('\n')
   }
 
   const lines: string[] = [sig]
 
   for (const decl of fn.body.declarations) {
-    lines.push(`    ${emitLocalVarDecl(decl)}`)
+    lines.push(`${indent}  ${emitLocalVarDecl(decl)}`)
+  }
+  for (const localProcedure of fn.body.localProcedures ?? []) {
+    lines.push(emitProcedureImplAt(localProcedure, `${indent}  `))
+  }
+  for (const localFunction of fn.body.localFunctions ?? []) {
+    lines.push(emitFunctionImplAt(localFunction, `${indent}  `))
   }
 
-  lines.push('  BEGIN')
+  lines.push(`${indent}BEGIN`)
 
   if (fn.body.statements.length === 0) {
-    lines.push('    RETURN NULL;')
+    lines.push(`${indent}  RETURN NULL;`)
   } else {
-    lines.push(...emitStatementBlock(fn.body.statements, '    '))
+    lines.push(...emitStatementBlock(fn.body.statements, `${indent}  `))
   }
 
-  emitExceptionSection(lines, fn.body.exceptionHandlers, '  ')
-  lines.push(`  END ${fn.name};`)
+  emitExceptionSection(lines, fn.body.exceptionHandlers, indent)
+  lines.push(`${indent}END ${fn.name};`)
   return lines.join('\n')
 }
 
@@ -1431,6 +1568,25 @@ function emitStatement(stmt: StatementNode, indent: string): string[] {
         ...emitStatementBlock(stmt.statements, `${indent}  `),
         `${indent}END LOOP;`,
       ]
+    case 'while':
+      return [
+        `${indent}WHILE ${stmt.condition} LOOP`,
+        ...emitStatementBlock(stmt.statements, `${indent}  `),
+        `${indent}END LOOP;`,
+      ]
+    case 'case': {
+      const lines = [`${indent}CASE`]
+      for (const branch of stmt.branches) {
+        lines.push(`${indent}  WHEN ${branch.condition} THEN`)
+        lines.push(...emitStatementBlock(branch.statements, `${indent}    `))
+      }
+      if (stmt.elseStatements) {
+        lines.push(`${indent}  ELSE`)
+        lines.push(...emitStatementBlock(stmt.elseStatements, `${indent}    `))
+      }
+      lines.push(`${indent}END CASE;`)
+      return lines
+    }
   }
 }
 

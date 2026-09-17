@@ -19,6 +19,11 @@ describe('odbAuth framework package', () => {
       "DBMS_CRYPTO.MAC(UTL_RAW.CONCAT(HEXTORAW(p_salt), HEXTORAW('00000001')), DBMS_CRYPTO.HMAC_SH512, p_password_raw)",
     )
     expect(sql).toContain('FOR l_round IN 2..p_iterations LOOP')
+    expect(sql).toContain(
+      'FUNCTION verify_password(p_password IN VARCHAR2, p_stored_hash IN VARCHAR2) RETURN BOOLEAN IS',
+    )
+    expect(sql).toContain('RETURN FALSE;')
+    expect(sql).toContain('odb_auth_crypto.verify_password(p_password, l_password_hash) = FALSE')
     expect(sql).toContain('l_password_raw RAW(2000)')
     expect(sql).toContain('l_derived_key RAW(64)')
     expect(sql).toContain("UTL_I18N.STRING_TO_RAW(p_password, 'AL32UTF8')")

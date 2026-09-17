@@ -143,7 +143,7 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => {
         )
       })
     }),
-    verifyPassword: pkg.func('verify_password', odbType.number(), (fn) => {
+    verifyPassword: pkg.func('verify_password', odbType.boolean(), (fn) => {
       const { password, storedHash } = fn.parameters({
         in: { password: odbType.string(), storedHash: odbType.string() },
       })
@@ -162,7 +162,7 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => {
               `^${PASSWORD_HASH_ALGORITHM}\\$[1-9][0-9]*\\$[[:xdigit:]]{32}\\$[[:xdigit:]]{128}$`,
             ),
           ),
-          (then) => then.return('0'),
+          (then) => then.return(false),
         )
         body.set(
           iterations,
@@ -184,8 +184,8 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => {
         )
         body.set(passwordRaw, odbUtlI18n.stringToRaw(password, odbLiteral('AL32UTF8')))
         body.set(derivedHash, odbOracle.rawToHex(deriveKey.invoke(passwordRaw, salt, iterations)))
-        body.ifThen(cond.eq(derivedHash, expectedHash), (then) => then.return('1'))
-        body.return('0')
+        body.ifThen(cond.eq(derivedHash, expectedHash), (then) => then.return(true))
+        body.return(false)
       })
     }),
     randomToken: pkg.func('random_token', odbType.string(512), (fn) => {
@@ -338,7 +338,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => {
           statements.set(passwordHash, odbOracle.nvl(passwordHash, dummyPasswordHashConstant))
           statements.ifThen(
             cond.or([
-              cond.eq(odbAuthCrypto.verifyPassword(password, passwordHash), 0),
+              cond.eq(odbAuthCrypto.verifyPassword(password, passwordHash), false),
               cond.isNull(userId),
             ]),
             (then) => {
