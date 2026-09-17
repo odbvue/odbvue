@@ -36,7 +36,7 @@ describe('odbPackage member typing', () => {
     settings.getValue(123)
   })
 
-  it('rejects procedure members passed to call()', () => {
+  it('renders procedure members as typed call statements', () => {
     const settings = odbPackage('PCK_SETTINGS', (p) => ({
       getValue: p.func('GET_VALUE', 'VARCHAR2', (fn) => {
         fn.param('P_KEY', 'VARCHAR2')
@@ -46,9 +46,9 @@ describe('odbPackage member typing', () => {
       }),
     }))
 
-    expect(() => settings.call('setValue' as never, odbLiteral('APP_VERSION'))).toThrow(
-      'Package member setValue is not a function',
-    )
+    const statement = settings.setValue(odbLiteral('APP_VERSION'))
+    expect(statement.toSQL()).toBe("PCK_SETTINGS.SET_VALUE('APP_VERSION')")
+    expectTypeOf(statement).toEqualTypeOf<PlsqlStatement>()
   })
 
   it('is compatible with migration artifact interfaces', () => {

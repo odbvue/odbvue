@@ -1,12 +1,5 @@
 import { odbPackage, odbType } from '../../../schema/package.js'
-import {
-  cond,
-  odbLiteral,
-  plsqlExpr,
-  PlsqlStatement,
-  renderPlsql,
-  type PlsqlRenderable,
-} from '../../../schema/attribute.js'
+import { cond, odbLiteral, plsqlExpr } from '../../../schema/attribute.js'
 import { odbOracle } from '../../oracle/index.js'
 import { odbTable } from '../../../schema/table.js'
 import { odbQuery } from '../../../query/index.js'
@@ -19,7 +12,7 @@ export const rateLimitBuckets = odbTable('odb_rate_limit_buckets', (t) => ({
   blockedUntil: t.timestamp(),
 }))
 
-const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
+export const odbRateLimitApi = odbPackage('odb_rate_limit', (pkg) => ({
   hashSubject: pkg.func('hash_subject', 'VARCHAR2', (fn) => {
     const subject = fn.param('p_subject', 'VARCHAR2')
     fn.returnLength(64).body((body) =>
@@ -149,34 +142,19 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
 /** Shared fixed-window failure throttle for sensitive PL/SQL procedures. */
 export const odbRateLimit = {
   toSQLUp(options: { schema?: string } = {}): string {
-    return [rateLimitBuckets.toSQLUp(options), odbRateLimitPackage.toSQLUp(options)].join('\n')
+    return [rateLimitBuckets.toSQLUp(options), odbRateLimitApi.toSQLUp(options)].join('\n')
   },
   toSQLDown(options: { schema?: string } = {}): string {
-    return [odbRateLimitPackage.toSQLDown(options), rateLimitBuckets.toSQLDown(options)].join('\n')
+    return [odbRateLimitApi.toSQLDown(options), rateLimitBuckets.toSQLDown(options)].join('\n')
   },
   upgrade() {
     return {
       toSQLUp(options: { schema?: string } = {}): string {
-        return odbRateLimitPackage.toSQLUp(options)
+        return odbRateLimitApi.toSQLUp(options)
       },
       toSQLDown() {
         return ''
       },
     }
-  },
-  check(scope: PlsqlRenderable, subject: PlsqlRenderable): PlsqlStatement {
-    return new PlsqlStatement(
-      `odb_rate_limit.enforce(${renderPlsql(scope)}, ${renderPlsql(subject)})`,
-    )
-  },
-  failure(scope: PlsqlRenderable, subject: PlsqlRenderable): PlsqlStatement {
-    return new PlsqlStatement(
-      `odb_rate_limit.failure(${renderPlsql(scope)}, ${renderPlsql(subject)})`,
-    )
-  },
-  success(scope: PlsqlRenderable, subject: PlsqlRenderable): PlsqlStatement {
-    return new PlsqlStatement(
-      `odb_rate_limit.success(${renderPlsql(scope)}, ${renderPlsql(subject)})`,
-    )
   },
 }

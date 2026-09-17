@@ -290,7 +290,7 @@ export type PackageSqlOptions = {
 type PackageMemberDefinition = PlsqlFunction<any> | Procedure
 
 type PackageMemberReturnValue<TMember extends PackageMemberDefinition> =
-  TMember extends PlsqlFunction<infer TReturnType> ? PlsqlExpression<TReturnType> : void
+  TMember extends PlsqlFunction<infer TReturnType> ? PlsqlExpression<TReturnType> : PlsqlStatement
 
 type PackageMemberInvoker<TMember extends PackageMemberDefinition> = (
   ...args: PlsqlRenderable[]
@@ -1110,11 +1110,12 @@ export class PackageImpl<
       throw new Error(`Unknown package member: ${alias}`)
     }
 
-    if (!(member instanceof PlsqlFunction)) {
-      throw new Error(`Package member ${alias} is not a function`)
-    }
-
     const rendered = args.map(renderPlsql).join(', ')
+    if (!(member instanceof PlsqlFunction)) {
+      return new PlsqlStatement(
+        `${this.name}.${member.name}(${rendered})`,
+      ) as PackageMemberReturnValue<PackageMemberDefinition>
+    }
     return new PlsqlExpression(
       member.returnType,
       `${this.name}.${member.name}(${rendered})`,

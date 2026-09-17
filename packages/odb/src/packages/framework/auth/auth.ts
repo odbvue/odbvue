@@ -6,7 +6,7 @@ import { odbQuery } from '../../../query/index.js'
 import { odbDbmsCrypto, odbOracle, odbUtlI18n, odbUtlRaw } from '../../oracle/index.js'
 import { odbHttp } from '../http/http.js'
 import { odbJwt } from '../jwt/jwt.js'
-import { odbRateLimit } from '../rate-limit/rate-limit.js'
+import { odbRateLimit, odbRateLimitApi } from '../rate-limit/rate-limit.js'
 
 const AUTH_JWT_SECRET_MARKER = '__ODB_AUTH_JWT_SECRET__'
 const DEFAULT_JWT_SECRET = 'change-this-development-only-odbvue-auth-secret-2026'
@@ -309,7 +309,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
             loginSubject: odbType.string(128),
           })
         statements.set(loginSubject, odbOracle.lower(odbOracle.trim(loginUsername)))
-        statements.call(odbRateLimit.check(odbLiteral('AUTH_LOGIN_USERNAME'), loginSubject))
+        statements.call(odbRateLimitApi.enforce(odbLiteral('AUTH_LOGIN_USERNAME'), loginSubject))
         statements.query(
           odbQuery()
             .selectFrom(authUsers)
@@ -336,11 +336,11 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
             cond.isNull(userId),
           ]),
           (then) => {
-            then.call(odbRateLimit.failure(odbLiteral('AUTH_LOGIN_USERNAME'), loginSubject))
+            then.call(odbRateLimitApi.failure(odbLiteral('AUTH_LOGIN_USERNAME'), loginSubject))
             then.unauthorized('INVALID_CREDENTIALS')
           },
         )
-        statements.call(odbRateLimit.success(odbLiteral('AUTH_LOGIN_USERNAME'), loginSubject))
+        statements.call(odbRateLimitApi.success(odbLiteral('AUTH_LOGIN_USERNAME'), loginSubject))
         statements.set(sessionId, odbOracle.lower(odbOracle.rawToHex(odbOracle.sysGuid())))
         statements.set(refreshToken, odbAuthCrypto.randomToken(odbLiteral(REFRESH_TOKEN_BYTES)))
         statements.insertInto(authSessions, {
