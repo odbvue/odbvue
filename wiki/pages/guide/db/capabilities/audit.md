@@ -26,15 +26,13 @@ export const migration = defineMigration('20260802130000_audit', {
 Each `debug` / `info` / `warn` / `error` / `fatal` call inserts one record in an autonomous transaction, so audit logging never rolls back with the caller. From a procedure body use the `body.audit*` helpers — the message is quoted for you, and attributes are a plain JSON object whose values are PL/SQL expressions:
 
 ```ts
-import { odbPackage } from '@odbvue/odb'
+import { odbPackage, odbType } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (p) => {
-  p.proc('login', (proc) => {
-    const { uuid } = proc.parameters({ in: { uuid: 'VARCHAR2' } })
+  const login = p.defineProcedure('login', { in: { uuid: odbType.string() } })
 
-    proc.body((body) => {
-      body.auditEvent('user logged in', { 'user.id': 'p_uuid' })
-    })
+  login.body((body) => {
+    body.auditEvent('user logged in', { 'user.id': login.parameters.uuid })
   })
 })
 ```
@@ -42,7 +40,7 @@ const appPackage = odbPackage('pck_app', (p) => {
 The available body helpers are `auditDebug`, `auditInfo`, `auditWarn`, `auditError`, `auditFatal`, and `auditEvent` (an INFO-level alias). Attribute keys become OTel attribute names; values are emitted as-is, so pass a bare variable (`p_uuid`), a literal (`"'active'"`), or a nested call.
 
 ```ts
-proc.body((body) => {
+login.body((body) => {
   body.auditWarn('rate limit near', { 'user.id': 'p_uuid', 'http.request.method': 'v_method' })
 })
 ```
@@ -50,7 +48,7 @@ proc.body((body) => {
 For full control over severity text and event time, call the package directly with `body.raw`:
 
 ```ts
-proc.body((body) => {
+login.body((body) => {
   body.raw(odbAudit.log("'INFO'", "'job finished'", 'v_attributes', 'systimestamp'))
 })
 ```

@@ -152,28 +152,39 @@ odbSettings.seed({ id: 'APP_VERSION', name: 'Application version', value: '1.0.0
 ### Example
 
 ```ts
-const { url } = proc.parameters({ out: { url: 'VARCHAR2' } })
+const getUrl = pkg.defineProcedure('get_url', { out: { url: odbType.string() } })
 
-proc.body((body) => {
-  body.set(url, odbSettings.read(odbLiteral('API_URL')))
+getUrl.body((body) => {
+  body.set(getUrl.parameters.url, odbSettings.read(odbLiteral('API_URL')))
 })
 ```
 
 ## ORDS Services
 
-Expose a package procedure with an explicit HTTP contract:
+Declare a procedure signature first, then attach its explicit HTTP contract with `defineService()`:
 
 ```ts
-proc.service({
-  method: 'GET',
-  path: '/version',
-  summary: 'Returns the application version',
+import { defineService, odbPackage, odbType } from '@odbvue/odb'
+
+const api = odbPackage('pck_api', (pkg) => {
+  const version = pkg.defineProcedure('version', {
+    out: { version: odbType.string() },
+  })
+
+  version.body((body) => body.set(version.parameters.version, '1.0.1'))
+
+  defineService(version, {
+    method: 'GET',
+    path: '/version',
+    summary: 'Returns the application version',
+    params: { response: { version: 'version' } },
+  })
 })
 ```
 
-Optional `module`, `basePath`, and `paramTypes` properties override derived ORDS configuration. `proc.service()` stores this metadata directly in the application contract used by ORDS, client, and OpenAPI generators.
+`params` maps public HTTP names to keys from the declared procedure signature. Bind every parameter exactly once: `body` and `uri` accept `in`/`inOut` parameters, `response` accepts `out`/`inOut`, and `header` accepts either direction. Optional `module`, `basePath`, and `paramTypes` properties override derived ORDS configuration. `defineService()` stores metadata in the application contract used by ORDS, client, and OpenAPI generators.
 
-For `POST` and `PUT` services, IN parameters are JSON request-body fields by default. Configure `params` when a parameter must instead use a header or URI binding.
+For example, a POST request body is explicit: `params: { body: { username: 'username' } }`. Use `header` and `uri` for their respective transports.
 
 ## Authentication
 

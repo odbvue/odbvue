@@ -96,14 +96,23 @@ await withConnection(config, async (_conn, db) => {
 
 ## OpenAPI contract
 
-Use `p.proc()`, `proc.body()`, and `proc.service()` to define a service. A typed table query passed to `body.openFor()` carries its selected row shape into the generated response.
+Use `p.defineProcedure()` to declare the PL/SQL signature, `procedure.body()` for implementation, and `defineService()` for the HTTP contract. A typed table query passed to `body.openFor()` carries its selected row shape into the generated response.
 
 ```ts
-const { result } = proc.parameters({ out: { result: 'SYS_REFCURSOR' } })
-proc.body((body) =>
-  body.openFor(result, odbQuery().selectFrom(users).select([users.id, users.email])),
+const listUsers = pkg.defineProcedure('list_users', {
+  out: { result: odbType.resultset() },
+})
+listUsers.body((body) =>
+  body.openFor(
+    listUsers.parameters.result,
+    odbQuery().selectFrom(users).select([users.id, users.email]),
+  ),
 )
-proc.service({ method: 'GET', path: '/users' })
+defineService(listUsers, {
+  method: 'GET',
+  path: '/users',
+  params: { response: { result: 'result' } },
+})
 ```
 
 The CLI writes `apps/db/dist/openapi.json` after every successful database migration operation. The document describes the API currently deployed to ORDS: `ov du` includes newly applied migrations, `ov dd` removes rolled-back migrations, and `ov di` writes an empty document after the schema is removed.

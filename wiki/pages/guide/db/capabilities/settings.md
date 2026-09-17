@@ -47,25 +47,23 @@ odbSettings.seed(
 `write` upserts a setting; pass `p_secret = 'Y'` to encrypt the value. `read` returns the value, transparently decrypting secrets:
 
 ```ts
-import { odbLiteral, odbPackage } from '@odbvue/odb'
+import { odbLiteral, odbPackage, odbType } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (p) => {
-  p.proc('configure', (proc) => {
-    const { apiKey } = proc.parameters({ in: { apiKey: 'VARCHAR2' } })
+  const configure = p.defineProcedure('configure', { in: { apiKey: odbType.string() } })
 
-    proc.body((body) => {
-      body.raw(
-        odbSettings.write(odbLiteral('API_URL'), odbLiteral('https://api.example.com'), {
-          name: odbLiteral('Api Url'),
-        }),
-      )
-      body.raw(
-        odbSettings.write(odbLiteral('API_KEY'), 'p_api_key', {
-          name: odbLiteral('Api Key'),
-          secret: true,
-        }),
-      )
-    })
+  configure.body((body) => {
+    body.raw(
+      odbSettings.write(odbLiteral('API_URL'), odbLiteral('https://api.example.com'), {
+        name: odbLiteral('Api Url'),
+      }),
+    )
+    body.raw(
+      odbSettings.write(odbLiteral('API_KEY'), configure.parameters.apiKey, {
+        name: odbLiteral('Api Key'),
+        secret: true,
+      }),
+    )
   })
 
   p.func('api_url', 'VARCHAR2', (fn) => {

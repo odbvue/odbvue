@@ -16,6 +16,7 @@ import {
   emitLocalVarDecl,
   emitParamDef,
   emitParamType,
+  emitPlsqlType,
   renderPlsql,
 } from './attribute.js'
 import {
@@ -302,6 +303,7 @@ export type FunctionNode = {
 export type PrivateConstantNode = {
   name: string
   type: PlsqlType | string
+  length?: number
   substitution: string
 }
 
@@ -1397,7 +1399,12 @@ export class PackageImpl<
     substitution: string,
   ): PlsqlExpression<TType> {
     const definition = typeof type === 'object' ? type : { type }
-    this._privateConstants.push({ name, type: definition.type, substitution })
+    this._privateConstants.push({
+      name,
+      type: definition.type,
+      length: definition.length,
+      substitution,
+    })
     return new PlsqlExpression(definition.type, name)
   }
 
@@ -1495,7 +1502,7 @@ function emitPackageBody(pkg: OdbApplication, options: PackageSqlOptions = {}): 
       throw new Error(`Package ${pkg.name}: missing substitution ${constant.substitution}.`)
     }
     lines.push(
-      `  ${constant.name} CONSTANT ${emitParamType(constant.type)} := ${renderPlsqlLiteral(value)};`,
+      `  ${constant.name} CONSTANT ${emitPlsqlType(constant.type, { length: constant.length })} := ${renderPlsqlLiteral(value)};`,
     )
   }
 

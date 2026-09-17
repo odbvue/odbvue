@@ -209,7 +209,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                authorization?: string;
+                Authorization?: string;
             };
             path?: never;
             cookie?: never;

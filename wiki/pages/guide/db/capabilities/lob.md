@@ -22,17 +22,15 @@ export const migration = defineMigration('20260628161706_test', {
 ## Use In A Procedure Body
 
 ```ts
-import { odbPackage } from '@odbvue/odb'
+import { odbPackage, odbType } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (p) => {
-  p.proc('version', (proc) => {
-    const { test } = proc.parameters({ out: { test: 'CLOB' } })
+  const version = p.defineProcedure('version', { out: { test: odbType.clob() } })
 
-    proc.body((body) => {
-      const { vVersion } = body.variables({ vVersion: odbType.string(200) })
-      body.set(vVersion, '1.0.1')
-      body.set(test, vVersion.toBase64())
-    })
+  version.body((body) => {
+    const { vVersion } = body.variables({ vVersion: odbType.string(200) })
+    body.set(vVersion, '1.0.1')
+    body.set(version.parameters.test, vVersion.toBase64())
   })
 })
 ```
@@ -43,11 +41,11 @@ Capture parameter and variable handles, then use `body.set()` for compile-time t
 Local variables expose convenience methods based on their PL/SQL type:
 
 ```ts
-const { textResult, clobResult } = proc.parameters({
-  out: { textResult: 'CLOB', clobResult: 'CLOB' },
+const convert = pkg.defineProcedure('convert', {
+  out: { textResult: odbType.clob(), clobResult: odbType.clob() },
 })
 
-proc.body((body) => {
+convert.body((body) => {
   const { vText, vClob } = body.variables({
     vText: odbType.string(200),
     vClob: odbType.clob(),
@@ -55,8 +53,8 @@ proc.body((body) => {
   body.set(vText, 'hello')
   body.raw(`${vClob.name} := empty_clob()`)
 
-  body.set(textResult, vText.toBase64())
-  body.set(clobResult, vClob.toBase64())
+  body.set(convert.parameters.textResult, vText.toBase64())
+  body.set(convert.parameters.clobResult, vClob.toBase64())
 })
 ```
 

@@ -26,23 +26,21 @@ export const migration = defineMigration('20260802120000_jwt', {
 Build the claims payload with `JSON_OBJECT`, then pass it to `odb_jwt.encode`:
 
 ```ts
-import { odbPackage } from '@odbvue/odb'
+import { odbPackage, odbType } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (p) => {
-  p.proc('login', (proc) => {
-    const { uuid, token } = proc.parameters({
-      in: { uuid: 'VARCHAR2' },
-      out: { token: 'VARCHAR2' },
-    })
+  const login = p.defineProcedure('login', {
+    in: { uuid: odbType.string() },
+    out: { token: odbType.string() },
+  })
 
-    proc.body((body) => {
-      const { vPayload } = body.variables({ vPayload: odbType.string(2000) })
-      body.raw(
-        `${vPayload.name} := JSON_OBJECT('sub' VALUE p_uuid, 'iss' VALUE 'odbvue', ` +
-          `'iat' VALUE odb_jwt.to_epoch(), 'exp' VALUE odb_jwt.to_epoch() + 3600)`,
-      )
-      body.raw(`${token.name} := ${odbJwt.encode(vPayload.name, `'my-secret'`)}`)
-    })
+  login.body((body) => {
+    const { vPayload } = body.variables({ vPayload: odbType.string(2000) })
+    body.raw(
+      `${vPayload.name} := JSON_OBJECT('sub' VALUE ${login.parameters.uuid.name}, 'iss' VALUE 'odbvue', ` +
+        `'iat' VALUE odb_jwt.to_epoch(), 'exp' VALUE odb_jwt.to_epoch() + 3600)`,
+    )
+    body.raw(`${login.parameters.token.name} := ${odbJwt.encode(vPayload.name, `'my-secret'`)}`)
   })
 })
 ```
@@ -52,9 +50,9 @@ const appPackage = odbPackage('pck_app', (p) => {
 `verify` returns `1`/`0` for a valid signature; `claim` reads a single claim (after you have verified the token):
 
 ```ts
-const { uuid } = proc.parameters({ out: { uuid: 'VARCHAR2' } })
+const verifyToken = pkg.defineProcedure('verify_token', { out: { uuid: odbType.string() } })
 
-proc.body((body) => {
+verifyToken.body((body) => {
   const { vToken } = body.variables({ vToken: odbType.string(2000) })
   body.set(vToken, '...')
 
@@ -62,7 +60,7 @@ proc.body((body) => {
     `IF ${odbJwt.verify(vToken.name, `'my-secret'`)} = 1 ` +
       `AND ${odbJwt.isExpired(vToken.name)} = 0 THEN`,
   )
-  body.raw(`${uuid.name} := ${odbJwt.claim(vToken.name, `'sub'`)}`)
+  body.raw(`${verifyToken.parameters.uuid.name} := ${odbJwt.claim(vToken.name, `'sub'`)}`)
   body.raw(`END IF;`)
 })
 ```

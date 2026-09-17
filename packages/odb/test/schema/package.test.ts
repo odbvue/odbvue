@@ -144,8 +144,8 @@ describe('private package members', () => {
 
     expect(() => pkg.toSQLUp()).toThrow('missing substitution secret')
     const sql = pkg.toSQLUp({ substitutions: { secret: "don's secret" } })
-    expect(sql).toContain("c_secret CONSTANT VARCHAR2 := 'don''s secret';")
-    expect(sql).not.toContain('c_secret CONSTANT VARCHAR2;')
+    expect(sql).toContain("c_secret CONSTANT VARCHAR2(32767) := 'don''s secret';")
+    expect(sql).not.toContain('c_secret CONSTANT VARCHAR2(32767);')
     expect(sql).toContain('RETURN c_secret;')
   })
 })
