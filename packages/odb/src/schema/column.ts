@@ -161,6 +161,13 @@ export class Column<
     return this.name
   }
 
+  /** Create a column reference that renders under a table alias. */
+  withReference(name: string): this {
+    const column = new Column(name, this.type, this.options)
+    column._tableName = this._tableName
+    return column as this
+  }
+
   toNode(): ColumnNode {
     return {
       kind: 'column',

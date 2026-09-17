@@ -4,7 +4,7 @@ import {
   type Insertable,
   type Selectable,
   type SelectableColumnValue,
-  type Table,
+  Table,
   type TableColumn,
   type Updateable,
 } from '../schema/table.js'
@@ -27,6 +27,11 @@ import {
 type OrderByClause = {
   column: string
   direction: 'asc' | 'desc'
+}
+
+type JoinClause = {
+  table: string | NamedRef
+  on: ExpressionNode
 }
 
 type ColumnLike = Column<any, string, any, any, any, any>
@@ -88,6 +93,7 @@ export class SelectQueryBuilder<
   private _columns: string[] = []
   private _selectedColumns: ColumnNode[] | undefined = []
   private _where: ExpressionNode[] = []
+  private _joins: JoinClause[] = []
   private _orderBy: OrderByClause[] = []
   private _limit?: number
   private _forUpdate = false
@@ -104,7 +110,27 @@ export class SelectQueryBuilder<
 
   private tableName(): string {
     if (typeof this._table === 'string') return this._table
+    if (this._table instanceof Table) return this._table.queryName(this._schema)
     return this._schema ? `${this._schema}.${this._table.name}` : this._table.name
+  }
+
+  join<TJoin extends Table<any>>(
+    table: TJoin,
+    on: (eb: ExpressionBuilder) => ExpressionNode,
+  ): SelectQueryBuilder<TTable | TJoin, TResult, THasSelection>
+  join(table: string | NamedRef, on: (eb: ExpressionBuilder) => ExpressionNode): this
+  join(
+    table: string | NamedRef | Table<any>,
+    on: (eb: ExpressionBuilder) => ExpressionNode,
+  ): SelectQueryBuilder<any, TResult, THasSelection> {
+    this._joins.push({ table: table as string | NamedRef, on: on(odbExpr) })
+    return this as SelectQueryBuilder<any, TResult, THasSelection>
+  }
+
+  private joinedTableName(table: string | NamedRef): string {
+    if (typeof table === 'string') return table
+    if (table instanceof Table) return table.queryName(this._schema)
+    return this._schema ? `${this._schema}.${table.name}` : table.name
   }
 
   select<TColumn extends TableColumn<TTable>>(
@@ -205,12 +231,16 @@ export class SelectQueryBuilder<
 
     sql += ` FROM ${this.tableName()}`
 
+    const ctx = new BindContext('w')
+    for (const join of this._joins) {
+      sql += ` JOIN ${this.joinedTableName(join.table)} ON ${compileNode(join.on, ctx)}`
+    }
+
     const whereNode = combinePredicates(this._where)
     if (whereNode) {
-      const ctx = new BindContext('w')
       sql += ` WHERE ${compileNode(whereNode, ctx)}`
-      Object.assign(bindings, ctx.bindings)
     }
+    Object.assign(bindings, ctx.bindings)
 
     if (this._orderBy.length > 0) {
       const parts = this._orderBy.map((o) => `${o.column} ${o.direction.toUpperCase()}`)
@@ -230,6 +260,9 @@ export class SelectQueryBuilder<
     let sql = `SELECT ${cols}`
     if (this._into) sql += ` INTO ${this._into}`
     sql += ` FROM ${this.tableName()}`
+    for (const join of this._joins) {
+      sql += ` JOIN ${this.joinedTableName(join.table)} ON ${renderNode(join.on)}`
+    }
     const whereNode = combinePredicates(this._where)
     if (whereNode) sql += ` WHERE ${renderNode(whereNode)}`
     if (this._orderBy.length > 0) {

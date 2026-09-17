@@ -117,6 +117,9 @@ export type TableShape<TColumns extends TableColumnMap = Record<string, never>> 
 > &
   ResolveColumnMap<TColumns>
 
+/** A table projection whose columns render qualified by a SQL alias. */
+export type TableAlias<TTable extends Table<any>> = TTable & { readonly alias: string }
+
 export type ColumnName<TColumn extends Column<any, string, any, any, any, any>> =
   TColumn extends Column<any, infer TName, any, any, any, any> ? TName : never
 
@@ -133,10 +136,10 @@ export type ColumnKeyOf<TTable extends Table<any>> = {
     : never
 }[keyof TTable]
 
-export type TableColumn<TTable extends Table<any>> = Extract<
-  TTable[ColumnKeyOf<TTable>],
-  Column<any, string, any, any, any, any>
->
+export type TableColumn<TTable extends Table<any>> =
+  TTable extends Table<any>
+    ? Extract<TTable[ColumnKeyOf<TTable>], Column<any, string, any, any, any, any>>
+    : never
 
 export type Selectable<TTable extends Table<any>> = {
   [TKey in ColumnKeyOf<TTable> as TKey]: TTable[TKey] extends Column<
@@ -243,6 +246,7 @@ export type Updateable<TTable extends Table<any>> = Partial<{
 
 export class Table<TColumns extends TableColumnMap = Record<string, never>> {
   private readonly _shape?: TColumns
+  private _sourceTableName?: string
   private columns: Column<any, string, any, any, any, any, any>[] = []
   private columnNamesByKey = new Map<string, string>()
   private indexes: TableIndexDefinition[] = []
@@ -250,6 +254,32 @@ export class Table<TColumns extends TableColumnMap = Record<string, never>> {
   private tableComment?: string
 
   constructor(readonly name: string) {}
+
+  /** Create an aliased table reference for use in a query. */
+  as(alias: string): TableAlias<this> {
+    const table = Object.create(this) as TableAlias<this>
+    Object.defineProperties(table, {
+      name: { value: alias, enumerable: true },
+      alias: { value: alias, enumerable: true },
+    })
+    table._sourceTableName = this.name
+
+    for (const [key, value] of Object.entries(this)) {
+      if (value instanceof Column) {
+        ;(table as unknown as Record<string, unknown>)[key] = value.withReference(
+          `${alias}.${value.name}`,
+        )
+      }
+    }
+    return table
+  }
+
+  /** @internal Render this table for a query, including an optional alias. */
+  queryName(schema?: string): string {
+    const tableName = this._sourceTableName ?? this.name
+    const qualifiedName = schema ? `${schema}.${tableName}` : tableName
+    return this._sourceTableName ? `${qualifiedName} ${this.name}` : qualifiedName
+  }
 
   addColumn(column: Column<any, string, any, any, any, any, any>): this {
     column.attachTable(this.name)

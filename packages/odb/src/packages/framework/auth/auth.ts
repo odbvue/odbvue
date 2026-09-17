@@ -265,19 +265,22 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => {
         body.set(subject, odbJwt.claim(token, odbLiteral('sub')))
         body.set(sessionId, odbJwt.claim(token, odbLiteral('sid')))
         body.set(tokenVersion, odbOracle.toNumber(odbJwt.claim(token, odbLiteral('ver'))))
+        const sessions = authSessions.as('s')
+        const users = authUsers.as('u')
         body.query(
           odbQuery()
-            .selectFrom('odb_auth_sessions s JOIN odb_auth_users u ON u.id = s.user_id')
+            .selectFrom(sessions)
+            .join(users, (expression) => expression(users.id, '=', sessions.userId))
             .select('COUNT(*)')
             .into(activeSessionCount.name)
             .where((expression) =>
               expression.and([
-                expression('s.id', '=', sessionId),
-                expression('s.user_id', '=', subject),
-                expression('s.revoked_at', 'IS NULL'),
-                expression('s.expires_at', '>', expression.ref('SYSTIMESTAMP')),
-                expression('u.enabled', '=', 1),
-                expression('u.token_version', '=', tokenVersion),
+                expression(sessions.id, '=', sessionId),
+                expression(sessions.userId, '=', subject),
+                expression(sessions.revokedAt, 'IS NULL'),
+                expression(sessions.expiresAt, '>', expression.ref('SYSTIMESTAMP')),
+                expression(users.enabled, '=', 1),
+                expression(users.tokenVersion, '=', tokenVersion),
               ]),
             ),
         )
@@ -413,19 +416,20 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => {
             (then) => then.unauthorized(),
           )
           statements.set(presentedRefreshTokenHash, odbAuthCrypto.hashToken(presentedRefreshToken))
+          const sessions = authSessions.as('s')
           statements.query(
             odbQuery()
-              .selectFrom('odb_auth_sessions s')
-              .select(['s.id', 's.user_id', 's.previous_refresh_token_hash'])
+              .selectFrom(sessions)
+              .select([sessions.id, sessions.userId, sessions.previousRefreshTokenHash])
               .into(sessionId, userId, previousRefreshTokenHash)
               .where((expression) =>
                 expression.and([
                   expression.or([
-                    expression('s.refresh_token_hash', '=', presentedRefreshTokenHash),
-                    expression('s.previous_refresh_token_hash', '=', presentedRefreshTokenHash),
+                    expression(sessions.refreshTokenHash, '=', presentedRefreshTokenHash),
+                    expression(sessions.previousRefreshTokenHash, '=', presentedRefreshTokenHash),
                   ]),
-                  expression('s.revoked_at', 'IS NULL'),
-                  expression('s.expires_at', '>', expression.ref('SYSTIMESTAMP')),
+                  expression(sessions.revokedAt, 'IS NULL'),
+                  expression(sessions.expiresAt, '>', expression.ref('SYSTIMESTAMP')),
                 ]),
               )
               .forUpdate(),

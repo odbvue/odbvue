@@ -29,6 +29,31 @@ describe('odbQuery', () => {
     expect(compiled.bindings).toEqual({ w0: 42 })
   })
 
+  it('supports typed aliases and joins', () => {
+    const sessions = odbTable('APP_SESSIONS', (t) => ({
+      id: t.number('ID').notNull(),
+      userId: t.number('USER_ID').notNull(),
+    })).as('s')
+    const users = odbTable('APP_USERS', (t) => ({
+      id: t.number('ID').notNull(),
+      enabled: t.boolean('ENABLED').notNull(),
+    })).as('u')
+
+    const query = odbQuery()
+      .selectFrom(sessions)
+      .join(users, (expression) => expression(users.id, '=', sessions.userId))
+      .select([sessions.id, users.enabled])
+      .where(users.enabled, '=', true)
+
+    expect(query.toSQL()).toBe(
+      'SELECT s.ID, u.ENABLED FROM APP_SESSIONS s JOIN APP_USERS u ON u.ID = s.USER_ID WHERE u.ENABLED = 1',
+    )
+    expect(query.compile()).toEqual({
+      sql: 'SELECT s.ID, u.ENABLED FROM APP_SESSIONS s JOIN APP_USERS u ON u.ID = s.USER_ID WHERE u.ENABLED = :w0',
+      bindings: { w0: true },
+    })
+  })
+
   it('renders SELECT INTO for multiple typed targets', () => {
     const users = odbTable('APP_USERS', (t) => ({
       id: t.number('ID').notNull(),
