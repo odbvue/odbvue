@@ -54,6 +54,7 @@ const appPackage = odbPackage('pck_app', (p) => {
     method: 'POST',
     path: '/bootstrap',
     summary: 'Bootstraps the admin user',
+    params: { body: { username: 'username', password: 'password' } },
   })
 })
 
