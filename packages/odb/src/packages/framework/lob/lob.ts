@@ -19,15 +19,12 @@
 // Credit: https://github.com/paulzip-dev/Base64
 
 import { readFileSync } from 'node:fs'
+import { dropPackageIfExists, qualify } from '../../../schema/ddl.js'
 
 const spec = readFileSync(new URL('./lob.pks', import.meta.url), 'utf8')
 const body = readFileSync(new URL('./lob.pkb', import.meta.url), 'utf8')
 
 const LOB_PKG_NAME = 'odb_lob'
-
-function qualify(name: string, schema?: string): string {
-  return schema ? `${schema}.${name}` : name
-}
 
 /**
  * Pre-installed LOB / Base64 API (`odb_lob`).
@@ -53,15 +50,7 @@ export const odbLob = {
 
   /** Drop `odb_lob`. Optional schema qualifies the name. */
   toSQLDown(options: { schema?: string } = {}): string {
-    const name = qualify(LOB_PKG_NAME, options.schema)
-    return [
-      `BEGIN`,
-      `  EXECUTE IMMEDIATE 'DROP PACKAGE ${name}';`,
-      `EXCEPTION WHEN OTHERS THEN`,
-      `  IF SQLCODE != -4043 THEN RAISE; END IF;`,
-      `END;`,
-      `/`,
-    ].join('\n')
+    return dropPackageIfExists(LOB_PKG_NAME, options.schema)
   },
 
   /** `odb_lob.clob_to_blob(<clob>)` \u2192 BLOB */

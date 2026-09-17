@@ -18,6 +18,7 @@
 
 import { readFileSync } from 'node:fs'
 import { PlsqlExpression, renderPlsql, type PlsqlRenderable } from '../../../schema/attribute.js'
+import { dropPackageIfExists, qualify } from '../../../schema/ddl.js'
 
 const spec = readFileSync(new URL('./jwt.pks', import.meta.url), 'utf8')
 const body = readFileSync(new URL('./jwt.pkb', import.meta.url), 'utf8')
@@ -30,10 +31,6 @@ function call<T extends string>(
   args: readonly PlsqlRenderable[],
 ): PlsqlExpression<T> {
   return new PlsqlExpression(type, `odb_jwt.${name}(${args.map(renderPlsql).join(', ')})`)
-}
-
-function qualify(name: string, schema?: string): string {
-  return schema ? `${schema}.${name}` : name
 }
 
 /**
@@ -62,15 +59,7 @@ export const odbJwt = {
 
   /** Drop `odb_jwt`. Optional schema qualifies the name. */
   toSQLDown(options: { schema?: string } = {}): string {
-    const name = qualify(JWT_PKG_NAME, options.schema)
-    return [
-      `BEGIN`,
-      `  EXECUTE IMMEDIATE 'DROP PACKAGE ${name}';`,
-      `EXCEPTION WHEN OTHERS THEN`,
-      `  IF SQLCODE != -4043 THEN RAISE; END IF;`,
-      `END;`,
-      `/`,
-    ].join('\n')
+    return dropPackageIfExists(JWT_PKG_NAME, options.schema)
   },
 
   /** `odb_jwt.encode(<payload>, <secret>)` → VARCHAR2 (signed JWT) */

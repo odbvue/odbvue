@@ -1,9 +1,6 @@
 const HTTP_ERROR_NUMBER = -20999
 const ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]{0,99}$/
-
-function qualify(name: string, schema?: string): string {
-  return schema ? `${schema}.${name}` : name
-}
+import { dropPackageIfExists, qualify } from '../../../schema/ddl.js'
 
 function validateStatus(status: number): void {
   if (!Number.isInteger(status) || status < 400 || status > 599) {
@@ -42,15 +39,7 @@ export const odbHttp = {
     ].join('\n')
   },
   toSQLDown(options: { schema?: string } = {}): string {
-    const name = qualify('odb_http', options.schema)
-    return [
-      `BEGIN`,
-      `  EXECUTE IMMEDIATE 'DROP PACKAGE ${name}';`,
-      `EXCEPTION WHEN OTHERS THEN`,
-      `  IF SQLCODE != -4043 THEN RAISE; END IF;`,
-      `END;`,
-      `/`,
-    ].join('\n')
+    return dropPackageIfExists('odb_http', options.schema)
   },
   error(status: number, code: string): string {
     validateStatus(status)

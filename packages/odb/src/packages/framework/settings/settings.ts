@@ -23,6 +23,7 @@
 import { readFileSync } from 'node:fs'
 
 import { renderPlsql, type PlsqlRenderable } from '../../../schema/attribute.js'
+import { dropPackageIfExists, plsqlBlock, qualify } from '../../../schema/ddl.js'
 
 const spec = readFileSync(new URL('./settings.pks', import.meta.url), 'utf8')
 const body = readFileSync(new URL('./settings.pkb', import.meta.url), 'utf8')
@@ -37,14 +38,6 @@ const MASTER_KEY_ENV = 'ODBVUE_SETTINGS_MASTER_KEY'
 // nor ODBVUE_SETTINGS_MASTER_KEY is set. Override it in production, or use OCI
 // Vault (ODB_SETTINGS_MASTER_KEY_URI) so this key is never the one in effect.
 const DEFAULT_MASTER_KEY = '7F3A9C1E5B08D46271AE9F0C3D5B8E1240A7C6F9B2E43D18576C0A9E3F1B8D2C'
-
-function qualify(name: string, schema?: string): string {
-  return schema ? `${schema}.${name}` : name
-}
-
-function block(stmt: string): string {
-  return [`BEGIN`, `  ${stmt};`, `END;`, `/`].join('\n')
-}
 
 function lit(v: string): string {
   return `'${v.replace(/'/g, "''")}'`
@@ -122,15 +115,9 @@ export const odbSettings = {
 
   /** Drop `odb_settings` (package) and `odb_settings_store` (table). */
   toSQLDown(options: { schema?: string } = {}): string {
-    const pkg = qualify(SETTINGS_PKG_NAME, options.schema)
     const table = qualify(SETTINGS_TABLE_NAME, options.schema)
     return [
-      `BEGIN`,
-      `  EXECUTE IMMEDIATE 'DROP PACKAGE ${pkg}';`,
-      `EXCEPTION WHEN OTHERS THEN`,
-      `  IF SQLCODE != -4043 THEN RAISE; END IF;`,
-      `END;`,
-      `/`,
+      dropPackageIfExists(SETTINGS_PKG_NAME, options.schema),
       `BEGIN`,
       `  EXECUTE IMMEDIATE 'DROP TABLE ${table} PURGE';`,
       `EXCEPTION WHEN OTHERS THEN`,
@@ -197,7 +184,7 @@ export const odbSettings = {
         const pkg = qualify(SETTINGS_PKG_NAME, options.schema)
         return settings
           .map((s) =>
-            block(
+            plsqlBlock(
               `${pkg}.write(${lit(s.id)}, ${lit(s.name ?? s.id)}, ${lit(s.value)}, ` +
                 `${s.options !== undefined ? lit(s.options) : 'NULL'}, ${s.secret ? `'Y'` : `'N'`})`,
             ),
@@ -208,7 +195,7 @@ export const odbSettings = {
         const pkg = qualify(SETTINGS_PKG_NAME, options.schema)
         return settings
           .toReversed()
-          .map((s) => block(`${pkg}.remove(${lit(s.id)})`))
+          .map((s) => plsqlBlock(`${pkg}.remove(${lit(s.id)})`))
           .join('\n')
       },
     }

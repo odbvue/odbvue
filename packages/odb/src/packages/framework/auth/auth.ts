@@ -1,6 +1,7 @@
 import { pbkdf2Sync } from 'node:crypto'
 import { odbPackage, odbType } from '../../../schema/package.js'
 import { cond, odbLiteral, plsqlExpr, type PlsqlValue } from '../../../schema/attribute.js'
+import { plsqlBlock, qualify } from '../../../schema/ddl.js'
 import { odbTable } from '../../../schema/table.js'
 import { odbQuery } from '../../../query/index.js'
 import { odbDbmsCrypto, odbOracle, odbUtlI18n, odbUtlRaw } from '../../oracle/index.js'
@@ -29,14 +30,6 @@ function dummyPasswordHash(): string {
     'sha512',
   )
   return `${PASSWORD_HASH_ALGORITHM}$${PASSWORD_HASH_ITERATIONS}$${salt.toString('hex').toUpperCase()}$${hash.toString('hex').toUpperCase()}`
-}
-
-function qualify(name: string, schema?: string): string {
-  return schema ? `${schema}.${name}` : name
-}
-
-function block(statement: string): string {
-  return ['BEGIN', `  ${statement};`, 'END;', '/'].join('\n')
 }
 
 function refreshCookie(
@@ -640,7 +633,7 @@ export const odbAuth = {
       toSQLUp(options: { schema?: string } = {}): string {
         const table = qualify('odb_auth_users', options.schema)
         const crypto = qualify('odb_auth_crypto', options.schema)
-        return block(
+        return plsqlBlock(
           `MERGE INTO ${table} target USING (SELECT ${odbLiteral(user.username).toSQL()} username FROM dual) source ON (LOWER(target.username) = LOWER(source.username)) WHEN MATCHED THEN UPDATE SET target.password_hash = ${crypto}.hash_password(${odbLiteral(user.password).toSQL()}), target.display_name = ${odbLiteral(user.displayName ?? user.username).toSQL()}, target.enabled = 1, target.token_version = target.token_version + 1, target.updated_at = SYSTIMESTAMP WHEN NOT MATCHED THEN INSERT (username, password_hash, display_name, enabled, token_version) VALUES (${odbLiteral(user.username).toSQL()}, ${crypto}.hash_password(${odbLiteral(user.password).toSQL()}), ${odbLiteral(user.displayName ?? user.username).toSQL()}, 1, 0)`,
         )
       },

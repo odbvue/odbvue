@@ -20,16 +20,13 @@
 // The PL/SQL sources below are the source-of-truth for `odb_audit`.
 
 import { readFileSync } from 'node:fs'
+import { dropPackageIfExists, qualify } from '../../../schema/ddl.js'
 
 const spec = readFileSync(new URL('./audit.pks', import.meta.url), 'utf8')
 const body = readFileSync(new URL('./audit.pkb', import.meta.url), 'utf8')
 
 const AUDIT_PKG_NAME = 'odb_audit'
 const AUDIT_TABLE_NAME = 'odb_audit_logs'
-
-function qualify(name: string, schema?: string): string {
-  return schema ? `${schema}.${name}` : name
-}
 
 /** DDL for the `odb_audit_logs` table, wrapped so re-installs are idempotent (ORA-00955). */
 function tableUpSQL(schema?: string): string {
@@ -99,15 +96,9 @@ export const odbAudit = {
 
   /** Drop `odb_audit` (package) and `odb_audit_logs` (table). Optional schema qualifies the names. */
   toSQLDown(options: { schema?: string } = {}): string {
-    const pkg = qualify(AUDIT_PKG_NAME, options.schema)
     const table = qualify(AUDIT_TABLE_NAME, options.schema)
     return [
-      `BEGIN`,
-      `  EXECUTE IMMEDIATE 'DROP PACKAGE ${pkg}';`,
-      `EXCEPTION WHEN OTHERS THEN`,
-      `  IF SQLCODE != -4043 THEN RAISE; END IF;`,
-      `END;`,
-      `/`,
+      dropPackageIfExists(AUDIT_PKG_NAME, options.schema),
       `BEGIN`,
       `  EXECUTE IMMEDIATE 'DROP TABLE ${table} PURGE';`,
       `EXCEPTION WHEN OTHERS THEN`,
