@@ -17,11 +17,20 @@
 // The PL/SQL sources below are the source-of-truth for `odb_jwt`.
 
 import { readFileSync } from 'node:fs'
+import { PlsqlExpression, renderPlsql, type PlsqlRenderable } from '../../../schema/attribute.js'
 
 const spec = readFileSync(new URL('./jwt.pks', import.meta.url), 'utf8')
 const body = readFileSync(new URL('./jwt.pkb', import.meta.url), 'utf8')
 
 const JWT_PKG_NAME = 'odb_jwt'
+
+function call<T extends string>(
+  type: T,
+  name: string,
+  args: readonly PlsqlRenderable[],
+): PlsqlExpression<T> {
+  return new PlsqlExpression(type, `odb_jwt.${name}(${args.map(renderPlsql).join(', ')})`)
+}
 
 function qualify(name: string, schema?: string): string {
   return schema ? `${schema}.${name}` : name
@@ -65,49 +74,47 @@ export const odbJwt = {
   },
 
   /** `odb_jwt.encode(<payload>, <secret>)` → VARCHAR2 (signed JWT) */
-  encode(payload: string, secret: string): string {
-    return `odb_jwt.encode(${payload}, ${secret})`
+  encode(payload: PlsqlRenderable, secret: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
+    return call('VARCHAR2', 'encode', [payload, secret])
   },
 
   /** `odb_jwt.verify(<token>, <secret>)` → 0/1 */
-  verify(token: string, secret: string): string {
-    return `odb_jwt.verify(${token}, ${secret})`
+  verify(token: PlsqlRenderable, secret: PlsqlRenderable): PlsqlExpression<'NUMBER'> {
+    return call('NUMBER', 'verify', [token, secret])
   },
 
   /** `odb_jwt.payload(<token>)` → VARCHAR2 (decoded JSON claims, no signature check) */
-  payload(token: string): string {
-    return `odb_jwt.payload(${token})`
+  payload(token: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
+    return call('VARCHAR2', 'payload', [token])
   },
 
   /** `odb_jwt.claim(<token>, <name>)` → VARCHAR2 (single claim, no signature check) */
-  claim(token: string, name: string): string {
-    return `odb_jwt.claim(${token}, ${name})`
+  claim(token: PlsqlRenderable, name: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
+    return call('VARCHAR2', 'claim', [token, name])
   },
 
   /** `odb_jwt.is_expired(<token>[, <leeway>])` → 0/1 */
-  isExpired(token: string, leeway?: string): string {
-    return leeway === undefined
-      ? `odb_jwt.is_expired(${token})`
-      : `odb_jwt.is_expired(${token}, ${leeway})`
+  isExpired(token: PlsqlRenderable, leeway?: PlsqlRenderable): PlsqlExpression<'NUMBER'> {
+    return call('NUMBER', 'is_expired', leeway === undefined ? [token] : [token, leeway])
   },
 
   /** `odb_jwt.base64url_encode(<input>)` → VARCHAR2 */
-  base64urlEncode(input: string): string {
-    return `odb_jwt.base64url_encode(${input})`
+  base64urlEncode(input: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
+    return call('VARCHAR2', 'base64url_encode', [input])
   },
 
   /** `odb_jwt.base64url_decode(<input>)` → VARCHAR2 */
-  base64urlDecode(input: string): string {
-    return `odb_jwt.base64url_decode(${input})`
+  base64urlDecode(input: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
+    return call('VARCHAR2', 'base64url_decode', [input])
   },
 
   /** `odb_jwt.to_epoch([<timestamp>])` → INTEGER (Unix seconds) */
-  toEpoch(timestamp?: string): string {
-    return timestamp === undefined ? `odb_jwt.to_epoch()` : `odb_jwt.to_epoch(${timestamp})`
+  toEpoch(timestamp?: PlsqlRenderable): PlsqlExpression<'INTEGER'> {
+    return call('INTEGER', 'to_epoch', timestamp === undefined ? [] : [timestamp])
   },
 
   /** `odb_jwt.from_epoch(<epoch>)` → TIMESTAMP */
-  fromEpoch(epoch: string): string {
-    return `odb_jwt.from_epoch(${epoch})`
+  fromEpoch(epoch: PlsqlRenderable): PlsqlExpression<'TIMESTAMP'> {
+    return call('TIMESTAMP', 'from_epoch', [epoch])
   },
 }

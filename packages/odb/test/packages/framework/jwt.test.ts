@@ -30,20 +30,22 @@ describe('odbJwt (framework package odb_jwt)', () => {
 
   describe('call-expression helpers', () => {
     it('render odb_jwt.* calls', () => {
-      expect(odbJwt.encode('v_payload', 'v_secret')).toBe('odb_jwt.encode(v_payload, v_secret)')
-      expect(odbJwt.verify('v_token', 'v_secret')).toBe('odb_jwt.verify(v_token, v_secret)')
-      expect(odbJwt.payload('v_token')).toBe('odb_jwt.payload(v_token)')
-      expect(odbJwt.claim('v_token', "'sub'")).toBe("odb_jwt.claim(v_token, 'sub')")
-      expect(odbJwt.base64urlEncode('v_text')).toBe('odb_jwt.base64url_encode(v_text)')
-      expect(odbJwt.base64urlDecode('v_b64')).toBe('odb_jwt.base64url_decode(v_b64)')
-      expect(odbJwt.fromEpoch('v_epoch')).toBe('odb_jwt.from_epoch(v_epoch)')
+      expect(odbJwt.encode('v_payload', 'v_secret').toSQL()).toBe(
+        'odb_jwt.encode(v_payload, v_secret)',
+      )
+      expect(odbJwt.verify('v_token', 'v_secret').toSQL()).toBe('odb_jwt.verify(v_token, v_secret)')
+      expect(odbJwt.payload('v_token').toSQL()).toBe('odb_jwt.payload(v_token)')
+      expect(odbJwt.claim('v_token', "'sub'").toSQL()).toBe("odb_jwt.claim(v_token, 'sub')")
+      expect(odbJwt.base64urlEncode('v_text').toSQL()).toBe('odb_jwt.base64url_encode(v_text)')
+      expect(odbJwt.base64urlDecode('v_b64').toSQL()).toBe('odb_jwt.base64url_decode(v_b64)')
+      expect(odbJwt.fromEpoch('v_epoch').toSQL()).toBe('odb_jwt.from_epoch(v_epoch)')
     })
 
     it('renders optional arguments', () => {
-      expect(odbJwt.isExpired('v_token')).toBe('odb_jwt.is_expired(v_token)')
-      expect(odbJwt.isExpired('v_token', '30')).toBe('odb_jwt.is_expired(v_token, 30)')
-      expect(odbJwt.toEpoch()).toBe('odb_jwt.to_epoch()')
-      expect(odbJwt.toEpoch('v_ts')).toBe('odb_jwt.to_epoch(v_ts)')
+      expect(odbJwt.isExpired('v_token').toSQL()).toBe('odb_jwt.is_expired(v_token)')
+      expect(odbJwt.isExpired('v_token', '30').toSQL()).toBe('odb_jwt.is_expired(v_token, 30)')
+      expect(odbJwt.toEpoch().toSQL()).toBe('odb_jwt.to_epoch()')
+      expect(odbJwt.toEpoch('v_ts').toSQL()).toBe('odb_jwt.to_epoch(v_ts)')
     })
   })
 })

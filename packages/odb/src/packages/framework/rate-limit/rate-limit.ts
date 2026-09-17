@@ -1,5 +1,6 @@
 import { odbPackage, odbType } from '../../../schema/package.js'
-import { PlsqlExpression, PlsqlStatement } from '../../../schema/attribute.js'
+import { cond, expr, PlsqlExpression, PlsqlStatement } from '../../../schema/attribute.js'
+import { odbOracle } from '../../oracle/index.js'
 import { odbTable } from '../../../schema/table.js'
 import { odbQuery } from '../../../query/index.js'
 
@@ -46,7 +47,7 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
             ]),
           ),
       )
-      body.ifThen(`${blockedUntil.name} > SYSTIMESTAMP`, (then) => then.tooManyRequests())
+      body.ifThen(cond.gt(blockedUntil, odbOracle.sysTimestamp()), (then) => then.tooManyRequests())
       body.when('NO_DATA_FOUND', (handler) => handler.null())
     })
   }),
@@ -75,7 +76,7 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
           .forUpdate(),
       )
       body.ifThen(
-        `${windowStartedAt.name} + NUMTODSINTERVAL(60, 'SECOND') <= SYSTIMESTAMP`,
+        cond.lte(expr.add(windowStartedAt, expr.interval(60, 'SECOND')), odbOracle.sysTimestamp()),
         (then) => {
           then.set(windowStartedAt, new PlsqlExpression('TIMESTAMP', 'SYSTIMESTAMP'))
           then.set(failureCount, new PlsqlExpression('NUMBER', '1'))

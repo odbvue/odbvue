@@ -1,6 +1,6 @@
 import { pbkdf2Sync } from 'node:crypto'
 import { odbPackage, odbType } from '../../../schema/package.js'
-import { odbLiteral, PlsqlExpression } from '../../../schema/attribute.js'
+import { cond, odbLiteral, PlsqlExpression } from '../../../schema/attribute.js'
 import { odbTable } from '../../../schema/table.js'
 import { odbQuery } from '../../../query/index.js'
 import { odbDbmsCrypto, odbOracle, odbUtlI18n, odbUtlRaw } from '../../oracle/index.js'
@@ -142,7 +142,12 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
           derivedHash: odbType.string(128),
         })
       body.ifThen(
-        `NOT REGEXP_LIKE(${storedHash.name}, '^${PASSWORD_HASH_ALGORITHM}\\$[1-9][0-9]*\\$[[:xdigit:]]{32}\\$[[:xdigit:]]{128}$')`,
+        cond.not(
+          cond.regexpLike(
+            storedHash,
+            `^${PASSWORD_HASH_ALGORITHM}\\$[1-9][0-9]*\\$[[:xdigit:]]{32}\\$[[:xdigit:]]{128}$`,
+          ),
+        ),
         (then) => then.return('0'),
       )
       body.set(
@@ -178,7 +183,7 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
         loop.set(derivedKey, odbUtlRaw.bitXor(derivedKey, roundBlock))
       })
       body.set(derivedHash, odbOracle.rawToHex(derivedKey))
-      body.ifThen(`${derivedHash.name} = ${expectedHash.name}`, (then) => then.return('1'))
+      body.ifThen(cond.eq(derivedHash, expectedHash), (then) => then.return('1'))
       body.return('0')
     })
   }),
@@ -232,15 +237,15 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => ({
         ),
       )
       body.ifThen(
-        `odb_jwt.verify(${token.name}, '${AUTH_JWT_SECRET_MARKER}') = 0 OR odb_jwt.is_expired(${token.name}) = 1`,
+        cond.or([
+          cond.eq(odbJwt.verify(token, odbLiteral(AUTH_JWT_SECRET_MARKER)), 0),
+          cond.eq(odbJwt.isExpired(token), 1),
+        ]),
         (then) => then.unauthorized(),
       )
-      body.set(subject, new PlsqlExpression('VARCHAR2', odbJwt.claim(token.name, "'sub'")))
-      body.set(sessionId, new PlsqlExpression('VARCHAR2', odbJwt.claim(token.name, "'sid'")))
-      body.set(
-        tokenVersion,
-        new PlsqlExpression('NUMBER', `TO_NUMBER(${odbJwt.claim(token.name, "'ver'")})`),
-      )
+      body.set(subject, odbJwt.claim(token, odbLiteral('sub')))
+      body.set(sessionId, odbJwt.claim(token, odbLiteral('sid')))
+      body.set(tokenVersion, odbOracle.toNumber(odbJwt.claim(token, odbLiteral('ver'))))
       body.query(
         odbQuery()
           .selectFrom('odb_auth_sessions s JOIN odb_auth_users u ON u.id = s.user_id')
@@ -257,7 +262,7 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => ({
             ]),
           ),
       )
-      body.ifThen(`${activeSessionCount.name} = 0`, (then) => then.unauthorized())
+      body.ifThen(cond.eq(activeSessionCount, 0), (then) => then.unauthorized())
       body.return(subject.name)
     })
   }),
@@ -310,7 +315,10 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
           odbOracle.nvl(passwordHash, odbLiteral(DUMMY_PASSWORD_HASH_MARKER)),
         )
         statements.ifThen(
-          `${odbAuthCrypto.verifyPassword(password, passwordHash).toSQL()} = 0 OR ${userId.name} IS NULL`,
+          cond.or([
+            cond.eq(odbAuthCrypto.verifyPassword(password, passwordHash), 0),
+            cond.isNull(userId),
+          ]),
           (then) => {
             then.call(odbRateLimit.failure("'AUTH_LOGIN_USERNAME'", loginSubject.name))
             then.unauthorized('INVALID_CREDENTIALS')
@@ -386,7 +394,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
           ),
         )
         statements.ifThen(
-          `NOT REGEXP_LIKE(${presentedRefreshToken.name}, '^[[:xdigit:]]{128}$')`,
+          cond.not(cond.regexpLike(presentedRefreshToken, '^[[:xdigit:]]{128}$')),
           (then) => then.unauthorized(),
         )
         statements.set(presentedRefreshTokenHash, odbAuthCrypto.hashToken(presentedRefreshToken))
@@ -419,18 +427,15 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
               ]),
             ),
         )
-        statements.ifThen(
-          `${presentedRefreshTokenHash.name} = ${previousRefreshTokenHash.name}`,
-          (then) => {
-            then.query(
-              odbQuery()
-                .updateTable(authSessions)
-                .set({ revokedAt: new PlsqlExpression('TIMESTAMP', 'SYSTIMESTAMP') })
-                .where((expression) => expression(authSessions.id, '=', sessionId)),
-            )
-            then.unauthorized()
-          },
-        )
+        statements.ifThen(cond.eq(presentedRefreshTokenHash, previousRefreshTokenHash), (then) => {
+          then.query(
+            odbQuery()
+              .updateTable(authSessions)
+              .set({ revokedAt: new PlsqlExpression('TIMESTAMP', 'SYSTIMESTAMP') })
+              .where((expression) => expression(authSessions.id, '=', sessionId)),
+          )
+          then.unauthorized()
+        })
         statements.set(nextRefreshToken, odbAuthCrypto.randomToken(odbLiteral(REFRESH_TOKEN_BYTES)))
         statements.query(
           odbQuery()

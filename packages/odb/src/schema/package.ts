@@ -1,6 +1,7 @@
 import {
   BlobVar,
   ClobVar,
+  type PlsqlBooleanExpression,
   LocalVar,
   Param,
   PlsqlExpression,
@@ -578,21 +579,19 @@ export class ProcedureBody {
    *
    * @example
    * body.ifThen(
-   *   'v_status = 200',
+   *   cond.eq(status, 200),
    *   (t) => t.set(rToken, issueToken),
    *   (e) => e.auditWarn('login failed'),
    * )
    */
   ifThen(
-    condition: PlsqlRenderable,
+    condition: PlsqlBooleanExpression,
     buildThen: (body: ProcedureBody) => void,
     buildElse?: (body: ProcedureBody) => void,
   ): this {
     const node: StatementNode = {
       kind: 'if',
-      branches: [
-        { condition: renderPlsql(condition), statements: this.childStatements(buildThen) },
-      ],
+      branches: [{ condition: condition.toSQL(), statements: this.childStatements(buildThen) }],
     }
     if (buildElse) {
       node.elseStatements = this.childStatements(buildElse)

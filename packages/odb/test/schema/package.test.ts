@@ -1,8 +1,15 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { MigrationApplicationArtifact, MigrationSqlArtifact } from '../../src/migration.js'
 import { odbQuery } from '../../src/query/index.js'
-import { odbLiteral, PlsqlStatement, type PlsqlExpression } from '../../src/schema/attribute.js'
-import { odbPackage, odbType } from '../../src/schema/package.js'
+import {
+  cond,
+  expr,
+  odbLiteral,
+  PlsqlStatement,
+  type PlsqlBooleanExpression,
+  type PlsqlExpression,
+} from '../../src/schema/attribute.js'
+import { odbPackage, odbType, ProcedureBody } from '../../src/schema/package.js'
 import { odbTable } from '../../src/schema/table.js'
 describe('odbPackage member typing', () => {
   it('exposes typed package member invokers and rejects unknown members', () => {
@@ -69,19 +76,42 @@ describe('ProcedureBody control flow and exceptions', () => {
     return pkg.toSQLUp()
   }
 
+  it('renders typed, composable conditions and value expressions', () => {
+    const body = new ProcedureBody()
+    const { hash, userId, startedAt } = body.variables({
+      hash: odbType.string(128),
+      userId: odbType.guid(),
+      startedAt: odbType.timestamp(),
+    })
+    const validHash = cond.regexpLike(hash, "^a'b$")
+
+    expect(validHash.toSQL()).toBe("REGEXP_LIKE(l_hash, '^a''b$')")
+    expect(validHash.not().or(cond.isNull(userId)).toSQL()).toBe(
+      "(NOT (REGEXP_LIKE(l_hash, '^a''b$')) OR l_user_id IS NULL)",
+    )
+    expect(expr.add(startedAt, expr.interval(60, 'SECOND')).toSQL()).toBe(
+      "l_started_at + NUMTODSINTERVAL(60, 'SECOND')",
+    )
+    expect(expr.jsonObject({ subject: userId, active: true }).toSQL()).toBe(
+      "JSON_OBJECT('subject' VALUE l_user_id, 'active' VALUE TRUE RETURNING CLOB)",
+    )
+    expectTypeOf(validHash).toEqualTypeOf<PlsqlBooleanExpression>()
+  })
+
   it('emits an IF/ELSE block with nested statements', () => {
     const sql = bodyLines((proc) => {
       const result = proc.param('R_OUT', 'VARCHAR2', 'OUT')
-      proc.body((body) =>
+      proc.body((body) => {
+        const { status } = body.variables({ status: odbType.integer() })
         body.ifThen(
-          'v_status = 200',
+          cond.eq(status, 200),
           (t) => t.set(result, 'ok'),
           (e) => e.set(result, 'fail'),
-        ),
-      )
+        )
+      })
     })
 
-    expect(sql).toContain('IF v_status = 200 THEN')
+    expect(sql).toContain('IF l_status = 200 THEN')
     expect(sql).toContain("      R_OUT := 'ok';")
     expect(sql).toContain('    ELSE')
     expect(sql).toContain("      R_OUT := 'fail';")
@@ -155,10 +185,13 @@ describe('ProcedureBody control flow and exceptions', () => {
 
   it('emits an IF block without an ELSE branch', () => {
     const sql = bodyLines((proc) => {
-      proc.body((body) => body.ifThen('v_uuid IS NOT NULL', (t) => t.auditInfo('logged in')))
+      proc.body((body) => {
+        const { uuid } = body.variables({ uuid: odbType.string() })
+        body.ifThen(cond.isNotNull(uuid), (t) => t.auditInfo('logged in'))
+      })
     })
 
-    expect(sql).toContain('IF v_uuid IS NOT NULL THEN')
+    expect(sql).toContain('IF l_uuid IS NOT NULL THEN')
     expect(sql).not.toContain('ELSE')
     expect(sql).toContain('END IF;')
   })
@@ -211,12 +244,13 @@ describe('ProcedureBody control flow and exceptions', () => {
 
   it('hoists locals declared inside nested blocks to the enclosing body', () => {
     const sql = bodyLines((proc) => {
-      proc.body((body) =>
-        body.ifThen('1 = 1', (t) => {
+      proc.body((body) => {
+        const { one } = body.variables({ one: odbType.integer() })
+        body.ifThen(cond.eq(one, 1), (t) => {
           const { inner } = t.variables({ inner: odbType.string(10) })
           t.set(inner, 'x')
-        }),
-      )
+        })
+      })
     })
 
     expect(sql).toContain('    l_inner VARCHAR2(10);')
