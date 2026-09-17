@@ -907,6 +907,62 @@ export class Procedure {
    * })
    */
   service(definition: OrdsServiceDefinition): this {
+    const declaredParameters = new Set(this._params)
+    const mappedParameters = new Set<Param>()
+    const routeParameters = new Set(
+      Array.from(definition.path.matchAll(/:([A-Za-z][A-Za-z0-9_]*)/g), (match) => match[1]),
+    )
+    const mappedRouteParameters = new Set<string>()
+
+    for (const [transport, bindings] of Object.entries(definition.params ?? {})) {
+      for (const [publicName, parameter] of Object.entries(bindings ?? {})) {
+        if (!declaredParameters.has(parameter as Param)) {
+          throw new Error(`ORDS service ${this.name}: ${publicName} is not a procedure parameter.`)
+        }
+        if (mappedParameters.has(parameter as Param)) {
+          throw new Error(
+            `ORDS service ${this.name}: parameter ${(parameter as Param).name} is bound more than once.`,
+          )
+        }
+        const direction = (parameter as Param).toNode().direction
+        if (
+          (transport === 'body' || transport === 'uri') &&
+          direction !== 'IN' &&
+          direction !== 'IN OUT'
+        ) {
+          throw new Error(
+            `ORDS service ${this.name}: ${transport} binding ${publicName} must reference an IN or IN OUT parameter.`,
+          )
+        }
+        if (transport === 'response' && direction !== 'OUT' && direction !== 'IN OUT') {
+          throw new Error(
+            `ORDS service ${this.name}: response binding ${publicName} must reference an OUT or IN OUT parameter.`,
+          )
+        }
+        if (transport === 'uri') mappedRouteParameters.add(publicName)
+        mappedParameters.add(parameter as Param)
+      }
+    }
+
+    for (const parameter of this._params) {
+      if (!mappedParameters.has(parameter)) {
+        throw new Error(`ORDS service ${this.name}: parameter ${parameter.name} is not bound.`)
+      }
+    }
+    for (const routeParameter of routeParameters) {
+      if (!mappedRouteParameters.has(routeParameter)) {
+        throw new Error(
+          `ORDS service ${this.name}: route parameter :${routeParameter} has no URI binding.`,
+        )
+      }
+    }
+    for (const mappedRouteParameter of mappedRouteParameters) {
+      if (!routeParameters.has(mappedRouteParameter)) {
+        throw new Error(
+          `ORDS service ${this.name}: URI binding ${mappedRouteParameter} has no route parameter.`,
+        )
+      }
+    }
     this._service = {
       ...definition,
       path: normalizeServicePath(definition.path),

@@ -68,6 +68,40 @@ describe('odbPackage member typing', () => {
   })
 })
 
+describe('Procedure ORDS contracts', () => {
+  it('requires every parameter to have one direction-compatible binding', () => {
+    expect(() =>
+      odbPackage('PCK_API', (p) => {
+        p.proc('LOGIN', (proc) => {
+          const { username } = proc.parameters({
+            in: { username: odbType.string() },
+            out: { token: odbType.string() },
+          })
+          proc.service({ method: 'POST', path: '/login', params: { body: { username } } })
+        })
+      }),
+    ).toThrow('parameter p_token is not bound')
+  })
+
+  it('accepts complete route, request, and response bindings', () => {
+    expect(() =>
+      odbPackage('PCK_API', (p) => {
+        p.proc('GET_USER', (proc) => {
+          const { userId, result } = proc.parameters({
+            in: { userId: odbType.string() },
+            out: { result: odbType.string() },
+          })
+          proc.service({
+            method: 'GET',
+            path: '/users/:id',
+            params: { uri: { id: userId }, response: { result } },
+          })
+        })
+      }),
+    ).not.toThrow()
+  })
+})
+
 describe('ProcedureBody control flow and exceptions', () => {
   const bodyLines = (build: (proc: import('../../src/schema/package.js').Procedure) => void) => {
     const pkg = odbPackage('PCK_TEST', (p) => {

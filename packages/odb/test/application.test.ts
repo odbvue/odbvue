@@ -18,7 +18,7 @@ const users = odbTable('APP_USERS', (table) => ({
 
 const application = odbPackage('PCK_USERS', (p) => {
   p.proc('GET_USER', (proc) => {
-    const { result } = proc.parameters({
+    const { id, result } = proc.parameters({
       in: { id: 'NUMBER' },
       out: { result: 'SYS_REFCURSOR' },
     })
@@ -28,7 +28,12 @@ const application = odbPackage('PCK_USERS', (p) => {
         odbQuery().selectFrom(users).select([users.id, users.uuid, users.createdAt, users.email]),
       ),
     )
-    proc.service({ method: 'GET', path: '/users/:id', summary: 'Fetch a user' })
+    proc.service({
+      method: 'GET',
+      path: '/users/:id',
+      summary: 'Fetch a user',
+      params: { uri: { id }, response: { result } },
+    })
   })
 
   p.func('COUNT_USERS', 'NUMBER', (fn) => {
@@ -36,8 +41,8 @@ const application = odbPackage('PCK_USERS', (p) => {
   })
 
   p.proc('POST_USER', (proc) => {
-    proc.parameters({ in: { body: 'CLOB' } })
-    proc.service({ method: 'POST', path: '/users' })
+    const { body } = proc.parameters({ in: { body: 'CLOB' } })
+    proc.service({ method: 'POST', path: '/users', params: { body: { body } } })
   })
 })
 
@@ -46,10 +51,11 @@ describe('ODB application contract', () => {
     const model = JSON.parse(JSON.stringify(application.application())) as OdbApplication
     const procedure = model.procedures[0]
 
-    expect(procedure.service).toEqual({
+    expect(procedure.service).toMatchObject({
       method: 'GET',
       path: 'users/:id',
       summary: 'Fetch a user',
+      params: { uri: { id: { name: 'p_id' } }, response: { result: { name: 'p_result' } } },
     })
     expect(procedure.body?.statements[0]).toEqual({
       kind: 'raw',
@@ -100,8 +106,14 @@ describe('ODB application contract', () => {
   it('maps POST inputs from a JSON request body instead of HTTP headers', () => {
     const login = odbPackage('PCK_AUTH', (p) => {
       p.proc('POST_LOGIN', (proc) => {
-        proc.parameters({ in: { username: 'VARCHAR2', password: 'VARCHAR2' } })
-        proc.service({ method: 'POST', path: '/login' })
+        const { username, password } = proc.parameters({
+          in: { username: 'VARCHAR2', password: 'VARCHAR2' },
+        })
+        proc.service({
+          method: 'POST',
+          path: '/login',
+          params: { body: { username, password } },
+        })
       })
     })
 
@@ -137,8 +149,12 @@ describe('ODB application contract', () => {
   it('uses identifier-safe bind variables for kebab-case ORDS parameters', () => {
     const output = odbPackage('PCK_OUTPUT', (p) => {
       p.proc('POST_VALUE', (proc) => {
-        proc.parameters({ out: { accessToken: 'VARCHAR2' } })
-        proc.service({ method: 'POST', path: '/value' })
+        const { accessToken } = proc.parameters({ out: { accessToken: 'VARCHAR2' } })
+        proc.service({
+          method: 'POST',
+          path: '/value',
+          params: { response: { 'access-token': accessToken } },
+        })
       })
     })
 
