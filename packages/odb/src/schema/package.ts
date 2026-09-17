@@ -268,6 +268,8 @@ export type OdbApplication = {
   name: string
   procedures: ProcedureNode[]
   functions: FunctionNode[]
+  privateProcedures?: ProcedureNode[]
+  privateFunctions?: FunctionNode[]
 }
 
 export type ApplicationLike = OdbApplication | { application(): OdbApplication }
@@ -1034,6 +1036,11 @@ export class PlsqlFunction<TReturnType extends PlsqlType | string = PlsqlType | 
     return this
   }
 
+  /** Build an unqualified call suitable for use by another member of this package. */
+  invoke(...args: PlsqlRenderable[]): PlsqlExpression<TReturnType> {
+    return new PlsqlExpression(this.returnType, `${this.name}(${args.map(renderPlsql).join(', ')})`)
+  }
+
   toNode(): FunctionNode {
     return {
       kind: 'function',
@@ -1055,7 +1062,13 @@ export type Package<
   readonly objectName: string
   readonly isBlueGreen: true
   proc(name: string, build?: (proc: Procedure) => void): Procedure
+  privateProc(name: string, build?: (proc: Procedure) => void): Procedure
   func<TReturnType extends PlsqlType | string = PlsqlType | string>(
+    name: string,
+    returnType: TReturnType | OdbTypeDescriptor<TReturnType>,
+    build?: (fn: PlsqlFunction<TReturnType>) => void,
+  ): PlsqlFunction<TReturnType>
+  privateFunc<TReturnType extends PlsqlType | string = PlsqlType | string>(
     name: string,
     returnType: TReturnType | OdbTypeDescriptor<TReturnType>,
     build?: (fn: PlsqlFunction<TReturnType>) => void,
@@ -1074,6 +1087,8 @@ export class PackageImpl<
 > {
   private _procedures: Procedure[] = []
   private _functions: PlsqlFunction<any>[] = []
+  private _privateProcedures: Procedure[] = []
+  private _privateFunctions: PlsqlFunction<any>[] = []
   private _memberLookup: Record<string, PackageMemberDefinition> = {}
 
   /**
@@ -1129,6 +1144,13 @@ export class PackageImpl<
     return p
   }
 
+  privateProc(name: string, build?: (proc: Procedure) => void): Procedure {
+    const p = new Procedure(name)
+    build?.(p)
+    this._privateProcedures.push(p)
+    return p
+  }
+
   func<TReturnType extends PlsqlType | string = PlsqlType | string>(
     name: string,
     returnType: TReturnType | OdbTypeDescriptor<TReturnType>,
@@ -1138,6 +1160,18 @@ export class PackageImpl<
     const f = new PlsqlFunction(name, definition.type, { length: definition.length })
     build?.(f)
     this._functions.push(f)
+    return f
+  }
+
+  privateFunc<TReturnType extends PlsqlType | string = PlsqlType | string>(
+    name: string,
+    returnType: TReturnType | OdbTypeDescriptor<TReturnType>,
+    build?: (fn: PlsqlFunction<TReturnType>) => void,
+  ): PlsqlFunction<TReturnType> {
+    const definition = typeof returnType === 'object' ? returnType : { type: returnType }
+    const f = new PlsqlFunction(name, definition.type, { length: definition.length })
+    build?.(f)
+    this._privateFunctions.push(f)
     return f
   }
 
@@ -1164,6 +1198,8 @@ export class PackageImpl<
       name: this.name,
       procedures: this._procedures.map((p) => p.toNode()),
       functions: this._functions.map((f) => f.toNode()),
+      privateProcedures: this._privateProcedures.map((p) => p.toNode()),
+      privateFunctions: this._privateFunctions.map((f) => f.toNode()),
     }
   }
 
@@ -1225,6 +1261,14 @@ function emitPackageBody(pkg: OdbApplication, options: PackageSqlOptions = {}): 
   const name = qualifyName(identifier, options.schema)
   const orReplace = options.orReplace !== false ? 'OR REPLACE ' : ''
   const lines: string[] = [`CREATE ${orReplace}PACKAGE BODY ${name} AS`]
+
+  for (const proc of pkg.privateProcedures ?? []) {
+    lines.push(emitProcedureImpl(proc))
+  }
+
+  for (const fn of pkg.privateFunctions ?? []) {
+    lines.push(emitFunctionImpl(fn))
+  }
 
   for (const proc of pkg.procedures) {
     lines.push(emitProcedureImpl(proc))

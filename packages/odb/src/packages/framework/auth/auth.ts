@@ -94,85 +94,16 @@ export const authSessions = odbTable('odb_auth_sessions', (t) => ({
   .unique('odb_auth_sessions_uq_token', (columns) => [columns.refreshTokenHash])
 
 /** Password and opaque token primitives used by `odb_auth`. */
-export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
-  hashPassword: pkg.func('hash_password', odbType.string(512), (fn) => {
-    const password = fn.param('p_password', odbType.string())
+export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => {
+  const deriveKey = pkg.privateFunc('derive_key', odbType.raw(PASSWORD_HASH_BYTES), (fn) => {
+    const passwordRaw = fn.param('p_password_raw', odbType.raw(2000))
+    const salt = fn.param('p_salt', odbType.string(32))
+    const iterations = fn.param('p_iterations', odbType.number())
     fn.body((body) => {
-      const { salt, passwordRaw, roundBlock, derivedKey, hash } = body.variables({
-        salt: odbType.string(32),
-        passwordRaw: odbType.raw(2000),
+      const { roundBlock, derivedKey } = body.variables({
         roundBlock: odbType.raw(PASSWORD_HASH_BYTES),
         derivedKey: odbType.raw(PASSWORD_HASH_BYTES),
-        hash: odbType.string(128),
       })
-      body.set(salt, odbOracle.rawToHex(odbDbmsCrypto.randomBytes(16)))
-      body.set(passwordRaw, odbUtlI18n.stringToRaw(password, odbLiteral('AL32UTF8')))
-      body.set(
-        roundBlock,
-        odbDbmsCrypto.mac(
-          odbUtlRaw.concat(odbOracle.hexToRaw(salt), odbOracle.hexToRaw(odbLiteral('00000001'))),
-          odbDbmsCrypto.HMAC_SH512,
-          passwordRaw,
-        ),
-      )
-      body.set(derivedKey, roundBlock)
-      body.forRange('round', 2, PASSWORD_HASH_ITERATIONS, (_round, loop) => {
-        loop.set(roundBlock, odbDbmsCrypto.mac(roundBlock, odbDbmsCrypto.HMAC_SH512, passwordRaw))
-        loop.set(derivedKey, odbUtlRaw.bitXor(derivedKey, roundBlock))
-      })
-      body.set(hash, odbOracle.rawToHex(derivedKey))
-      body.return(
-        plsqlExpr.concat(
-          odbLiteral(`${PASSWORD_HASH_ALGORITHM}$${PASSWORD_HASH_ITERATIONS}$`),
-          salt,
-          odbLiteral('$'),
-          hash,
-        ),
-      )
-    })
-  }),
-  verifyPassword: pkg.func('verify_password', odbType.number(), (fn) => {
-    const password = fn.param('p_password', odbType.string())
-    const storedHash = fn.param('p_password_hash', odbType.string())
-    fn.body((body) => {
-      const { iterations, salt, expectedHash, passwordRaw, roundBlock, derivedKey, derivedHash } =
-        body.variables({
-          iterations: odbType.number(),
-          salt: odbType.string(32),
-          expectedHash: odbType.string(128),
-          passwordRaw: odbType.raw(2000),
-          roundBlock: odbType.raw(PASSWORD_HASH_BYTES),
-          derivedKey: odbType.raw(PASSWORD_HASH_BYTES),
-          derivedHash: odbType.string(128),
-        })
-      body.ifThen(
-        cond.not(
-          cond.regexpLike(
-            storedHash,
-            `^${PASSWORD_HASH_ALGORITHM}\\$[1-9][0-9]*\\$[[:xdigit:]]{32}\\$[[:xdigit:]]{128}$`,
-          ),
-        ),
-        (then) => then.return('0'),
-      )
-      body.set(
-        iterations,
-        odbOracle.toNumber(
-          odbOracle.regexpSubstr(
-            storedHash,
-            odbLiteral(`^${PASSWORD_HASH_ALGORITHM}\\$([1-9][0-9]*)\\$`),
-            1,
-            1,
-            odbOracle.null(),
-            1,
-          ),
-        ),
-      )
-      body.set(salt, odbOracle.regexpSubstr(storedHash, odbLiteral('[[:xdigit:]]{32}'), 1, 1))
-      body.set(
-        expectedHash,
-        odbOracle.regexpSubstr(storedHash, odbLiteral('[[:xdigit:]]{128}'), 1, 1),
-      )
-      body.set(passwordRaw, odbUtlI18n.stringToRaw(password, odbLiteral('AL32UTF8')))
       body.set(
         roundBlock,
         odbDbmsCrypto.mac(
@@ -186,26 +117,97 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
         loop.set(roundBlock, odbDbmsCrypto.mac(roundBlock, odbDbmsCrypto.HMAC_SH512, passwordRaw))
         loop.set(derivedKey, odbUtlRaw.bitXor(derivedKey, roundBlock))
       })
-      body.set(derivedHash, odbOracle.rawToHex(derivedKey))
-      body.ifThen(cond.eq(derivedHash, expectedHash), (then) => then.return('1'))
-      body.return('0')
+      body.return(derivedKey)
     })
-  }),
-  randomToken: pkg.func('random_token', odbType.string(512), (fn) => {
-    const bytes = fn.param('p_bytes', odbType.number())
-    fn.body((body) => body.return(odbOracle.rawToHex(odbDbmsCrypto.randomBytes(bytes))))
-  }),
-  hashToken: pkg.func('hash_token', odbType.string(128), (fn) => {
-    const token = fn.param('p_token', odbType.string())
-    fn.body((body) =>
-      body.return(
-        odbOracle.rawToHex(
-          odbDbmsCrypto.hash(odbUtlRaw.castToRaw(token), odbDbmsCrypto.HASH_SH256),
+  })
+
+  return {
+    hashPassword: pkg.func('hash_password', odbType.string(512), (fn) => {
+      const password = fn.param('p_password', odbType.string())
+      fn.body((body) => {
+        const { salt, passwordRaw, hash } = body.variables({
+          salt: odbType.string(32),
+          passwordRaw: odbType.raw(2000),
+          hash: odbType.string(128),
+        })
+        body.set(salt, odbOracle.rawToHex(odbDbmsCrypto.randomBytes(16)))
+        body.set(passwordRaw, odbUtlI18n.stringToRaw(password, odbLiteral('AL32UTF8')))
+        body.set(
+          hash,
+          odbOracle.rawToHex(
+            deriveKey.invoke(passwordRaw, salt, odbLiteral(PASSWORD_HASH_ITERATIONS)),
+          ),
+        )
+        body.return(
+          plsqlExpr.concat(
+            odbLiteral(`${PASSWORD_HASH_ALGORITHM}$${PASSWORD_HASH_ITERATIONS}$`),
+            salt,
+            odbLiteral('$'),
+            hash,
+          ),
+        )
+      })
+    }),
+    verifyPassword: pkg.func('verify_password', odbType.number(), (fn) => {
+      const password = fn.param('p_password', odbType.string())
+      const storedHash = fn.param('p_password_hash', odbType.string())
+      fn.body((body) => {
+        const { iterations, salt, expectedHash, passwordRaw, derivedHash } = body.variables({
+          iterations: odbType.number(),
+          salt: odbType.string(32),
+          expectedHash: odbType.string(128),
+          passwordRaw: odbType.raw(2000),
+          derivedHash: odbType.string(128),
+        })
+        body.ifThen(
+          cond.not(
+            cond.regexpLike(
+              storedHash,
+              `^${PASSWORD_HASH_ALGORITHM}\\$[1-9][0-9]*\\$[[:xdigit:]]{32}\\$[[:xdigit:]]{128}$`,
+            ),
+          ),
+          (then) => then.return('0'),
+        )
+        body.set(
+          iterations,
+          odbOracle.toNumber(
+            odbOracle.regexpSubstr(
+              storedHash,
+              odbLiteral(`^${PASSWORD_HASH_ALGORITHM}\\$([1-9][0-9]*)\\$`),
+              1,
+              1,
+              odbOracle.null(),
+              1,
+            ),
+          ),
+        )
+        body.set(salt, odbOracle.regexpSubstr(storedHash, odbLiteral('[[:xdigit:]]{32}'), 1, 1))
+        body.set(
+          expectedHash,
+          odbOracle.regexpSubstr(storedHash, odbLiteral('[[:xdigit:]]{128}'), 1, 1),
+        )
+        body.set(passwordRaw, odbUtlI18n.stringToRaw(password, odbLiteral('AL32UTF8')))
+        body.set(derivedHash, odbOracle.rawToHex(deriveKey.invoke(passwordRaw, salt, iterations)))
+        body.ifThen(cond.eq(derivedHash, expectedHash), (then) => then.return('1'))
+        body.return('0')
+      })
+    }),
+    randomToken: pkg.func('random_token', odbType.string(512), (fn) => {
+      const bytes = fn.param('p_bytes', odbType.number())
+      fn.body((body) => body.return(odbOracle.rawToHex(odbDbmsCrypto.randomBytes(bytes))))
+    }),
+    hashToken: pkg.func('hash_token', odbType.string(128), (fn) => {
+      const token = fn.param('p_token', odbType.string())
+      fn.body((body) =>
+        body.return(
+          odbOracle.rawToHex(
+            odbDbmsCrypto.hash(odbUtlRaw.castToRaw(token), odbDbmsCrypto.HASH_SH256),
+          ),
         ),
-      ),
-    )
-  }),
-}))
+      )
+    }),
+  }
+})
 
 /** Access-token wrapper around ODB's generic HS256 JWT implementation. */
 export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => ({

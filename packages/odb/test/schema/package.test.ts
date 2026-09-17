@@ -102,6 +102,25 @@ describe('Procedure ORDS contracts', () => {
   })
 })
 
+describe('private package members', () => {
+  it('emits private members in the body and supports local typed calls', () => {
+    const pkg = odbPackage('PCK_PRIVATE', (p) => {
+      const normalize = p.privateFunc('NORMALIZE', odbType.string(), (fn) => {
+        const value = fn.param('P_VALUE', odbType.string())
+        fn.body((body) => body.return(value))
+      })
+      p.func('PUBLIC_VALUE', odbType.string(), (fn) => {
+        fn.body((body) => body.return(normalize.invoke(odbLiteral('value'))))
+      })
+    })
+
+    const sql = pkg.toSQLUp()
+    expect(sql).not.toContain('FUNCTION NORMALIZE(P_VALUE IN VARCHAR2);')
+    expect(sql).toContain('FUNCTION NORMALIZE(P_VALUE IN VARCHAR2) RETURN VARCHAR2 IS')
+    expect(sql).toContain("RETURN NORMALIZE('value');")
+  })
+})
+
 describe('ProcedureBody control flow and exceptions', () => {
   const bodyLines = (build: (proc: import('../../src/schema/package.js').Procedure) => void) => {
     const pkg = odbPackage('PCK_TEST', (p) => {
