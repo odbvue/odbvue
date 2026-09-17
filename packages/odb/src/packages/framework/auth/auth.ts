@@ -37,19 +37,15 @@ function refreshCookie(
   options: Required<Pick<OdbAuthOptions, 'refreshCookieName' | 'refreshCookieSecure'>>,
   maxAge = REFRESH_TOKEN_MAX_AGE_SECONDS,
 ) {
-  return plsqlExpr.concat(
-    odbLiteral(`${options.refreshCookieName}=`),
-    token,
-    odbLiteral('; '),
-    odbLiteral('Path=/'),
-    odbLiteral('; '),
-    odbLiteral('HttpOnly'),
-    ...(options.refreshCookieSecure ? [odbLiteral('; '), odbLiteral('Secure')] : []),
-    odbLiteral('; '),
-    odbLiteral('SameSite=Lax'),
-    odbLiteral('; '),
-    odbLiteral(`Max-Age=${maxAge}`),
-  )
+  return odbHttp.setCookie({
+    name: options.refreshCookieName,
+    value: token,
+    path: '/',
+    httpOnly: true,
+    secure: options.refreshCookieSecure,
+    sameSite: 'Lax',
+    maxAge,
+  })
 }
 
 function expiredRefreshCookie(
@@ -170,17 +166,23 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => {
             odbOracle.regexpSubstr(
               storedHash,
               odbLiteral(`^${PASSWORD_HASH_ALGORITHM}\\$([1-9][0-9]*)\\$`),
-              1,
-              1,
-              odbOracle.null(),
-              1,
+              { position: 1, occurrence: 1, matchParameter: odbOracle.null(), subexpression: 1 },
             ),
           ),
         )
-        body.set(salt, odbOracle.regexpSubstr(storedHash, odbLiteral('[[:xdigit:]]{32}'), 1, 1))
+        body.set(
+          salt,
+          odbOracle.regexpSubstr(storedHash, odbLiteral('[[:xdigit:]]{32}'), {
+            position: 1,
+            occurrence: 1,
+          }),
+        )
         body.set(
           expectedHash,
-          odbOracle.regexpSubstr(storedHash, odbLiteral('[[:xdigit:]]{128}'), 1, 1),
+          odbOracle.regexpSubstr(storedHash, odbLiteral('[[:xdigit:]]{128}'), {
+            position: 1,
+            occurrence: 1,
+          }),
         )
         body.set(passwordRaw, odbUtlI18n.stringToRaw(password, odbLiteral('AL32UTF8')))
         body.set(derivedHash, odbOracle.rawToHex(deriveKey.invoke(passwordRaw, salt, iterations)))
@@ -403,10 +405,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => {
             odbOracle.regexpSubstr(
               cookieHeader,
               odbLiteral(`(^|;[[:space:]]*)${authCookieOptions.refreshCookieName}=([^;]*)`),
-              1,
-              1,
-              odbOracle.null(),
-              2,
+              { position: 1, occurrence: 1, matchParameter: odbOracle.null(), subexpression: 2 },
             ),
           )
           statements.ifThen(
@@ -502,10 +501,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => {
             odbOracle.regexpSubstr(
               cookieHeader,
               odbLiteral(`(^|;[[:space:]]*)${authCookieOptions.refreshCookieName}=([^;]*)`),
-              1,
-              1,
-              odbOracle.null(),
-              2,
+              { position: 1, occurrence: 1, matchParameter: odbOracle.null(), subexpression: 2 },
             ),
           )
           statements.query(

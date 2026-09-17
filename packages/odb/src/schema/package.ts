@@ -37,16 +37,12 @@ export type AnyQueryBuilder = {
   selectedColumns?(): ColumnNode[] | undefined
 }
 
-type ParameterTypeAlias = 'string' | 'number' | 'boolean' | 'date' | 'timestamp' | 'clob'
-
 export type OdbTypeDescriptor<TType extends PlsqlType | string> = {
   type: TType
   length?: number
 }
 
 type ParameterInput =
-  | PlsqlType
-  | string
   | Column<any, string, any, any, any, any, any>
   | OdbTypeDescriptor<PlsqlType | string>
 
@@ -55,19 +51,7 @@ type ResolvedParameterType<TInput extends ParameterInput> =
     ? TType
     : TInput extends Column<any, any, any, any, any, any, any>
       ? string
-      : TInput extends 'string'
-        ? 'VARCHAR2'
-        : TInput extends 'number'
-          ? 'NUMBER'
-          : TInput extends 'boolean'
-            ? 'BOOLEAN'
-            : TInput extends 'date'
-              ? 'DATE'
-              : TInput extends 'timestamp'
-                ? 'TIMESTAMP'
-                : TInput extends 'clob'
-                  ? 'CLOB'
-                  : TInput
+      : never
 
 type InputParameters<TInputs extends Record<string, ParameterInput>> = {
   [TKey in keyof TInputs]: Param<ResolvedParameterType<TInputs[TKey]>>
@@ -127,15 +111,6 @@ type NamedParameters<TParameters extends ProcedureParameters> = ParameterGroup<T
   ParameterGroup<TParameters, 'out'> &
   ParameterGroup<TParameters, 'inOut'>
 
-const parameterTypeAliases: Record<ParameterTypeAlias, PlsqlType> = {
-  string: 'VARCHAR2',
-  number: 'NUMBER',
-  boolean: 'BOOLEAN',
-  date: 'DATE',
-  timestamp: 'TIMESTAMP',
-  clob: 'CLOB',
-}
-
 function inputParameterName(key: string): string {
   const snakeCase = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()
   return `p_${snakeCase}`
@@ -160,8 +135,7 @@ function renderPlsqlLiteral(value: string | number | boolean | null): string {
 
 function inputParameterType(input: ParameterInput): PlsqlType | string {
   if (input instanceof Column) return input.typeReference()
-  if (typeof input === 'object') return input.type
-  return parameterTypeAliases[input as ParameterTypeAlias] ?? input
+  return input.type
 }
 
 function inputParameterOdbType(input: ParameterInput): OdbType {
@@ -247,7 +221,33 @@ export type StatementNode =
   | WhileNode
   | CaseNode
 
-export type ExceptionHandlerNode = { when: string; statements: StatementNode[] }
+export type OraclePredefinedException =
+  | 'ACCESS_INTO_NULL'
+  | 'CASE_NOT_FOUND'
+  | 'COLLECTION_IS_NULL'
+  | 'CURSOR_ALREADY_OPEN'
+  | 'DUP_VAL_ON_INDEX'
+  | 'INVALID_CURSOR'
+  | 'INVALID_NUMBER'
+  | 'LOGIN_DENIED'
+  | 'NO_DATA_FOUND'
+  | 'NOT_LOGGED_ON'
+  | 'PROGRAM_ERROR'
+  | 'ROWTYPE_MISMATCH'
+  | 'SELF_IS_NULL'
+  | 'STORAGE_ERROR'
+  | 'SUBSCRIPT_BEYOND_COUNT'
+  | 'SUBSCRIPT_OUTSIDE_LIMIT'
+  | 'SYS_INVALID_ROWID'
+  | 'TIMEOUT_ON_RESOURCE'
+  | 'TOO_MANY_ROWS'
+  | 'VALUE_ERROR'
+  | 'ZERO_DIVIDE'
+
+export type ExceptionHandlerNode = {
+  when: OraclePredefinedException | 'OTHERS'
+  statements: StatementNode[]
+}
 
 // ── AST node types ───────────────────────────────────────────────────────────
 
@@ -759,7 +759,10 @@ export class ProcedureBody {
    * @example
    * body.when('no_data_found', (h) => h.set(rError, odbLiteral('not found')))
    */
-  when(exceptionName: string, build: (body: ProcedureBody) => void): this {
+  when(
+    exceptionName: OraclePredefinedException | 'OTHERS',
+    build: (body: ProcedureBody) => void,
+  ): this {
     this._exceptionHandlers.push({ when: exceptionName, statements: this.childStatements(build) })
     return this
   }

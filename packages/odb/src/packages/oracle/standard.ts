@@ -19,6 +19,13 @@ function call<T extends string>(
   return new PlsqlExpression(type, `${fn}(${args.map(arg).join(', ')})`)
 }
 
+export type RegexpSubstrOptions = {
+  position?: PlsqlRenderable | number
+  occurrence?: PlsqlRenderable | number
+  matchParameter?: PlsqlRenderable
+  subexpression?: PlsqlRenderable | number
+}
+
 /** Typed expressions for Oracle SQL built-in functions and pseudocolumns. */
 export const odbOracle = {
   /** `RAWTOHEX(<raw>)` -> VARCHAR2 */
@@ -121,20 +128,17 @@ export const odbOracle = {
     return call('VARCHAR2', 'REGEXP_REPLACE', args)
   },
 
-  /** `REGEXP_SUBSTR(<source>, <pattern>[, <position>[, <occurrence>[, <match_parameter>[, <subexpression>]]]])` -> VARCHAR2 */
+  /** `REGEXP_SUBSTR(<source>, <pattern>[, options])` -> VARCHAR2 */
   regexpSubstr(
     source: PlsqlRenderable,
     pattern: PlsqlRenderable,
-    position?: PlsqlRenderable | number,
-    occurrence?: PlsqlRenderable | number,
-    matchParameter?: PlsqlRenderable,
-    subexpression?: PlsqlRenderable | number,
+    options: RegexpSubstrOptions = {},
   ): PlsqlExpression<'VARCHAR2'> {
     const args: (PlsqlRenderable | number)[] = [source, pattern]
-    if (position !== undefined) args.push(position)
-    if (occurrence !== undefined) args.push(occurrence)
-    if (matchParameter !== undefined) args.push(matchParameter)
-    if (subexpression !== undefined) args.push(subexpression)
+    if (options.position !== undefined) args.push(options.position)
+    if (options.occurrence !== undefined) args.push(options.occurrence)
+    if (options.matchParameter !== undefined) args.push(options.matchParameter)
+    if (options.subexpression !== undefined) args.push(options.subexpression)
     return call('VARCHAR2', 'REGEXP_SUBSTR', args)
   },
 

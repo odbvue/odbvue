@@ -24,7 +24,12 @@ describe('odbOracle', () => {
   it('renders regular-expression functions with optional arguments', () => {
     expect(
       odbOracle
-        .regexpSubstr('p_cookie', odbLiteral('token=([^;]*)'), 1, 1, odbOracle.null(), 1)
+        .regexpSubstr('p_cookie', odbLiteral('token=([^;]*)'), {
+          position: 1,
+          occurrence: 1,
+          matchParameter: odbOracle.null(),
+          subexpression: 1,
+        })
         .toSQL(),
     ).toBe("REGEXP_SUBSTR(p_cookie, 'token=([^;]*)', 1, 1, NULL, 1)")
     expect(

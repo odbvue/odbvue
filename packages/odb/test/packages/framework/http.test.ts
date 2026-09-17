@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { odbOrdsEndpoint } from '../../../src/ords.js'
+import { PlsqlExpression } from '../../../src/schema/attribute.js'
 import { odbHttp } from '../../../src/packages/framework/http/http.js'
 import { ProcedureBody } from '../../../src/schema/package.js'
 
@@ -25,6 +26,27 @@ describe('odbHttp framework package', () => {
     ])
     expect(() => body.httpError(200, 'OK')).toThrow('status must be an integer')
     expect(() => body.httpError(429, 'too-many')).toThrow('code must be uppercase')
+  })
+
+  it('renders typed Set-Cookie values', () => {
+    expect(
+      odbHttp
+        .setCookie({
+          name: '__Host-token',
+          value: new PlsqlExpression('VARCHAR2', 'p_token'),
+          path: '/',
+          httpOnly: true,
+          secure: true,
+          sameSite: 'Lax',
+          maxAge: 60,
+        })
+        .toSQL(),
+    ).toBe(
+      "'__Host-token=' || p_token || '; Path=/' || '; HttpOnly' || '; Secure' || '; SameSite=Lax' || '; Max-Age=60'",
+    )
+    expect(() => odbHttp.setCookie({ name: 'token', value: 'p_token', maxAge: -1 })).toThrow(
+      'maxAge must be a non-negative integer',
+    )
   })
 
   it('maps explicit errors and unexpected exceptions to JSON responses', () => {

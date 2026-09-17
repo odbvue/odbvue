@@ -6,7 +6,7 @@ import {
   generateApplicationOpenApi,
 } from '../src/application.js'
 import { odbQuery } from '../src/query/index.js'
-import { odbPackage, type OdbApplication } from '../src/schema/package.js'
+import { odbPackage, odbType, type OdbApplication } from '../src/schema/package.js'
 import { odbTable } from '../src/schema/table.js'
 
 const users = odbTable('APP_USERS', (table) => ({
@@ -19,8 +19,8 @@ const users = odbTable('APP_USERS', (table) => ({
 const application = odbPackage('PCK_USERS', (p) => {
   p.proc('GET_USER', (proc) => {
     const { id, result } = proc.parameters({
-      in: { id: 'NUMBER' },
-      out: { result: 'SYS_REFCURSOR' },
+      in: { id: odbType.number() },
+      out: { result: odbType.resultset() },
     })
     proc.body((body) =>
       body.openFor(
@@ -36,12 +36,12 @@ const application = odbPackage('PCK_USERS', (p) => {
     })
   })
 
-  p.func('COUNT_USERS', 'NUMBER', (fn) => {
+  p.func('COUNT_USERS', odbType.number(), (fn) => {
     fn.body((body) => body.return(0))
   })
 
   p.proc('POST_USER', (proc) => {
-    const { body } = proc.parameters({ in: { body: 'CLOB' } })
+    const { body } = proc.parameters({ in: { body: odbType.clob() } })
     proc.service({ method: 'POST', path: '/users', params: { body: { body } } })
   })
 })
@@ -107,7 +107,7 @@ describe('ODB application contract', () => {
     const login = odbPackage('PCK_AUTH', (p) => {
       p.proc('POST_LOGIN', (proc) => {
         const { username, password } = proc.parameters({
-          in: { username: 'VARCHAR2', password: 'VARCHAR2' },
+          in: { username: odbType.string(), password: odbType.string() },
         })
         proc.service({
           method: 'POST',
@@ -149,7 +149,7 @@ describe('ODB application contract', () => {
   it('uses identifier-safe bind variables for kebab-case ORDS parameters', () => {
     const output = odbPackage('PCK_OUTPUT', (p) => {
       p.proc('POST_VALUE', (proc) => {
-        const { accessToken } = proc.parameters({ out: { accessToken: 'VARCHAR2' } })
+        const { accessToken } = proc.parameters({ out: { accessToken: odbType.string() } })
         proc.service({
           method: 'POST',
           path: '/value',

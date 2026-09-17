@@ -1,6 +1,12 @@
 const HTTP_ERROR_NUMBER = -20999
 const ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]{0,99}$/
-import { PlsqlStatement } from '../../../schema/attribute.js'
+import {
+  odbLiteral,
+  plsqlExpr,
+  PlsqlExpression,
+  PlsqlStatement,
+  type PlsqlRenderable,
+} from '../../../schema/attribute.js'
 import { dropPackageIfExists, qualify } from '../../../schema/ddl.js'
 
 function validateStatus(status: number): void {
@@ -13,6 +19,16 @@ function validateCode(code: string): void {
   if (!ERROR_CODE_PATTERN.test(code)) {
     throw new Error('odbHttp: code must be uppercase alphanumeric with optional underscores.')
   }
+}
+
+export type SetCookieOptions = {
+  name: string
+  value: PlsqlRenderable
+  path?: string
+  httpOnly?: boolean
+  secure?: boolean
+  sameSite?: 'Lax' | 'Strict' | 'None'
+  maxAge?: number
 }
 
 /** Framework support for explicit HTTP errors from PL/SQL service bodies. */
@@ -55,5 +71,18 @@ export const odbHttp = {
   },
   tooManyRequests(code = 'TOO_MANY_REQUESTS'): PlsqlStatement {
     return this.error(429, code)
+  },
+  setCookie(options: SetCookieOptions): PlsqlExpression<'VARCHAR2'> {
+    if (!options.name) throw new Error('odbHttp.setCookie: name is required.')
+    if (options.maxAge !== undefined && (!Number.isInteger(options.maxAge) || options.maxAge < 0)) {
+      throw new Error('odbHttp.setCookie: maxAge must be a non-negative integer.')
+    }
+    const parts: PlsqlRenderable[] = [odbLiteral(`${options.name}=`), options.value]
+    if (options.path) parts.push(odbLiteral(`; Path=${options.path}`))
+    if (options.httpOnly) parts.push(odbLiteral('; HttpOnly'))
+    if (options.secure) parts.push(odbLiteral('; Secure'))
+    if (options.sameSite) parts.push(odbLiteral(`; SameSite=${options.sameSite}`))
+    if (options.maxAge !== undefined) parts.push(odbLiteral(`; Max-Age=${options.maxAge}`))
+    return plsqlExpr.concat(...parts)
   },
 }
