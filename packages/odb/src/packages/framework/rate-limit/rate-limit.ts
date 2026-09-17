@@ -1,5 +1,12 @@
 import { odbPackage, odbType } from '../../../schema/package.js'
-import { cond, expr, PlsqlExpression, PlsqlStatement } from '../../../schema/attribute.js'
+import {
+  cond,
+  odbLiteral,
+  plsqlExpr,
+  PlsqlStatement,
+  renderPlsql,
+  type PlsqlRenderable,
+} from '../../../schema/attribute.js'
 import { odbOracle } from '../../oracle/index.js'
 import { odbTable } from '../../../schema/table.js'
 import { odbQuery } from '../../../query/index.js'
@@ -19,9 +26,7 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
       body.returnQuery(
         odbQuery()
           .selectFrom('dual')
-          .select(
-            new PlsqlExpression('VARCHAR2', `LOWER(STANDARD_HASH(${subject.name}, 'SHA256'))`),
-          ),
+          .select(odbOracle.lower(odbOracle.standardHash(subject, odbLiteral('SHA256')))),
       ),
     )
   }),
@@ -34,7 +39,7 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
         subjectHash: odbType.string(64),
         blockedUntil: odbType.timestamp(),
       })
-      body.set(subjectHash, new PlsqlExpression('VARCHAR2', `hash_subject(${subject.name})`))
+      body.set(subjectHash, plsqlExpr.call('VARCHAR2', 'hash_subject', subject))
       body.query(
         odbQuery()
           .selectFrom(rateLimitBuckets)
@@ -61,7 +66,7 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
         windowStartedAt: odbType.timestamp(),
         failureCount: odbType.number(),
       })
-      body.set(subjectHash, new PlsqlExpression('VARCHAR2', `hash_subject(${subject.name})`))
+      body.set(subjectHash, plsqlExpr.call('VARCHAR2', 'hash_subject', subject))
       body.query(
         odbQuery()
           .selectFrom(rateLimitBuckets)
@@ -76,13 +81,15 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
           .forUpdate(),
       )
       body.ifThen(
-        cond.lte(expr.add(windowStartedAt, expr.interval(60, 'SECOND')), odbOracle.sysTimestamp()),
+        cond.lte(
+          odbOracle.plus(windowStartedAt, odbOracle.interval.seconds(60)),
+          odbOracle.sysTimestamp(),
+        ),
         (then) => {
-          then.set(windowStartedAt, new PlsqlExpression('TIMESTAMP', 'SYSTIMESTAMP'))
-          then.set(failureCount, new PlsqlExpression('NUMBER', '1'))
+          then.set(windowStartedAt, odbOracle.sysTimestamp())
+          then.set(failureCount, odbLiteral(1))
         },
-        (otherwise) =>
-          otherwise.set(failureCount, new PlsqlExpression('NUMBER', `${failureCount.name} + 1`)),
+        (otherwise) => otherwise.set(failureCount, odbOracle.plus(failureCount, 1)),
       )
       body.query(
         odbQuery()
@@ -90,9 +97,11 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
           .set({
             windowStartedAt,
             failureCount,
-            blockedUntil: new PlsqlExpression(
+            blockedUntil: odbOracle.caseWhen(
+              cond.gte(failureCount, 5),
+              odbOracle.plus(odbOracle.sysTimestamp(), odbOracle.interval.seconds(60)),
+              odbOracle.null(),
               'TIMESTAMP',
-              `CASE WHEN ${failureCount.name} >= 5 THEN SYSTIMESTAMP + NUMTODSINTERVAL(60, 'SECOND') ELSE NULL END`,
             ),
           })
           .where((expression) =>
@@ -108,7 +117,7 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
           .insertInto(rateLimitBuckets, {
             scope,
             subjectHash,
-            windowStartedAt: new PlsqlExpression('TIMESTAMP', 'SYSTIMESTAMP'),
+            windowStartedAt: odbOracle.sysTimestamp(),
             failureCount: 1,
           })
           .commit(),
@@ -121,7 +130,7 @@ const odbRateLimitPackage = odbPackage('odb_rate_limit', (pkg) => ({
     })
     proc.autonomous().body((body) => {
       const { subjectHash } = body.variables({ subjectHash: odbType.string(64) })
-      body.set(subjectHash, new PlsqlExpression('VARCHAR2', `hash_subject(${subject.name})`))
+      body.set(subjectHash, plsqlExpr.call('VARCHAR2', 'hash_subject', subject))
       body.query(
         odbQuery()
           .deleteFrom(rateLimitBuckets)
@@ -155,13 +164,19 @@ export const odbRateLimit = {
       },
     }
   },
-  check(scope: string, subject: string): PlsqlStatement {
-    return new PlsqlStatement(`odb_rate_limit.enforce(${scope}, ${subject})`)
+  check(scope: PlsqlRenderable, subject: PlsqlRenderable): PlsqlStatement {
+    return new PlsqlStatement(
+      `odb_rate_limit.enforce(${renderPlsql(scope)}, ${renderPlsql(subject)})`,
+    )
   },
-  failure(scope: string, subject: string): PlsqlStatement {
-    return new PlsqlStatement(`odb_rate_limit.failure(${scope}, ${subject})`)
+  failure(scope: PlsqlRenderable, subject: PlsqlRenderable): PlsqlStatement {
+    return new PlsqlStatement(
+      `odb_rate_limit.failure(${renderPlsql(scope)}, ${renderPlsql(subject)})`,
+    )
   },
-  success(scope: string, subject: string): PlsqlStatement {
-    return new PlsqlStatement(`odb_rate_limit.success(${scope}, ${subject})`)
+  success(scope: PlsqlRenderable, subject: PlsqlRenderable): PlsqlStatement {
+    return new PlsqlStatement(
+      `odb_rate_limit.success(${renderPlsql(scope)}, ${renderPlsql(subject)})`,
+    )
   },
 }

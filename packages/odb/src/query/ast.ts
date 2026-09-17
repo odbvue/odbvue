@@ -1,4 +1,5 @@
 import { Column } from '../schema/column.js'
+import { plsqlExpr } from '../schema/attribute.js'
 
 export type ComparisonOperator = '=' | '!=' | '<' | '>' | '<=' | '>=' | 'LIKE'
 export type NullOperator = 'IS NULL' | 'IS NOT NULL'
@@ -117,7 +118,9 @@ export function predicate(
   return { kind: 'binary', left: toReference(left), op, right: toOperand(right) }
 }
 
-export const odbExpr: ExpressionBuilder = Object.assign(predicate as ExpressionBuilder, {
+export type OdbExpressionBuilder = ExpressionBuilder & Pick<typeof plsqlExpr, 'cast' | 'concat'>
+
+export const odbExpr: OdbExpressionBuilder = Object.assign(predicate as ExpressionBuilder, {
   and: (expressions: ExpressionNode[]): LogicalExpressionNode => ({
     kind: 'logical',
     op: 'AND',
@@ -143,6 +146,8 @@ export const odbExpr: ExpressionBuilder = Object.assign(predicate as ExpressionB
     args: args.map(toReference),
   }),
   subquery: (query: Compilable): SubqueryNode => ({ kind: 'subquery', query }),
+  cast: plsqlExpr.cast,
+  concat: plsqlExpr.concat,
 })
 
 // ── Value rendering ───────────────────────────────────────────────────────────

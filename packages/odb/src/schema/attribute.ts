@@ -149,7 +149,18 @@ export const cond = {
 }
 
 /** Typed value expressions that compose with assignments, returns, and conditions. */
-export const expr = {
+export const plsqlExpr = {
+  /** Explicitly treat a compatible expression as the requested PL/SQL type. */
+  cast<T extends PlsqlType | string>(value: PlsqlValue): PlsqlExpression<T> {
+    return new PlsqlExpression(value.type as T, value.toSQL())
+  },
+  call<T extends PlsqlType | string>(
+    type: T,
+    name: string,
+    ...args: PlsqlRenderable[]
+  ): PlsqlExpression<T> {
+    return new PlsqlExpression(type, `${name}(${args.map(renderPlsql).join(', ')})`)
+  },
   add<T extends PlsqlType | string>(
     left: PlsqlValue<T>,
     right: PlsqlExpressionValue,
@@ -180,11 +191,14 @@ export const expr = {
   concat(...values: PlsqlExpressionValue[]): PlsqlExpression<'VARCHAR2'> {
     return new PlsqlExpression('VARCHAR2', values.map(renderExpressionValue).join(' || '))
   },
-  jsonObject(values: Record<string, PlsqlExpressionValue>): PlsqlExpression<'CLOB'> {
+  jsonObject<T extends PlsqlType | string = 'CLOB'>(
+    values: Record<string, PlsqlExpressionValue>,
+    type: T = 'CLOB' as T,
+  ): PlsqlExpression<T> {
     const entries = Object.entries(values).map(
       ([key, value]) => `${renderExpressionValue(key)} VALUE ${renderExpressionValue(value)}`,
     )
-    return new PlsqlExpression('CLOB', `JSON_OBJECT(${entries.join(', ')} RETURNING CLOB)`)
+    return new PlsqlExpression(type, `JSON_OBJECT(${entries.join(', ')} RETURNING ${type})`)
   },
   interval(value: PlsqlExpressionValue, unit: string): PlsqlExpression<'INTERVAL DAY TO SECOND'> {
     return new PlsqlExpression(
@@ -193,6 +207,9 @@ export const expr = {
     )
   },
 }
+
+/** @deprecated Use plsqlExpr. */
+export const expr = plsqlExpr
 
 export type ParamOptions = {
   length?: number

@@ -1,6 +1,6 @@
 import { pbkdf2Sync } from 'node:crypto'
 import { odbPackage, odbType } from '../../../schema/package.js'
-import { cond, odbLiteral, PlsqlExpression } from '../../../schema/attribute.js'
+import { cond, odbLiteral, plsqlExpr, type PlsqlValue } from '../../../schema/attribute.js'
 import { odbTable } from '../../../schema/table.js'
 import { odbQuery } from '../../../query/index.js'
 import { odbDbmsCrypto, odbOracle, odbUtlI18n, odbUtlRaw } from '../../oracle/index.js'
@@ -20,10 +20,6 @@ const authCookieOptions = {
   refreshCookieName: '__Host-odb_refresh',
   refreshCookieSecure: true,
 } as const
-
-function literal(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`
-}
 
 function dummyPasswordHash(): string {
   const salt = Buffer.alloc(16)
@@ -46,26 +42,29 @@ function block(statement: string): string {
 }
 
 function refreshCookie(
-  token: string,
+  token: PlsqlValue,
   options: Required<Pick<OdbAuthOptions, 'refreshCookieName' | 'refreshCookieSecure'>>,
-): string {
-  return [
-    `'${options.refreshCookieName}=' || ${token}`,
-    "'Path=/'",
-    "'HttpOnly'",
-    ...(options.refreshCookieSecure ? ["'Secure'"] : []),
-    "'SameSite=Lax'",
-    `'Max-Age=${REFRESH_TOKEN_MAX_AGE_SECONDS}'`,
-  ].join(" || '; ' || ")
+  maxAge = REFRESH_TOKEN_MAX_AGE_SECONDS,
+) {
+  return plsqlExpr.concat(
+    odbLiteral(`${options.refreshCookieName}=`),
+    token,
+    odbLiteral('; '),
+    odbLiteral('Path=/'),
+    odbLiteral('; '),
+    odbLiteral('HttpOnly'),
+    ...(options.refreshCookieSecure ? [odbLiteral('; '), odbLiteral('Secure')] : []),
+    odbLiteral('; '),
+    odbLiteral('SameSite=Lax'),
+    odbLiteral('; '),
+    odbLiteral(`Max-Age=${maxAge}`),
+  )
 }
 
 function expiredRefreshCookie(
   options: Required<Pick<OdbAuthOptions, 'refreshCookieName' | 'refreshCookieSecure'>>,
-): string {
-  return refreshCookie("''", options).replace(
-    `'Max-Age=${REFRESH_TOKEN_MAX_AGE_SECONDS}'`,
-    "'Max-Age=0'",
-  )
+) {
+  return refreshCookie(odbLiteral(''), options, 0)
 }
 
 export const authUsers = odbTable('odb_auth_users', (t) => ({
@@ -123,7 +122,12 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => ({
       })
       body.set(hash, odbOracle.rawToHex(derivedKey))
       body.return(
-        `'${PASSWORD_HASH_ALGORITHM}$${PASSWORD_HASH_ITERATIONS}$' || ${salt.name} || '$' || ${hash.name}`,
+        plsqlExpr.concat(
+          odbLiteral(`${PASSWORD_HASH_ALGORITHM}$${PASSWORD_HASH_ITERATIONS}$`),
+          salt,
+          odbLiteral('$'),
+          hash,
+        ),
       )
     })
   }),
@@ -211,7 +215,19 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => ({
     const tokenVersion = fn.param('p_token_version', odbType.number())
     fn.body((body) =>
       body.return(
-        `odb_jwt.encode(JSON_OBJECT('sub' VALUE ${userId.name}, 'sid' VALUE ${sessionId.name}, 'ver' VALUE ${tokenVersion.name}, 'iat' VALUE odb_jwt.to_epoch(), 'exp' VALUE odb_jwt.to_epoch() + 900 RETURNING VARCHAR2), '${AUTH_JWT_SECRET_MARKER}')`,
+        odbJwt.encode(
+          plsqlExpr.jsonObject(
+            {
+              sub: userId,
+              sid: sessionId,
+              ver: tokenVersion,
+              iat: odbJwt.toEpoch(),
+              exp: plsqlExpr.add(odbJwt.toEpoch(), 900),
+            },
+            'VARCHAR2',
+          ),
+          odbLiteral(AUTH_JWT_SECRET_MARKER),
+        ),
       ),
     )
   }),
@@ -293,7 +309,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
             loginSubject: odbType.string(128),
           })
         statements.set(loginSubject, odbOracle.lower(odbOracle.trim(loginUsername)))
-        statements.call(odbRateLimit.check("'AUTH_LOGIN_USERNAME'", loginSubject.name))
+        statements.call(odbRateLimit.check(odbLiteral('AUTH_LOGIN_USERNAME'), loginSubject))
         statements.query(
           odbQuery()
             .selectFrom(authUsers)
@@ -320,30 +336,24 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
             cond.isNull(userId),
           ]),
           (then) => {
-            then.call(odbRateLimit.failure("'AUTH_LOGIN_USERNAME'", loginSubject.name))
+            then.call(odbRateLimit.failure(odbLiteral('AUTH_LOGIN_USERNAME'), loginSubject))
             then.unauthorized('INVALID_CREDENTIALS')
           },
         )
-        statements.call(odbRateLimit.success("'AUTH_LOGIN_USERNAME'", loginSubject.name))
+        statements.call(odbRateLimit.success(odbLiteral('AUTH_LOGIN_USERNAME'), loginSubject))
         statements.set(sessionId, odbOracle.lower(odbOracle.rawToHex(odbOracle.sysGuid())))
         statements.set(refreshToken, odbAuthCrypto.randomToken(odbLiteral(REFRESH_TOKEN_BYTES)))
         statements.insertInto(authSessions, {
           id: sessionId,
           userId,
           refreshTokenHash: odbAuthCrypto.hashToken(refreshToken),
-          expiresAt: new PlsqlExpression('TIMESTAMP', "SYSTIMESTAMP + INTERVAL '30' DAY"),
+          expiresAt: odbOracle.plus(odbOracle.sysTimestamp(), odbOracle.interval.days(30)),
         })
         statements.set(
           accessToken,
-          new PlsqlExpression(
-            'CLOB',
-            odbAuthJwt.createAccessToken(userId, sessionId, tokenVersion).toSQL(),
-          ),
+          plsqlExpr.cast<'CLOB'>(odbAuthJwt.createAccessToken(userId, sessionId, tokenVersion)),
         )
-        statements.set(
-          setCookie,
-          new PlsqlExpression('VARCHAR2', refreshCookie(refreshToken.name, authCookieOptions)),
-        )
+        statements.set(setCookie, refreshCookie(refreshToken, authCookieOptions))
         statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized('INVALID_CREDENTIALS'))
       })
       .service({
@@ -431,7 +441,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
           then.query(
             odbQuery()
               .updateTable(authSessions)
-              .set({ revokedAt: new PlsqlExpression('TIMESTAMP', 'SYSTIMESTAMP') })
+              .set({ revokedAt: odbOracle.sysTimestamp() })
               .where((expression) => expression(authSessions.id, '=', sessionId)),
           )
           then.unauthorized()
@@ -443,21 +453,15 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
             .set({
               previousRefreshTokenHash: presentedRefreshTokenHash,
               refreshTokenHash: odbAuthCrypto.hashToken(nextRefreshToken),
-              lastUsedAt: new PlsqlExpression('TIMESTAMP', 'SYSTIMESTAMP'),
+              lastUsedAt: odbOracle.sysTimestamp(),
             })
             .where((expression) => expression(authSessions.id, '=', sessionId)),
         )
         statements.set(
           accessToken,
-          new PlsqlExpression(
-            'CLOB',
-            odbAuthJwt.createAccessToken(userId, sessionId, tokenVersion).toSQL(),
-          ),
+          plsqlExpr.cast<'CLOB'>(odbAuthJwt.createAccessToken(userId, sessionId, tokenVersion)),
         )
-        statements.set(
-          setCookie,
-          new PlsqlExpression('VARCHAR2', refreshCookie(nextRefreshToken.name, authCookieOptions)),
-        )
+        statements.set(setCookie, refreshCookie(nextRefreshToken, authCookieOptions))
         statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized())
       })
       .service({
@@ -495,7 +499,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
         statements.query(
           odbQuery()
             .updateTable(authSessions)
-            .set({ revokedAt: new PlsqlExpression('TIMESTAMP', 'SYSTIMESTAMP') })
+            .set({ revokedAt: odbOracle.sysTimestamp() })
             .where((expression) =>
               expression.and([
                 expression(
@@ -508,10 +512,7 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
             ),
         )
         statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized())
-        statements.set(
-          setCookie,
-          new PlsqlExpression('VARCHAR2', expiredRefreshCookie(authCookieOptions)),
-        )
+        statements.set(setCookie, expiredRefreshCookie(authCookieOptions))
       })
       .service({
         method: 'POST',
@@ -621,7 +622,7 @@ export const odbAuth = {
         const table = qualify('odb_auth_users', options.schema)
         const crypto = qualify('odb_auth_crypto', options.schema)
         return block(
-          `MERGE INTO ${table} target USING (SELECT ${literal(user.username)} username FROM dual) source ON (LOWER(target.username) = LOWER(source.username)) WHEN MATCHED THEN UPDATE SET target.password_hash = ${crypto}.hash_password(${literal(user.password)}), target.display_name = ${literal(user.displayName ?? user.username)}, target.enabled = 1, target.token_version = target.token_version + 1, target.updated_at = SYSTIMESTAMP WHEN NOT MATCHED THEN INSERT (username, password_hash, display_name, enabled, token_version) VALUES (${literal(user.username)}, ${crypto}.hash_password(${literal(user.password)}), ${literal(user.displayName ?? user.username)}, 1, 0)`,
+          `MERGE INTO ${table} target USING (SELECT ${odbLiteral(user.username).toSQL()} username FROM dual) source ON (LOWER(target.username) = LOWER(source.username)) WHEN MATCHED THEN UPDATE SET target.password_hash = ${crypto}.hash_password(${odbLiteral(user.password).toSQL()}), target.display_name = ${odbLiteral(user.displayName ?? user.username).toSQL()}, target.enabled = 1, target.token_version = target.token_version + 1, target.updated_at = SYSTIMESTAMP WHEN NOT MATCHED THEN INSERT (username, password_hash, display_name, enabled, token_version) VALUES (${odbLiteral(user.username).toSQL()}, ${crypto}.hash_password(${odbLiteral(user.password).toSQL()}), ${odbLiteral(user.displayName ?? user.username).toSQL()}, 1, 0)`,
         )
       },
       toSQLDown() {

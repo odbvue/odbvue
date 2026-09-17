@@ -1,4 +1,11 @@
-import { PlsqlExpression, renderPlsql, type PlsqlRenderable } from '../../schema/attribute.js'
+import {
+  plsqlExpr,
+  PlsqlExpression,
+  renderPlsql,
+  type PlsqlBooleanExpression,
+  type PlsqlRenderable,
+  type PlsqlType,
+} from '../../schema/attribute.js'
 
 function arg(value: PlsqlRenderable | number): string {
   return typeof value === 'number' ? String(value) : renderPlsql(value)
@@ -39,14 +46,57 @@ export const odbOracle = {
     return call('VARCHAR2', 'LOWER', [value])
   },
 
+  /** `STANDARD_HASH(<value>, <algorithm>)` -> VARCHAR2 */
+  standardHash(value: PlsqlRenderable, algorithm: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
+    return call('VARCHAR2', 'STANDARD_HASH', [value, algorithm])
+  },
+
   /** `TRIM(<value>)` -> VARCHAR2 */
   trim(value: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
     return call('VARCHAR2', 'TRIM', [value])
   },
 
-  /** `NVL(<value>, <fallback>)` -> VARCHAR2 */
-  nvl(value: PlsqlRenderable, fallback: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
-    return call('VARCHAR2', 'NVL', [value, fallback])
+  /** `NVL(<value>, <fallback>)` retains the first argument's type. */
+  nvl<T extends PlsqlType | string>(
+    value: import('../../schema/attribute.js').PlsqlValue<T>,
+    fallback: PlsqlRenderable,
+  ): PlsqlExpression<T> {
+    return call(value.type, 'NVL', [value, fallback])
+  },
+
+  interval: {
+    days(value: PlsqlRenderable | number): PlsqlExpression<'INTERVAL DAY TO SECOND'> {
+      return plsqlExpr.interval(value, 'DAY')
+    },
+    seconds(value: PlsqlRenderable | number): PlsqlExpression<'INTERVAL DAY TO SECOND'> {
+      return plsqlExpr.interval(value, 'SECOND')
+    },
+  },
+
+  plus<T extends PlsqlType | string>(
+    left: import('../../schema/attribute.js').PlsqlValue<T>,
+    right: PlsqlRenderable | number,
+  ): PlsqlExpression<T> {
+    return plsqlExpr.add(left, right)
+  },
+
+  minus(
+    left: PlsqlRenderable | number,
+    right: PlsqlRenderable | number,
+  ): PlsqlExpression<'NUMBER'> {
+    return plsqlExpr.subtract(left, right)
+  },
+
+  caseWhen<T extends PlsqlType | string>(
+    condition: PlsqlBooleanExpression,
+    whenTrue: PlsqlRenderable,
+    whenFalse: PlsqlRenderable,
+    type: T,
+  ): PlsqlExpression<T> {
+    return new PlsqlExpression(
+      type,
+      `CASE WHEN ${condition.toSQL()} THEN ${renderPlsql(whenTrue)} ELSE ${renderPlsql(whenFalse)} END`,
+    )
   },
 
   /** `TO_NUMBER(<value>)` -> NUMBER */
