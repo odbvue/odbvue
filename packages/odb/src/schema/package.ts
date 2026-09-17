@@ -113,6 +113,10 @@ export type ProcedureParameters = {
   inOut?: Record<string, ParameterInput>
 }
 
+export type FunctionParameters = {
+  in: Record<string, ParameterInput>
+}
+
 type ParameterGroup<TParameters, TDirection extends keyof ProcedureParameters> =
   TParameters extends Record<TDirection, infer TInputs>
     ? TInputs extends Record<string, ParameterInput>
@@ -1033,6 +1037,34 @@ export class PlsqlFunction<TReturnType extends PlsqlType | string = PlsqlType | 
     const p = new Param(name, definition.type, direction, { length: definition.length })
     this._params.push(p)
     return p
+  }
+
+  /**
+   * Declare named IN parameters with automatic `p_` names. Functions only
+   * accept IN parameters because their callers use expression syntax.
+   */
+  parameters<TParameters extends FunctionParameters>(
+    definitions: TParameters,
+  ): InputParameters<TParameters['in']> {
+    const parameters = {} as InputParameters<TParameters['in']>
+    for (const [key, input] of Object.entries(definitions.in)) {
+      const definition = input as ParameterInput
+      const parameter = new Param(
+        inputParameterName(key),
+        inputParameterType(definition),
+        'IN',
+        {
+          length:
+            typeof definition === 'object' && !(definition instanceof Column)
+              ? definition.length
+              : undefined,
+        },
+        inputParameterOdbType(definition),
+      )
+      this._params.push(parameter)
+      Object.assign(parameters, { [key]: parameter })
+    }
+    return parameters
   }
 
   /**

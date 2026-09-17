@@ -87,9 +87,13 @@ export const authSessions = odbTable('odb_auth_sessions', (t) => ({
 /** Password and opaque token primitives used by `odb_auth`. */
 export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => {
   const deriveKey = pkg.privateFunc('derive_key', odbType.raw(PASSWORD_HASH_BYTES), (fn) => {
-    const passwordRaw = fn.param('p_password_raw', odbType.raw(2000))
-    const salt = fn.param('p_salt', odbType.string(32))
-    const iterations = fn.param('p_iterations', odbType.number())
+    const { passwordRaw, salt, iterations } = fn.parameters({
+      in: {
+        passwordRaw: odbType.raw(2000),
+        salt: odbType.string(32),
+        iterations: odbType.number(),
+      },
+    })
     fn.body((body) => {
       const { roundBlock, derivedKey } = body.variables({
         roundBlock: odbType.raw(PASSWORD_HASH_BYTES),
@@ -114,7 +118,7 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => {
 
   return {
     hashPassword: pkg.func('hash_password', odbType.string(512), (fn) => {
-      const password = fn.param('p_password', odbType.string())
+      const { password } = fn.parameters({ in: { password: odbType.string() } })
       fn.body((body) => {
         const { salt, passwordRaw, hash } = body.variables({
           salt: odbType.string(32),
@@ -140,8 +144,9 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => {
       })
     }),
     verifyPassword: pkg.func('verify_password', odbType.number(), (fn) => {
-      const password = fn.param('p_password', odbType.string())
-      const storedHash = fn.param('p_password_hash', odbType.string())
+      const { password, storedHash } = fn.parameters({
+        in: { password: odbType.string(), storedHash: odbType.string() },
+      })
       fn.body((body) => {
         const { iterations, salt, expectedHash, passwordRaw, derivedHash } = body.variables({
           iterations: odbType.number(),
@@ -184,11 +189,11 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => {
       })
     }),
     randomToken: pkg.func('random_token', odbType.string(512), (fn) => {
-      const bytes = fn.param('p_bytes', odbType.number())
+      const { bytes } = fn.parameters({ in: { bytes: odbType.number() } })
       fn.body((body) => body.return(odbOracle.rawToHex(odbDbmsCrypto.randomBytes(bytes))))
     }),
     hashToken: pkg.func('hash_token', odbType.string(128), (fn) => {
-      const token = fn.param('p_token', odbType.string())
+      const { token } = fn.parameters({ in: { token: odbType.string() } })
       fn.body((body) =>
         body.return(
           odbOracle.rawToHex(
@@ -206,9 +211,9 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => {
 
   return {
     createAccessToken: pkg.func('create_access_token', odbType.string(4000), (fn) => {
-      const userId = fn.param('p_user_id', odbType.guid())
-      const sessionId = fn.param('p_session_id', odbType.guid())
-      const tokenVersion = fn.param('p_token_version', odbType.number())
+      const { userId, sessionId, tokenVersion } = fn.parameters({
+        in: { userId: odbType.guid(), sessionId: odbType.guid(), tokenVersion: odbType.number() },
+      })
       fn.body((body) =>
         body.return(
           odbJwt.encode(
@@ -228,7 +233,7 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => {
       )
     }),
     requireUser: pkg.func('require_user', odbType.guid(), (fn) => {
-      const authorization = fn.param('p_authorization', odbType.string())
+      const { authorization } = fn.parameters({ in: { authorization: odbType.string() } })
       fn.body((body) => {
         const { token, subject, sessionId, tokenVersion, activeSessionCount } = body.variables({
           token: odbType.string(4000),

@@ -134,6 +134,26 @@ describe('private package members', () => {
   })
 })
 
+describe('function parameters', () => {
+  it('derives named IN parameter names and column anchored types', () => {
+    const users = odbTable('APP_USERS', (t) => ({ id: t.guid().primaryKey() }))
+    const pkg = odbPackage('PCK_USERS', (p) => {
+      p.func('GET_USER', odbType.string(), (fn) => {
+        const { userId, name } = fn.parameters({
+          in: { userId: users.id, name: odbType.string(128) },
+        })
+        expect(userId.name).toBe('p_user_id')
+        expect(name.name).toBe('p_name')
+        fn.body((body) => body.return(name))
+      })
+    })
+
+    expect(pkg.toSQLUp()).toContain(
+      'FUNCTION GET_USER(p_user_id IN APP_USERS.id%TYPE, p_name IN VARCHAR2) RETURN VARCHAR2;',
+    )
+  })
+})
+
 describe('ProcedureBody control flow and exceptions', () => {
   const bodyLines = (build: (proc: import('../../src/schema/package.js').Procedure) => void) => {
     const pkg = odbPackage('PCK_TEST', (p) => {

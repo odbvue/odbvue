@@ -14,7 +14,7 @@ export const rateLimitBuckets = odbTable('odb_rate_limit_buckets', (t) => ({
 
 export const odbRateLimitApi = odbPackage('odb_rate_limit', (pkg) => ({
   hashSubject: pkg.func('hash_subject', 'VARCHAR2', (fn) => {
-    const subject = fn.param('p_subject', 'VARCHAR2')
+    const { subject } = fn.parameters({ in: { subject: 'VARCHAR2' } })
     fn.returnLength(64).body((body) =>
       body.returnQuery(
         odbQuery()
