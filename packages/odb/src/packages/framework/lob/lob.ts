@@ -19,12 +19,17 @@
 // Credit: https://github.com/paulzip-dev/Base64
 
 import { readFileSync } from 'node:fs'
+import { PlsqlExpression, renderPlsql, type PlsqlRenderable } from '../../../schema/attribute.js'
 import { dropPackageIfExists, qualify } from '../../../schema/ddl.js'
 
 const spec = readFileSync(new URL('./lob.pks', import.meta.url), 'utf8')
 const body = readFileSync(new URL('./lob.pkb', import.meta.url), 'utf8')
 
 const LOB_PKG_NAME = 'odb_lob'
+
+function call<T extends string>(type: T, name: string, value: PlsqlRenderable): PlsqlExpression<T> {
+  return new PlsqlExpression(type, `odb_lob.${name}(${renderPlsql(value)})`)
+}
 
 /**
  * Pre-installed LOB / Base64 API (`odb_lob`).
@@ -54,42 +59,42 @@ export const odbLob = {
   },
 
   /** `odb_lob.clob_to_blob(<clob>)` \u2192 BLOB */
-  clobToBlob(clob: string): string {
-    return `odb_lob.clob_to_blob(${clob})`
+  clobToBlob(clob: PlsqlRenderable): PlsqlExpression<'BLOB'> {
+    return call('BLOB', 'clob_to_blob', clob)
   },
 
   /** `odb_lob.blob_to_clob(<blob>)` \u2192 CLOB */
-  blobToClob(blob: string): string {
-    return `odb_lob.blob_to_clob(${blob})`
+  blobToClob(blob: PlsqlRenderable): PlsqlExpression<'CLOB'> {
+    return call('CLOB', 'blob_to_clob', blob)
   },
 
   /** `odb_lob.blob_to_base64(<blob>)` \u2192 CLOB */
-  blobToBase64(blob: string): string {
-    return `odb_lob.blob_to_base64(${blob})`
+  blobToBase64(blob: PlsqlRenderable): PlsqlExpression<'CLOB'> {
+    return call('CLOB', 'blob_to_base64', blob)
   },
 
   /** `odb_lob.clob_to_base64(<clob>)` \u2192 CLOB */
-  clobToBase64(clob: string): string {
-    return `odb_lob.clob_to_base64(${clob})`
+  clobToBase64(clob: PlsqlRenderable): PlsqlExpression<'CLOB'> {
+    return call('CLOB', 'clob_to_base64', clob)
   },
 
   /** `odb_lob.varchar2_to_base64(<varchar2>)` \u2192 CLOB */
-  varchar2ToBase64(v: string): string {
-    return `odb_lob.varchar2_to_base64(${v})`
+  varchar2ToBase64(value: PlsqlRenderable): PlsqlExpression<'CLOB'> {
+    return call('CLOB', 'varchar2_to_base64', value)
   },
 
   /** `odb_lob.base64_to_blob(<b64>)` \u2192 BLOB */
-  base64ToBlob(b64: string): string {
-    return `odb_lob.base64_to_blob(${b64})`
+  base64ToBlob(base64: PlsqlRenderable): PlsqlExpression<'BLOB'> {
+    return call('BLOB', 'base64_to_blob', base64)
   },
 
   /** `odb_lob.base64_to_clob(<b64>)` \u2192 CLOB */
-  base64ToClob(b64: string): string {
-    return `odb_lob.base64_to_clob(${b64})`
+  base64ToClob(base64: PlsqlRenderable): PlsqlExpression<'CLOB'> {
+    return call('CLOB', 'base64_to_clob', base64)
   },
 
   /** `odb_lob.base64_to_varchar2(<b64>)` \u2192 VARCHAR2 */
-  base64ToVarchar2(b64: string): string {
-    return `odb_lob.base64_to_varchar2(${b64})`
+  base64ToVarchar2(base64: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
+    return call('VARCHAR2', 'base64_to_varchar2', base64)
   },
 }

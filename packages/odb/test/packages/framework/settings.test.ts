@@ -76,24 +76,28 @@ describe('odbSettings (framework package odb_settings)', () => {
 
   describe('call-expression helpers', () => {
     it('renders read / remove with literal or expression ids', () => {
-      expect(odbSettings.read(odbLiteral('API_URL'))).toBe("odb_settings.read('API_URL')")
-      expect(odbSettings.read('v_id')).toBe('odb_settings.read(v_id)')
-      expect(odbSettings.remove(odbLiteral('API_URL'))).toBe("odb_settings.remove('API_URL')")
+      expect(odbSettings.read(odbLiteral('API_URL')).toSQL()).toBe("odb_settings.read('API_URL')")
+      expect(odbSettings.read('v_id').toSQL()).toBe('odb_settings.read(v_id)')
+      expect(odbSettings.remove(odbLiteral('API_URL')).toSQL()).toBe(
+        "odb_settings.remove('API_URL')",
+      )
     })
 
     it('renders write() defaulting name to id and secret to N', () => {
-      expect(odbSettings.write(odbLiteral('API_URL'), odbLiteral('https://x'))).toBe(
+      expect(odbSettings.write(odbLiteral('API_URL'), odbLiteral('https://x')).toSQL()).toBe(
         "odb_settings.write('API_URL', 'API_URL', 'https://x', NULL, 'N')",
       )
     })
 
     it('renders write() with name, options and secret', () => {
       expect(
-        odbSettings.write(odbLiteral('API_KEY'), 'p_api_key', {
-          name: odbLiteral('Api Key'),
-          options: 'v_opts',
-          secret: true,
-        }),
+        odbSettings
+          .write(odbLiteral('API_KEY'), 'p_api_key', {
+            name: odbLiteral('Api Key'),
+            options: 'v_opts',
+            secret: true,
+          })
+          .toSQL(),
       ).toBe("odb_settings.write('API_KEY', 'Api Key', p_api_key, v_opts, 'Y')")
     })
   })

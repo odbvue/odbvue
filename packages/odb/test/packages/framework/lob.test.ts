@@ -28,14 +28,14 @@ describe('odbLob (framework package odb_lob)', () => {
 
   describe('call-expression helpers', () => {
     it('render odb_lob.* calls', () => {
-      expect(odbLob.clobToBlob('v_clob')).toBe('odb_lob.clob_to_blob(v_clob)')
-      expect(odbLob.blobToClob('v_blob')).toBe('odb_lob.blob_to_clob(v_blob)')
-      expect(odbLob.blobToBase64('v_blob')).toBe('odb_lob.blob_to_base64(v_blob)')
-      expect(odbLob.clobToBase64('v_clob')).toBe('odb_lob.clob_to_base64(v_clob)')
-      expect(odbLob.varchar2ToBase64('v_text')).toBe('odb_lob.varchar2_to_base64(v_text)')
-      expect(odbLob.base64ToBlob('v_b64')).toBe('odb_lob.base64_to_blob(v_b64)')
-      expect(odbLob.base64ToClob('v_b64')).toBe('odb_lob.base64_to_clob(v_b64)')
-      expect(odbLob.base64ToVarchar2('v_b64')).toBe('odb_lob.base64_to_varchar2(v_b64)')
+      expect(odbLob.clobToBlob('v_clob').toSQL()).toBe('odb_lob.clob_to_blob(v_clob)')
+      expect(odbLob.blobToClob('v_blob').toSQL()).toBe('odb_lob.blob_to_clob(v_blob)')
+      expect(odbLob.blobToBase64('v_blob').toSQL()).toBe('odb_lob.blob_to_base64(v_blob)')
+      expect(odbLob.clobToBase64('v_clob').toSQL()).toBe('odb_lob.clob_to_base64(v_clob)')
+      expect(odbLob.varchar2ToBase64('v_text').toSQL()).toBe('odb_lob.varchar2_to_base64(v_text)')
+      expect(odbLob.base64ToBlob('v_b64').toSQL()).toBe('odb_lob.base64_to_blob(v_b64)')
+      expect(odbLob.base64ToClob('v_b64').toSQL()).toBe('odb_lob.base64_to_clob(v_b64)')
+      expect(odbLob.base64ToVarchar2('v_b64').toSQL()).toBe('odb_lob.base64_to_varchar2(v_b64)')
     })
   })
 

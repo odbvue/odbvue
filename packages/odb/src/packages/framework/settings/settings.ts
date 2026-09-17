@@ -22,7 +22,12 @@
 
 import { readFileSync } from 'node:fs'
 
-import { renderPlsql, type PlsqlRenderable } from '../../../schema/attribute.js'
+import {
+  PlsqlExpression,
+  PlsqlStatement,
+  renderPlsql,
+  type PlsqlRenderable,
+} from '../../../schema/attribute.js'
 import { dropPackageIfExists, plsqlBlock, qualify } from '../../../schema/ddl.js'
 
 const spec = readFileSync(new URL('./settings.pks', import.meta.url), 'utf8')
@@ -128,8 +133,8 @@ export const odbSettings = {
   },
 
   /** `odb_settings.read(<id>)` → VARCHAR2 (decrypted value). Pass `odbLiteral('KEY')` for a literal id. */
-  read(id: PlsqlRenderable): string {
-    return `odb_settings.read(${renderPlsql(id)})`
+  read(id: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
+    return new PlsqlExpression('VARCHAR2', `odb_settings.read(${renderPlsql(id)})`)
   },
 
   /**
@@ -142,17 +147,19 @@ export const odbSettings = {
     id: PlsqlRenderable,
     value: PlsqlRenderable,
     opts: { name?: PlsqlRenderable; options?: PlsqlRenderable; secret?: boolean } = {},
-  ): string {
+  ): PlsqlStatement {
     const idSql = renderPlsql(id)
     const nameSql = opts.name !== undefined ? renderPlsql(opts.name) : idSql
     const optionsSql = opts.options !== undefined ? renderPlsql(opts.options) : 'NULL'
     const secretSql = opts.secret ? `'Y'` : `'N'`
-    return `odb_settings.write(${idSql}, ${nameSql}, ${renderPlsql(value)}, ${optionsSql}, ${secretSql})`
+    return new PlsqlStatement(
+      `odb_settings.write(${idSql}, ${nameSql}, ${renderPlsql(value)}, ${optionsSql}, ${secretSql})`,
+    )
   },
 
   /** `odb_settings.remove(<id>)`. Pass `odbLiteral('KEY')` for a literal id. */
-  remove(id: PlsqlRenderable): string {
-    return `odb_settings.remove(${renderPlsql(id)})`
+  remove(id: PlsqlRenderable): PlsqlStatement {
+    return new PlsqlStatement(`odb_settings.remove(${renderPlsql(id)})`)
   },
 
   /**

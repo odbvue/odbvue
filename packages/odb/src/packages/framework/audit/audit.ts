@@ -20,6 +20,12 @@
 // The PL/SQL sources below are the source-of-truth for `odb_audit`.
 
 import { readFileSync } from 'node:fs'
+import {
+  PlsqlExpression,
+  PlsqlStatement,
+  renderPlsql,
+  type PlsqlRenderable,
+} from '../../../schema/attribute.js'
 import { dropPackageIfExists, qualify } from '../../../schema/ddl.js'
 
 const spec = readFileSync(new URL('./audit.pks', import.meta.url), 'utf8')
@@ -109,60 +115,76 @@ export const odbAudit = {
   },
 
   /** `odb_audit.log(<severity>, <body>[, <attributes>[, <event_timestamp>]])` */
-  log(severity: string, message: string, attributes?: string, eventTimestamp?: string): string {
-    const args = [severity, message]
-    if (attributes !== undefined || eventTimestamp !== undefined) args.push(attributes ?? 'NULL')
-    if (eventTimestamp !== undefined) args.push(eventTimestamp)
-    return `odb_audit.log(${args.join(', ')})`
+  log(
+    severity: PlsqlRenderable,
+    message: PlsqlRenderable,
+    attributes?: PlsqlRenderable,
+    eventTimestamp?: PlsqlRenderable,
+  ): PlsqlStatement {
+    const args = [renderPlsql(severity), renderPlsql(message)]
+    if (attributes !== undefined || eventTimestamp !== undefined)
+      args.push(attributes === undefined ? 'NULL' : renderPlsql(attributes))
+    if (eventTimestamp !== undefined) args.push(renderPlsql(eventTimestamp))
+    return new PlsqlStatement(`odb_audit.log(${args.join(', ')})`)
   },
 
   /** `odb_audit.debug(<body>[, <attributes>])` */
-  debug(message: string, attributes?: string): string {
-    return attributes === undefined
-      ? `odb_audit.debug(${message})`
-      : `odb_audit.debug(${message}, ${attributes})`
+  debug(message: PlsqlRenderable, attributes?: PlsqlRenderable): PlsqlStatement {
+    return new PlsqlStatement(
+      attributes === undefined
+        ? `odb_audit.debug(${renderPlsql(message)})`
+        : `odb_audit.debug(${renderPlsql(message)}, ${renderPlsql(attributes)})`,
+    )
   },
 
   /** `odb_audit.info(<body>[, <attributes>])` */
-  info(message: string, attributes?: string): string {
-    return attributes === undefined
-      ? `odb_audit.info(${message})`
-      : `odb_audit.info(${message}, ${attributes})`
+  info(message: PlsqlRenderable, attributes?: PlsqlRenderable): PlsqlStatement {
+    return new PlsqlStatement(
+      attributes === undefined
+        ? `odb_audit.info(${renderPlsql(message)})`
+        : `odb_audit.info(${renderPlsql(message)}, ${renderPlsql(attributes)})`,
+    )
   },
 
   /** `odb_audit.warn(<body>[, <attributes>])` */
-  warn(message: string, attributes?: string): string {
-    return attributes === undefined
-      ? `odb_audit.warn(${message})`
-      : `odb_audit.warn(${message}, ${attributes})`
+  warn(message: PlsqlRenderable, attributes?: PlsqlRenderable): PlsqlStatement {
+    return new PlsqlStatement(
+      attributes === undefined
+        ? `odb_audit.warn(${renderPlsql(message)})`
+        : `odb_audit.warn(${renderPlsql(message)}, ${renderPlsql(attributes)})`,
+    )
   },
 
   /** `odb_audit.error(<body>[, <attributes>])` */
-  error(message: string, attributes?: string): string {
-    return attributes === undefined
-      ? `odb_audit.error(${message})`
-      : `odb_audit.error(${message}, ${attributes})`
+  error(message: PlsqlRenderable, attributes?: PlsqlRenderable): PlsqlStatement {
+    return new PlsqlStatement(
+      attributes === undefined
+        ? `odb_audit.error(${renderPlsql(message)})`
+        : `odb_audit.error(${renderPlsql(message)}, ${renderPlsql(attributes)})`,
+    )
   },
 
   /** `odb_audit.fatal(<body>[, <attributes>])` */
-  fatal(message: string, attributes?: string): string {
-    return attributes === undefined
-      ? `odb_audit.fatal(${message})`
-      : `odb_audit.fatal(${message}, ${attributes})`
+  fatal(message: PlsqlRenderable, attributes?: PlsqlRenderable): PlsqlStatement {
+    return new PlsqlStatement(
+      attributes === undefined
+        ? `odb_audit.fatal(${renderPlsql(message)})`
+        : `odb_audit.fatal(${renderPlsql(message)}, ${renderPlsql(attributes)})`,
+    )
   },
 
   /** `odb_audit.severity_number(<severity>)` → PLS_INTEGER (OTel SeverityNumber) */
-  severityNumber(severity: string): string {
-    return `odb_audit.severity_number(${severity})`
+  severityNumber(severity: PlsqlRenderable): PlsqlExpression<'PLS_INTEGER'> {
+    return new PlsqlExpression('PLS_INTEGER', `odb_audit.severity_number(${renderPlsql(severity)})`)
   },
 
   /** `odb_audit.bulk(<json_array>)` */
-  bulk(data: string): string {
-    return `odb_audit.bulk(${data})`
+  bulk(data: PlsqlRenderable): PlsqlStatement {
+    return new PlsqlStatement(`odb_audit.bulk(${renderPlsql(data)})`)
   },
 
   /** `odb_audit.purge(<older_than>)` */
-  purge(olderThan: string): string {
-    return `odb_audit.purge(${olderThan})`
+  purge(olderThan: PlsqlRenderable): PlsqlStatement {
+    return new PlsqlStatement(`odb_audit.purge(${renderPlsql(olderThan)})`)
   },
 }

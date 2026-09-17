@@ -1,5 +1,6 @@
 const HTTP_ERROR_NUMBER = -20999
 const ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]{0,99}$/
+import { PlsqlStatement } from '../../../schema/attribute.js'
 import { dropPackageIfExists, qualify } from '../../../schema/ddl.js'
 
 function validateStatus(status: number): void {
@@ -41,18 +42,18 @@ export const odbHttp = {
   toSQLDown(options: { schema?: string } = {}): string {
     return dropPackageIfExists('odb_http', options.schema)
   },
-  error(status: number, code: string): string {
+  error(status: number, code: string): PlsqlStatement {
     validateStatus(status)
     validateCode(code)
-    return `odb_http.raise_error(${status}, '${code}')`
+    return new PlsqlStatement(`odb_http.raise_error(${status}, '${code}')`)
   },
-  unauthorized(code = 'UNAUTHORIZED'): string {
+  unauthorized(code = 'UNAUTHORIZED'): PlsqlStatement {
     return this.error(401, code)
   },
-  forbidden(code = 'FORBIDDEN'): string {
+  forbidden(code = 'FORBIDDEN'): PlsqlStatement {
     return this.error(403, code)
   },
-  tooManyRequests(code = 'TOO_MANY_REQUESTS'): string {
+  tooManyRequests(code = 'TOO_MANY_REQUESTS'): PlsqlStatement {
     return this.error(429, code)
   },
 }

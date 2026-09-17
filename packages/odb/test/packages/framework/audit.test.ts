@@ -51,25 +51,27 @@ describe('odbAudit (framework package odb_audit)', () => {
 
   describe('call-expression helpers', () => {
     it('renders severity helpers', () => {
-      expect(odbAudit.debug("'msg'")).toBe("odb_audit.debug('msg')")
-      expect(odbAudit.info("'msg'", 'v_attr')).toBe("odb_audit.info('msg', v_attr)")
-      expect(odbAudit.warn("'msg'")).toBe("odb_audit.warn('msg')")
-      expect(odbAudit.error("'msg'", 'v_attr')).toBe("odb_audit.error('msg', v_attr)")
-      expect(odbAudit.fatal("'msg'")).toBe("odb_audit.fatal('msg')")
+      expect(odbAudit.debug("'msg'").toSQL()).toBe("odb_audit.debug('msg')")
+      expect(odbAudit.info("'msg'", 'v_attr').toSQL()).toBe("odb_audit.info('msg', v_attr)")
+      expect(odbAudit.warn("'msg'").toSQL()).toBe("odb_audit.warn('msg')")
+      expect(odbAudit.error("'msg'", 'v_attr').toSQL()).toBe("odb_audit.error('msg', v_attr)")
+      expect(odbAudit.fatal("'msg'").toSQL()).toBe("odb_audit.fatal('msg')")
     })
 
     it('renders log() with optional arguments', () => {
-      expect(odbAudit.log("'INFO'", "'msg'")).toBe("odb_audit.log('INFO', 'msg')")
-      expect(odbAudit.log("'INFO'", "'msg'", 'v_attr')).toBe("odb_audit.log('INFO', 'msg', v_attr)")
-      expect(odbAudit.log("'INFO'", "'msg'", undefined, 'systimestamp')).toBe(
+      expect(odbAudit.log("'INFO'", "'msg'").toSQL()).toBe("odb_audit.log('INFO', 'msg')")
+      expect(odbAudit.log("'INFO'", "'msg'", 'v_attr').toSQL()).toBe(
+        "odb_audit.log('INFO', 'msg', v_attr)",
+      )
+      expect(odbAudit.log("'INFO'", "'msg'", undefined, 'systimestamp').toSQL()).toBe(
         "odb_audit.log('INFO', 'msg', NULL, systimestamp)",
       )
     })
 
     it('renders utility helpers', () => {
-      expect(odbAudit.severityNumber("'WARN'")).toBe("odb_audit.severity_number('WARN')")
-      expect(odbAudit.bulk('v_data')).toBe('odb_audit.bulk(v_data)')
-      expect(odbAudit.purge('v_cutoff')).toBe('odb_audit.purge(v_cutoff)')
+      expect(odbAudit.severityNumber("'WARN'").toSQL()).toBe("odb_audit.severity_number('WARN')")
+      expect(odbAudit.bulk('v_data').toSQL()).toBe('odb_audit.bulk(v_data)')
+      expect(odbAudit.purge('v_cutoff').toSQL()).toBe('odb_audit.purge(v_cutoff)')
     })
   })
 
