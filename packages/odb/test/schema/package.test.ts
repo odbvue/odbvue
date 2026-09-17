@@ -119,6 +119,19 @@ describe('private package members', () => {
     expect(sql).toContain('FUNCTION NORMALIZE(P_VALUE IN VARCHAR2) RETURN VARCHAR2 IS')
     expect(sql).toContain("RETURN NORMALIZE('value');")
   })
+
+  it('emits private constants from required escaped substitutions', () => {
+    const pkg = odbPackage('PCK_PRIVATE', (p) => {
+      const secret = p.privateConstant('c_secret', odbType.string(), 'secret')
+      p.func('PUBLIC_VALUE', odbType.string(), (fn) => fn.body((body) => body.return(secret)))
+    })
+
+    expect(() => pkg.toSQLUp()).toThrow('missing substitution secret')
+    const sql = pkg.toSQLUp({ substitutions: { secret: "don's secret" } })
+    expect(sql).toContain("c_secret CONSTANT VARCHAR2 := 'don''s secret';")
+    expect(sql).not.toContain('c_secret CONSTANT VARCHAR2;')
+    expect(sql).toContain('RETURN c_secret;')
+  })
 })
 
 describe('ProcedureBody control flow and exceptions', () => {

@@ -11,6 +11,9 @@ describe('odbAuth framework package', () => {
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_auth_jwt AS')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_auth AS')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_http AS')
+    expect(sql).toContain("c_jwt_secret CONSTANT VARCHAR2 := 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';")
+    expect(sql).toContain("c_dummy_password_hash CONSTANT VARCHAR2 := 'pbkdf2-sha512$210000$")
+    expect(sql).not.toContain('__ODB_AUTH_')
     expect(sql).toContain("'pbkdf2-sha512$210000$' || l_salt || '$' || l_hash")
     expect(sql).toContain(
       "DBMS_CRYPTO.MAC(UTL_RAW.CONCAT(HEXTORAW(p_salt), HEXTORAW('00000001')), DBMS_CRYPTO.HMAC_SH512, p_password_raw)",

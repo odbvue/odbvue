@@ -8,14 +8,12 @@ import { odbHttp } from '../http/http.js'
 import { odbJwt } from '../jwt/jwt.js'
 import { odbRateLimit, odbRateLimitApi } from '../rate-limit/rate-limit.js'
 
-const AUTH_JWT_SECRET_MARKER = '__ODB_AUTH_JWT_SECRET__'
 const DEFAULT_JWT_SECRET = 'change-this-development-only-odbvue-auth-secret-2026'
 const PASSWORD_HASH_ALGORITHM = 'pbkdf2-sha512'
 const PASSWORD_HASH_ITERATIONS = 210000
 const PASSWORD_HASH_BYTES = 64
 const REFRESH_TOKEN_BYTES = 64
 const REFRESH_TOKEN_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
-const DUMMY_PASSWORD_HASH_MARKER = '__ODB_AUTH_DUMMY_PASSWORD_HASH__'
 const authCookieOptions = {
   refreshCookieName: '__Host-odb_refresh',
   refreshCookieSecure: true,
@@ -210,360 +208,375 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => {
 })
 
 /** Access-token wrapper around ODB's generic HS256 JWT implementation. */
-export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => ({
-  createAccessToken: pkg.func('create_access_token', odbType.string(4000), (fn) => {
-    const userId = fn.param('p_user_id', odbType.guid())
-    const sessionId = fn.param('p_session_id', odbType.guid())
-    const tokenVersion = fn.param('p_token_version', odbType.number())
-    fn.body((body) =>
-      body.return(
-        odbJwt.encode(
-          plsqlExpr.jsonObject(
-            {
-              sub: userId,
-              sid: sessionId,
-              ver: tokenVersion,
-              iat: odbJwt.toEpoch(),
-              exp: plsqlExpr.add(odbJwt.toEpoch(), 900),
-            },
-            'VARCHAR2',
-          ),
-          odbLiteral(AUTH_JWT_SECRET_MARKER),
-        ),
-      ),
-    )
-  }),
-  requireUser: pkg.func('require_user', odbType.guid(), (fn) => {
-    const authorization = fn.param('p_authorization', odbType.string())
-    fn.body((body) => {
-      const { token, subject, sessionId, tokenVersion, activeSessionCount } = body.variables({
-        token: odbType.string(4000),
-        subject: authUsers.id,
-        sessionId: authSessions.id,
-        tokenVersion: authUsers.tokenVersion,
-        activeSessionCount: odbType.number(),
-      })
-      body.set(
-        token,
-        odbOracle.regexpReplace(
-          authorization,
-          odbLiteral('^Bearer[[:space:]]+'),
-          odbLiteral(''),
-          1,
-          1,
-          odbLiteral('i'),
-        ),
-      )
-      body.ifThen(
-        cond.or([
-          cond.eq(odbJwt.verify(token, odbLiteral(AUTH_JWT_SECRET_MARKER)), 0),
-          cond.eq(odbJwt.isExpired(token), 1),
-        ]),
-        (then) => then.unauthorized(),
-      )
-      body.set(subject, odbJwt.claim(token, odbLiteral('sub')))
-      body.set(sessionId, odbJwt.claim(token, odbLiteral('sid')))
-      body.set(tokenVersion, odbOracle.toNumber(odbJwt.claim(token, odbLiteral('ver'))))
-      body.query(
-        odbQuery()
-          .selectFrom('odb_auth_sessions s JOIN odb_auth_users u ON u.id = s.user_id')
-          .select('COUNT(*)')
-          .into(activeSessionCount.name)
-          .where((expression) =>
-            expression.and([
-              expression('s.id', '=', sessionId),
-              expression('s.user_id', '=', subject),
-              expression('s.revoked_at', 'IS NULL'),
-              expression('s.expires_at', '>', expression.ref('SYSTIMESTAMP')),
-              expression('u.enabled', '=', 1),
-              expression('u.token_version', '=', tokenVersion),
-            ]),
-          ),
-      )
-      body.ifThen(cond.eq(activeSessionCount, 0), (then) => then.unauthorized())
-      body.return(subject.name)
-    })
-  }),
-}))
+export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => {
+  const jwtSecret = pkg.privateConstant('c_jwt_secret', odbType.string(), 'jwtSecret')
 
-/** ORDS-facing authentication API. Refresh tokens never enter access JWTs. */
-export const odbAuthApi = odbPackage('odb_auth', (pkg) => ({
-  login: pkg.proc('login', (proc) => {
-    const { loginUsername, password, accessToken, setCookie } = proc.parameters({
-      in: {
-        loginUsername: authUsers.username,
-        password: odbType.string(512),
-      },
-      out: {
-        accessToken: odbType.clob(),
-        setCookie: odbType.string(),
-      },
-    })
-    proc
-      .body((statements) => {
-        const { userId, passwordHash, tokenVersion, sessionId, refreshToken, loginSubject } =
-          statements.variables({
-            userId: authUsers.id,
-            passwordHash: authUsers.passwordHash,
-            tokenVersion: authUsers.tokenVersion,
-            sessionId: authSessions.id,
-            refreshToken: odbType.string(512),
-            loginSubject: odbType.string(128),
-          })
-        statements.set(loginSubject, odbOracle.lower(odbOracle.trim(loginUsername)))
-        statements.call(odbRateLimitApi.enforce(odbLiteral('AUTH_LOGIN_USERNAME'), loginSubject))
-        statements.query(
-          odbQuery()
-            .selectFrom(authUsers)
-            .select(['MAX(id)', 'MAX(password_hash)', 'MAX(token_version)'])
-            .into(userId, passwordHash, tokenVersion)
-            .where((expression) =>
-              expression.and([
-                expression(
-                  expression.fn('LOWER', expression.ref(authUsers.username.name)),
-                  '=',
-                  expression.fn('LOWER', expression.ref(loginUsername.name)),
-                ),
-                expression(authUsers.enabled, '=', 1),
-              ]),
+  return {
+    createAccessToken: pkg.func('create_access_token', odbType.string(4000), (fn) => {
+      const userId = fn.param('p_user_id', odbType.guid())
+      const sessionId = fn.param('p_session_id', odbType.guid())
+      const tokenVersion = fn.param('p_token_version', odbType.number())
+      fn.body((body) =>
+        body.return(
+          odbJwt.encode(
+            plsqlExpr.jsonObject(
+              {
+                sub: userId,
+                sid: sessionId,
+                ver: tokenVersion,
+                iat: odbJwt.toEpoch(),
+                exp: plsqlExpr.add(odbJwt.toEpoch(), 900),
+              },
+              'VARCHAR2',
             ),
-        )
-        statements.set(
-          passwordHash,
-          odbOracle.nvl(passwordHash, odbLiteral(DUMMY_PASSWORD_HASH_MARKER)),
-        )
-        statements.ifThen(
-          cond.or([
-            cond.eq(odbAuthCrypto.verifyPassword(password, passwordHash), 0),
-            cond.isNull(userId),
-          ]),
-          (then) => {
-            then.call(odbRateLimitApi.failure(odbLiteral('AUTH_LOGIN_USERNAME'), loginSubject))
-            then.unauthorized('INVALID_CREDENTIALS')
-          },
-        )
-        statements.call(odbRateLimitApi.success(odbLiteral('AUTH_LOGIN_USERNAME'), loginSubject))
-        statements.set(sessionId, odbOracle.lower(odbOracle.rawToHex(odbOracle.sysGuid())))
-        statements.set(refreshToken, odbAuthCrypto.randomToken(odbLiteral(REFRESH_TOKEN_BYTES)))
-        statements.insertInto(authSessions, {
-          id: sessionId,
-          userId,
-          refreshTokenHash: odbAuthCrypto.hashToken(refreshToken),
-          expiresAt: odbOracle.plus(odbOracle.sysTimestamp(), odbOracle.interval.days(30)),
-        })
-        statements.set(
-          accessToken,
-          plsqlExpr.cast<'CLOB'>(odbAuthJwt.createAccessToken(userId, sessionId, tokenVersion)),
-        )
-        statements.set(setCookie, refreshCookie(refreshToken, authCookieOptions))
-        statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized('INVALID_CREDENTIALS'))
-      })
-      .service({
-        method: 'POST',
-        path: '/login',
-        basePath: '/auth',
-        summary: 'Authenticate using username and password',
-        params: {
-          body: { username: loginUsername, password },
-          response: { accessToken },
-          header: { 'Set-Cookie': setCookie },
-        },
-      })
-  }),
-  refresh: pkg.proc('refresh', (proc) => {
-    const { cookieHeader, accessToken, setCookie } = proc.parameters({
-      in: { cookieHeader: odbType.string(4000) },
-      out: { accessToken: odbType.clob(), setCookie: odbType.string() },
-    })
-    proc
-      .body((statements) => {
-        const {
-          sessionId,
-          userId,
-          tokenVersion,
-          previousRefreshTokenHash,
-          presentedRefreshToken,
-          presentedRefreshTokenHash,
-          nextRefreshToken,
-        } = statements.variables({
+            jwtSecret,
+          ),
+        ),
+      )
+    }),
+    requireUser: pkg.func('require_user', odbType.guid(), (fn) => {
+      const authorization = fn.param('p_authorization', odbType.string())
+      fn.body((body) => {
+        const { token, subject, sessionId, tokenVersion, activeSessionCount } = body.variables({
+          token: odbType.string(4000),
+          subject: authUsers.id,
           sessionId: authSessions.id,
-          userId: authUsers.id,
           tokenVersion: authUsers.tokenVersion,
-          previousRefreshTokenHash: authSessions.previousRefreshTokenHash,
-          presentedRefreshToken: odbType.string(512),
-          presentedRefreshTokenHash: authSessions.refreshTokenHash,
-          nextRefreshToken: odbType.string(512),
+          activeSessionCount: odbType.number(),
         })
-        statements.set(
-          presentedRefreshToken,
-          odbOracle.regexpSubstr(
-            cookieHeader,
-            odbLiteral(`(^|;[[:space:]]*)${authCookieOptions.refreshCookieName}=([^;]*)`),
+        body.set(
+          token,
+          odbOracle.regexpReplace(
+            authorization,
+            odbLiteral('^Bearer[[:space:]]+'),
+            odbLiteral(''),
             1,
             1,
-            odbOracle.null(),
-            2,
+            odbLiteral('i'),
           ),
         )
-        statements.ifThen(
-          cond.not(cond.regexpLike(presentedRefreshToken, '^[[:xdigit:]]{128}$')),
+        body.ifThen(
+          cond.or([
+            cond.eq(odbJwt.verify(token, jwtSecret), 0),
+            cond.eq(odbJwt.isExpired(token), 1),
+          ]),
           (then) => then.unauthorized(),
         )
-        statements.set(presentedRefreshTokenHash, odbAuthCrypto.hashToken(presentedRefreshToken))
-        statements.query(
+        body.set(subject, odbJwt.claim(token, odbLiteral('sub')))
+        body.set(sessionId, odbJwt.claim(token, odbLiteral('sid')))
+        body.set(tokenVersion, odbOracle.toNumber(odbJwt.claim(token, odbLiteral('ver'))))
+        body.query(
           odbQuery()
-            .selectFrom('odb_auth_sessions s')
-            .select(['s.id', 's.user_id', 's.previous_refresh_token_hash'])
-            .into(sessionId, userId, previousRefreshTokenHash)
+            .selectFrom('odb_auth_sessions s JOIN odb_auth_users u ON u.id = s.user_id')
+            .select('COUNT(*)')
+            .into(activeSessionCount.name)
             .where((expression) =>
               expression.and([
-                expression.or([
-                  expression('s.refresh_token_hash', '=', presentedRefreshTokenHash),
-                  expression('s.previous_refresh_token_hash', '=', presentedRefreshTokenHash),
-                ]),
+                expression('s.id', '=', sessionId),
+                expression('s.user_id', '=', subject),
                 expression('s.revoked_at', 'IS NULL'),
                 expression('s.expires_at', '>', expression.ref('SYSTIMESTAMP')),
-              ]),
-            )
-            .forUpdate(),
-        )
-        statements.query(
-          odbQuery()
-            .selectFrom(authUsers)
-            .select(authUsers.tokenVersion)
-            .into(tokenVersion)
-            .where((expression) =>
-              expression.and([
-                expression(authUsers.id, '=', userId),
-                expression(authUsers.enabled, '=', 1),
+                expression('u.enabled', '=', 1),
+                expression('u.token_version', '=', tokenVersion),
               ]),
             ),
         )
-        statements.ifThen(cond.eq(presentedRefreshTokenHash, previousRefreshTokenHash), (then) => {
-          then.query(
+        body.ifThen(cond.eq(activeSessionCount, 0), (then) => then.unauthorized())
+        body.return(subject.name)
+      })
+    }),
+  }
+})
+
+/** ORDS-facing authentication API. Refresh tokens never enter access JWTs. */
+export const odbAuthApi = odbPackage('odb_auth', (pkg) => {
+  const dummyPasswordHashConstant = pkg.privateConstant(
+    'c_dummy_password_hash',
+    odbType.string(512),
+    'dummyPasswordHash',
+  )
+
+  return {
+    login: pkg.proc('login', (proc) => {
+      const { loginUsername, password, accessToken, setCookie } = proc.parameters({
+        in: {
+          loginUsername: authUsers.username,
+          password: odbType.string(512),
+        },
+        out: {
+          accessToken: odbType.clob(),
+          setCookie: odbType.string(),
+        },
+      })
+      proc
+        .body((statements) => {
+          const { userId, passwordHash, tokenVersion, sessionId, refreshToken, loginSubject } =
+            statements.variables({
+              userId: authUsers.id,
+              passwordHash: authUsers.passwordHash,
+              tokenVersion: authUsers.tokenVersion,
+              sessionId: authSessions.id,
+              refreshToken: odbType.string(512),
+              loginSubject: odbType.string(128),
+            })
+          statements.set(loginSubject, odbOracle.lower(odbOracle.trim(loginUsername)))
+          statements.call(odbRateLimitApi.enforce(odbLiteral('AUTH_LOGIN_USERNAME'), loginSubject))
+          statements.query(
+            odbQuery()
+              .selectFrom(authUsers)
+              .select(['MAX(id)', 'MAX(password_hash)', 'MAX(token_version)'])
+              .into(userId, passwordHash, tokenVersion)
+              .where((expression) =>
+                expression.and([
+                  expression(
+                    expression.fn('LOWER', expression.ref(authUsers.username.name)),
+                    '=',
+                    expression.fn('LOWER', expression.ref(loginUsername.name)),
+                  ),
+                  expression(authUsers.enabled, '=', 1),
+                ]),
+              ),
+          )
+          statements.set(passwordHash, odbOracle.nvl(passwordHash, dummyPasswordHashConstant))
+          statements.ifThen(
+            cond.or([
+              cond.eq(odbAuthCrypto.verifyPassword(password, passwordHash), 0),
+              cond.isNull(userId),
+            ]),
+            (then) => {
+              then.call(odbRateLimitApi.failure(odbLiteral('AUTH_LOGIN_USERNAME'), loginSubject))
+              then.unauthorized('INVALID_CREDENTIALS')
+            },
+          )
+          statements.call(odbRateLimitApi.success(odbLiteral('AUTH_LOGIN_USERNAME'), loginSubject))
+          statements.set(sessionId, odbOracle.lower(odbOracle.rawToHex(odbOracle.sysGuid())))
+          statements.set(refreshToken, odbAuthCrypto.randomToken(odbLiteral(REFRESH_TOKEN_BYTES)))
+          statements.insertInto(authSessions, {
+            id: sessionId,
+            userId,
+            refreshTokenHash: odbAuthCrypto.hashToken(refreshToken),
+            expiresAt: odbOracle.plus(odbOracle.sysTimestamp(), odbOracle.interval.days(30)),
+          })
+          statements.set(
+            accessToken,
+            plsqlExpr.cast<'CLOB'>(odbAuthJwt.createAccessToken(userId, sessionId, tokenVersion)),
+          )
+          statements.set(setCookie, refreshCookie(refreshToken, authCookieOptions))
+          statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized('INVALID_CREDENTIALS'))
+        })
+        .service({
+          method: 'POST',
+          path: '/login',
+          basePath: '/auth',
+          summary: 'Authenticate using username and password',
+          params: {
+            body: { username: loginUsername, password },
+            response: { accessToken },
+            header: { 'Set-Cookie': setCookie },
+          },
+        })
+    }),
+    refresh: pkg.proc('refresh', (proc) => {
+      const { cookieHeader, accessToken, setCookie } = proc.parameters({
+        in: { cookieHeader: odbType.string(4000) },
+        out: { accessToken: odbType.clob(), setCookie: odbType.string() },
+      })
+      proc
+        .body((statements) => {
+          const {
+            sessionId,
+            userId,
+            tokenVersion,
+            previousRefreshTokenHash,
+            presentedRefreshToken,
+            presentedRefreshTokenHash,
+            nextRefreshToken,
+          } = statements.variables({
+            sessionId: authSessions.id,
+            userId: authUsers.id,
+            tokenVersion: authUsers.tokenVersion,
+            previousRefreshTokenHash: authSessions.previousRefreshTokenHash,
+            presentedRefreshToken: odbType.string(512),
+            presentedRefreshTokenHash: authSessions.refreshTokenHash,
+            nextRefreshToken: odbType.string(512),
+          })
+          statements.set(
+            presentedRefreshToken,
+            odbOracle.regexpSubstr(
+              cookieHeader,
+              odbLiteral(`(^|;[[:space:]]*)${authCookieOptions.refreshCookieName}=([^;]*)`),
+              1,
+              1,
+              odbOracle.null(),
+              2,
+            ),
+          )
+          statements.ifThen(
+            cond.not(cond.regexpLike(presentedRefreshToken, '^[[:xdigit:]]{128}$')),
+            (then) => then.unauthorized(),
+          )
+          statements.set(presentedRefreshTokenHash, odbAuthCrypto.hashToken(presentedRefreshToken))
+          statements.query(
+            odbQuery()
+              .selectFrom('odb_auth_sessions s')
+              .select(['s.id', 's.user_id', 's.previous_refresh_token_hash'])
+              .into(sessionId, userId, previousRefreshTokenHash)
+              .where((expression) =>
+                expression.and([
+                  expression.or([
+                    expression('s.refresh_token_hash', '=', presentedRefreshTokenHash),
+                    expression('s.previous_refresh_token_hash', '=', presentedRefreshTokenHash),
+                  ]),
+                  expression('s.revoked_at', 'IS NULL'),
+                  expression('s.expires_at', '>', expression.ref('SYSTIMESTAMP')),
+                ]),
+              )
+              .forUpdate(),
+          )
+          statements.query(
+            odbQuery()
+              .selectFrom(authUsers)
+              .select(authUsers.tokenVersion)
+              .into(tokenVersion)
+              .where((expression) =>
+                expression.and([
+                  expression(authUsers.id, '=', userId),
+                  expression(authUsers.enabled, '=', 1),
+                ]),
+              ),
+          )
+          statements.ifThen(
+            cond.eq(presentedRefreshTokenHash, previousRefreshTokenHash),
+            (then) => {
+              then.query(
+                odbQuery()
+                  .updateTable(authSessions)
+                  .set({ revokedAt: odbOracle.sysTimestamp() })
+                  .where((expression) => expression(authSessions.id, '=', sessionId)),
+              )
+              then.unauthorized()
+            },
+          )
+          statements.set(
+            nextRefreshToken,
+            odbAuthCrypto.randomToken(odbLiteral(REFRESH_TOKEN_BYTES)),
+          )
+          statements.query(
+            odbQuery()
+              .updateTable(authSessions)
+              .set({
+                previousRefreshTokenHash: presentedRefreshTokenHash,
+                refreshTokenHash: odbAuthCrypto.hashToken(nextRefreshToken),
+                lastUsedAt: odbOracle.sysTimestamp(),
+              })
+              .where((expression) => expression(authSessions.id, '=', sessionId)),
+          )
+          statements.set(
+            accessToken,
+            plsqlExpr.cast<'CLOB'>(odbAuthJwt.createAccessToken(userId, sessionId, tokenVersion)),
+          )
+          statements.set(setCookie, refreshCookie(nextRefreshToken, authCookieOptions))
+          statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized())
+        })
+        .service({
+          method: 'POST',
+          path: '/refresh',
+          basePath: '/auth',
+          summary: 'Rotate a refresh token and issue an access token',
+          params: {
+            header: { Cookie: cookieHeader, 'Set-Cookie': setCookie },
+            response: { accessToken },
+          },
+        })
+    }),
+    logout: pkg.proc('logout', (proc) => {
+      const { cookieHeader, setCookie } = proc.parameters({
+        in: { cookieHeader: odbType.string(4000) },
+        out: { setCookie: odbType.string() },
+      })
+      proc
+        .body((statements) => {
+          const { presentedRefreshToken } = statements.variables({
+            presentedRefreshToken: odbType.string(512),
+          })
+          statements.set(
+            presentedRefreshToken,
+            odbOracle.regexpSubstr(
+              cookieHeader,
+              odbLiteral(`(^|;[[:space:]]*)${authCookieOptions.refreshCookieName}=([^;]*)`),
+              1,
+              1,
+              odbOracle.null(),
+              2,
+            ),
+          )
+          statements.query(
             odbQuery()
               .updateTable(authSessions)
               .set({ revokedAt: odbOracle.sysTimestamp() })
-              .where((expression) => expression(authSessions.id, '=', sessionId)),
+              .where((expression) =>
+                expression.and([
+                  expression(
+                    'refresh_token_hash',
+                    '=',
+                    odbAuthCrypto.hashToken(presentedRefreshToken),
+                  ),
+                  expression('revoked_at', 'IS NULL'),
+                ]),
+              ),
           )
-          then.unauthorized()
+          statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized())
+          statements.set(setCookie, expiredRefreshCookie(authCookieOptions))
         })
-        statements.set(nextRefreshToken, odbAuthCrypto.randomToken(odbLiteral(REFRESH_TOKEN_BYTES)))
-        statements.query(
-          odbQuery()
-            .updateTable(authSessions)
-            .set({
-              previousRefreshTokenHash: presentedRefreshTokenHash,
-              refreshTokenHash: odbAuthCrypto.hashToken(nextRefreshToken),
-              lastUsedAt: odbOracle.sysTimestamp(),
-            })
-            .where((expression) => expression(authSessions.id, '=', sessionId)),
-        )
-        statements.set(
-          accessToken,
-          plsqlExpr.cast<'CLOB'>(odbAuthJwt.createAccessToken(userId, sessionId, tokenVersion)),
-        )
-        statements.set(setCookie, refreshCookie(nextRefreshToken, authCookieOptions))
-        statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized())
-      })
-      .service({
-        method: 'POST',
-        path: '/refresh',
-        basePath: '/auth',
-        summary: 'Rotate a refresh token and issue an access token',
-        params: {
-          header: { Cookie: cookieHeader, 'Set-Cookie': setCookie },
-          response: { accessToken },
-        },
-      })
-  }),
-  logout: pkg.proc('logout', (proc) => {
-    const { cookieHeader, setCookie } = proc.parameters({
-      in: { cookieHeader: odbType.string(4000) },
-      out: { setCookie: odbType.string() },
-    })
-    proc
-      .body((statements) => {
-        const { presentedRefreshToken } = statements.variables({
-          presentedRefreshToken: odbType.string(512),
+        .service({
+          method: 'POST',
+          path: '/logout',
+          basePath: '/auth',
+          summary: 'Revoke an authentication session',
+          params: {
+            header: { Cookie: cookieHeader, 'Set-Cookie': setCookie },
+          },
         })
-        statements.set(
-          presentedRefreshToken,
-          odbOracle.regexpSubstr(
-            cookieHeader,
-            odbLiteral(`(^|;[[:space:]]*)${authCookieOptions.refreshCookieName}=([^;]*)`),
-            1,
-            1,
-            odbOracle.null(),
-            2,
-          ),
-        )
-        statements.query(
-          odbQuery()
-            .updateTable(authSessions)
-            .set({ revokedAt: odbOracle.sysTimestamp() })
-            .where((expression) =>
-              expression.and([
-                expression(
-                  'refresh_token_hash',
-                  '=',
-                  odbAuthCrypto.hashToken(presentedRefreshToken),
-                ),
-                expression('revoked_at', 'IS NULL'),
-              ]),
-            ),
-        )
-        statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized())
-        statements.set(setCookie, expiredRefreshCookie(authCookieOptions))
-      })
-      .service({
-        method: 'POST',
-        path: '/logout',
-        basePath: '/auth',
-        summary: 'Revoke an authentication session',
-        params: {
-          header: { Cookie: cookieHeader, 'Set-Cookie': setCookie },
+    }),
+    me: pkg.proc('me', (proc) => {
+      const { authorization, userId, username, displayName } = proc.parameters({
+        in: { authorization: odbType.string(4000) },
+        out: {
+          userId: authUsers.id,
+          username: authUsers.username,
+          displayName: authUsers.displayName,
         },
       })
-  }),
-  me: pkg.proc('me', (proc) => {
-    const { authorization, userId, username, displayName } = proc.parameters({
-      in: { authorization: odbType.string(4000) },
-      out: {
-        userId: authUsers.id,
-        username: authUsers.username,
-        displayName: authUsers.displayName,
-      },
-    })
-    proc
-      .body((statements) => {
-        const { subject } = statements.variables({ subject: authUsers.id })
-        statements.set(subject, odbAuthJwt.requireUser(authorization))
-        statements.query(
-          odbQuery()
-            .selectFrom(authUsers)
-            .select([authUsers.id, authUsers.username, authUsers.displayName])
-            .into(userId, username, displayName)
-            .where((expression) =>
-              expression.and([
-                expression(authUsers.id, '=', subject),
-                expression(authUsers.enabled, '=', 1),
-              ]),
-            ),
-        )
-      })
-      .service({
-        method: 'GET',
-        path: '/me',
-        basePath: '/auth',
-        summary: 'Return the authenticated user',
-        params: {
-          header: { Authorization: authorization },
-          response: { userId, username, displayName },
-        },
-      })
-  }),
-}))
+      proc
+        .body((statements) => {
+          const { subject } = statements.variables({ subject: authUsers.id })
+          statements.set(subject, odbAuthJwt.requireUser(authorization))
+          statements.query(
+            odbQuery()
+              .selectFrom(authUsers)
+              .select([authUsers.id, authUsers.username, authUsers.displayName])
+              .into(userId, username, displayName)
+              .where((expression) =>
+                expression.and([
+                  expression(authUsers.id, '=', subject),
+                  expression(authUsers.enabled, '=', 1),
+                ]),
+              ),
+          )
+        })
+        .service({
+          method: 'GET',
+          path: '/me',
+          basePath: '/auth',
+          summary: 'Return the authenticated user',
+          params: {
+            header: { Authorization: authorization },
+            response: { userId, username, displayName },
+          },
+        })
+    }),
+  }
+})
 
 export interface OdbAuthOptions {
   jwtSecret?: string
@@ -582,8 +595,8 @@ export const odbAuth = {
       odbJwt.toSQLUp(options),
       odbHttp.toSQLUp(options),
       odbAuthCrypto.toSQLUp(options),
-      odbAuthJwt.toSQLUp(options).replaceAll(AUTH_JWT_SECRET_MARKER, secret.replace(/'/g, "''")),
-      odbAuthApi.toSQLUp(options).replaceAll(DUMMY_PASSWORD_HASH_MARKER, dummyPasswordHash()),
+      odbAuthJwt.toSQLUp({ ...options, substitutions: { jwtSecret: secret } }),
+      odbAuthApi.toSQLUp({ ...options, substitutions: { dummyPasswordHash: dummyPasswordHash() } }),
     ].join('\n')
   },
   upgrade() {
@@ -598,7 +611,10 @@ export const odbAuth = {
           '  IF SQLCODE != -1430 THEN RAISE; END IF;',
           'END;',
           '/',
-          odbAuthApi.toSQLUp(options).replaceAll(DUMMY_PASSWORD_HASH_MARKER, dummyPasswordHash()),
+          odbAuthApi.toSQLUp({
+            ...options,
+            substitutions: { dummyPasswordHash: dummyPasswordHash() },
+          }),
         ].join('\n')
       },
       toSQLDown() {

@@ -263,6 +263,12 @@ export type FunctionNode = {
   body?: ProcedureBodyNode
 }
 
+export type PrivateConstantNode = {
+  name: string
+  type: PlsqlType | string
+  substitution: string
+}
+
 export type OdbApplication = {
   kind: 'package'
   name: string
@@ -270,6 +276,7 @@ export type OdbApplication = {
   functions: FunctionNode[]
   privateProcedures?: ProcedureNode[]
   privateFunctions?: FunctionNode[]
+  privateConstants?: PrivateConstantNode[]
 }
 
 export type ApplicationLike = OdbApplication | { application(): OdbApplication }
@@ -281,6 +288,8 @@ export function applicationNode(application: ApplicationLike): OdbApplication {
 export type PackageSqlOptions = {
   schema?: string
   orReplace?: boolean
+  /** Values used by private constants declared with `privateConstant()`. */
+  substitutions?: Record<string, string | number | boolean | null>
   /**
    * Physical object name to emit instead of the public name. Used by the
    * blue/green deployment flow to create the package under a colored name
@@ -1073,6 +1082,11 @@ export type Package<
     returnType: TReturnType | OdbTypeDescriptor<TReturnType>,
     build?: (fn: PlsqlFunction<TReturnType>) => void,
   ): PlsqlFunction<TReturnType>
+  privateConstant<TType extends PlsqlType | string>(
+    name: string,
+    type: TType | OdbTypeDescriptor<TType>,
+    substitution: string,
+  ): PlsqlExpression<TType>
   call<TMemberName extends keyof TMembers>(
     member: TMemberName,
     ...args: PlsqlRenderable[]
@@ -1089,6 +1103,7 @@ export class PackageImpl<
   private _functions: PlsqlFunction<any>[] = []
   private _privateProcedures: Procedure[] = []
   private _privateFunctions: PlsqlFunction<any>[] = []
+  private _privateConstants: PrivateConstantNode[] = []
   private _memberLookup: Record<string, PackageMemberDefinition> = {}
 
   /**
@@ -1176,6 +1191,20 @@ export class PackageImpl<
   }
 
   /**
+   * Declare a body-private constant whose value is supplied when SQL is
+   * generated. The returned expression can be used by package members.
+   */
+  privateConstant<TType extends PlsqlType | string>(
+    name: string,
+    type: TType | OdbTypeDescriptor<TType>,
+    substitution: string,
+  ): PlsqlExpression<TType> {
+    const definition = typeof type === 'object' ? type : { type }
+    this._privateConstants.push({ name, type: definition.type, substitution })
+    return new PlsqlExpression(definition.type, name)
+  }
+
+  /**
    * Build a typed call expression to a member of this package, e.g.
    * `pck_api_settings.get_value('APP_VERSION')`. The return type is inferred
    * from the declared function (defaults to VARCHAR2). Callers reference the
@@ -1200,6 +1229,7 @@ export class PackageImpl<
       functions: this._functions.map((f) => f.toNode()),
       privateProcedures: this._privateProcedures.map((p) => p.toNode()),
       privateFunctions: this._privateFunctions.map((f) => f.toNode()),
+      privateConstants: this._privateConstants.map((constant) => ({ ...constant })),
     }
   }
 
@@ -1261,6 +1291,16 @@ function emitPackageBody(pkg: OdbApplication, options: PackageSqlOptions = {}): 
   const name = qualifyName(identifier, options.schema)
   const orReplace = options.orReplace !== false ? 'OR REPLACE ' : ''
   const lines: string[] = [`CREATE ${orReplace}PACKAGE BODY ${name} AS`]
+
+  for (const constant of pkg.privateConstants ?? []) {
+    const value = options.substitutions?.[constant.substitution]
+    if (value === undefined) {
+      throw new Error(`Package ${pkg.name}: missing substitution ${constant.substitution}.`)
+    }
+    lines.push(
+      `  ${constant.name} CONSTANT ${emitParamType(constant.type)} := ${renderPlsqlLiteral(value)};`,
+    )
+  }
 
   for (const proc of pkg.privateProcedures ?? []) {
     lines.push(emitProcedureImpl(proc))
