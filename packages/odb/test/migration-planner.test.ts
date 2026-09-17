@@ -31,7 +31,7 @@ describe('migration planner', () => {
 
   it('uses the ODB-owned registry for blue-green objects', () => {
     const pkg = odbPackage('pck_test', (definition) => {
-      definition.proc('run', (procedure) => procedure.body(() => {}))
+      definition.defineProcedure('run', {}).body(() => {})
     })
     const migration = defineMigration('20260601000000_test', { schema: 'APP' })
       .install(pkg)

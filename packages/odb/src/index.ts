@@ -5,9 +5,12 @@ export * from './schema/table.js'
 export * from './schema/attribute.js'
 export {
   odbPackage,
+  defineService,
   emitApplicationSql,
   odbType,
+  type DefinedProcedure,
   type OrdsServiceDefinition,
+  type ProcedureServiceDefinition,
   type Package,
 } from './schema/package.js'
 export * from './introspect.js'

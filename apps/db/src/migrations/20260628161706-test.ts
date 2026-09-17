@@ -1,4 +1,5 @@
 import {
+  defineService,
   odbEnv,
   defineMigration,
   odbLob,
@@ -28,33 +29,31 @@ export const appUsersTable = odbTable('app_users', (t) => ({
   .check((c, e) => e.in(c.status, ['A', 'D', 'N']))
 
 const appPackage = odbPackage('pck_app', (p) => {
-  p.proc('bootstrap', (proc) => {
-    const { username, password } = proc.parameters({
-      in: {
-        username: appUsersTable.username,
-        password: appUsersTable.password,
-      },
-    })
+  const bootstrap = p.defineProcedure('bootstrap', {
+    in: {
+      username: appUsersTable.username,
+      password: appUsersTable.password,
+    },
+  })
+  const { username, password } = bootstrap.parameters
 
-    proc
-      .body((body) => {
-        body
-          .insertInto(appUsersTable, {
-            username,
-            password,
-            fullname: 'Bootstrap Admin',
-            status: 'A',
-          })
-          .auditInfo('Bootstrap admin user created', { 'user.name': username })
-          .whenOthers((h) =>
-            h.auditError('Bootstrap admin user creation failed', { 'user.name': username }),
-          )
+  bootstrap.body((body) => {
+    body
+      .insertInto(appUsersTable, {
+        username,
+        password,
+        fullname: 'Bootstrap Admin',
+        status: 'A',
       })
-      .service({
-        method: 'POST',
-        path: '/bootstrap',
-        summary: 'Bootstraps the admin user',
-      })
+      .auditInfo('Bootstrap admin user created', { 'user.name': username })
+      .whenOthers((h) =>
+        h.auditError('Bootstrap admin user creation failed', { 'user.name': username }),
+      )
+  })
+  defineService(bootstrap, {
+    method: 'POST',
+    path: '/bootstrap',
+    summary: 'Bootstraps the admin user',
   })
 })
 

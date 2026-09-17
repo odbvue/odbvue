@@ -111,6 +111,17 @@ type NamedParameters<TParameters extends ProcedureParameters> = ParameterGroup<T
   ParameterGroup<TParameters, 'out'> &
   ParameterGroup<TParameters, 'inOut'>
 
+type ProcedureParameterName<TParameters extends ProcedureParameters> =
+  keyof NamedParameters<TParameters> & string
+
+type InputProcedureParameterName<TParameters extends ProcedureParameters> =
+  | (keyof ParameterGroup<TParameters, 'in'> & string)
+  | (keyof ParameterGroup<TParameters, 'inOut'> & string)
+
+type OutputProcedureParameterName<TParameters extends ProcedureParameters> =
+  | (keyof ParameterGroup<TParameters, 'out'> & string)
+  | (keyof ParameterGroup<TParameters, 'inOut'> & string)
+
 function inputParameterName(key: string): string {
   const snakeCase = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()
   return `p_${snakeCase}`
@@ -885,6 +896,71 @@ export type OrdsServiceParameterGroups = {
   response?: Record<string, PlsqlReference>
 }
 
+/** Transport bindings for a contract-first procedure. */
+export type ProcedureServiceDefinition<TParameters extends ProcedureParameters> = Omit<
+  OrdsServiceDefinition,
+  'params'
+> & {
+  params?: {
+    body?: Record<string, InputProcedureParameterName<TParameters>>
+    header?: Record<string, ProcedureParameterName<TParameters>>
+    uri?: Record<string, InputProcedureParameterName<TParameters>>
+    response?: Record<string, OutputProcedureParameterName<TParameters>>
+  }
+}
+
+/** A procedure whose signature is fixed before its implementation is written. */
+export class DefinedProcedure<TParameters extends ProcedureParameters> {
+  constructor(
+    readonly procedure: Procedure,
+    readonly parameters: NamedParameters<TParameters>,
+  ) {}
+
+  body(build: (body: ProcedureBody) => void): this {
+    this.procedure.body(build)
+    return this
+  }
+
+  autonomous(): this {
+    this.procedure.autonomous()
+    return this
+  }
+}
+
+/** Attach an ORDS contract to a previously declared procedure. */
+export function defineService<TParameters extends ProcedureParameters>(
+  definedProcedure: DefinedProcedure<TParameters>,
+  definition: ProcedureServiceDefinition<TParameters>,
+): Procedure {
+  const parameterReferences = definedProcedure.parameters as Record<string, PlsqlReference>
+  const resolveBindings = (bindings: Record<string, string> | undefined) =>
+    bindings &&
+    Object.fromEntries(
+      Object.entries(bindings).map(([publicName, parameterName]) => {
+        const parameter = parameterReferences[parameterName]
+        if (!parameter) {
+          throw new Error(
+            `ORDS service ${definedProcedure.procedure.name}: ${parameterName} is not a procedure parameter.`,
+          )
+        }
+        return [publicName, parameter]
+      }),
+    )
+
+  const params = definition.params
+  return definedProcedure.procedure.attachService({
+    ...definition,
+    params: params
+      ? {
+          body: resolveBindings(params.body),
+          header: resolveBindings(params.header),
+          uri: resolveBindings(params.uri),
+          response: resolveBindings(params.response),
+        }
+      : undefined,
+  })
+}
+
 /** Compile a procedure's service metadata into an ORDS endpoint. */
 function buildOrdsEndpoint(
   packageName: string,
@@ -1015,18 +1091,8 @@ export class Procedure {
     return new PlsqlStatement(`${this.name}(${args.map(renderPlsql).join(', ')})`)
   }
 
-  /**
-   * Expose this procedure as an ORDS service using an explicit, reviewable
-   * public contract.
-   *
-   * @example
-   * proc.service({
-   *   method: 'GET',
-   *   path: '/users/:id',
-   *   summary: 'Fetch a single user',
-   * })
-   */
-  service(definition: OrdsServiceDefinition): this {
+  /** @internal Used by defineService() to attach a validated ORDS service contract. */
+  attachService(definition: OrdsServiceDefinition): this {
     const declaredParameters = new Set(this._params)
     const mappedParameters = new Set<Param>()
     const routeParameters = new Set(
@@ -1195,7 +1261,10 @@ export type Package<
   readonly name: string
   readonly objectName: string
   readonly isBlueGreen: true
-  proc(name: string, build?: (proc: Procedure) => void): Procedure
+  defineProcedure<TParameters extends ProcedureParameters>(
+    name: string,
+    parameters: TParameters,
+  ): DefinedProcedure<TParameters>
   privateProc(name: string, build?: (proc: Procedure) => void): Procedure
   func<TReturnType extends PlsqlType | string = PlsqlType | string>(
     name: string,
@@ -1277,11 +1346,14 @@ export class PackageImpl<
     ) as PackageMemberReturnValue<PackageMemberDefinition>
   }
 
-  proc(name: string, build?: (proc: Procedure) => void): Procedure {
-    const p = new Procedure(name)
-    build?.(p)
-    this._procedures.push(p)
-    return p
+  defineProcedure<TParameters extends ProcedureParameters>(
+    name: string,
+    parameters: TParameters,
+  ): DefinedProcedure<TParameters> {
+    const procedure = new Procedure(name)
+    const namedParameters = procedure.parameters(parameters)
+    this._procedures.push(procedure)
+    return new DefinedProcedure(procedure, namedParameters)
   }
 
   privateProc(name: string, build?: (proc: Procedure) => void): Procedure {

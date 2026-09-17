@@ -9,7 +9,7 @@ import {
   type PlsqlBooleanExpression,
   type PlsqlExpression,
 } from '../../src/schema/attribute.js'
-import { odbPackage, odbType, ProcedureBody } from '../../src/schema/package.js'
+import { defineService, odbPackage, odbType, ProcedureBody } from '../../src/schema/package.js'
 import { odbTable } from '../../src/schema/table.js'
 describe('odbPackage member typing', () => {
   it('exposes typed package member invokers and rejects unknown members', () => {
@@ -17,9 +17,9 @@ describe('odbPackage member typing', () => {
       getValue: p.func('GET_VALUE', odbType.string(), (fn) => {
         fn.parameters({ in: { key: odbType.string() } })
       }),
-      setValue: p.proc('SET_VALUE', (proc) => {
-        proc.parameters({ in: { key: odbType.string(), value: odbType.string() } })
-      }),
+      setValue: p.defineProcedure('SET_VALUE', {
+        in: { key: odbType.string(), value: odbType.string() },
+      }).procedure,
     }))
 
     const value = settings.getValue(odbLiteral('APP_VERSION'))
@@ -41,9 +41,7 @@ describe('odbPackage member typing', () => {
       getValue: p.func('GET_VALUE', odbType.string(), (fn) => {
         fn.parameters({ in: { key: odbType.string() } })
       }),
-      setValue: p.proc('SET_VALUE', (proc) => {
-        proc.parameters({ in: { key: odbType.string() } })
-      }),
+      setValue: p.defineProcedure('SET_VALUE', { in: { key: odbType.string() } }).procedure,
     }))
 
     const statement = settings.setValue(odbLiteral('APP_VERSION'))
@@ -69,15 +67,35 @@ describe('odbPackage member typing', () => {
 })
 
 describe('Procedure ORDS contracts', () => {
+  it('binds a contract-first procedure by declared parameter name', () => {
+    const pkg = odbPackage('PCK_API', (p) => {
+      const login = p.defineProcedure('LOGIN', {
+        in: { username: odbType.string() },
+        out: { token: odbType.string() },
+      })
+      login.body((body) => body.set(login.parameters.token, 'issued'))
+      defineService(login, {
+        method: 'POST',
+        path: '/login',
+        params: { body: { username: 'username' }, response: { token: 'token' } },
+      })
+      return { login: login.procedure }
+    })
+
+    expect(pkg.application().procedures[0].service?.params?.body?.username.name).toBe('p_username')
+  })
+
   it('requires every parameter to have one direction-compatible binding', () => {
     expect(() =>
       odbPackage('PCK_API', (p) => {
-        p.proc('LOGIN', (proc) => {
-          const { username } = proc.parameters({
-            in: { username: odbType.string() },
-            out: { token: odbType.string() },
-          })
-          proc.service({ method: 'POST', path: '/login', params: { body: { username } } })
+        const login = p.defineProcedure('LOGIN', {
+          in: { username: odbType.string() },
+          out: { token: odbType.string() },
+        })
+        defineService(login, {
+          method: 'POST',
+          path: '/login',
+          params: { body: { username: 'username' } },
         })
       }),
     ).toThrow('parameter p_token is not bound')
@@ -86,16 +104,14 @@ describe('Procedure ORDS contracts', () => {
   it('accepts complete route, request, and response bindings', () => {
     expect(() =>
       odbPackage('PCK_API', (p) => {
-        p.proc('GET_USER', (proc) => {
-          const { userId, result } = proc.parameters({
-            in: { userId: odbType.string() },
-            out: { result: odbType.string() },
-          })
-          proc.service({
-            method: 'GET',
-            path: '/users/:id',
-            params: { uri: { id: userId }, response: { result } },
-          })
+        const getUser = p.defineProcedure('GET_USER', {
+          in: { userId: odbType.string() },
+          out: { result: odbType.string() },
+        })
+        defineService(getUser, {
+          method: 'GET',
+          path: '/users/:id',
+          params: { uri: { id: 'userId' }, response: { result: 'result' } },
         })
       }),
     ).not.toThrow()
@@ -169,7 +185,8 @@ describe('function parameters', () => {
 describe('ProcedureBody control flow and exceptions', () => {
   const bodyLines = (build: (proc: import('../../src/schema/package.js').Procedure) => void) => {
     const pkg = odbPackage('PCK_TEST', (p) => {
-      p.proc('DO_IT', build)
+      const procedure = p.defineProcedure('DO_IT', {})
+      build(procedure.procedure)
     })
     return pkg.toSQLUp()
   }

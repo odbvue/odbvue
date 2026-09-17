@@ -6,7 +6,7 @@ import {
   generateApplicationOpenApi,
 } from '../src/application.js'
 import { odbQuery } from '../src/query/index.js'
-import { odbPackage, odbType, type OdbApplication } from '../src/schema/package.js'
+import { defineService, odbPackage, odbType, type OdbApplication } from '../src/schema/package.js'
 import { odbTable } from '../src/schema/table.js'
 
 const users = odbTable('APP_USERS', (table) => ({
@@ -17,32 +17,32 @@ const users = odbTable('APP_USERS', (table) => ({
 }))
 
 const application = odbPackage('PCK_USERS', (p) => {
-  p.proc('GET_USER', (proc) => {
-    const { id, result } = proc.parameters({
-      in: { id: odbType.number() },
-      out: { result: odbType.resultset() },
-    })
-    proc.body((body) =>
-      body.openFor(
-        result,
-        odbQuery().selectFrom(users).select([users.id, users.uuid, users.createdAt, users.email]),
-      ),
-    )
-    proc.service({
-      method: 'GET',
-      path: '/users/:id',
-      summary: 'Fetch a user',
-      params: { uri: { id }, response: { result } },
-    })
+  const getUser = p.defineProcedure('GET_USER', {
+    in: { id: odbType.number() },
+    out: { result: odbType.resultset() },
+  })
+  getUser.body((body) =>
+    body.openFor(
+      getUser.parameters.result,
+      odbQuery().selectFrom(users).select([users.id, users.uuid, users.createdAt, users.email]),
+    ),
+  )
+  defineService(getUser, {
+    method: 'GET',
+    path: '/users/:id',
+    summary: 'Fetch a user',
+    params: { uri: { id: 'id' }, response: { result: 'result' } },
   })
 
   p.func('COUNT_USERS', odbType.number(), (fn) => {
     fn.body((body) => body.return(0))
   })
 
-  p.proc('POST_USER', (proc) => {
-    const { body } = proc.parameters({ in: { body: odbType.clob() } })
-    proc.service({ method: 'POST', path: '/users', params: { body: { body } } })
+  const postUser = p.defineProcedure('POST_USER', { in: { body: odbType.clob() } })
+  defineService(postUser, {
+    method: 'POST',
+    path: '/users',
+    params: { body: { body: 'body' } },
   })
 })
 
@@ -105,15 +105,13 @@ describe('ODB application contract', () => {
 
   it('maps POST inputs from a JSON request body instead of HTTP headers', () => {
     const login = odbPackage('PCK_AUTH', (p) => {
-      p.proc('POST_LOGIN', (proc) => {
-        const { username, password } = proc.parameters({
-          in: { username: odbType.string(), password: odbType.string() },
-        })
-        proc.service({
-          method: 'POST',
-          path: '/login',
-          params: { body: { username, password } },
-        })
+      const postLogin = p.defineProcedure('POST_LOGIN', {
+        in: { username: odbType.string(), password: odbType.string() },
+      })
+      defineService(postLogin, {
+        method: 'POST',
+        path: '/login',
+        params: { body: { username: 'username', password: 'password' } },
       })
     })
 
@@ -148,13 +146,13 @@ describe('ODB application contract', () => {
 
   it('uses identifier-safe bind variables for kebab-case ORDS parameters', () => {
     const output = odbPackage('PCK_OUTPUT', (p) => {
-      p.proc('POST_VALUE', (proc) => {
-        const { accessToken } = proc.parameters({ out: { accessToken: odbType.string() } })
-        proc.service({
-          method: 'POST',
-          path: '/value',
-          params: { response: { 'access-token': accessToken } },
-        })
+      const postValue = p.defineProcedure('POST_VALUE', {
+        out: { accessToken: odbType.string() },
+      })
+      defineService(postValue, {
+        method: 'POST',
+        path: '/value',
+        params: { response: { 'access-token': 'accessToken' } },
       })
     })
 
