@@ -24,7 +24,7 @@ import {
   type Operator,
 } from './ast.js'
 
-type SqlPredicate = { toSQL(): string }
+type SqlPredicate = { toSQL(): string; toQuerySQL?(): string }
 
 type OrderByClause = {
   column: string
@@ -82,7 +82,10 @@ function toPredicate(
   value?: unknown,
 ): ExpressionNode {
   if (typeof column === 'function') return column(odbExpr)
-  if (op === undefined && isSqlExpression(column)) return { kind: 'raw', sql: column.toSQL() }
+  if (op === undefined && isSqlExpression(column)) {
+    const condition = column as SqlPredicate
+    return { kind: 'raw', sql: condition.toQuerySQL?.() ?? condition.toSQL() }
+  }
   return predicate(column as string | Column<any, string>, op as Operator, value)
 }
 
@@ -132,7 +135,10 @@ export class SelectQueryBuilder<
   ): SelectQueryBuilder<any, TResult, THasSelection> {
     this._joins.push({
       table: table as string | NamedRef,
-      on: typeof on === 'function' ? on(odbExpr) : { kind: 'raw', sql: on.toSQL() },
+      on:
+        typeof on === 'function'
+          ? on(odbExpr)
+          : { kind: 'raw', sql: on.toQuerySQL?.() ?? on.toSQL() },
     })
     return this as SelectQueryBuilder<any, TResult, THasSelection>
   }
@@ -583,7 +589,7 @@ export class MergeQueryBuilder<
       target: MergeTarget<TTable>,
       source: MergeSource<TSource>,
       expression: ExpressionBuilder,
-    ) => ExpressionNode,
+    ) => ExpressionNode | SqlPredicate,
   ): this {
     if (!this._sourceAlias) throw new Error('merge.on(): call using() first.')
     const source = Object.fromEntries(
@@ -594,7 +600,10 @@ export class MergeQueryBuilder<
         ? this._table
         : { ref: (name: string) => mergeReference(`${this.targetAlias()}.${name}`) }
     ) as MergeTarget<TTable>
-    this._on = build(target, source, odbExpr)
+    const condition = build(target, source, odbExpr)
+    this._on = isSqlExpression(condition)
+      ? { kind: 'raw', sql: (condition as SqlPredicate).toQuerySQL?.() ?? condition.toSQL() }
+      : condition
     return this
   }
 

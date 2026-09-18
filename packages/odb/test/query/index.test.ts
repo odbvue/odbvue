@@ -40,7 +40,7 @@ describe('odbQuery', () => {
       .select(users.id)
       .where(cond.and([cond.eq(users.enabled, true), cond.eq(users.id, 42)]))
 
-    expect(query.toSQL()).toBe('SELECT ID FROM APP_USERS WHERE (ENABLED = TRUE AND ID = 42)')
+    expect(query.toSQL()).toBe('SELECT ID FROM APP_USERS WHERE (ENABLED = 1 AND ID = 42)')
   })
 
   it('supports typed aliases and joins', () => {
@@ -231,7 +231,7 @@ describe('odbQuery', () => {
     const merge = odbQuery()
       .mergeInto(users)
       .using({ username: 'ada', displayName: 'Ada Lovelace' }, 'source')
-      .on((target, source, expression) => expression(target.username, '=', source.username))
+      .on((target, source) => cond.eq(target.username, source.username))
       .whenMatched({ displayName: new Param('source.displayName', 'VARCHAR2'), enabled: true })
       .whenNotMatched({
         username: new Param('source.username', 'VARCHAR2'),

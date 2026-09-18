@@ -42,6 +42,18 @@ export class PlsqlExpression<T extends PlsqlType | string> implements PlsqlValue
 
 /** A typed PL/SQL predicate suitable for control-flow conditions. */
 class PlsqlBooleanExpressionImpl extends PlsqlExpression<'BOOLEAN'> {
+  constructor(
+    sql: string,
+    private readonly querySql = sql,
+  ) {
+    super('BOOLEAN', sql)
+  }
+
+  /** Render this condition for SQL table predicates, where booleans are numeric. */
+  toQuerySQL(): string {
+    return this.querySql
+  }
+
   and(...conditions: PlsqlBooleanExpression[]): PlsqlBooleanExpression {
     return cond.and([this, ...conditions])
   }
@@ -66,7 +78,7 @@ export class PlsqlStatement {
   }
 }
 
-export type PlsqlRenderable = string | PlsqlValue
+export type PlsqlRenderable = string | { toSQL(): string }
 
 export function renderPlsql(value: PlsqlRenderable): string {
   if (typeof value === 'string') return value
@@ -94,7 +106,7 @@ export function odbLiteral(
     : new PlsqlExpression('VARCHAR2', `'${value.replace(/'/g, "''")}'`)
 }
 
-export type PlsqlExpressionValue = PlsqlValue | string | number | boolean | null
+export type PlsqlExpressionValue = { toSQL(): string } | string | number | boolean | null
 
 function renderExpressionValue(value: PlsqlExpressionValue): string {
   if (typeof value === 'string') return odbLiteral(value).toSQL()
@@ -104,47 +116,68 @@ function renderExpressionValue(value: PlsqlExpressionValue): string {
   return value.toSQL()
 }
 
-function condition(sql: string): PlsqlBooleanExpression {
-  return new PlsqlBooleanExpressionImpl('BOOLEAN', sql)
+function renderQueryExpressionValue(value: PlsqlExpressionValue): string {
+  if (typeof value === 'boolean') return value ? '1' : '0'
+  return renderExpressionValue(value)
+}
+
+function queryConditionSql(value: PlsqlBooleanExpression): string {
+  return value.toQuerySQL()
+}
+
+function condition(sql: string, querySql = sql): PlsqlBooleanExpression {
+  return new PlsqlBooleanExpressionImpl(sql, querySql)
 }
 
 /** Typed predicates for PL/SQL control flow. */
 export const cond = {
-  eq(left: PlsqlValue, right: PlsqlExpressionValue): PlsqlBooleanExpression {
-    return condition(`${left.toSQL()} = ${renderExpressionValue(right)}`)
+  eq(left: { toSQL(): string }, right: PlsqlExpressionValue): PlsqlBooleanExpression {
+    return condition(
+      `${left.toSQL()} = ${renderExpressionValue(right)}`,
+      `${left.toSQL()} = ${renderQueryExpressionValue(right)}`,
+    )
   },
-  ne(left: PlsqlValue, right: PlsqlExpressionValue): PlsqlBooleanExpression {
-    return condition(`${left.toSQL()} != ${renderExpressionValue(right)}`)
+  ne(left: { toSQL(): string }, right: PlsqlExpressionValue): PlsqlBooleanExpression {
+    return condition(
+      `${left.toSQL()} != ${renderExpressionValue(right)}`,
+      `${left.toSQL()} != ${renderQueryExpressionValue(right)}`,
+    )
   },
-  gt(left: PlsqlValue, right: PlsqlExpressionValue): PlsqlBooleanExpression {
+  gt(left: { toSQL(): string }, right: PlsqlExpressionValue): PlsqlBooleanExpression {
     return condition(`${left.toSQL()} > ${renderExpressionValue(right)}`)
   },
-  gte(left: PlsqlValue, right: PlsqlExpressionValue): PlsqlBooleanExpression {
+  gte(left: { toSQL(): string }, right: PlsqlExpressionValue): PlsqlBooleanExpression {
     return condition(`${left.toSQL()} >= ${renderExpressionValue(right)}`)
   },
-  lt(left: PlsqlValue, right: PlsqlExpressionValue): PlsqlBooleanExpression {
+  lt(left: { toSQL(): string }, right: PlsqlExpressionValue): PlsqlBooleanExpression {
     return condition(`${left.toSQL()} < ${renderExpressionValue(right)}`)
   },
-  lte(left: PlsqlValue, right: PlsqlExpressionValue): PlsqlBooleanExpression {
+  lte(left: { toSQL(): string }, right: PlsqlExpressionValue): PlsqlBooleanExpression {
     return condition(`${left.toSQL()} <= ${renderExpressionValue(right)}`)
   },
-  isNull(value: PlsqlValue): PlsqlBooleanExpression {
+  isNull(value: { toSQL(): string }): PlsqlBooleanExpression {
     return condition(`${value.toSQL()} IS NULL`)
   },
-  isNotNull(value: PlsqlValue): PlsqlBooleanExpression {
+  isNotNull(value: { toSQL(): string }): PlsqlBooleanExpression {
     return condition(`${value.toSQL()} IS NOT NULL`)
   },
-  regexpLike(value: PlsqlValue, pattern: string): PlsqlBooleanExpression {
+  regexpLike(value: { toSQL(): string }, pattern: string): PlsqlBooleanExpression {
     return condition(`REGEXP_LIKE(${value.toSQL()}, ${renderExpressionValue(pattern)})`)
   },
   not(value: PlsqlBooleanExpression): PlsqlBooleanExpression {
-    return condition(`NOT (${value.toSQL()})`)
+    return condition(`NOT (${value.toSQL()})`, `NOT (${queryConditionSql(value)})`)
   },
   and(values: readonly PlsqlBooleanExpression[]): PlsqlBooleanExpression {
-    return condition(`(${values.map((value) => value.toSQL()).join(' AND ')})`)
+    return condition(
+      `(${values.map((value) => value.toSQL()).join(' AND ')})`,
+      `(${values.map(queryConditionSql).join(' AND ')})`,
+    )
   },
   or(values: readonly PlsqlBooleanExpression[]): PlsqlBooleanExpression {
-    return condition(`(${values.map((value) => value.toSQL()).join(' OR ')})`)
+    return condition(
+      `(${values.map((value) => value.toSQL()).join(' OR ')})`,
+      `(${values.map(queryConditionSql).join(' OR ')})`,
+    )
   },
 }
 

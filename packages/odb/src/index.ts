@@ -8,7 +8,7 @@ export {
   defineService,
   emitApplicationSql,
   odbType,
-  type DefinedProcedure,
+  type ProcedureDefinition,
   type OdbPackageOptions,
   type OrdsServiceDefinition,
   type ProcedureServiceDefinition,

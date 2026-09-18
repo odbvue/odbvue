@@ -270,17 +270,17 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => {
         body.query(
           odbQuery()
             .selectFrom(sessions)
-            .join(users, (expression) => expression(users.id, '=', sessions.userId))
+            .join(users, cond.eq(users.id, sessions.userId))
             .select('COUNT(*)')
             .into(activeSessionCount)
-            .where((expression) =>
-              expression.and([
-                expression(sessions.id, '=', sessionId),
-                expression(sessions.userId, '=', subject),
-                expression(sessions.revokedAt, 'IS NULL'),
-                expression(sessions.expiresAt, '>', expression.ref('SYSTIMESTAMP')),
-                expression(users.enabled, '=', 1),
-                expression(users.tokenVersion, '=', tokenVersion),
+            .where(
+              cond.and([
+                cond.eq(sessions.id, sessionId),
+                cond.eq(sessions.userId, subject),
+                cond.isNull(sessions.revokedAt),
+                cond.gt(sessions.expiresAt, odbOracle.sysTimestamp()),
+                cond.eq(users.enabled, true),
+                cond.eq(users.tokenVersion, tokenVersion),
               ]),
             ),
         )
@@ -422,14 +422,14 @@ export const odbAuthApi = odbPackage('odb_auth', { basePath: '/auth' }, (pkg) =>
           .selectFrom(sessions)
           .select([sessions.id, sessions.userId, sessions.previousRefreshTokenHash])
           .into(sessionId, userId, previousRefreshTokenHash)
-          .where((expression) =>
-            expression.and([
-              expression.or([
-                expression(sessions.refreshTokenHash, '=', presentedRefreshTokenHash),
-                expression(sessions.previousRefreshTokenHash, '=', presentedRefreshTokenHash),
+          .where(
+            cond.and([
+              cond.or([
+                cond.eq(sessions.refreshTokenHash, presentedRefreshTokenHash),
+                cond.eq(sessions.previousRefreshTokenHash, presentedRefreshTokenHash),
               ]),
-              expression(sessions.revokedAt, 'IS NULL'),
-              expression(sessions.expiresAt, '>', expression.ref('SYSTIMESTAMP')),
+              cond.isNull(sessions.revokedAt),
+              cond.gt(sessions.expiresAt, odbOracle.sysTimestamp()),
             ]),
           )
           .forUpdate(),
@@ -439,19 +439,14 @@ export const odbAuthApi = odbPackage('odb_auth', { basePath: '/auth' }, (pkg) =>
           .selectFrom(authUsers)
           .select(authUsers.tokenVersion)
           .into(tokenVersion)
-          .where((expression) =>
-            expression.and([
-              expression(authUsers.id, '=', userId),
-              expression(authUsers.enabled, '=', 1),
-            ]),
-          ),
+          .where(cond.and([cond.eq(authUsers.id, userId), cond.eq(authUsers.enabled, true)])),
       )
       statements.ifThen(cond.eq(presentedRefreshTokenHash, previousRefreshTokenHash), (then) => {
         then.query(
           odbQuery()
             .updateTable(authSessions)
             .set({ revokedAt: odbOracle.sysTimestamp() })
-            .where((expression) => expression(authSessions.id, '=', sessionId)),
+            .where(cond.eq(authSessions.id, sessionId)),
         )
         then.unauthorized()
       })
@@ -464,7 +459,7 @@ export const odbAuthApi = odbPackage('odb_auth', { basePath: '/auth' }, (pkg) =>
             refreshTokenHash: odbAuthCrypto.hashToken(nextRefreshToken),
             lastUsedAt: odbOracle.sysTimestamp(),
           })
-          .where((expression) => expression(authSessions.id, '=', sessionId)),
+          .where(cond.eq(authSessions.id, sessionId)),
       )
       statements.set(
         refreshAccessToken,
@@ -510,10 +505,13 @@ export const odbAuthApi = odbPackage('odb_auth', { basePath: '/auth' }, (pkg) =>
         odbQuery()
           .updateTable(authSessions)
           .set({ revokedAt: odbOracle.sysTimestamp() })
-          .where((expression) =>
-            expression.and([
-              expression('refresh_token_hash', '=', odbAuthCrypto.hashToken(presentedRefreshToken)),
-              expression('revoked_at', 'IS NULL'),
+          .where(
+            cond.and([
+              cond.eq(
+                authSessions.refreshTokenHash,
+                odbAuthCrypto.hashToken(presentedRefreshToken),
+              ),
+              cond.isNull(authSessions.revokedAt),
             ]),
           ),
       )
@@ -546,12 +544,7 @@ export const odbAuthApi = odbPackage('odb_auth', { basePath: '/auth' }, (pkg) =>
           .selectFrom(authUsers)
           .select([authUsers.id, authUsers.username, authUsers.displayName])
           .into(userId, username, displayName)
-          .where((expression) =>
-            expression.and([
-              expression(authUsers.id, '=', subject),
-              expression(authUsers.enabled, '=', 1),
-            ]),
-          ),
+          .where(cond.and([cond.eq(authUsers.id, subject), cond.eq(authUsers.enabled, true)])),
       )
     },
   )
@@ -647,12 +640,8 @@ export const odbAuth = {
           .using({ username: odbLiteral(user.username) }, 'source')
         const sourceUsername = merge.sourceRef('username')
         merge
-          .on((target, source, expression) =>
-            expression(
-              expression.fn('LOWER', target.username),
-              '=',
-              expression.fn('LOWER', source.username),
-            ),
+          .on((target, source) =>
+            cond.eq(odbOracle.lower(target.username), odbOracle.lower(source.username)),
           )
           .whenMatched({
             passwordHash,

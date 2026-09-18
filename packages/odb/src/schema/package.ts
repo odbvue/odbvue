@@ -112,17 +112,6 @@ type NamedParameters<TParameters extends ProcedureParameters> = ParameterGroup<T
   ParameterGroup<TParameters, 'out'> &
   ParameterGroup<TParameters, 'inOut'>
 
-type ProcedureParameterName<TParameters extends ProcedureParameters> =
-  keyof NamedParameters<TParameters> & string
-
-type InputProcedureParameterName<TParameters extends ProcedureParameters> =
-  | (keyof ParameterGroup<TParameters, 'in'> & string)
-  | (keyof ParameterGroup<TParameters, 'inOut'> & string)
-
-type OutputProcedureParameterName<TParameters extends ProcedureParameters> =
-  | (keyof ParameterGroup<TParameters, 'out'> & string)
-  | (keyof ParameterGroup<TParameters, 'inOut'> & string)
-
 function inputParameterName(key: string): string {
   const snakeCase = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()
   return `p_${snakeCase}`
@@ -133,7 +122,7 @@ function localVariableName(key: string): string {
   return `l_${snakeCase}`
 }
 
-function isPlsqlValue(value: unknown): value is PlsqlValue {
+function isPlsqlValue(value: unknown): value is { toSQL(): string } {
   return typeof value === 'object' && value !== null && 'toSQL' in value
 }
 
@@ -336,7 +325,7 @@ export type PackageSqlOptions = {
   physicalName?: string
 }
 
-type PackageMemberDefinition = PlsqlFunction<any> | Procedure | DefinedProcedure<any>
+type PackageMemberDefinition = PlsqlFunction<any> | ProcedureDefinition<any>
 
 type PackageMemberReturnValue<TMember extends PackageMemberDefinition> =
   TMember extends PlsqlFunction<infer TReturnType> ? PlsqlExpression<TReturnType> : PlsqlStatement
@@ -909,12 +898,6 @@ export type ProcedureServiceDefinition<TParameters extends ProcedureParameters> 
   OrdsServiceDefinition,
   'params'
 > & {
-  params?: {
-    body?: Record<string, InputProcedureParameterName<TParameters>>
-    header?: Record<string, ProcedureParameterName<TParameters>>
-    uri?: Record<string, InputProcedureParameterName<TParameters>>
-    response?: Record<string, OutputProcedureParameterName<TParameters>>
-  }
   /** Direct typed bindings for JSON request-body values. */
   body?: Record<
     string,
@@ -937,21 +920,31 @@ export type ProcedureServiceDefinition<TParameters extends ProcedureParameters> 
   >
 }
 
-/** A procedure whose signature is fixed before its implementation is written. */
-export class DefinedProcedure<TParameters extends ProcedureParameters> {
+/** A complete package procedure with typed parameters and implementation. */
+export class ProcedureDefinition<TParameters extends ProcedureParameters> {
   constructor(
-    readonly procedure: Procedure,
+    private readonly procedure: Procedure,
     readonly parameters: NamedParameters<TParameters>,
   ) {}
 
-  body(build: (body: ProcedureBody) => void): this {
-    this.procedure.body(build)
-    return this
+  get name(): string {
+    return this.procedure.name
   }
 
   autonomous(): this {
     this.procedure.autonomous()
     return this
+  }
+
+  /** @internal Attach a validated ORDS service contract. */
+  attachService(definition: OrdsServiceDefinition): this {
+    this.procedure.attachService(definition)
+    return this
+  }
+
+  /** @internal Emit the procedure application node. */
+  toNode(): ProcedureNode {
+    return this.procedure.toNode()
   }
 }
 
@@ -962,33 +955,9 @@ export type ProcedureBuildContext<TParameters extends ProcedureParameters> = {
 
 /** Attach an ORDS contract to a previously declared procedure. */
 export function defineService<TParameters extends ProcedureParameters>(
-  definedProcedure: DefinedProcedure<TParameters>,
+  procedure: ProcedureDefinition<TParameters>,
   definition: ProcedureServiceDefinition<TParameters>,
-): Procedure {
-  if (
-    definition.params &&
-    (definition.body || definition.headers || definition.uri || definition.response)
-  ) {
-    throw new Error(
-      'defineService: use either params or direct body, headers, uri, and response bindings.',
-    )
-  }
-  const parameterReferences = definedProcedure.parameters as Record<string, PlsqlReference>
-  const resolveBindings = (bindings: Record<string, string> | undefined) =>
-    bindings &&
-    Object.fromEntries(
-      Object.entries(bindings).map(([publicName, parameterName]) => {
-        const parameter = parameterReferences[parameterName]
-        if (!parameter) {
-          throw new Error(
-            `ORDS service ${definedProcedure.procedure.name}: ${parameterName} is not a procedure parameter.`,
-          )
-        }
-        return [publicName, parameter]
-      }),
-    )
-
-  const params = definition.params
+): ProcedureDefinition<TParameters> {
   const directParams =
     definition.body || definition.headers || definition.uri || definition.response
       ? {
@@ -1005,16 +974,9 @@ export function defineService<TParameters extends ProcedureParameters>(
     response: _response,
     ...serviceDefinition
   } = definition
-  return definedProcedure.procedure.attachService({
+  return procedure.attachService({
     ...serviceDefinition,
-    params: params
-      ? {
-          body: resolveBindings(params.body),
-          header: resolveBindings(params.header),
-          uri: resolveBindings(params.uri),
-          response: resolveBindings(params.response),
-        }
-      : (directParams as OrdsServiceParameterGroups | undefined),
+    params: directParams as OrdsServiceParameterGroups | undefined,
   })
 }
 
@@ -1322,15 +1284,11 @@ export type Package<
   readonly name: string
   readonly objectName: string
   readonly isBlueGreen: true
-  defineProcedure<TParameters extends ProcedureParameters>(
-    name: string,
-    parameters: TParameters,
-  ): DefinedProcedure<TParameters>
   proc<TParameters extends ProcedureParameters>(
     name: string,
     parameters: TParameters,
     build: (context: ProcedureBuildContext<TParameters>) => void,
-  ): DefinedProcedure<TParameters>
+  ): ProcedureDefinition<TParameters>
   privateProc(name: string, build?: (proc: Procedure) => void): Procedure
   func<TReturnType extends PlsqlType | string = PlsqlType | string>(
     name: string,
@@ -1359,7 +1317,7 @@ export type Package<
 export class PackageImpl<
   TMembers extends Record<string, PackageMemberDefinition> = Record<string, never>,
 > {
-  private _procedures: Procedure[] = []
+  private _procedures: ProcedureDefinition<any>[] = []
   private _functions: PlsqlFunction<any>[] = []
   private _privateProcedures: Procedure[] = []
   private _privateFunctions: PlsqlFunction<any>[] = []
@@ -1404,36 +1362,27 @@ export class PackageImpl<
     }
 
     const rendered = args.map(renderPlsql).join(', ')
-    const procedure = member instanceof DefinedProcedure ? member.procedure : member
-    if (!(procedure instanceof PlsqlFunction)) {
+    if (!(member instanceof PlsqlFunction)) {
       return new PlsqlStatement(
-        `${this.name}.${procedure.name}(${rendered})`,
+        `${this.name}.${member.name}(${rendered})`,
       ) as PackageMemberReturnValue<PackageMemberDefinition>
     }
     return new PlsqlExpression(
-      procedure.returnType,
-      `${this.name}.${procedure.name}(${rendered})`,
+      member.returnType,
+      `${this.name}.${member.name}(${rendered})`,
     ) as PackageMemberReturnValue<PackageMemberDefinition>
-  }
-
-  defineProcedure<TParameters extends ProcedureParameters>(
-    name: string,
-    parameters: TParameters,
-  ): DefinedProcedure<TParameters> {
-    const procedure = new Procedure(name, this.serviceDefaults)
-    const namedParameters = procedure.parameters(parameters)
-    this._procedures.push(procedure)
-    return new DefinedProcedure(procedure, namedParameters)
   }
 
   proc<TParameters extends ProcedureParameters>(
     name: string,
     parameters: TParameters,
     build: (context: ProcedureBuildContext<TParameters>) => void,
-  ): DefinedProcedure<TParameters> {
-    const procedure = this.defineProcedure(name, parameters)
-    procedure.body((body) => build({ params: procedure.parameters, body }))
-    return procedure
+  ): ProcedureDefinition<TParameters> {
+    const procedure = new Procedure(name, this.serviceDefaults)
+    const definition = new ProcedureDefinition(procedure, procedure.parameters(parameters))
+    procedure.body((body) => build({ params: definition.parameters, body }))
+    this._procedures.push(definition)
+    return definition
   }
 
   privateProc(name: string, build?: (proc: Procedure) => void): Procedure {
@@ -1507,7 +1456,7 @@ export class PackageImpl<
     return {
       kind: 'package',
       name: this.name,
-      procedures: this._procedures.map((p) => p.toNode()),
+      procedures: this._procedures.map((procedure) => procedure.toNode()),
       functions: this._functions.map((f) => f.toNode()),
       privateProcedures: this._privateProcedures.map((p) => p.toNode()),
       privateFunctions: this._privateFunctions.map((f) => f.toNode()),
