@@ -272,7 +272,7 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => {
             .selectFrom(sessions)
             .join(users, (expression) => expression(users.id, '=', sessions.userId))
             .select('COUNT(*)')
-            .into(activeSessionCount.name)
+            .into(activeSessionCount)
             .where((expression) =>
               expression.and([
                 expression(sessions.id, '=', sessionId),
@@ -285,7 +285,7 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => {
             ),
         )
         body.ifThen(cond.eq(activeSessionCount, 0), (then) => then.unauthorized())
-        body.return(subject.name)
+        body.return(subject)
       })
     }),
   }
@@ -330,9 +330,9 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => {
         .where((expression) =>
           expression.and([
             expression(
-              expression.fn('LOWER', expression.ref(authUsers.username.name)),
+              expression.fn('LOWER', expression.ref(authUsers.username)),
               '=',
-              expression.fn('LOWER', expression.ref(loginUsername.name)),
+              expression.fn('LOWER', expression.ref(loginUsername)),
             ),
             expression(authUsers.enabled, '=', 1),
           ]),
