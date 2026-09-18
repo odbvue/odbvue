@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { odbExpr, compileExpression, renderExpression } from '../../src/query/ast.js'
 import { odbQuery } from '../../src/query/index.js'
+import { Param } from '../../src/schema/attribute.js'
 import { odbTable } from '../../src/schema/table.js'
 
 const users = odbTable('APP_USERS', (t) => ({
@@ -42,6 +43,13 @@ describe('expression AST', () => {
   it('supports function calls and column-to-column comparisons', () => {
     const node = odbExpr(odbExpr.fn('UPPER', users.status), '=', odbExpr.ref('target'))
     expect(renderExpression(node)).toBe('UPPER(status) = target')
+  })
+
+  it('accepts typed PL/SQL references without extracting their names', () => {
+    const username = new Param('p_username', 'VARCHAR2')
+    const node = odbExpr.fn('LOWER', odbExpr.ref(username))
+
+    expect(renderExpression(node)).toBe('LOWER(p_username)')
   })
 
   it('supports NOT and raw SQL nodes', () => {

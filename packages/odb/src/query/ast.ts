@@ -76,13 +76,18 @@ function isExpressionNode(value: unknown): value is ExpressionNode {
   )
 }
 
+/** An identifier-like value accepted by the expression builder. */
+export type NamedExpressionRef = { readonly name: string }
+
 /** An operand accepted by the expression builder: identifier, node, or column. */
-export type ExprInput = string | Column<any, string> | ExpressionNode
+export type ExprInput = string | NamedExpressionRef | ExpressionNode
 
 function toReference(input: ExprInput): ExpressionNode {
   if (typeof input === 'string') return { kind: 'column', name: input }
   if (input instanceof Column) return { kind: 'column', name: input.name }
-  return input
+  if (isExpressionNode(input)) return input
+  if ('name' in input) return { kind: 'column', name: input.name }
+  throw new Error('Invalid expression reference.')
 }
 
 function toOperand(value: unknown): ExpressionNode {
@@ -100,7 +105,7 @@ export interface ExpressionBuilder {
   or(expressions: ExpressionNode[]): LogicalExpressionNode
   not(expression: ExpressionNode): NotNode
   in(left: ExprInput, values: readonly unknown[]): InExpressionNode
-  ref(name: string): ColumnRefNode
+  ref(reference: string | NamedExpressionRef): ColumnRefNode
   val(value: unknown): ValueNode
   raw(sql: string): RawSqlNode
   fn(name: string, ...args: ExprInput[]): FunctionCallNode
@@ -137,7 +142,10 @@ export const odbExpr: OdbExpressionBuilder = Object.assign(predicate as Expressi
     operand: toReference(operand),
     values: values.map(toOperand),
   }),
-  ref: (name: string): ColumnRefNode => ({ kind: 'column', name }),
+  ref: (reference: string | NamedExpressionRef): ColumnRefNode => ({
+    kind: 'column',
+    name: typeof reference === 'string' ? reference : reference.name,
+  }),
   val: (value: unknown): ValueNode => ({ kind: 'value', value }),
   raw: (sql: string): RawSqlNode => ({ kind: 'raw', sql }),
   fn: (name: string, ...args: ExprInput[]): FunctionCallNode => ({
