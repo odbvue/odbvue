@@ -67,6 +67,29 @@ describe('odbPackage member typing', () => {
 })
 
 describe('Procedure ORDS contracts', () => {
+  it('inherits a package base path while allowing service overrides', () => {
+    const pkg = odbPackage('PCK_AUTH', { basePath: '/auth' }, (p) => {
+      const login = p.defineProcedure('LOGIN', { in: { username: odbType.string() } })
+      defineService(login, {
+        method: 'POST',
+        path: '/login',
+        params: { body: { username: 'username' } },
+      })
+
+      const health = p.defineProcedure('HEALTH', {})
+      defineService(health, {
+        method: 'GET',
+        path: '/health',
+        basePath: '/internal',
+      })
+    })
+
+    expect(pkg.application().procedures.map((procedure) => procedure.service?.basePath)).toEqual([
+      'auth/',
+      'internal/',
+    ])
+  })
+
   it('binds a contract-first procedure by declared parameter name', () => {
     const pkg = odbPackage('PCK_API', (p) => {
       const login = p.defineProcedure('LOGIN', {

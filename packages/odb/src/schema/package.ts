@@ -887,6 +887,12 @@ export type OrdsServiceDefinition = {
   params?: OrdsServiceParameterGroups
 }
 
+/** Defaults applied to every ORDS service declared by a package. */
+export type OdbPackageOptions = {
+  /** ORDS module base path. Individual services can override this value. */
+  basePath?: string
+}
+
 export type OrdsServiceParameterGroups = {
   /** IN values read from a JSON request body. */
   body?: Record<string, PlsqlReference>
@@ -1034,7 +1040,10 @@ export class Procedure {
   private _service?: ServiceNode
   private _autonomous = false
 
-  constructor(readonly name: string) {}
+  constructor(
+    readonly name: string,
+    private readonly serviceDefaults: OdbPackageOptions = {},
+  ) {}
 
   /**
    * Declare named IN, OUT, and IN OUT parameters with automatic `p_` names
@@ -1151,10 +1160,11 @@ export class Procedure {
         )
       }
     }
+    const basePath = definition.basePath ?? this.serviceDefaults.basePath
     this._service = {
       ...definition,
       path: normalizeServicePath(definition.path),
-      basePath: definition.basePath ? normalizeBasePath(definition.basePath) : undefined,
+      basePath: basePath ? normalizeBasePath(basePath) : undefined,
       paramTypes: definition.paramTypes ? { ...definition.paramTypes } : undefined,
       params: definition.params ? { ...definition.params } : undefined,
     }
@@ -1309,7 +1319,10 @@ export class PackageImpl<
    */
   readonly isBlueGreen = true as const
 
-  constructor(readonly name: string) {}
+  constructor(
+    readonly name: string,
+    private readonly serviceDefaults: OdbPackageOptions = {},
+  ) {}
 
   /** Public (synonym) name callers use — the stable identity across colors. */
   get objectName(): string {
@@ -1352,7 +1365,7 @@ export class PackageImpl<
     name: string,
     parameters: TParameters,
   ): DefinedProcedure<TParameters> {
-    const procedure = new Procedure(name)
+    const procedure = new Procedure(name, this.serviceDefaults)
     const namedParameters = procedure.parameters(parameters)
     this._procedures.push(procedure)
     return new DefinedProcedure(procedure, namedParameters)
@@ -1674,12 +1687,25 @@ function emitStatement(stmt: StatementNode, indent: string): string[] {
 
 // ── Factory ───────────────────────────────────────────────────────────────────
 
-export function odbPackage<TMembers extends Record<string, PackageMemberDefinition>>(
+export const odbPackage: {
+  <TMembers extends Record<string, PackageMemberDefinition>>(
+    name: string,
+    build?: (pkg: PackageImpl<any>) => TMembers | void,
+  ): Package<TMembers>
+  <TMembers extends Record<string, PackageMemberDefinition>>(
+    name: string,
+    options: OdbPackageOptions,
+    build?: (pkg: PackageImpl<any>) => TMembers | void,
+  ): Package<TMembers>
+} = function <TMembers extends Record<string, PackageMemberDefinition>>(
   name: string,
+  optionsOrBuild?: OdbPackageOptions | ((pkg: PackageImpl<any>) => TMembers | void),
   build?: (pkg: PackageImpl<any>) => TMembers | void,
 ): Package<TMembers> {
-  const pkg = new PackageImpl<TMembers>(name)
-  const result = build?.(pkg)
+  const options = typeof optionsOrBuild === 'function' ? {} : (optionsOrBuild ?? {})
+  const packageBuild = typeof optionsOrBuild === 'function' ? optionsOrBuild : build
+  const pkg = new PackageImpl<TMembers>(name, options)
+  const result = packageBuild?.(pkg)
 
   if (result && typeof result === 'object') {
     for (const [key, member] of Object.entries(result)) {

@@ -292,7 +292,7 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => {
 })
 
 /** ORDS-facing authentication API. Refresh tokens never enter access JWTs. */
-export const odbAuthApi = odbPackage('odb_auth', (pkg) => {
+export const odbAuthApi = odbPackage('odb_auth', { basePath: '/auth' }, (pkg) => {
   const dummyPasswordHashConstant = pkg.privateConstant(
     'c_dummy_password_hash',
     odbType.string(512),
@@ -368,7 +368,6 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => {
   defineService(login, {
     method: 'POST',
     path: '/login',
-    basePath: '/auth',
     summary: 'Authenticate using username and password',
     params: {
       body: { username: 'loginUsername', password: 'password' },
@@ -477,7 +476,6 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => {
   defineService(refresh, {
     method: 'POST',
     path: '/refresh',
-    basePath: '/auth',
     summary: 'Rotate a refresh token and issue an access token',
     params: {
       header: { Cookie: 'cookieHeader', 'Set-Cookie': 'setCookie' },
@@ -519,7 +517,6 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => {
   defineService(logout, {
     method: 'POST',
     path: '/logout',
-    basePath: '/auth',
     summary: 'Revoke an authentication session',
     params: { header: { Cookie: 'cookieHeader', 'Set-Cookie': 'setCookie' } },
   })
@@ -552,7 +549,6 @@ export const odbAuthApi = odbPackage('odb_auth', (pkg) => {
   defineService(me, {
     method: 'GET',
     path: '/me',
-    basePath: '/auth',
     summary: 'Return the authenticated user',
     params: {
       header: { Authorization: 'authorization' },
