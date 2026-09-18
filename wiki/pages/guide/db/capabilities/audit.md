@@ -29,10 +29,8 @@ Each `debug` / `info` / `warn` / `error` / `fatal` call inserts one record in an
 import { odbPackage, odbType } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (p) => {
-  const login = p.defineProcedure('login', { in: { uuid: odbType.string() } })
-
-  login.body((body) => {
-    body.auditEvent('user logged in', { 'user.id': login.parameters.uuid })
+  const login = p.proc('login', { in: { uuid: odbType.string() } }, ({ params, body }) => {
+    body.auditEvent('user logged in', { 'user.id': params.uuid })
   })
 })
 ```
@@ -40,17 +38,15 @@ const appPackage = odbPackage('pck_app', (p) => {
 The available body helpers are `auditDebug`, `auditInfo`, `auditWarn`, `auditError`, `auditFatal`, and `auditEvent` (an INFO-level alias). Attribute keys become OTel attribute names; values are emitted as-is, so pass a bare variable (`p_uuid`), a literal (`"'active'"`), or a nested call.
 
 ```ts
-login.body((body) => {
-  body.auditWarn('rate limit near', { 'user.id': 'p_uuid', 'http.request.method': 'v_method' })
-})
+// Inside a proc() callback, `body` is the statement builder:
+body.auditWarn('rate limit near', { 'user.id': 'p_uuid', 'http.request.method': 'v_method' })
 ```
 
 For full control over severity text and event time, call the package directly with `body.raw`:
 
 ```ts
-login.body((body) => {
-  body.raw(odbAudit.log("'INFO'", "'job finished'", 'v_attributes', 'systimestamp'))
-})
+// Inside a proc() callback, `body` is the statement builder:
+body.raw(odbAudit.log("'INFO'", "'job finished'", 'v_attributes', 'systimestamp'))
 ```
 
 ## The `odb_audit_logs` Table

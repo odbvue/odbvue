@@ -50,21 +50,23 @@ odbSettings.seed(
 import { odbLiteral, odbPackage, odbType } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (p) => {
-  const configure = p.defineProcedure('configure', { in: { apiKey: odbType.string() } })
-
-  configure.body((body) => {
-    body.raw(
-      odbSettings.write(odbLiteral('API_URL'), odbLiteral('https://api.example.com'), {
-        name: odbLiteral('Api Url'),
-      }),
-    )
-    body.raw(
-      odbSettings.write(odbLiteral('API_KEY'), configure.parameters.apiKey, {
-        name: odbLiteral('Api Key'),
-        secret: true,
-      }),
-    )
-  })
+  const configure = p.proc(
+    'configure',
+    { in: { apiKey: odbType.string() } },
+    ({ params, body }) => {
+      body.raw(
+        odbSettings.write(odbLiteral('API_URL'), odbLiteral('https://api.example.com'), {
+          name: odbLiteral('Api Url'),
+        }),
+      )
+      body.raw(
+        odbSettings.write(odbLiteral('API_KEY'), params.apiKey, {
+          name: odbLiteral('Api Key'),
+          secret: true,
+        }),
+      )
+    },
+  )
 
   p.func('api_url', 'VARCHAR2', (fn) => {
     fn.body((body) => body.return(odbSettings.read(odbLiteral('API_URL'))))

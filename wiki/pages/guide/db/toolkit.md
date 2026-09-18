@@ -56,12 +56,12 @@ const files = odbTable('app_files', (t) => ({
 })).comment('Application files')
 ```
 
-## Expression builder
+## Query conditions
 
-`where()` also accepts an expression callback for `AND`/`OR`, functions, and subqueries, backed by a real AST + Oracle compiler (`compile()` returns SQL + binds).
+Use `cond` for comparisons and logical groups in both PL/SQL control flow and query predicates. Query builders remain backed by a real AST + Oracle compiler (`compile()` returns SQL + binds).
 
 ```ts
-.where((eb) => eb.or([eb(users.id, '=', 1), eb(users.email, 'IS NULL')]))
+.where(cond.or([cond.eq(users.id, 1), cond.isNull(users.email)]))
 ```
 
 ## Application contract
@@ -96,22 +96,19 @@ await withConnection(config, async (_conn, db) => {
 
 ## OpenAPI contract
 
-Use `p.defineProcedure()` to declare the PL/SQL signature, `procedure.body()` for implementation, and `defineService()` for the HTTP contract. A typed table query passed to `body.openFor()` carries its selected row shape into the generated response.
+Use `p.proc()` to declare the PL/SQL signature and implementation together, then attach its HTTP contract with `defineService()`. A typed table query passed to `body.openFor()` carries its selected row shape into the generated response.
 
 ```ts
-const listUsers = pkg.defineProcedure('list_users', {
-  out: { result: odbType.resultset() },
-})
-listUsers.body((body) =>
-  body.openFor(
-    listUsers.parameters.result,
-    odbQuery().selectFrom(users).select([users.id, users.email]),
-  ),
+const listUsers = pkg.proc(
+  'list_users',
+  { out: { result: odbType.resultset() } },
+  ({ params, body }) =>
+    body.openFor(params.result, odbQuery().selectFrom(users).select([users.id, users.email])),
 )
 defineService(listUsers, {
   method: 'GET',
   path: '/users',
-  params: { response: { result: 'result' } },
+  response: { result: listUsers.parameters.result },
 })
 ```
 

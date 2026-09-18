@@ -40,19 +40,15 @@ import { defineMigration, defineService, odbEnv, odbPackage, odbType } from '@od
 const schemaName = odbEnv.read('ODBVUE_ADB_SCHEMA_USERNAME')
 
 const appPackage = odbPackage('pck_app', (p) => {
-  const version = p.defineProcedure('version', {
-    out: { version: odbType.string() },
-  })
-
-  version.body((body) => {
-    body.set(version.parameters.version, '1.0.1')
+  const version = p.proc('version', { out: { version: odbType.string() } }, ({ params, body }) => {
+    body.set(params.version, '1.0.1')
   })
 
   defineService(version, {
     method: 'GET',
     path: '/version',
     summary: 'Returns the application version',
-    params: { response: { version: 'version' } },
+    response: { version: version.parameters.version },
   })
 })
 
@@ -222,19 +218,19 @@ This is DML and read-query generation, not schema generation.
 Inside a package body, send selected values directly to PL/SQL variables or parameters with `into(...)`:
 
 ```ts
-proc.body((body) => {
-  const { userId, username } = proc.parameters({
-    out: { userId: odbType.guid(), username: odbType.string(128) },
-  })
-
-  body.query(
-    odbQuery()
-      .selectFrom(users)
-      .select([users.id, users.username])
-      .into(userId, username)
-      .where(users.email, '=', 'ada@example.com'),
-  )
-})
+pkg.proc(
+  'lookup_user',
+  { out: { userId: odbType.guid(), username: odbType.string(128) } },
+  ({ params, body }) => {
+    body.query(
+      odbQuery()
+        .selectFrom(users)
+        .select([users.id, users.username])
+        .into(params.userId, params.username)
+        .where(users.email, '=', 'ada@example.com'),
+    )
+  },
+)
 ```
 
 The generated statement is `SELECT id, username INTO p_user_id, p_username ...`.
@@ -247,11 +243,13 @@ The generated statement is `SELECT id, username INTO p_user_id, p_username ...`.
 import { odbPackage, odbType } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (pkg) => {
-  const version = pkg.defineProcedure('version', { out: { version: odbType.string() } })
-
-  version.body((body) => {
-    body.set(version.parameters.version, '1.0.1')
-  })
+  const version = pkg.proc(
+    'version',
+    { out: { version: odbType.string() } },
+    ({ params, body }) => {
+      body.set(params.version, '1.0.1')
+    },
+  )
 })
 
 const sql = appPackage.toSQLUp({ schema: 'APP_USER' })
@@ -270,16 +268,15 @@ For concise, type-aware declarations, use named parameter and variable groups. O
 import { odbPackage, odbType } from '@odbvue/odb'
 
 const usersApi = odbPackage('pck_users', (pkg) => {
-  const getUser = pkg.defineProcedure('get_user', {
-    in: { userId: odbType.guid() },
-    out: { displayName: odbType.string(256) },
-  })
-
-  getUser.body((body) => {
-    const { normalizedId } = body.variables({ normalizedId: odbType.guid() })
-    body.set(normalizedId, getUser.parameters.userId)
-    body.set(getUser.parameters.displayName, 'Ada Lovelace')
-  })
+  const getUser = pkg.proc(
+    'get_user',
+    { in: { userId: odbType.guid() }, out: { displayName: odbType.string(256) } },
+    ({ params, body }) => {
+      const { normalizedId } = body.variables({ normalizedId: odbType.guid() })
+      body.set(normalizedId, params.userId)
+      body.set(params.displayName, 'Ada Lovelace')
+    },
+  )
 })
 ```
 
@@ -288,7 +285,7 @@ This emits `p_user_id`, `p_display_name`, and `l_normalized_id`. `odbType` suppl
 For numeric PL/SQL loops, use `forRange()`. The callback receives the implicit `PLS_INTEGER` loop index and a nested typed statement body.
 
 ```ts
-proc.body((body) => {
+pkg.proc('process', {}, ({ body }) => {
   const { total, limit } = body.variables({
     total: odbType.integer(),
     limit: odbType.integer(),
@@ -359,30 +356,28 @@ Other framework packages follow the same pattern — for example `odb_jwt` (`odb
 
 ORDS support is built into the same model.
 
-Define the procedure signature with `pkg.defineProcedure()` and attach its public HTTP contract with `defineService()`. The application generator emits the ORDS registration PL/SQL needed to expose the procedure as a REST endpoint.
+Define the procedure and its implementation with `pkg.proc()`, then attach its public HTTP contract with `defineService()`. The application generator emits the ORDS registration PL/SQL needed to expose the procedure as a REST endpoint.
 
 ```ts
 import { defineService, generateApplication, odbPackage, odbType } from '@odbvue/odb'
 
 const usersApi = odbPackage('pck_users', (pkg) => {
-  const getUser = pkg.defineProcedure('get_user', {
-    in: { userId: odbType.number() },
-    out: { user: odbType.resultset() },
-  })
-  getUser.body((body) => {
-    body.raw(
-      `OPEN ${getUser.parameters.user.name} FOR SELECT id, email FROM app_users WHERE id = ${getUser.parameters.userId.name}`,
-    )
-  })
+  const getUser = pkg.proc(
+    'get_user',
+    { in: { userId: odbType.number() }, out: { user: odbType.resultset() } },
+    ({ params, body }) => {
+      body.raw(
+        `OPEN ${params.user.name} FOR SELECT id, email FROM app_users WHERE id = ${params.userId.name}`,
+      )
+    },
+  )
   defineService(getUser, {
     method: 'GET',
     path: '/users/:user-id',
     summary: 'Fetch a single user',
     paramTypes: { p_user_id: 'INT' },
-    params: {
-      uri: { 'user-id': 'userId' },
-      response: { user: 'user' },
-    },
+    uri: { 'user-id': getUser.parameters.userId },
+    response: { user: getUser.parameters.user },
   })
 })
 
@@ -393,7 +388,7 @@ The service contract makes the HTTP method and route visible during code review.
 
 - package name becomes the ORDS module name
 - PL/SQL parameters map to ORDS parameters
-- the explicit `params` contract maps each PL/SQL parameter to a request body, header, URI segment, or JSON response field
+- direct `body`, `headers`, `uri`, and `response` bindings map each PL/SQL parameter to HTTP transport
 
 For example, a login procedure with `P_USERNAME` and `P_PASSWORD` receives:
 
@@ -404,9 +399,9 @@ For example, a login procedure with `P_USERNAME` and `P_PASSWORD` receives:
 }
 ```
 
-`params` is exhaustive: bind every declared parameter exactly once. `body` and `uri` accept `in`/`inOut` parameters, `response` accepts `out`/`inOut`, and `header` accepts either direction.
+Service bindings are exhaustive: bind every declared parameter exactly once. `body` and `uri` accept `in`/`inOut` parameters, `response` accepts `out`/`inOut`, and `headers` accepts either direction.
 
-Service metadata belongs in `defineService(procedure, { method, path, params })`, making the application contract explicit and reusable by ORDS, client, and OpenAPI generators.
+Service metadata belongs in `defineService(procedure, { method, path, body, headers, uri, response })`, making the application contract explicit and reusable by ORDS, client, and OpenAPI generators.
 
 The migration context enables schema-level ORDS automatically before the first `expose()` operation. It can still be managed explicitly outside the context:
 
@@ -512,7 +507,7 @@ So "Oracle Database in TypeScript" here does not mean Oracle is replaced by Type
 - Use `odbPackage()` for business logic that belongs in PL/SQL.
 - Use the built-in wrappers (`odbUtlRaw`, `odbUtlEncode`, `odbDbmsLob`, `odbDbmsCrypto`) to call Oracle's own packages from a package body.
 - Use framework packages such as `odbLob` for odb-provided helpers that install into your schema under the `odb_*` naming convention.
-- Use `defineProcedure()` and `defineService()` with `odbOrdsSchema()` when package procedures should become REST endpoints.
+- Use `proc()` and `defineService()` with `odbOrdsSchema()` when package procedures should become REST endpoints.
 - Use `defineMigration()` to version all of the above.
 - Packages deploy blue/green automatically for lock-free redeploys and instant rollback.
 

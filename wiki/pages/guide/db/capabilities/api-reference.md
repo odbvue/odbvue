@@ -29,12 +29,10 @@ odbLob.base64ToVarchar2('v_b64')
 ### Example
 
 ```ts
-const { result } = proc.parameters({ out: { result: 'CLOB' } })
-
-proc.body((body) => {
+pkg.proc('encode', { out: { result: odbType.clob() } }, ({ params, body }) => {
   const { vText } = body.variables({ vText: odbType.string(200) })
   body.set(vText, 'hello')
-  body.set(result, vText.toBase64())
+  body.set(params.result, vText.toBase64())
 })
 ```
 
@@ -69,14 +67,12 @@ odbJwt.fromEpoch('v_epoch')
 ### Example
 
 ```ts
-const { token } = proc.parameters({ out: { token: 'VARCHAR2' } })
-
-proc.body((body) => {
+pkg.proc('issue_token', { out: { token: odbType.string() } }, ({ params, body }) => {
   const { vPayload } = body.variables({ vPayload: odbType.string(2000) })
   body.raw(
     `${vPayload.name} := JSON_OBJECT('sub' VALUE 'u1', 'exp' VALUE odb_jwt.to_epoch() + 3600)`,
   )
-  body.raw(`${token.name} := ${odbJwt.encode(vPayload.name, `'my-secret'`)}`)
+  body.raw(`${params.token.name} := ${odbJwt.encode(vPayload.name, `'my-secret'`)}`)
 })
 ```
 
@@ -111,7 +107,7 @@ odbAudit.purge('v_cutoff')
 ### Example
 
 ```ts
-proc.body((body) => {
+pkg.proc('log_event', {}, ({ body }) => {
   body.auditEvent('user logged in', { 'user.id': 'p_uuid' })
 })
 ```
@@ -152,39 +148,35 @@ odbSettings.seed({ id: 'APP_VERSION', name: 'Application version', value: '1.0.0
 ### Example
 
 ```ts
-const getUrl = pkg.defineProcedure('get_url', { out: { url: odbType.string() } })
-
-getUrl.body((body) => {
-  body.set(getUrl.parameters.url, odbSettings.read(odbLiteral('API_URL')))
+const getUrl = pkg.proc('get_url', { out: { url: odbType.string() } }, ({ params, body }) => {
+  body.set(params.url, odbSettings.read(odbLiteral('API_URL')))
 })
 ```
 
 ## ORDS Services
 
-Declare a procedure signature first, then attach its explicit HTTP contract with `defineService()`:
+Declare a procedure and its implementation with `proc()`, then attach its explicit HTTP contract with `defineService()`:
 
 ```ts
 import { defineService, odbPackage, odbType } from '@odbvue/odb'
 
 const api = odbPackage('pck_api', (pkg) => {
-  const version = pkg.defineProcedure('version', {
-    out: { version: odbType.string() },
-  })
-
-  version.body((body) => body.set(version.parameters.version, '1.0.1'))
+  const version = pkg.proc('version', { out: { version: odbType.string() } }, ({ params, body }) =>
+    body.set(params.version, '1.0.1'),
+  )
 
   defineService(version, {
     method: 'GET',
     path: '/version',
     summary: 'Returns the application version',
-    params: { response: { version: 'version' } },
+    response: { version: version.parameters.version },
   })
 })
 ```
 
-`params` maps public HTTP names to keys from the declared procedure signature. Bind every parameter exactly once: `body` and `uri` accept `in`/`inOut` parameters, `response` accepts `out`/`inOut`, and `header` accepts either direction. Optional `module`, `basePath`, and `paramTypes` properties override derived ORDS configuration. `defineService()` stores metadata in the application contract used by ORDS, client, and OpenAPI generators.
+Direct bindings map public HTTP names to typed procedure parameters. Bind every parameter exactly once: `body` and `uri` accept `in`/`inOut` parameters, `response` accepts `out`/`inOut`, and `headers` accepts either direction. Optional `module`, `basePath`, and `paramTypes` properties override derived ORDS configuration. `defineService()` stores metadata in the application contract used by ORDS, client, and OpenAPI generators.
 
-For example, a POST request body is explicit: `params: { body: { username: 'username' } }`. Use `header` and `uri` for their respective transports.
+For example, a POST request body is explicit: `body: { username: procedure.parameters.username }`. Use `headers` and `uri` for their respective transports.
 
 ## Authentication
 

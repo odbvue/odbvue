@@ -25,12 +25,10 @@ export const migration = defineMigration('20260628161706_test', {
 import { odbPackage, odbType } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (p) => {
-  const version = p.defineProcedure('version', { out: { test: odbType.clob() } })
-
-  version.body((body) => {
+  const version = p.proc('version', { out: { test: odbType.clob() } }, ({ params, body }) => {
     const { vVersion } = body.variables({ vVersion: odbType.string(200) })
     body.set(vVersion, '1.0.1')
-    body.set(version.parameters.test, vVersion.toBase64())
+    body.set(params.test, vVersion.toBase64())
   })
 })
 ```
@@ -41,21 +39,21 @@ Capture parameter and variable handles, then use `body.set()` for compile-time t
 Local variables expose convenience methods based on their PL/SQL type:
 
 ```ts
-const convert = pkg.defineProcedure('convert', {
-  out: { textResult: odbType.clob(), clobResult: odbType.clob() },
-})
+const convert = pkg.proc(
+  'convert',
+  { out: { textResult: odbType.clob(), clobResult: odbType.clob() } },
+  ({ params, body }) => {
+    const { vText, vClob } = body.variables({
+      vText: odbType.string(200),
+      vClob: odbType.clob(),
+    })
+    body.set(vText, 'hello')
+    body.raw(`${vClob.name} := empty_clob()`)
 
-convert.body((body) => {
-  const { vText, vClob } = body.variables({
-    vText: odbType.string(200),
-    vClob: odbType.clob(),
-  })
-  body.set(vText, 'hello')
-  body.raw(`${vClob.name} := empty_clob()`)
-
-  body.set(convert.parameters.textResult, vText.toBase64())
-  body.set(convert.parameters.clobResult, vClob.toBase64())
-})
+    body.set(params.textResult, vText.toBase64())
+    body.set(params.clobResult, vClob.toBase64())
+  },
+)
 ```
 
 Use `body.raw()` only as an escape hatch for raw PL/SQL statements.
