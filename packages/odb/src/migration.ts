@@ -3,7 +3,10 @@ import path from 'path'
 import { pathToFileURL } from 'url'
 
 import { Column, emitColumnDef, type ColumnOptions, type ColumnType } from './schema/column.js'
+import { odbLiteral } from './schema/attribute.js'
 import { odbOrdsSchema } from './ords.js'
+import { odbQuery } from './query/index.js'
+import { odbOracle } from './packages/oracle/index.js'
 import { type Schema } from './schema/schema.js'
 import { type Table } from './schema/table.js'
 import type { AnyQueryBuilder } from './schema/package.js'
@@ -131,19 +134,34 @@ function registryMergeSql(
 ): string {
   const table = `${schema}.${BLUE_GREEN_REGISTRY_TABLE}`
   const name = objectName.toUpperCase()
-  return [
-    `MERGE INTO ${table} t`,
-    `USING (SELECT '${name}' AS object_name FROM dual) s`,
-    `ON (t.object_name = s.object_name)`,
-    `WHEN MATCHED THEN UPDATE SET`,
-    `  t.object_type = '${objectType}',`,
-    `  t.active_color = '${color}',`,
-    `  t.migration_name = '${migrationName}',`,
-    `  t.updated = SYSTIMESTAMP`,
-    `WHEN NOT MATCHED THEN`,
-    `  INSERT (object_name, object_type, active_color, migration_name)`,
-    `  VALUES ('${name}', '${objectType}', '${color}', '${migrationName}');`,
-  ].join('\n')
+  const merge = odbQuery()
+    .mergeInto(table, 't')
+    .using(
+      {
+        objectName: odbLiteral(name),
+        objectType: odbLiteral(objectType),
+        activeColor: odbLiteral(color),
+        migrationName: odbLiteral(migrationName),
+      },
+      's',
+    )
+  return merge
+    .on((target, source, expression) =>
+      expression(target.ref('object_name'), '=', source.objectName),
+    )
+    .whenMatched({
+      object_type: merge.sourceRef('objectType'),
+      active_color: merge.sourceRef('activeColor'),
+      migration_name: merge.sourceRef('migrationName'),
+      updated: odbOracle.sysTimestamp(),
+    })
+    .whenNotMatched({
+      object_name: merge.sourceRef('objectName'),
+      object_type: merge.sourceRef('objectType'),
+      active_color: merge.sourceRef('activeColor'),
+      migration_name: merge.sourceRef('migrationName'),
+    })
+    .toSQL()
 }
 
 /** Remove an object from the registry (first-install rollback). */

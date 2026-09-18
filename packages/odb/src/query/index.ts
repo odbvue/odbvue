@@ -476,6 +476,195 @@ export class DeleteQueryBuilder<TTable extends Table<any> = Table<any>> {
   }
 }
 
+type MergeReference = NamedRef & ExpressionNode & { toSQL(): string }
+
+type MergeSource<TValues extends Record<string, unknown>> = {
+  [TKey in keyof TValues]: MergeReference
+}
+
+type MergeTarget<TTable extends Table<any> | string | NamedRef> =
+  TTable extends Table<any> ? TTable : { ref(name: string): MergeReference }
+
+function mergeReference(name: string): MergeReference {
+  return { kind: 'column', name, toSQL: () => name }
+}
+
+/** Oracle `MERGE` statement builder with a single-row `SELECT ... FROM dual` source. */
+export class MergeQueryBuilder<
+  TTable extends Table<any> | string | NamedRef = Table<any> | string | NamedRef,
+  TSource extends Record<string, unknown> = Record<string, never>,
+> {
+  private _source?: Record<string, unknown>
+  private _sourceAlias?: string
+  private _on?: ExpressionNode
+  private _matched?: Record<string, unknown>
+  private _notMatched?: Record<string, unknown>
+  private _schema?: string
+
+  constructor(
+    private readonly _table: TTable,
+    private readonly _targetAlias?: string,
+  ) {}
+
+  resolveSchema(schema: string): this {
+    this._schema = schema
+    return this
+  }
+
+  private tableName(): string {
+    if (typeof this._table === 'string') return this._table
+    if (this._table instanceof Table) return this._table.queryName(this._schema)
+    return this._schema ? `${this._schema}.${this._table.name}` : this._table.name
+  }
+
+  private columnName(key: string): string {
+    return this._table instanceof Table ? this._table.columnNameForKey(key) : key
+  }
+
+  private targetAlias(): string {
+    if (this._targetAlias) return this._targetAlias
+    if (this._table instanceof Table && 'alias' in this._table) {
+      return (this._table as Table<any> & { alias: string }).alias
+    }
+    return 'target'
+  }
+
+  private targetSql(): string {
+    const table = this.tableName()
+    return this._table instanceof Table && 'alias' in this._table
+      ? table
+      : `${table} ${this.targetAlias()}`
+  }
+
+  /** Define the single-row merge source and its SQL alias. */
+  using<TValues extends Record<string, unknown>>(
+    values: TValues,
+    alias = 'source',
+  ): MergeQueryBuilder<TTable, TValues> {
+    this._source = { ...values }
+    this._sourceAlias = alias
+    return this as unknown as MergeQueryBuilder<TTable, TValues>
+  }
+
+  /** Reference a named field from the `using()` source. */
+  sourceRef<TKey extends keyof TSource & string>(key: TKey): MergeReference {
+    if (!this._sourceAlias) throw new Error('merge.sourceRef(): call using() first.')
+    return mergeReference(`${this._sourceAlias}.${key}`)
+  }
+
+  /** Define the target/source matching predicate. */
+  on(
+    build: (
+      target: MergeTarget<TTable>,
+      source: MergeSource<TSource>,
+      expression: ExpressionBuilder,
+    ) => ExpressionNode,
+  ): this {
+    if (!this._sourceAlias) throw new Error('merge.on(): call using() first.')
+    const source = Object.fromEntries(
+      Object.keys(this._source ?? {}).map((key) => [key, this.sourceRef(key)]),
+    ) as MergeSource<TSource>
+    const target = (
+      this._table instanceof Table
+        ? this._table
+        : { ref: (name: string) => mergeReference(`${this.targetAlias()}.${name}`) }
+    ) as MergeTarget<TTable>
+    this._on = build(target, source, odbExpr)
+    return this
+  }
+
+  /** Set target fields when a matching source row exists. */
+  whenMatched(
+    values: TTable extends Table<any> ? Updateable<TTable> : Record<string, unknown>,
+  ): this {
+    this._matched = { ...values }
+    return this
+  }
+
+  /** Insert a target row when no matching source row exists. */
+  whenNotMatched(
+    values: TTable extends Table<any> ? Insertable<TTable> : Record<string, unknown>,
+  ): this {
+    this._notMatched = { ...values }
+    return this
+  }
+
+  private validate(): void {
+    if (!this._source || !this._sourceAlias) throw new Error('merge: a source is required.')
+    if (!this._on) throw new Error('merge: an ON predicate is required.')
+    if (!this._matched && !this._notMatched) {
+      throw new Error('merge: define whenMatched() or whenNotMatched().')
+    }
+  }
+
+  private sourceSql(render: (value: unknown, key: string) => string): string {
+    return Object.entries(this._source ?? {})
+      .map(([key, value]) => `${render(value, key)} AS ${key}`)
+      .join(', ')
+  }
+
+  private updateSql(render: (value: unknown, key: string) => string): string | undefined {
+    if (!this._matched) return undefined
+    return Object.entries(this._matched)
+      .map(
+        ([key, value]) => `${this.targetAlias()}.${this.columnName(key)} = ${render(value, key)}`,
+      )
+      .join(', ')
+  }
+
+  private insertSql(render: (value: unknown, key: string) => string): string | undefined {
+    if (!this._notMatched) return undefined
+    const keys = Object.keys(this._notMatched)
+    const columns = keys.map((key) => this.columnName(key)).join(', ')
+    const values = keys.map((key) => render(this._notMatched![key], key)).join(', ')
+    return `(${columns}) VALUES (${values})`
+  }
+
+  compile(): CompiledQuery {
+    this.validate()
+    const bindings: Record<string, unknown> = {}
+    const source = this.sourceSql((value, key) => {
+      if (isSqlExpression(value)) return value.toSQL()
+      const binding = `source_${key}`
+      bindings[binding] = value
+      return `:${binding}`
+    })
+    const renderWrite = (prefix: string) => (value: unknown, key: string) => {
+      if (isSqlExpression(value)) return value.toSQL()
+      const binding = `${prefix}_${key}`
+      bindings[binding] = value
+      return `:${binding}`
+    }
+    const context = new BindContext('m')
+    const clauses = [
+      `MERGE INTO ${this.targetSql()}`,
+      `USING (SELECT ${source} FROM dual) ${this._sourceAlias}`,
+      `ON (${compileNode(this._on!, context)})`,
+    ]
+    const update = this.updateSql(renderWrite('update'))
+    if (update) clauses.push(`WHEN MATCHED THEN UPDATE SET ${update}`)
+    const insert = this.insertSql(renderWrite('insert'))
+    if (insert) clauses.push(`WHEN NOT MATCHED THEN INSERT ${insert}`)
+    Object.assign(bindings, context.bindings)
+    return { sql: clauses.join(' '), bindings }
+  }
+
+  toSQL(): string {
+    this.validate()
+    const source = this.sourceSql((value) => inlineValue(value))
+    const clauses = [
+      `MERGE INTO ${this.targetSql()}`,
+      `USING (SELECT ${source} FROM dual) ${this._sourceAlias}`,
+      `ON (${renderNode(this._on!)})`,
+    ]
+    const update = this.updateSql((value) => inlineValue(value))
+    if (update) clauses.push(`WHEN MATCHED THEN UPDATE SET ${update}`)
+    const insert = this.insertSql((value) => inlineValue(value))
+    if (insert) clauses.push(`WHEN NOT MATCHED THEN INSERT ${insert}`)
+    return clauses.join(' ')
+  }
+}
+
 export class OdbQuery {
   selectFrom<TTable extends Table<any>>(table: TTable): SelectQueryBuilder<TTable>
   selectFrom(table: string | NamedRef): SelectQueryBuilder
@@ -499,6 +688,15 @@ export class OdbQuery {
   deleteFrom(table: string | NamedRef): DeleteQueryBuilder
   deleteFrom(table: string | NamedRef | Table<any>): DeleteQueryBuilder<any> {
     return new DeleteQueryBuilder(table as string | NamedRef)
+  }
+
+  mergeInto<TTable extends Table<any>>(
+    table: TTable,
+    targetAlias?: string,
+  ): MergeQueryBuilder<TTable>
+  mergeInto(table: string | NamedRef, targetAlias?: string): MergeQueryBuilder<string | NamedRef>
+  mergeInto(table: string | NamedRef | Table<any>, targetAlias?: string): MergeQueryBuilder<any> {
+    return new MergeQueryBuilder(table as string | NamedRef, targetAlias)
   }
 }
 

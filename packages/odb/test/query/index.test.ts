@@ -208,6 +208,37 @@ describe('odbQuery', () => {
     )
   })
 
+  it('builds an Oracle merge from typed target columns and source fields', () => {
+    const users = odbTable('APP_USERS', (t) => ({
+      username: t.string('USERNAME').notNull(),
+      displayName: t.string('DISPLAY_NAME'),
+      enabled: t.boolean('ENABLED').notNull(),
+    })).as('target')
+    const merge = odbQuery()
+      .mergeInto(users)
+      .using({ username: 'ada', displayName: 'Ada Lovelace' }, 'source')
+      .on((target, source, expression) => expression(target.username, '=', source.username))
+      .whenMatched({ displayName: new Param('source.displayName', 'VARCHAR2'), enabled: true })
+      .whenNotMatched({
+        username: new Param('source.username', 'VARCHAR2'),
+        displayName: new Param('source.displayName', 'VARCHAR2'),
+        enabled: true,
+      })
+
+    expect(merge.toSQL()).toBe(
+      "MERGE INTO APP_USERS target USING (SELECT 'ada' AS username, 'Ada Lovelace' AS displayName FROM dual) source ON (target.USERNAME = source.username) WHEN MATCHED THEN UPDATE SET target.DISPLAY_NAME = source.displayName, target.ENABLED = 1 WHEN NOT MATCHED THEN INSERT (USERNAME, DISPLAY_NAME, ENABLED) VALUES (source.username, source.displayName, 1)",
+    )
+    expect(merge.compile()).toEqual({
+      sql: 'MERGE INTO APP_USERS target USING (SELECT :source_username AS username, :source_displayName AS displayName FROM dual) source ON (target.USERNAME = source.username) WHEN MATCHED THEN UPDATE SET target.DISPLAY_NAME = source.displayName, target.ENABLED = :update_enabled WHEN NOT MATCHED THEN INSERT (USERNAME, DISPLAY_NAME, ENABLED) VALUES (source.username, source.displayName, :insert_enabled)',
+      bindings: {
+        source_username: 'ada',
+        source_displayName: 'Ada Lovelace',
+        update_enabled: true,
+        insert_enabled: true,
+      },
+    })
+  })
+
   it('accumulates result types across chained select calls', () => {
     const users = odbTable('APP_USERS', (t) => ({
       id: t.number('ID').notNull(),

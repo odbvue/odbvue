@@ -628,11 +628,41 @@ export const odbAuth = {
       throw new Error('odbAuth.seedUser(): username and password are required.')
     return {
       toSQLUp(options: { schema?: string } = {}): string {
-        const table = qualify('odb_auth_users', options.schema)
+        const users = authUsers.as('target')
         const crypto = qualify('odb_auth_crypto', options.schema)
-        return plsqlBlock(
-          `MERGE INTO ${table} target USING (SELECT ${odbLiteral(user.username).toSQL()} username FROM dual) source ON (LOWER(target.username) = LOWER(source.username)) WHEN MATCHED THEN UPDATE SET target.password_hash = ${crypto}.hash_password(${odbLiteral(user.password).toSQL()}), target.display_name = ${odbLiteral(user.displayName ?? user.username).toSQL()}, target.enabled = 1, target.token_version = target.token_version + 1, target.updated_at = SYSTIMESTAMP WHEN NOT MATCHED THEN INSERT (username, password_hash, display_name, enabled, token_version) VALUES (${odbLiteral(user.username).toSQL()}, ${crypto}.hash_password(${odbLiteral(user.password).toSQL()}), ${odbLiteral(user.displayName ?? user.username).toSQL()}, 1, 0)`,
+        const passwordHash = plsqlExpr.call(
+          'VARCHAR2',
+          `${crypto}.hash_password`,
+          odbLiteral(user.password),
         )
+        const merge = odbQuery()
+          .mergeInto(users)
+          .using({ username: odbLiteral(user.username) }, 'source')
+        const sourceUsername = merge.sourceRef('username')
+        merge
+          .on((target, source, expression) =>
+            expression(
+              expression.fn('LOWER', target.username),
+              '=',
+              expression.fn('LOWER', source.username),
+            ),
+          )
+          .whenMatched({
+            passwordHash,
+            displayName: odbLiteral(user.displayName ?? user.username),
+            enabled: true,
+            tokenVersion: plsqlExpr.add(users.tokenVersion, 1),
+            updatedAt: odbOracle.sysTimestamp(),
+          })
+          .whenNotMatched({
+            username: sourceUsername,
+            passwordHash,
+            displayName: odbLiteral(user.displayName ?? user.username),
+            enabled: true,
+            tokenVersion: 0,
+          })
+        if (options.schema) merge.resolveSchema(options.schema)
+        return plsqlBlock(merge.toSQL())
       },
       toSQLDown() {
         return ''
