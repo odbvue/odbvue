@@ -3,12 +3,13 @@ import { defineMigration, defineService, odbPackage, odbType } from '@odbvue/odb
 const schemaName = process.env.ODBVUE_ADB_SCHEMA_USERNAME ?? ''
 
 const testPackage = odbPackage('pck_test', (pkg) => {
-  const test = pkg.defineProcedure('test', { out: { result: odbType.string() } })
-  test.body((body) => body.set(test.parameters.result, 'OK'))
+  const test = pkg.proc('test', { out: { result: odbType.string() } }, ({ params, body }) =>
+    body.set(params.result, 'OK'),
+  )
   defineService(test, {
     method: 'GET',
     path: '/test',
-    params: { response: { result: 'result' } },
+    response: { result: test.parameters.result },
   })
 })
 

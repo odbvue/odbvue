@@ -24,6 +24,8 @@ import {
   type Operator,
 } from './ast.js'
 
+type SqlPredicate = { toSQL(): string }
+
 type OrderByClause = {
   column: string
   direction: 'asc' | 'desc'
@@ -75,12 +77,13 @@ function isSqlExpression(value: unknown): value is { toSQL(): string } {
 
 /** Build a predicate node from a builder callback or a column/op/value triple. */
 function toPredicate(
-  column: string | Column<any, string> | ((eb: ExpressionBuilder) => ExpressionNode),
+  column: string | Column<any, string> | SqlPredicate | ((eb: ExpressionBuilder) => ExpressionNode),
   op?: Operator,
   value?: unknown,
 ): ExpressionNode {
   if (typeof column === 'function') return column(odbExpr)
-  return predicate(column, op as Operator, value)
+  if (op === undefined && isSqlExpression(column)) return { kind: 'raw', sql: column.toSQL() }
+  return predicate(column as string | Column<any, string>, op as Operator, value)
 }
 
 export class SelectQueryBuilder<
@@ -118,12 +121,19 @@ export class SelectQueryBuilder<
     table: TJoin,
     on: (eb: ExpressionBuilder) => ExpressionNode,
   ): SelectQueryBuilder<TTable | TJoin, TResult, THasSelection>
+  join<TJoin extends Table<any>>(
+    table: TJoin,
+    on: SqlPredicate,
+  ): SelectQueryBuilder<TTable | TJoin, TResult, THasSelection>
   join(table: string | NamedRef, on: (eb: ExpressionBuilder) => ExpressionNode): this
   join(
     table: string | NamedRef | Table<any>,
-    on: (eb: ExpressionBuilder) => ExpressionNode,
+    on: ((eb: ExpressionBuilder) => ExpressionNode) | SqlPredicate,
   ): SelectQueryBuilder<any, TResult, THasSelection> {
-    this._joins.push({ table: table as string | NamedRef, on: on(odbExpr) })
+    this._joins.push({
+      table: table as string | NamedRef,
+      on: typeof on === 'function' ? on(odbExpr) : { kind: 'raw', sql: on.toSQL() },
+    })
     return this as SelectQueryBuilder<any, TResult, THasSelection>
   }
 
@@ -175,6 +185,7 @@ export class SelectQueryBuilder<
   }
 
   where(build: (eb: ExpressionBuilder) => ExpressionNode): this
+  where(condition: SqlPredicate): this
   where<TColumn extends TableColumn<TTable>>(
     column: TColumn,
     op: ComparisonOperator,
@@ -188,7 +199,11 @@ export class SelectQueryBuilder<
   where(column: string, op: ComparisonOperator, value: unknown): this
   where(column: string, op: NullOperator): this
   where(
-    column: string | Column<any, string> | ((eb: ExpressionBuilder) => ExpressionNode),
+    column:
+      | string
+      | Column<any, string>
+      | SqlPredicate
+      | ((eb: ExpressionBuilder) => ExpressionNode),
     op?: Operator,
     value?: unknown,
   ): this {
@@ -361,6 +376,7 @@ export class UpdateQueryBuilder<TTable extends Table<any> = Table<any>> {
   }
 
   where(build: (eb: ExpressionBuilder) => ExpressionNode): this
+  where(condition: SqlPredicate): this
   where<TColumn extends TableColumn<TTable>>(
     column: TColumn,
     op: ComparisonOperator,
@@ -374,7 +390,11 @@ export class UpdateQueryBuilder<TTable extends Table<any> = Table<any>> {
   where(column: string, op: ComparisonOperator, value: unknown): this
   where(column: string, op: NullOperator): this
   where(
-    column: string | Column<any, string> | ((eb: ExpressionBuilder) => ExpressionNode),
+    column:
+      | string
+      | Column<any, string>
+      | SqlPredicate
+      | ((eb: ExpressionBuilder) => ExpressionNode),
     op?: Operator,
     value?: unknown,
   ): this {
@@ -433,6 +453,7 @@ export class DeleteQueryBuilder<TTable extends Table<any> = Table<any>> {
   }
 
   where(build: (eb: ExpressionBuilder) => ExpressionNode): this
+  where(condition: SqlPredicate): this
   where<TColumn extends TableColumn<TTable>>(
     column: TColumn,
     op: ComparisonOperator,
@@ -446,7 +467,11 @@ export class DeleteQueryBuilder<TTable extends Table<any> = Table<any>> {
   where(column: string, op: ComparisonOperator, value: unknown): this
   where(column: string, op: NullOperator): this
   where(
-    column: string | Column<any, string> | ((eb: ExpressionBuilder) => ExpressionNode),
+    column:
+      | string
+      | Column<any, string>
+      | SqlPredicate
+      | ((eb: ExpressionBuilder) => ExpressionNode),
     op?: Operator,
     value?: unknown,
   ): this {

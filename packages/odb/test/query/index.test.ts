@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { Param } from '../../src/schema/attribute.js'
+import { cond, Param } from '../../src/schema/attribute.js'
 import { type SelectQuery, odbQuery } from '../../src/query/index.js'
 import { type Column } from '../../src/schema/column.js'
 import {
@@ -27,6 +27,20 @@ describe('odbQuery', () => {
     const compiled = query.compile()
     expect(compiled.sql).toBe('SELECT id, username FROM APP_USERS WHERE id = :w0 FOR UPDATE')
     expect(compiled.bindings).toEqual({ w0: 42 })
+  })
+
+  it('accepts reusable PL/SQL conditions as SQL predicates', () => {
+    const users = odbTable('APP_USERS', (t) => ({
+      id: t.number('ID').notNull(),
+      enabled: t.boolean('ENABLED').notNull(),
+    }))
+
+    const query = odbQuery()
+      .selectFrom(users)
+      .select(users.id)
+      .where(cond.and([cond.eq(users.enabled, true), cond.eq(users.id, 42)]))
+
+    expect(query.toSQL()).toBe('SELECT ID FROM APP_USERS WHERE (ENABLED = TRUE AND ID = 42)')
   })
 
   it('supports typed aliases and joins', () => {

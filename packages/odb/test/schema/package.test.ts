@@ -67,6 +67,31 @@ describe('odbPackage member typing', () => {
 })
 
 describe('Procedure ORDS contracts', () => {
+  it('declares a procedure with proc() and direct typed service bindings', () => {
+    const pkg = odbPackage('PCK_API', (p) => {
+      const login = p.proc(
+        'LOGIN',
+        {
+          in: { username: odbType.string() },
+          out: { token: odbType.string() },
+        },
+        ({ params, body }) => body.set(params.token, params.username),
+      )
+      defineService(login, {
+        method: 'POST',
+        path: '/login',
+        body: { username: login.parameters.username },
+        response: { token: login.parameters.token },
+      })
+      return { login }
+    })
+
+    expect(pkg.application().procedures[0].service?.params?.body?.username.name).toBe('p_username')
+    expect(pkg.toSQLUp()).toContain(
+      'PROCEDURE LOGIN(p_username IN VARCHAR2, p_token OUT VARCHAR2);',
+    )
+  })
+
   it('inherits a package base path while allowing service overrides', () => {
     const pkg = odbPackage('PCK_AUTH', { basePath: '/auth' }, (p) => {
       const login = p.defineProcedure('LOGIN', { in: { username: odbType.string() } })
