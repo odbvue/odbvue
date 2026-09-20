@@ -29,8 +29,15 @@ export const runInfraUpPodman = async () => {
   } else logger.muted('Podman is running...')
 
   let services: Record<string, unknown> = {}
+  const localAdbNames = new Set<string>()
+  const reusedContainerNames = new Set<string>()
   config.getConfig().services.forEach((service) => {
-    if (service.kind === 'oracle-adb') {
+    if (service.kind === 'oracle-adb' && service.platform === 'local-podman') {
+      localAdbNames.add(service.service)
+      if (service.spec.reuseExisting === true) {
+        reusedContainerNames.add(service.service)
+        return
+      }
       services['oracle-adb'] = {
         image: 'container-registry.oracle.com/database/adb-free:latest',
         name: service.service,
@@ -46,26 +53,38 @@ export const runInfraUpPodman = async () => {
     }
   })
 
-  const composeFileContent = {
-    name: projectNameWithEnv,
-    services,
+  if (Object.keys(services).length > 0) {
+    const composeFileContent = {
+      name: projectNameWithEnv,
+      services,
+    }
+    const composeFile = new YamlFile(path.resolve(envDir, 'podman-compose.yaml'))
+    composeFile.set(composeFileContent)
+    await podman.composeUp(envDir)
+    await podman.waitForComposeContainers(projectNameWithEnv)
   }
 
-  const composeFile = new YamlFile(path.resolve(envDir, 'podman-compose.yaml'))
-  composeFile.set(composeFileContent)
-  await podman.composeUp(envDir)
+  const allContainers = podman.getContainerStatuses()
+  for (const containerName of reusedContainerNames) {
+    const container = allContainers.find((item) => item.name === containerName)
+    if (!container) {
+      logger.fatal(`Existing container "${containerName}" was not found.`)
+    } else if (container.state !== 'running') {
+      await podman.startContainer(containerName)
+    } else {
+      await podman.waitForContainerHealth(containerName)
+    }
+  }
 
-  await podman.waitForComposeContainers(projectNameWithEnv)
-
-  const containers = podman.getContainerStatuses(projectNameWithEnv)
-  containers
-    .filter((c) => c.name === `${projectName}-adb`)
-    .forEach(async (c) => {
-      const walletPath = path.join(envDir, '.wallets', `${projectName}-adb.zip`)
-      await podman.downloadDbWalletZip(c.name, walletPath)
-      const extractDir = path.join(envDir, '.wallets', `${projectName}-adb`)
-      await unZip(walletPath, extractDir)
-    })
+  const containers = podman
+    .getContainerStatuses(projectNameWithEnv)
+    .concat(allContainers.filter((container) => reusedContainerNames.has(container.name)))
+  for (const container of containers.filter((item) => localAdbNames.has(item.name))) {
+    const walletPath = path.join(envDir, '.wallets', `${container.name}.zip`)
+    await podman.downloadDbWalletZip(container.name, walletPath)
+    const extractDir = path.join(envDir, '.wallets', container.name)
+    await unZip(walletPath, extractDir)
+  }
 
   containers.forEach((c) => {
     logger.success(`${c.name} is up and running (${c.state}, ${c.status}) [${c.ports.join(', ')}]`)

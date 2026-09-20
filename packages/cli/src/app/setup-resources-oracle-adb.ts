@@ -69,31 +69,88 @@ export const runSetupOracleAdb = async () => {
   if (deploymentType === 'local-podman') {
     const podmanClient = new PodmanClient()
     const containers = podmanClient.getContainers()
-    const ports = podmanClient.getContainerPorts()
+    let ports = podmanClient.getContainerPorts()
 
-    const { dbName, listenerPort, ordsPort } = await prompts([
-      {
-        type: 'text',
-        name: 'dbName',
-        message: 'Database name',
-        initial: `${projectName}-adb`,
-        validate: (value) => containerNameValidation(value, containers),
-      },
-      {
-        type: 'text',
-        name: 'listenerPort',
-        message: 'Listener Port',
-        initial: '1522',
-        validate: (value) => containerPortValidation(value, ports),
-      },
-      {
-        type: 'text',
-        name: 'ordsPort',
-        message: 'ORDS Port',
-        initial: '8443',
-        validate: (value) => containerPortValidation(value, ports),
-      },
-    ])
+    const { dbName: requestedDbName } = await prompts({
+      type: 'text',
+      name: 'dbName',
+      message: 'Database name',
+      initial: `${projectName}-adb`,
+      validate: (value) => (value.trim() ? true : 'This field is required'),
+    })
+
+    let dbName = requestedDbName.trim()
+    let reuseExisting = false
+    if (containers.includes(dbName)) {
+      const { existingContainerAction } = await prompts({
+        type: 'select',
+        name: 'existingContainerAction',
+        message: `Container "${dbName}" already exists`,
+        choices: [
+          { title: 'Use existing container (keep its port mappings)', value: 'reuse' },
+          { title: 'Recreate container', value: 'recreate' },
+          { title: 'Use a different name', value: 'rename' },
+          { title: 'Exit setup', value: 'exit' },
+        ],
+      })
+
+      if (existingContainerAction === 'exit') {
+        logger.info('Setup cancelled.')
+        return
+      }
+
+      if (existingContainerAction === 'rename') {
+        const response = await prompts({
+          type: 'text',
+          name: 'dbName',
+          message: 'Database name',
+          initial: `${dbName}-2`,
+          validate: (value) => containerNameValidation(value, containers),
+        })
+        dbName = response.dbName.trim()
+      }
+
+      if (existingContainerAction === 'recreate') {
+        podmanClient.stopContainer(dbName)
+        if (!podmanClient.removeContainer(dbName)) {
+          logger.fatal(`Failed to remove existing container "${dbName}".`)
+        }
+        ports = podmanClient.getContainerPorts()
+      }
+
+      reuseExisting = existingContainerAction === 'reuse'
+    }
+
+    const existingService = config
+      .getConfig()
+      .services.find((service) => service.service === dbName && service.platform === 'local-podman')
+    let listenerPort =
+      typeof existingService?.spec.listenerPort === 'string'
+        ? existingService.spec.listenerPort
+        : '1522'
+    let ordsPort =
+      typeof existingService?.spec.ordsPort === 'string' ? existingService.spec.ordsPort : '8443'
+
+    if (!reuseExisting) {
+      const response = await prompts([
+        {
+          type: 'text',
+          name: 'listenerPort',
+          message: 'Listener Port',
+          initial: listenerPort,
+          validate: (value) => containerPortValidation(value, ports),
+        },
+        {
+          type: 'text',
+          name: 'ordsPort',
+          message: 'ORDS Port',
+          initial: ordsPort,
+          validate: (value) => containerPortValidation(value, ports),
+        },
+      ])
+      listenerPort = response.listenerPort
+      ordsPort = response.ordsPort
+    }
 
     config.addService({
       service: dbName,
@@ -102,6 +159,7 @@ export const runSetupOracleAdb = async () => {
       spec: {
         listenerPort,
         ordsPort,
+        reuseExisting,
       },
     })
   }

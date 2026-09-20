@@ -13,6 +13,7 @@ import {
 
 import { SecretsStore } from '../adapters/secrets-store.js'
 import { EnvironmentStore } from '../adapters/environment-store.js'
+import { ConfigStore } from '../adapters/config-store.js'
 
 import { logger } from '../shared/logger.js'
 
@@ -25,14 +26,17 @@ export type DbExecResponse = {
 /** Resolve wallet/TNS/secret configuration for the current environment. */
 export const buildConnectionConfig = (silent: boolean): OracleConnectionConfig => {
   const { envDir, projectName } = new EnvironmentStore().getCurrent()
+  const serviceName =
+    new ConfigStore().getConfig().services.find((service) => service.kind === 'oracle-adb')
+      ?.service || `${projectName}-adb`
 
-  const walletPath = path.join(envDir, '.wallets', `${projectName}-adb.zip`)
+  const walletPath = path.join(envDir, '.wallets', `${serviceName}.zip`)
   if (!fs.existsSync(walletPath)) {
     logger.fatal(`Wallet zip not found at ${walletPath}`)
   }
   if (!silent) logger.info(`Using wallet at ${walletPath}`)
 
-  const tnsPath = path.join(envDir, '.wallets', `${projectName}-adb`, 'tnsnames.ora')
+  const tnsPath = path.join(envDir, '.wallets', serviceName, 'tnsnames.ora')
   const connectString = resolveTnsAlias(tnsPath)
   if (!silent) logger.info(`Using connection string ${connectString} from ${tnsPath}`)
 
