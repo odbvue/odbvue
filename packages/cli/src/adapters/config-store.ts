@@ -30,7 +30,7 @@ type Platform =
 
 type Service = {
   service: string
-  kind: 'oracle-adb' | 'oracle-object-storage' | 'compute'
+  kind: 'oracle-adb' | 'oracle-object-storage' | 'compute' | 'odbvue-kms'
   platform: 'oci' | 'local-podman'
   spec: Record<string, unknown>
 }
@@ -99,6 +99,11 @@ export class ConfigStore {
     } else {
       this.config.services[existingServiceIndex] = service
     }
+    this.saveConfig()
+  }
+
+  removeService = (serviceName: string) => {
+    this.config.services = this.config.services.filter((service) => service.service !== serviceName)
     this.saveConfig()
   }
 }

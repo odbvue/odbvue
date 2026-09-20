@@ -7,6 +7,13 @@ import { unZip } from '../shared/zip.js'
 import { EnvironmentStore } from '../adapters/environment-store.js'
 import { ConfigStore } from '../adapters/config-store.js'
 import { PodmanClient } from '../adapters/podman-client.js'
+import {
+  ensureLocalKek,
+  getLocalKekName,
+  getLocalKmsCompose,
+  KMS_SERVICE_NAME,
+  writeLocalKmsBuildContext,
+} from './setup-resources-kms.js'
 
 export const runInfraUpPodman = async () => {
   const { projectName, currentEnv, envDir } = new EnvironmentStore().getCurrent()
@@ -28,19 +35,27 @@ export const runInfraUpPodman = async () => {
     }
   } else logger.muted('Podman is running...')
 
-  let services: Record<string, unknown> = {}
-  const localAdbNames = new Set<string>()
-  const reusedContainerNames = new Set<string>()
-  config.getConfig().services.forEach((service) => {
-    if (service.kind === 'oracle-adb' && service.platform === 'local-podman') {
-      localAdbNames.add(service.service)
-      if (service.spec.reuseExisting === true) {
-        reusedContainerNames.add(service.service)
-        return
-      }
+  const localAdbServices = config
+    .getConfig()
+    .services.filter(
+      (service) => service.kind === 'oracle-adb' && service.platform === 'local-podman',
+    )
+  if (localAdbServices.length === 0) return
+
+  ensureLocalKek(podman)
+  writeLocalKmsBuildContext(envDir)
+
+  const kekName = getLocalKekName(projectName, currentEnv)
+  const internalNetworkName = `${projectNameWithEnv}-internal`
+
+  const services: Record<string, unknown> = {
+    [KMS_SERVICE_NAME]: getLocalKmsCompose(kekName),
+  }
+  localAdbServices.forEach((service) => {
+    if (service.kind === 'oracle-adb') {
       services['oracle-adb'] = {
         image: 'container-registry.oracle.com/database/adb-free:latest',
-        name: service.service,
+        container_name: service.service,
         ports: [`${service.spec.listenerPort}:1522`, `${service.spec.ordsPort}:8443`],
         environment: {
           WORKLOAD_TYPE: 'ATP',
@@ -49,6 +64,7 @@ export const runInfraUpPodman = async () => {
         },
         cap_add: ['SYS_ADMIN'],
         devices: ['/dev/fuse:/dev/fuse'],
+        networks: ['odbvue-internal'],
       }
     }
   })
@@ -57,29 +73,18 @@ export const runInfraUpPodman = async () => {
     const composeFileContent = {
       name: projectNameWithEnv,
       services,
+      networks: { 'odbvue-internal': { name: internalNetworkName } },
+      secrets: { [kekName]: { external: true } },
     }
     const composeFile = new YamlFile(path.resolve(envDir, 'podman-compose.yaml'))
     composeFile.set(composeFileContent)
+    logger.info('Reconciling local services with Podman Compose...')
     await podman.composeUp(envDir)
     await podman.waitForComposeContainers(projectNameWithEnv)
   }
 
-  const allContainers = podman.getContainerStatuses()
-  for (const containerName of reusedContainerNames) {
-    const container = allContainers.find((item) => item.name === containerName)
-    if (!container) {
-      logger.fatal(`Existing container "${containerName}" was not found.`)
-    } else if (container.state !== 'running') {
-      await podman.startContainer(containerName)
-    } else {
-      await podman.waitForContainerHealth(containerName)
-    }
-  }
-
-  const containers = podman
-    .getContainerStatuses(projectNameWithEnv)
-    .concat(allContainers.filter((container) => reusedContainerNames.has(container.name)))
-  for (const container of containers.filter((item) => localAdbNames.has(item.name))) {
+  const containers = podman.getContainerStatuses(projectNameWithEnv)
+  for (const container of containers.filter((item) => item.name === 'odbvue-adb')) {
     const walletPath = path.join(envDir, '.wallets', `${container.name}.zip`)
     await podman.downloadDbWalletZip(container.name, walletPath)
     const extractDir = path.join(envDir, '.wallets', container.name)

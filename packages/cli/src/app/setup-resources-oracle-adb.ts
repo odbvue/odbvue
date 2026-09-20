@@ -10,6 +10,7 @@ import { availablePlatforms, ConfigStore } from '../adapters/config-store.js'
 import { SecretsStore } from '../adapters/secrets-store.js'
 
 import { INITIAL_PASSWORD } from '../shared/const.js'
+import { KMS_SERVICE_NAME } from './setup-resources-kms.js'
 
 const passwordValidation = (value: string) => {
   if (!value.trim()) return 'This field is required'
@@ -54,9 +55,10 @@ export const runSetupOracleAdb = async () => {
         ])
 
   if (deploymentType === 'local-podman') {
-    const podmanClient = new PodmanClient()
-    const containers = podmanClient.getContainers()
-    const ports = podmanClient.getContainerPorts()
+    config.removeService(KMS_SERVICE_NAME)
+    const podman = new PodmanClient()
+    const containers = podman.getContainers()
+    const ports = podman.getContainerPorts()
 
     const { dbName: requestedDbName } = await prompts({
       type: 'text',

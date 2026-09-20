@@ -1,4 +1,4 @@
-import { execSync } from 'child_process'
+import { execFileSync } from 'child_process'
 import { spawn } from 'child_process'
 import { mkdirSync, createWriteStream } from 'fs'
 import { platform } from 'os'
@@ -17,9 +17,9 @@ export interface ContainerStatus {
 export class PodmanClient {
   private podmanCmd: string | null
 
-  tryExec = (command: string, cwd?: string): boolean => {
+  tryExec = (command: string, args: string[] = [], cwd?: string): boolean => {
     try {
-      execSync(command, {
+      execFileSync(command, args, {
         cwd,
         stdio: 'ignore',
       })
@@ -33,24 +33,24 @@ export class PodmanClient {
     this.podmanCmd = null
     const isWindows = platform() === 'win32'
     if (isWindows) {
-      if (this.tryExec('podman.exe --version')) {
+      if (this.tryExec('podman.exe', ['--version'])) {
         this.podmanCmd = 'podman.exe'
       }
     }
-    if (this.tryExec('podman --version')) {
+    if (this.tryExec('podman', ['--version'])) {
       this.podmanCmd = 'podman'
     }
   }
 
   isInstalled(): boolean {
     if (this.podmanCmd === null) return false
-    return this.tryExec(`${this.podmanCmd} --version`)
+    return this.tryExec(this.podmanCmd, ['--version'])
   }
 
   isRunning(): boolean {
     if (this.podmanCmd === null) return false
     try {
-      execSync(`${this.podmanCmd} info`, { stdio: 'pipe' })
+      execFileSync(this.podmanCmd, ['info'], { stdio: 'pipe' })
       return true
     } catch {
       return false
@@ -60,7 +60,7 @@ export class PodmanClient {
   startMachine(): boolean {
     if (this.podmanCmd === null) return false
     try {
-      execSync(`${this.podmanCmd} machine start`, { stdio: 'inherit' })
+      execFileSync(this.podmanCmd, ['machine', 'start'], { stdio: 'inherit' })
       return true
     } catch {
       return false
@@ -68,8 +68,9 @@ export class PodmanClient {
   }
 
   checkResources() {
+    if (this.podmanCmd === null) return { cpus: 0, memoryGb: 0 }
     try {
-      const info = execSync(`${this.podmanCmd} system info --format json`, {
+      const info = execFileSync(this.podmanCmd, ['system', 'info', '--format', 'json'], {
         stdio: 'pipe',
       }).toString()
       const systemInfo = JSON.parse(info)
@@ -89,7 +90,7 @@ export class PodmanClient {
       return []
     }
     try {
-      const output = execSync(`${this.podmanCmd} ps -a --format "{{.Names}}"`, {
+      const output = execFileSync(this.podmanCmd, ['ps', '-a', '--format', '{{.Names}}'], {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
       }).trim()
@@ -99,13 +100,63 @@ export class PodmanClient {
     }
   }
 
-  async composeUp(containerDir: string, rebuild: boolean = false) {
+  secretExists(secretName: string): boolean {
     if (this.podmanCmd === null) return false
     try {
-      execSync(`${this.podmanCmd} compose up -d ${rebuild ? '--build' : ''}`, {
-        cwd: containerDir,
-        stdio: ['pipe', 'pipe', 'pipe'],
+      execFileSync(this.podmanCmd, ['secret', 'inspect', secretName], { stdio: 'ignore' })
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  createSecret(secretName: string, value: Buffer): boolean {
+    if (this.podmanCmd === null) return false
+    try {
+      execFileSync(this.podmanCmd, ['secret', 'create', secretName, '-'], {
+        input: value,
+        stdio: ['pipe', 'ignore', 'pipe'],
       })
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  connectContainerToNetwork(containerName: string, networkName: string): boolean {
+    if (this.podmanCmd === null) return false
+    try {
+      execFileSync(this.podmanCmd, ['network', 'connect', networkName, containerName], {
+        stdio: 'ignore',
+      })
+      return true
+    } catch {
+      try {
+        const output = execFileSync(this.podmanCmd, ['inspect', containerName], {
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+        })
+        const container = JSON.parse(output)[0] as {
+          NetworkSettings?: { Networks?: Record<string, unknown> }
+        }
+        return container.NetworkSettings?.Networks?.[networkName] !== undefined
+      } catch {
+        return false
+      }
+    }
+  }
+
+  async composeUp(containerDir: string, services: string[] = [], rebuild: boolean = false) {
+    if (this.podmanCmd === null) return false
+    try {
+      execFileSync(
+        this.podmanCmd,
+        ['compose', 'up', '-d', ...(rebuild ? ['--build'] : []), ...services],
+        {
+          cwd: containerDir,
+          stdio: 'inherit',
+        },
+      )
 
       return true
     } catch (error) {
@@ -116,7 +167,7 @@ export class PodmanClient {
   async composeDown(containerDir: string) {
     if (this.podmanCmd === null) return false
     try {
-      execSync(`${this.podmanCmd} compose down`, {
+      execFileSync(this.podmanCmd, ['compose', 'down'], {
         cwd: containerDir,
         stdio: ['pipe', 'pipe', 'pipe'],
       })
@@ -130,7 +181,7 @@ export class PodmanClient {
   async createContainer(containerDir: string) {
     if (this.podmanCmd === null) return false
     try {
-      execSync(`${this.podmanCmd} compose up -d --build`, {
+      execFileSync(this.podmanCmd, ['compose', 'up', '-d', '--build'], {
         cwd: containerDir,
         stdio: 'inherit',
       })
@@ -146,7 +197,7 @@ export class PodmanClient {
       return false
     }
     try {
-      execSync(`${this.podmanCmd} start ${containerName}`, { stdio: 'pipe' })
+      execFileSync(this.podmanCmd, ['start', containerName], { stdio: 'pipe' })
     } catch (error) {
       logger.fatal(error)
     }
@@ -164,7 +215,7 @@ export class PodmanClient {
       return false
     }
     try {
-      execSync(`${this.podmanCmd} stop ${containerName}`, { stdio: 'pipe' })
+      execFileSync(this.podmanCmd, ['stop', containerName], { stdio: 'pipe' })
 
       return true
     } catch {
@@ -177,7 +228,7 @@ export class PodmanClient {
       return false
     }
     try {
-      execSync(`${this.podmanCmd} rm ${containerName}`, { stdio: 'pipe' })
+      execFileSync(this.podmanCmd, ['rm', containerName], { stdio: 'pipe' })
 
       return true
     } catch {
@@ -190,11 +241,15 @@ export class PodmanClient {
       return []
     }
     try {
-      const filterFlag = projectName
-        ? `--filter label=com.docker.compose.project=${projectName}`
-        : ''
-      const output = execSync(
-        `${this.podmanCmd} ps -a ${filterFlag} --format "{{.Names}}\t{{.State}}\t{{.Status}}\t{{.Ports}}"`,
+      const output = execFileSync(
+        this.podmanCmd,
+        [
+          'ps',
+          '-a',
+          ...(projectName ? ['--filter', `label=com.docker.compose.project=${projectName}`] : []),
+          '--format',
+          '{{.Names}}\t{{.State}}\t{{.Status}}\t{{.Ports}}',
+        ],
         {
           encoding: 'utf-8',
           stdio: ['pipe', 'pipe', 'pipe'],
@@ -234,11 +289,14 @@ export class PodmanClient {
       return []
     }
     try {
-      const psCommand = includeAll ? 'ps -a' : 'ps'
-      const output = execSync(`${this.podmanCmd} ${psCommand} --format "{{.Names}}|{{.Ports}}"`, {
-        encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-      })
+      const output = execFileSync(
+        this.podmanCmd,
+        ['ps', ...(includeAll ? ['-a'] : []), '--format', '{{.Names}}|{{.Ports}}'],
+        {
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+        },
+      )
       const lines = output.trim().split('\n')
       const portsSet = new Set<string>()
 
@@ -312,7 +370,8 @@ export class PodmanClient {
 
   async waitForComposeContainers(
     projectName: string,
-    timeoutMs: number = 1200000,
+    requireHealthy: boolean = true,
+    timeoutMs: number = 3600000,
     intervalMs: number = 5000,
   ): Promise<void> {
     if (this.podmanCmd === null) {
@@ -324,7 +383,9 @@ export class PodmanClient {
       (state) => {
         const containers = state as ContainerStatus[]
         if (containers.length === 0) return false
-        return containers.every((c) => c.healthy)
+        return requireHealthy
+          ? containers.every((container) => container.healthy)
+          : containers.every((container) => container.state === 'running')
       },
       (state, elapsed, spinner) => {
         const containers = state as ContainerStatus[]
@@ -336,7 +397,8 @@ export class PodmanClient {
         const elapsedSec = Math.floor((elapsed % 60000) / 1000)
         const timeStr = elapsedMin > 0 ? `${elapsedMin}m ${elapsedSec}s` : `${elapsedSec}s`
         const statusLine = containers.map((c) => `${c.name} ${c.state.toUpperCase()}`).join(' | ')
-        process.stdout.write(`\r${spinner} ${statusLine} (${timeStr})    `)
+        const readiness = requireHealthy ? 'Waiting for Oracle readiness' : 'Waiting for containers'
+        process.stdout.write(`\r${spinner} ${readiness}: ${statusLine} (${timeStr})    `)
       },
       undefined,
       `Timeout waiting for containers to be ready`,
@@ -356,16 +418,18 @@ export class PodmanClient {
 
     const getContainerStatus = (): string | null => {
       try {
-        const result = execSync(
-          `${this.podmanCmd!} inspect --format "{{.State.Health.Status}}" ${containerName}`,
+        const result = execFileSync(
+          this.podmanCmd!,
+          ['inspect', '--format', '{{.State.Health.Status}}', containerName],
           { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
         ).trim()
         return result
       } catch {
         // Container might not exist yet or no health check defined
         try {
-          const running = execSync(
-            `${this.podmanCmd!} inspect --format "{{.State.Running}}" ${containerName}`,
+          const running = execFileSync(
+            this.podmanCmd!,
+            ['inspect', '--format', '{{.State.Running}}', containerName],
             { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
           ).trim()
           return running === 'true' ? 'running' : 'not-running'

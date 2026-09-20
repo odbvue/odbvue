@@ -9,6 +9,7 @@ import { PodmanClient } from '../adapters/podman-client.js'
 import { OciClient } from '../adapters/oci-client.js'
 
 import { runDbExec } from './db-exec.js'
+import { KMS_SERVICE_NAME } from './setup-resources-kms.js'
 
 type DbStatusResponse = {
   rows?: {
@@ -19,22 +20,27 @@ type DbStatusResponse = {
 export const runInfraStatus = async () => {
   const config = new ConfigStore()
   const platforms = config.getConfig().platforms
+  const environmentStore = new EnvironmentStore()
+  const { projectName, currentEnv } = environmentStore.getCurrent()
+  const projectNameWithEnv = `${projectName}-${currentEnv}`
 
   for (const platform of platforms) {
-    logger.info(`Platform: ${platform.platform}`)
-
     if (platform.platform === 'local-podman') {
+      logger.info('Infrastructure: local-podman')
       const podman = new PodmanClient()
       const isRunning = await podman.isRunning()
       if (isRunning) {
-        const containers = await podman.getContainerStatuses()
+        const containers = podman.getContainerStatuses(projectNameWithEnv)
         if (containers.length > 0) {
           logger.muted('Containers:')
           containers.forEach((c) => {
-            logger.muted(`  - ${c.name}: (${c.state}, ${c.status}) [${c.ports.join(', ')}]`)
+            const readiness = c.healthy ? 'healthy' : c.status
+            const exposure = c.name === KMS_SERVICE_NAME ? 'internal only' : c.ports.join(', ')
+            logger.muted(`  - ${c.name}: ${c.state} / ${readiness}`)
+            logger.muted(`    ${exposure || 'no published ports'}`)
           })
         } else {
-          logger.muted('No containers found')
+          logger.muted(`No containers found for ${projectNameWithEnv}`)
         }
         logger.success('Local Podman is running')
       } else {
@@ -43,7 +49,6 @@ export const runInfraStatus = async () => {
     }
 
     if (platform.platform === 'oci') {
-      const environmentStore = new EnvironmentStore()
       const { envDir } = environmentStore.getCurrent()
       const ociFilePath = path.join(envDir, '.oci', 'config')
 
