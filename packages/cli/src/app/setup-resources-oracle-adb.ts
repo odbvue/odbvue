@@ -24,24 +24,11 @@ const passwordValidation = (value: string) => {
   return true
 }
 
-const containerNameValidation = (value: string, containers: string[]) => {
-  if (!value.trim()) return 'This field is required'
-  if (containers.includes(value)) return `Container with name "${value}" already exists`
-  return true
-}
-
 const containerPortValidation = (value: string, ports: string[]) => {
   if (!value.trim()) return 'This field is required'
   const port = Number(value)
   if (isNaN(port) || port < 1 || port > 65535) return 'Please enter a valid port number (1-65535)'
   if (ports.includes(value)) return `Port "${value}" is already in use`
-  return true
-}
-
-const ociValidation = async (value: string, adbInstances: string[]) => {
-  if (!value.trim()) return 'This field is required'
-  if (adbInstances.some((adb) => adb === value))
-    return `ADB instance with name "${value}" already exists in OCI`
   return true
 }
 
@@ -69,7 +56,7 @@ export const runSetupOracleAdb = async () => {
   if (deploymentType === 'local-podman') {
     const podmanClient = new PodmanClient()
     const containers = podmanClient.getContainers()
-    let ports = podmanClient.getContainerPorts()
+    const ports = podmanClient.getContainerPorts()
 
     const { dbName: requestedDbName } = await prompts({
       type: 'text',
@@ -79,46 +66,10 @@ export const runSetupOracleAdb = async () => {
       validate: (value) => (value.trim() ? true : 'This field is required'),
     })
 
-    let dbName = requestedDbName.trim()
-    let reuseExisting = false
-    if (containers.includes(dbName)) {
-      const { existingContainerAction } = await prompts({
-        type: 'select',
-        name: 'existingContainerAction',
-        message: `Container "${dbName}" already exists`,
-        choices: [
-          { title: 'Use existing container (keep its port mappings)', value: 'reuse' },
-          { title: 'Recreate container', value: 'recreate' },
-          { title: 'Use a different name', value: 'rename' },
-          { title: 'Exit setup', value: 'exit' },
-        ],
-      })
-
-      if (existingContainerAction === 'exit') {
-        logger.info('Setup cancelled.')
-        return
-      }
-
-      if (existingContainerAction === 'rename') {
-        const response = await prompts({
-          type: 'text',
-          name: 'dbName',
-          message: 'Database name',
-          initial: `${dbName}-2`,
-          validate: (value) => containerNameValidation(value, containers),
-        })
-        dbName = response.dbName.trim()
-      }
-
-      if (existingContainerAction === 'recreate') {
-        podmanClient.stopContainer(dbName)
-        if (!podmanClient.removeContainer(dbName)) {
-          logger.fatal(`Failed to remove existing container "${dbName}".`)
-        }
-        ports = podmanClient.getContainerPorts()
-      }
-
-      reuseExisting = existingContainerAction === 'reuse'
+    const dbName = requestedDbName.trim()
+    const reuseExisting = containers.includes(dbName)
+    if (reuseExisting) {
+      logger.warn(`Container "${dbName}" already exists and will be used without changing ports.`)
     }
 
     const existingService = config
@@ -178,8 +129,12 @@ export const runSetupOracleAdb = async () => {
       name: 'dbName',
       message: 'Database name',
       initial: `${projectName}-adb`,
-      validate: (value) => ociValidation(value, adbInstances),
+      validate: (value) => (value.trim() ? true : 'This field is required'),
     })
+
+    if (adbInstances.includes(dbName)) {
+      logger.warn(`ADB instance "${dbName}" already exists and will be used.`)
+    }
 
     config.addService({
       service: dbName,
