@@ -122,13 +122,13 @@ export type LoadDbMigrationStateOptions = {
 export const loadDbMigrationState = async (
   options: LoadDbMigrationStateOptions = {},
 ): Promise<DbMigrationState | null> => {
+  const secrets = new SecretsStore()
+  secrets.load()
   buildDbProject()
 
   const sourceDir = path.join(dbDir, 'dist', 'migrations')
   const destDir = path.join(dbDir, 'dist', 'sql')
 
-  const secrets = new SecretsStore()
-  secrets.load()
   const configuredSchema = secrets.get('ODBVUE_ADB_SCHEMA_USERNAME')
   if (!configuredSchema) {
     logger.error('Schema username not found in secrets')

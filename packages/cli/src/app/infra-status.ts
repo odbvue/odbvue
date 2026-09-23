@@ -9,7 +9,6 @@ import { PodmanClient } from '../adapters/podman-client.js'
 import { OciClient } from '../adapters/oci-client.js'
 
 import { runDbExec } from './db-exec.js'
-import { KMS_SERVICE_NAME } from './setup-resources-kms.js'
 
 type DbStatusResponse = {
   rows?: {
@@ -21,8 +20,11 @@ export const runInfraStatus = async () => {
   const config = new ConfigStore()
   const platforms = config.getConfig().platforms
   const environmentStore = new EnvironmentStore()
-  const { projectName, currentEnv } = environmentStore.getCurrent()
-  const projectNameWithEnv = `${projectName}-${currentEnv}`
+  const localAdb = config
+    .getConfig()
+    .services.filter(
+      (service) => service.kind === 'oracle-adb' && service.platform === 'local-podman',
+    )
 
   for (const platform of platforms) {
     if (platform.platform === 'local-podman') {
@@ -30,17 +32,19 @@ export const runInfraStatus = async () => {
       const podman = new PodmanClient()
       const isRunning = await podman.isRunning()
       if (isRunning) {
-        const containers = podman.getContainerStatuses(projectNameWithEnv)
+        const containers = podman
+          .getContainerStatuses()
+          .filter((container) => localAdb.some((service) => service.service === container.name))
         if (containers.length > 0) {
           logger.muted('Containers:')
           containers.forEach((c) => {
             const readiness = c.healthy ? 'healthy' : c.status
-            const exposure = c.name === KMS_SERVICE_NAME ? 'internal only' : c.ports.join(', ')
+            const exposure = c.ports.join(', ')
             logger.muted(`  - ${c.name}: ${c.state} / ${readiness}`)
             logger.muted(`    ${exposure || 'no published ports'}`)
           })
         } else {
-          logger.muted(`No containers found for ${projectNameWithEnv}`)
+          logger.muted('No local ADB container found')
         }
         logger.success('Local Podman is running')
       } else {

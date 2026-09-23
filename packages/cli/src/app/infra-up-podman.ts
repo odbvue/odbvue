@@ -1,3 +1,4 @@
+import prompts from 'prompts'
 import path from 'path'
 
 import { logger } from '../shared/logger.js'
@@ -7,13 +8,8 @@ import { unZip } from '../shared/zip.js'
 import { EnvironmentStore } from '../adapters/environment-store.js'
 import { ConfigStore } from '../adapters/config-store.js'
 import { PodmanClient } from '../adapters/podman-client.js'
-import {
-  ensureLocalKek,
-  getLocalKekName,
-  getLocalKmsCompose,
-  KMS_SERVICE_NAME,
-  writeLocalKmsBuildContext,
-} from './setup-resources-kms.js'
+
+const composeFile = 'podman-compose.yaml'
 
 export const runInfraUpPodman = async () => {
   const { projectName, currentEnv, envDir } = new EnvironmentStore().getCurrent()
@@ -22,7 +18,7 @@ export const runInfraUpPodman = async () => {
   const config = new ConfigStore()
   if (!config.getConfig().platforms.some((p) => p.platform === 'local-podman')) return
 
-  logger.info('Starting Local Podman containers...')
+  logger.info('Starting local ADB...')
   const podman = new PodmanClient()
 
   if (!podman.isInstalled()) {
@@ -41,58 +37,69 @@ export const runInfraUpPodman = async () => {
       (service) => service.kind === 'oracle-adb' && service.platform === 'local-podman',
     )
   if (localAdbServices.length === 0) return
-
-  ensureLocalKek(podman)
-  writeLocalKmsBuildContext(envDir)
-
-  const kekName = getLocalKekName(projectName, currentEnv)
-  const internalNetworkName = `${projectNameWithEnv}-internal`
-
-  const services: Record<string, unknown> = {
-    [KMS_SERVICE_NAME]: getLocalKmsCompose(kekName),
+  if (localAdbServices.length !== 1) {
+    throw new Error('Local Podman supports exactly one ADB service.')
   }
-  localAdbServices.forEach((service) => {
-    if (service.kind === 'oracle-adb') {
-      services['oracle-adb'] = {
-        image: 'container-registry.oracle.com/database/adb-free:latest',
-        container_name: service.service,
-        ports: [`${service.spec.listenerPort}:1522`, `${service.spec.ordsPort}:8443`],
-        environment: {
-          WORKLOAD_TYPE: 'ATP',
-          ADMIN_PASSWORD: '${ODBVUE_ADB_ADMIN_PASSWORD}',
-          WALLET_PASSWORD: '${ODBVUE_ADB_WALLET_PASSWORD}',
+  const service = localAdbServices[0]
+
+  const existing = podman
+    .getContainerStatuses()
+    .find((container) => container.name === service.service)
+  let action: 'create' | 'use-existing' | 'recreate' = 'create'
+  if (existing) {
+    const { action: selectedAction } = await prompts({
+      type: 'select',
+      name: 'action',
+      message: `Container "${service.service}" already exists (${existing.status})`,
+      choices: [
+        {
+          title:
+            existing.state === 'running' ? 'Use existing container' : 'Start existing container',
+          value: 'use-existing',
         },
-        cap_add: ['SYS_ADMIN'],
-        devices: ['/dev/fuse:/dev/fuse'],
-        networks: ['odbvue-internal'],
-      }
+        { title: 'Recreate container', value: 'recreate' },
+        { title: 'Exit', value: 'exit' },
+      ],
+    })
+    if (selectedAction !== 'use-existing' && selectedAction !== 'recreate') return false
+    action = selectedAction
+  }
+  if (action === 'use-existing') {
+    if (existing?.state !== 'running' && !podman.startContainer(service.service)) {
+      throw new Error(`Failed to start ADB container "${service.service}".`)
     }
-  })
-
-  if (Object.keys(services).length > 0) {
-    const composeFileContent = {
+    logger.info(`Using existing local ADB container "${service.service}".`)
+  } else {
+    new YamlFile(path.resolve(envDir, composeFile)).set({
       name: projectNameWithEnv,
-      services,
-      networks: { 'odbvue-internal': { name: internalNetworkName } },
-      secrets: { [kekName]: { external: true } },
-    }
-    const composeFile = new YamlFile(path.resolve(envDir, 'podman-compose.yaml'))
-    composeFile.set(composeFileContent)
-    logger.info('Reconciling local services with Podman Compose...')
-    await podman.composeUp(envDir)
-    await podman.waitForComposeContainers(projectNameWithEnv)
+      services: {
+        'oracle-adb': {
+          image: 'container-registry.oracle.com/database/adb-free:latest',
+          container_name: service.service,
+          ports: [`${service.spec.listenerPort}:1522`, `${service.spec.ordsPort}:8443`],
+          environment: {
+            WORKLOAD_TYPE: 'ATP',
+            ADMIN_PASSWORD: '${ODBVUE_ADB_ADMIN_PASSWORD}',
+            WALLET_PASSWORD: '${ODBVUE_ADB_WALLET_PASSWORD}',
+          },
+          cap_add: ['SYS_ADMIN'],
+          devices: ['/dev/fuse:/dev/fuse'],
+        },
+      },
+    })
+    logger.info(`Reconciling local ADB container "${service.service}"...`)
+    await podman.composeUp(envDir, action === 'recreate')
   }
+  await podman.waitForContainerHealth(service.service, 3600000)
 
-  const containers = podman.getContainerStatuses(projectNameWithEnv)
-  for (const container of containers.filter((item) => item.name === 'odbvue-adb')) {
-    const walletPath = path.join(envDir, '.wallets', `${container.name}.zip`)
-    await podman.downloadDbWalletZip(container.name, walletPath)
-    const extractDir = path.join(envDir, '.wallets', container.name)
-    await unZip(walletPath, extractDir)
-  }
+  const container = podman.getContainerStatuses().find((item) => item.name === service.service)
+  if (!container?.healthy) throw new Error(`ADB container "${service.service}" is not healthy.`)
+  const walletPath = path.join(envDir, '.wallets', `${container.name}.zip`)
+  await podman.downloadDbWalletZip(container.name, walletPath)
+  await unZip(walletPath, path.join(envDir, '.wallets', container.name))
 
-  containers.forEach((c) => {
-    logger.success(`${c.name} is up and running (${c.state}, ${c.status}) [${c.ports.join(', ')}]`)
-  })
+  logger.success(
+    `${container.name} is up and running (${container.state}, ${container.status}) [${container.ports.join(', ')}]`,
+  )
   logger.lf()
 }

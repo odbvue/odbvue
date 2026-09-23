@@ -40,8 +40,14 @@ export const runImplode = async (options: ImplodeOptions = {}) => {
   if (platforms.some((p) => p.platform === 'local-podman')) {
     logger.info('Removing local Podman containers...')
     const podman = new PodmanClient()
-    const removed = await podman.composeDown(envDir)
-    if (!removed) {
+    const localAdbServices = config
+      .getConfig()
+      .services.filter(
+        (service) => service.kind === 'oracle-adb' && service.platform === 'local-podman',
+      )
+    if (localAdbServices.length > 1)
+      throw new Error('Local Podman supports exactly one ADB service.')
+    if (localAdbServices.length === 1 && !(await podman.composeDown(envDir))) {
       logger.warn('Failed to remove Podman containers.')
     }
   }

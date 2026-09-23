@@ -12,6 +12,19 @@ export const buildDbProject = (): void => {
   rmSync(path.join(dbDir, 'dist', 'sql'), { recursive: true, force: true })
 
   const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+  const odbResult = spawnSync(pnpm, ['--dir', path.join(rootDir, 'packages', 'odb'), 'build'], {
+    cwd: rootDir,
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+  })
+
+  if (odbResult.error) {
+    throw new Error(`Failed to start ODB framework build: ${odbResult.error.message}`)
+  }
+  if (odbResult.status !== 0) {
+    throw new Error(`ODB framework build failed with exit code ${odbResult.status ?? 'unknown'}`)
+  }
+
   const result = spawnSync(pnpm, ['--dir', dbDir, 'build'], {
     cwd: rootDir,
     stdio: 'inherit',

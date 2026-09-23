@@ -100,58 +100,19 @@ export class PodmanClient {
     }
   }
 
-  secretExists(secretName: string): boolean {
-    if (this.podmanCmd === null) return false
-    try {
-      execFileSync(this.podmanCmd, ['secret', 'inspect', secretName], { stdio: 'ignore' })
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  createSecret(secretName: string, value: Buffer): boolean {
-    if (this.podmanCmd === null) return false
-    try {
-      execFileSync(this.podmanCmd, ['secret', 'create', secretName, '-'], {
-        input: value,
-        stdio: ['pipe', 'ignore', 'pipe'],
-      })
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  connectContainerToNetwork(containerName: string, networkName: string): boolean {
-    if (this.podmanCmd === null) return false
-    try {
-      execFileSync(this.podmanCmd, ['network', 'connect', networkName, containerName], {
-        stdio: 'ignore',
-      })
-      return true
-    } catch {
-      try {
-        const output = execFileSync(this.podmanCmd, ['inspect', containerName], {
-          encoding: 'utf-8',
-          stdio: ['pipe', 'pipe', 'pipe'],
-        })
-        const container = JSON.parse(output)[0] as {
-          NetworkSettings?: { Networks?: Record<string, unknown> }
-        }
-        return container.NetworkSettings?.Networks?.[networkName] !== undefined
-      } catch {
-        return false
-      }
-    }
-  }
-
-  async composeUp(containerDir: string, services: string[] = [], rebuild: boolean = false) {
+  async composeUp(containerDir: string, forceRecreate: boolean = false) {
     if (this.podmanCmd === null) return false
     try {
       execFileSync(
         this.podmanCmd,
-        ['compose', 'up', '-d', ...(rebuild ? ['--build'] : []), ...services],
+        [
+          'compose',
+          '-f',
+          'podman-compose.yaml',
+          'up',
+          '-d',
+          ...(forceRecreate ? ['--force-recreate'] : []),
+        ],
         {
           cwd: containerDir,
           stdio: 'inherit',
@@ -167,7 +128,7 @@ export class PodmanClient {
   async composeDown(containerDir: string) {
     if (this.podmanCmd === null) return false
     try {
-      execFileSync(this.podmanCmd, ['compose', 'down'], {
+      execFileSync(this.podmanCmd, ['compose', '-f', 'podman-compose.yaml', 'down'], {
         cwd: containerDir,
         stdio: ['pipe', 'pipe', 'pipe'],
       })
@@ -178,21 +139,7 @@ export class PodmanClient {
     }
   }
 
-  async createContainer(containerDir: string) {
-    if (this.podmanCmd === null) return false
-    try {
-      execFileSync(this.podmanCmd, ['compose', 'up', '-d', '--build'], {
-        cwd: containerDir,
-        stdio: 'inherit',
-      })
-
-      return true
-    } catch (error) {
-      logger.fatal(error)
-    }
-  }
-
-  async startContainer(containerName: string) {
+  startContainer(containerName: string): boolean {
     if (this.podmanCmd === null) {
       return false
     }
@@ -202,54 +149,17 @@ export class PodmanClient {
       logger.fatal(error)
     }
 
-    try {
-      await this.waitForContainerHealth(containerName)
-    } catch (error) {
-      logger.fatal(error)
-    }
     return true
   }
 
-  stopContainer(containerName: string): boolean {
-    if (this.podmanCmd === null) {
-      return false
-    }
-    try {
-      execFileSync(this.podmanCmd, ['stop', containerName], { stdio: 'pipe' })
-
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  removeContainer(containerName: string): boolean {
-    if (this.podmanCmd === null) {
-      return false
-    }
-    try {
-      execFileSync(this.podmanCmd, ['rm', containerName], { stdio: 'pipe' })
-
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  getContainerStatuses(projectName?: string): ContainerStatus[] {
+  getContainerStatuses(): ContainerStatus[] {
     if (this.podmanCmd === null) {
       return []
     }
     try {
       const output = execFileSync(
         this.podmanCmd,
-        [
-          'ps',
-          '-a',
-          ...(projectName ? ['--filter', `label=com.docker.compose.project=${projectName}`] : []),
-          '--format',
-          '{{.Names}}\t{{.State}}\t{{.Status}}\t{{.Ports}}',
-        ],
+        ['ps', '-a', '--format', '{{.Names}}\t{{.State}}\t{{.Status}}\t{{.Ports}}'],
         {
           encoding: 'utf-8',
           stdio: ['pipe', 'pipe', 'pipe'],
@@ -266,7 +176,7 @@ export class PodmanClient {
         const portsStr = parts[3] || ''
 
         const healthMatch = status.match(/\((.*?)\)/)
-        const healthy = healthMatch ? healthMatch[1].toLowerCase().includes('healthy') : false
+        const healthy = healthMatch ? healthMatch[1].toLowerCase() === 'healthy' : false
 
         const ports: string[] = []
         if (portsStr && portsStr !== '<none>') {
@@ -366,45 +276,6 @@ export class PodmanClient {
 
       check()
     })
-  }
-
-  async waitForComposeContainers(
-    projectName: string,
-    requireHealthy: boolean = true,
-    timeoutMs: number = 3600000,
-    intervalMs: number = 5000,
-  ): Promise<void> {
-    if (this.podmanCmd === null) {
-      throw new Error('Podman is not installed')
-    }
-
-    await this.waitForReadiness(
-      () => this.getContainerStatuses(projectName),
-      (state) => {
-        const containers = state as ContainerStatus[]
-        if (containers.length === 0) return false
-        return requireHealthy
-          ? containers.every((container) => container.healthy)
-          : containers.every((container) => container.state === 'running')
-      },
-      (state, elapsed, spinner) => {
-        const containers = state as ContainerStatus[]
-        if (containers.length === 0) {
-          process.stdout.write(`\r${spinner} Waiting for containers...`)
-          return
-        }
-        const elapsedMin = Math.floor(elapsed / 60000)
-        const elapsedSec = Math.floor((elapsed % 60000) / 1000)
-        const timeStr = elapsedMin > 0 ? `${elapsedMin}m ${elapsedSec}s` : `${elapsedSec}s`
-        const statusLine = containers.map((c) => `${c.name} ${c.state.toUpperCase()}`).join(' | ')
-        const readiness = requireHealthy ? 'Waiting for Oracle readiness' : 'Waiting for containers'
-        process.stdout.write(`\r${spinner} ${readiness}: ${statusLine} (${timeStr})    `)
-      },
-      undefined,
-      `Timeout waiting for containers to be ready`,
-      timeoutMs,
-      intervalMs,
-    )
   }
 
   async waitForContainerHealth(
