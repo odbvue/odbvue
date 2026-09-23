@@ -7,6 +7,7 @@ export type SchemaNode = {
   dataTablespace: string
   tempTablespace: string
   grants: Grant[]
+  resourcePrincipalEnabled: boolean
 }
 
 export class Schema {
@@ -14,6 +15,7 @@ export class Schema {
   private _dataTablespace: string = 'DATA'
   private _tempTablespace: string = 'TEMP'
   private _grants: Grant[] = []
+  private _resourcePrincipalEnabled = false
 
   constructor(
     readonly username: string,
@@ -37,6 +39,11 @@ export class Schema {
     return this
   }
 
+  enableResourcePrincipal(): this {
+    this._resourcePrincipalEnabled = true
+    return this
+  }
+
   toNode(): SchemaNode {
     return {
       kind: 'schema',
@@ -45,6 +52,7 @@ export class Schema {
       dataTablespace: this._dataTablespace,
       tempTablespace: this._tempTablespace,
       grants: [...this._grants],
+      resourcePrincipalEnabled: this._resourcePrincipalEnabled,
     }
   }
 
@@ -57,6 +65,12 @@ export class Schema {
         QUOTA UNLIMITED ON ${this._dataTablespace};`,
       `GRANT CREATE SESSION TO ${this.username};`,
       ...this._grants.map((grant) => `GRANT ${grant} TO ${this.username};`),
+      ...(this._resourcePrincipalEnabled
+        ? [
+            `BEGIN\n  DBMS_CLOUD_ADMIN.ENABLE_RESOURCE_PRINCIPAL();\nEXCEPTION\n  WHEN OTHERS THEN\n    IF SQLCODE != -20031 THEN RAISE; END IF;\nEND;\n/`,
+            `BEGIN\n  DBMS_CLOUD_ADMIN.ENABLE_RESOURCE_PRINCIPAL(username => '${this.username.replace(/'/g, "''")}');\nEXCEPTION\n  WHEN OTHERS THEN\n    IF SQLCODE != -20031 THEN RAISE; END IF;\nEND;\n/`,
+          ]
+        : []),
     ].join('\n')
   }
 
