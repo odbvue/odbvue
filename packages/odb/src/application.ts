@@ -50,11 +50,15 @@ export function emitApplicationOrdsSql(
   options: { schema?: string } = {},
 ): string {
   const definedModules = new Set<string>()
+  const definedTemplates = new Set<string>()
   return compileApplicationEndpoints(application)
     .map((endpoint) => {
       const defineModule = !definedModules.has(endpoint.module)
+      const templateKey = JSON.stringify([endpoint.module, endpoint.effectivePattern])
+      const defineTemplate = !definedTemplates.has(templateKey)
       definedModules.add(endpoint.module)
-      return endpoint.toSQLUp({ ...options, defineModule })
+      definedTemplates.add(templateKey)
+      return endpoint.toSQLUp({ ...options, defineModule, defineTemplate })
     })
     .join('\n\n')
 }

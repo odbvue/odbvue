@@ -65,6 +65,8 @@ export type OrdsEndpointSqlOptions = {
   schema?: string
   /** Define the owning module before its template. Defaults to true. */
   defineModule?: boolean
+  /** Define the template before its handler. Defaults to true. */
+  defineTemplate?: boolean
 }
 
 // ── OrdsParam ─────────────────────────────────────────────────────────────────
@@ -318,15 +320,21 @@ export class OrdsEndpoint {
             `  COMMIT;`,
             '',
           ]
+    const templateSql =
+      options.defineTemplate === false
+        ? []
+        : [
+            `  ords.define_template(`,
+            `    p_module_name => '${this.module}',`,
+            `    p_pattern     => '${pattern}',`,
+            `    p_comments    => ${comment}`,
+            `  );`,
+            `  COMMIT;`,
+            '',
+          ]
     const body = [
       ...moduleSql,
-      `  ords.define_template(`,
-      `    p_module_name => '${this.module}',`,
-      `    p_pattern     => '${pattern}',`,
-      `    p_comments    => ${comment}`,
-      `  );`,
-      `  COMMIT;`,
-      '',
+      ...templateSql,
       `  ords.define_handler(`,
       `    p_module_name    => '${this.module}',`,
       `    p_pattern        => '${pattern}',`,
