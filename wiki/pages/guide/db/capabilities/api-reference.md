@@ -123,9 +123,12 @@ Key/value settings store with AES-256 encryption for secrets. Backed by the odb 
 ```ts
 import { odbSettings } from '@odbvue/odb'
 
-// Fallback key defaults to a built-in dev key; override via ODBVUE_SETTINGS_MASTER_KEY
+// Local development: generate or reuse the database-resident master key
 odbSettings.toSQLUp({ schema: 'APP_USER' })
 odbSettings.toSQLDown({ schema: 'APP_USER' })
+
+// OCI: use Vault instead of a local master-key table
+odbSettings.vaultSecret(vaultSecretUri).toSQLUp({ schema: 'APP_USER' })
 ```
 
 ### Expression Helpers

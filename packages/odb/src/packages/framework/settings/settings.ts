@@ -3,20 +3,15 @@
 // This module exposes two things:
 //
 // 1. `odbSettings.toSQLUp()` / `odbSettings.toSQLDown()` — SQL to install / drop
-//    the `odb_settings_store` table and the `odb_settings` package in the target
+//    the settings store, local key (when used), and the `odb_settings` package in the target
 //    schema. Call these from a migration's `.up()` / `.down()`.
 //
 // 2. `odbSettings.<fn>(...)` — pure functions returning PL/SQL call/expression
 //    strings that invoke `odb_settings.*`. Use them anywhere a PL/SQL statement
 //    or expression is accepted (e.g. `body.set(v_out, odbSettings.read("'API_URL'"))`).
 //
-// Secrets are encrypted with AES-256-CBC. The master key is resolved at runtime
-// by the package: first from an OCI Vault secret (via resource principal, when
-// an `ODB_SETTINGS_MASTER_KEY_URI` setting is present), otherwise from a fallback
-// key baked into the package body at install time. That fallback defaults to a
-// built-in development key and can be overridden with the `masterKey` option or
-// the `ODBVUE_SETTINGS_MASTER_KEY` environment variable (a 64-char hex / 32-byte
-// AES-256 key).
+// Secrets are encrypted with AES-256-CBC. The master key is obtained at runtime
+// from a local development key or OCI Vault.
 //
 // The PL/SQL sources below are the source-of-truth for `odb_settings`.
 
@@ -29,33 +24,17 @@ import {
   type PlsqlRenderable,
 } from '../../../schema/attribute.js'
 import { dropPackageIfExists, plsqlBlock, qualify } from '../../../schema/ddl.js'
+import { odbPackage, odbType } from '../../../schema/package.js'
+import { odbAuth } from '../auth/auth.js'
 
 const spec = readFileSync(new URL('./settings.pks', import.meta.url), 'utf8')
 const body = readFileSync(new URL('./settings.pkb', import.meta.url), 'utf8')
 
 const SETTINGS_PKG_NAME = 'odb_settings'
 const SETTINGS_TABLE_NAME = 'odb_settings_store'
-const MASTER_KEY_MARKER = '__ODB_SETTINGS_MASTER_KEY__'
-const MASTER_KEY_ENV = 'ODBVUE_SETTINGS_MASTER_KEY'
-
-// Built-in AES-256 fallback key (64 hex / 32 bytes). This is a shared development
-// default — like INITIAL_PASSWORD — used only when neither an explicit `masterKey`
-// nor ODBVUE_SETTINGS_MASTER_KEY is set. Override it in production, or use OCI
-// Vault (ODB_SETTINGS_MASTER_KEY_URI) so this key is never the one in effect.
-const DEFAULT_MASTER_KEY = '7F3A9C1E5B08D46271AE9F0C3D5B8E1240A7C6F9B2E43D18576C0A9E3F1B8D2C'
-
+const LOCAL_KEY_TABLE = 'APP_SETTINGS_MASTER_KEY_LOCAL'
 function lit(v: string): string {
   return `'${v.replace(/'/g, "''")}'`
-}
-
-/** Resolve and validate the fallback AES-256 master key (64 hex chars / 32 bytes). */
-function resolveMasterKey(masterKey?: string): string {
-  const key = masterKey ?? process.env[MASTER_KEY_ENV] ?? DEFAULT_MASTER_KEY
-  const normalized = key.trim().toUpperCase()
-  if (!/^[0-9A-F]{64}$/.test(normalized)) {
-    throw new Error(`odb_settings: master key must be 64 hex characters (32 bytes) for AES-256.`)
-  }
-  return normalized
 }
 
 /** DDL for the `odb_settings_store` table, wrapped so re-installs are idempotent (ORA-00955). */
@@ -88,10 +67,7 @@ function tableUpSQL(schema?: string): string {
  * Pre-installed settings store (`odb_settings` + `odb_settings_store`).
  *
  * Call `odbSettings.toSQLUp()` from a migration `.up()` to install the table and
- * package, and `odbSettings.toSQLDown()` from `.down()` to drop them. The
- * fallback encryption key defaults to a built-in development key; override it
- * with the `masterKey` option or the `ODBVUE_SETTINGS_MASTER_KEY` environment
- * variable.
+ * package, and `odbSettings.toSQLDown()` from `.down()` to drop them.
  *
  * The `<fn>(...)` helpers return PL/SQL call/expression strings. Every argument
  * should be a valid PL/SQL expression (bare variable name, literal, or nested
@@ -99,8 +75,7 @@ function tableUpSQL(schema?: string): string {
  */
 export const odbSettings = {
   /** Install `odb_settings_store` (table) and `odb_settings` (spec + body). */
-  toSQLUp(options: { schema?: string; masterKey?: string } = {}): string {
-    const masterKey = resolveMasterKey(options.masterKey)
+  toSQLUp(options: { schema?: string; vaultSecretUri?: string } = {}): string {
     const specSql = options.schema
       ? spec.replace(
           /^CREATE OR REPLACE PACKAGE odb_settings AS/,
@@ -114,13 +89,25 @@ export const odbSettings = {
             `CREATE OR REPLACE PACKAGE BODY ${qualify(SETTINGS_PKG_NAME, options.schema)} AS`,
           )
         : body
-    ).replace(MASTER_KEY_MARKER, masterKey)
-    return [tableUpSQL(options.schema), specSql, bodySql].join('\n')
+    ).replace(
+      '__ODB_SETTINGS_VAULT_SECRET_URI__',
+      (options.vaultSecretUri ?? '').replace(/'/g, "''"),
+    )
+    const keyTable = qualify(LOCAL_KEY_TABLE, options.schema)
+    const localKeySql = options.vaultSecretUri
+      ? []
+      : [
+          `BEGIN EXECUTE IMMEDIATE 'CREATE TABLE ${keyTable} (id NUMBER PRIMARY KEY, master_key RAW(32) NOT NULL, CONSTRAINT APP_SETTINGS_MASTER_KEY_LOCAL_CK CHECK (id = 1))'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -955 THEN RAISE; END IF; END;\n/`,
+          `INSERT INTO ${keyTable} (id, master_key) SELECT 1, DBMS_CRYPTO.RANDOMBYTES(32) FROM dual WHERE NOT EXISTS (SELECT 1 FROM ${keyTable} WHERE id = 1);\nCOMMIT;`,
+        ]
+    return [...localKeySql, tableUpSQL(options.schema), specSql, bodySql].join('\n')
   },
 
   /** Drop `odb_settings` (package) and `odb_settings_store` (table). */
-  toSQLDown(options: { schema?: string } = {}): string {
+  toSQLDown(options: { schema?: string; vaultSecretUri?: string } = {}): string {
     const table = qualify(SETTINGS_TABLE_NAME, options.schema)
+    const dropTable = (name: string) =>
+      `BEGIN EXECUTE IMMEDIATE 'DROP TABLE ${qualify(name, options.schema)} PURGE'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;\n/`
     return [
       dropPackageIfExists(SETTINGS_PKG_NAME, options.schema),
       `BEGIN`,
@@ -129,12 +116,37 @@ export const odbSettings = {
       `  IF SQLCODE != -942 THEN RAISE; END IF;`,
       `END;`,
       `/`,
+      ...(options.vaultSecretUri ? [] : [dropTable(LOCAL_KEY_TABLE)]),
     ].join('\n')
+  },
+
+  local() {
+    return {
+      toSQLUp: (options: { schema?: string } = {}) => odbSettings.toSQLUp(options),
+      toSQLDown: (options: { schema?: string } = {}) => odbSettings.toSQLDown(options),
+    }
+  },
+
+  vaultSecret(vaultSecretUri: string) {
+    return {
+      toSQLUp: (options: { schema?: string } = {}) =>
+        odbSettings.toSQLUp({ ...options, vaultSecretUri }),
+      toSQLDown: (options: { schema?: string } = {}) =>
+        odbSettings.toSQLDown({ ...options, vaultSecretUri }),
+    }
   },
 
   /** `odb_settings.read(<id>)` → VARCHAR2 (decrypted value). Pass `odbLiteral('KEY')` for a literal id. */
   read(id: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
     return new PlsqlExpression('VARCHAR2', `odb_settings.read(${renderPlsql(id)})`)
+  },
+
+  readRegular(id: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
+    return new PlsqlExpression('VARCHAR2', `odb_settings.read_regular(${renderPlsql(id)})`)
+  },
+
+  readSecret(id: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
+    return new PlsqlExpression('VARCHAR2', `odb_settings.read_secret(${renderPlsql(id)})`)
   },
 
   /**
@@ -208,3 +220,61 @@ export const odbSettings = {
     }
   },
 }
+
+export const odbSettingsApi = odbPackage('odb_settings_api', { basePath: '/settings' }, (pkg) => {
+  const readSetting = pkg.proc(
+    'read_setting',
+    {
+      in: { authorization: odbType.string(4000), id: odbType.string(30) },
+      out: { value: odbType.string(2000) },
+    },
+    ({ params, body: statements }) => {
+      const { userId } = statements.variables({ userId: odbType.guid() })
+      statements.set(userId, odbAuth.requireUser(params.authorization))
+      statements.set(params.value, odbSettings.readRegular(params.id))
+    },
+  )
+  const writeSetting = pkg.proc(
+    'write_setting',
+    {
+      in: {
+        authorization: odbType.string(4000),
+        id: odbType.string(30),
+        value: odbType.string(2000),
+      },
+    },
+    ({ params, body: statements }) => {
+      const { userId } = statements.variables({ userId: odbType.guid() })
+      statements.set(userId, odbAuth.requireUser(params.authorization))
+      statements.call(odbSettings.write(params.id, params.value)).commit()
+    },
+  )
+  const readSecretSetting = pkg.proc(
+    'read_secret_setting',
+    {
+      in: { authorization: odbType.string(4000), id: odbType.string(30) },
+      out: { value: odbType.string(2000) },
+    },
+    ({ params, body: statements }) => {
+      const { userId } = statements.variables({ userId: odbType.guid() })
+      statements.set(userId, odbAuth.requireUser(params.authorization))
+      statements.set(params.value, odbSettings.readSecret(params.id))
+    },
+  )
+  const writeSecretSetting = pkg.proc(
+    'write_secret_setting',
+    {
+      in: {
+        authorization: odbType.string(4000),
+        id: odbType.string(30),
+        value: odbType.string(2000),
+      },
+    },
+    ({ params, body: statements }) => {
+      const { userId } = statements.variables({ userId: odbType.guid() })
+      statements.set(userId, odbAuth.requireUser(params.authorization))
+      statements.call(odbSettings.write(params.id, params.value, { secret: true })).commit()
+    },
+  )
+  return { readSetting, writeSetting, readSecretSetting, writeSecretSetting }
+})

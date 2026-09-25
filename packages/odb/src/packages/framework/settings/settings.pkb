@@ -7,9 +7,40 @@ CREATE OR REPLACE PACKAGE BODY odb_settings AS
     c_encryption_type CONSTANT PLS_INTEGER := dbms_crypto.encrypt_aes256
                                               + dbms_crypto.chain_cbc
                                               + dbms_crypto.pad_pkcs5;
-
-    -- Resolved once at package instantiation by initialize_master_key.
+    c_vault_secret_uri CONSTANT VARCHAR2(2000 CHAR) := '__ODB_SETTINGS_VAULT_SECRET_URI__';
     g_master_key RAW(32);
+
+    PROCEDURE load_master_key AS
+        v_value VARCHAR2(128 CHAR);
+    BEGIN
+        IF g_master_key IS NULL THEN
+            IF c_vault_secret_uri IS NULL THEN
+                EXECUTE IMMEDIATE 'SELECT master_key FROM APP_SETTINGS_MASTER_KEY_LOCAL WHERE id = 1' INTO g_master_key;
+            ELSE
+                EXECUTE IMMEDIATE q'[
+                    DECLARE
+                        v_resp dbms_cloud_types.resp;
+                        v_json CLOB;
+                    BEGIN
+                        v_resp := dbms_cloud.send_request(
+                            credential_name => 'OCI$RESOURCE_PRINCIPAL',
+                            uri             => :uri,
+                            method          => dbms_cloud.method_get
+                        );
+                        v_json := dbms_cloud.get_response_text(v_resp);
+                        :value := JSON_VALUE(v_json, '$.secretBundleContent.content');
+                    END;
+                ]' USING IN c_vault_secret_uri, OUT v_value;
+                IF v_value IS NULL OR NOT regexp_like(v_value, '^[A-Za-z0-9+/]{43}=$') THEN
+                    raise_application_error(-20050, 'ODB_SETTINGS master key retrieval failed');
+                END IF;
+                g_master_key := utl_encode.base64_decode(utl_raw.cast_to_raw(v_value));
+            END IF;
+            IF utl_raw.length(g_master_key) != 32 THEN
+                raise_application_error(-20050, 'ODB_SETTINGS master key retrieval failed');
+            END IF;
+        END IF;
+    END load_master_key;
 
     FUNCTION enc ( -- Encrypts a value: base64(IV || ciphertext)
         p_value IN VARCHAR2
@@ -17,6 +48,7 @@ CREATE OR REPLACE PACKAGE BODY odb_settings AS
         v_iv  RAW(16) := dbms_crypto.randombytes(16);
         v_enc RAW(32767);
     BEGIN
+        load_master_key;
         v_enc := dbms_crypto.encrypt(utl_raw.cast_to_raw(p_value), c_encryption_type, g_master_key, v_iv);
         RETURN utl_raw.cast_to_varchar2(utl_encode.base64_encode(utl_raw.concat(v_iv, v_enc)));
     END enc;
@@ -28,6 +60,7 @@ CREATE OR REPLACE PACKAGE BODY odb_settings AS
         v_iv  RAW(16) := utl_raw.substr(v_all, 1, 16);
         v_enc RAW(32767) := utl_raw.substr(v_all, 17);
     BEGIN
+        load_master_key;
         RETURN utl_raw.cast_to_varchar2(dbms_crypto.decrypt(v_enc, c_encryption_type, g_master_key, v_iv));
     END dec;
 
@@ -86,6 +119,26 @@ CREATE OR REPLACE PACKAGE BODY odb_settings AS
         RETURN v_value;
     END read;
 
+    FUNCTION read_regular (p_id IN VARCHAR2) RETURN VARCHAR2 AS
+        v_secret CHAR(1 CHAR);
+    BEGIN
+        SELECT secret INTO v_secret FROM odb_settings_store WHERE id = p_id;
+        IF v_secret <> 'N' THEN
+            raise_application_error(-20054, 'Setting is a secret.');
+        END IF;
+        RETURN read(p_id);
+    END read_regular;
+
+    FUNCTION read_secret (p_id IN VARCHAR2) RETURN VARCHAR2 AS
+        v_secret CHAR(1 CHAR);
+    BEGIN
+        SELECT secret INTO v_secret FROM odb_settings_store WHERE id = p_id;
+        IF v_secret <> 'Y' THEN
+            raise_application_error(-20055, 'Setting is not a secret.');
+        END IF;
+        RETURN read(p_id);
+    END read_secret;
+
     PROCEDURE remove (
         p_id IN VARCHAR2
     ) AS
@@ -93,38 +146,5 @@ CREATE OR REPLACE PACKAGE BODY odb_settings AS
         DELETE FROM odb_settings_store WHERE id = p_id;
     END remove;
 
-    PROCEDURE initialize_master_key AS
-        v_uri VARCHAR2(2000 CHAR);
-        v_b64 VARCHAR2(32767);
-    BEGIN
-        -- 1) OCI Vault via resource principal, when an ODB_SETTINGS_MASTER_KEY_URI
-        --    setting points at a secret bundle. Called through dynamic SQL so the
-        --    body still compiles where DBMS_CLOUD is unavailable (e.g. local Oracle).
-        v_uri := read('ODB_SETTINGS_MASTER_KEY_URI');
-        EXECUTE IMMEDIATE q'[
-            DECLARE
-                v_resp dbms_cloud_types.resp;
-                v_json CLOB;
-            BEGIN
-                v_resp := dbms_cloud.send_request(
-                    credential_name => 'OCI$RESOURCE_PRINCIPAL',
-                    uri             => :uri,
-                    method          => dbms_cloud.method_get
-                );
-                v_json := dbms_cloud.get_response_text(v_resp);
-                :b64 := JSON_VALUE(v_json, '$.secretBundleContent.content');
-            END;
-        ]'
-        USING IN v_uri, OUT v_b64;
-        g_master_key := utl_encode.base64_decode(utl_raw.cast_to_raw(v_b64));
-    EXCEPTION
-        WHEN OTHERS THEN
-            -- 2) Fallback: key baked into the package at install time from the
-            --    ODBVUE_SETTINGS_MASTER_KEY environment variable.
-            g_master_key := HEXTORAW('__ODB_SETTINGS_MASTER_KEY__');
-    END initialize_master_key;
-
-BEGIN
-    initialize_master_key;
 END odb_settings;
 /

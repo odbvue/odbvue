@@ -1,20 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { generateApplicationOpenApi } from '../../../src/application.js'
-import { defineMigration } from '../../../src/migration.js'
 import { odbAuth } from '../../../src/packages/framework/auth/auth.js'
 
 describe('odbAuth framework package', () => {
-  it('emits tables, primitives, and ORDS auth endpoints', () => {
+  it('emits tables and auth primitives without ORDS endpoints', () => {
     const sql = odbAuth.toSQLUp({ schema: 'APP', jwtSecret: 'x'.repeat(32) })
     expect(sql).toContain('CREATE TABLE APP.odb_auth_users')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_auth_crypto AS')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_auth_jwt AS')
-    expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_auth AS')
+    expect(sql).not.toContain('CREATE OR REPLACE PACKAGE APP.odb_auth AS')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_http AS')
     expect(sql).toContain(
       "c_jwt_secret CONSTANT VARCHAR2(32767) := 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';",
     )
-    expect(sql).toContain("c_dummy_password_hash CONSTANT VARCHAR2(512) := 'pbkdf2-sha512$210000$")
     expect(sql).not.toContain('__ODB_AUTH_')
     expect(sql).toContain("'pbkdf2-sha512$210000$' || l_salt || '$' || l_hash")
     expect(sql).toContain(
@@ -25,106 +22,16 @@ describe('odbAuth framework package', () => {
       'FUNCTION verify_password(p_password IN VARCHAR2, p_stored_hash IN VARCHAR2) RETURN BOOLEAN IS',
     )
     expect(sql).toContain('RETURN FALSE;')
-    expect(sql).toContain('odb_auth_crypto.verify_password(p_password, l_password_hash) = FALSE')
     expect(sql).toContain('l_password_raw RAW(2000)')
     expect(sql).toContain('l_derived_key RAW(64)')
     expect(sql).toContain("UTL_I18N.STRING_TO_RAW(p_password, 'AL32UTF8')")
     expect(sql).toContain("'^pbkdf2-sha512\\$([1-9][0-9]*)\\$'")
     expect(sql).not.toContain('DBMS_CRYPTO.PBKDF2')
     expect(sql).not.toContain('DBMS_CRYPTO.HASH(UTL_RAW.CAST_TO_RAW(l_salt ||')
-    expect(sql).toContain(
-      'PROCEDURE login(p_login_username IN odb_auth_users.username%TYPE, p_password IN VARCHAR2',
-    )
-    expect(sql).toContain('odb_auth_crypto.hash_token')
-    expect(sql).toContain('odb_rate_limit.enforce')
-    expect(sql).toContain('FOR UPDATE')
     expect(sql).toContain('previous_refresh_token_hash VARCHAR2(128 CHAR)')
-    expect(sql).toContain(
-      's.refresh_token_hash = l_presented_refresh_token_hash OR s.previous_refresh_token_hash = l_presented_refresh_token_hash',
-    )
-    expect(sql).toContain('IF l_presented_refresh_token_hash = l_previous_refresh_token_hash THEN')
-    expect(sql).toContain('SET revoked_at = SYSTIMESTAMP')
-    expect(sql).toContain('previous_refresh_token_hash = l_presented_refresh_token_hash')
-    expect(sql).toContain("'__Host-odb_refresh=' || l_refresh_token")
-    expect(sql).toContain("'; Max-Age=2592000'")
-    expect(sql).toContain("'; Max-Age=0'")
     expect(sql).toContain("l_subject := odb_jwt.claim(l_token, 'sub')")
     expect(sql).toContain("l_session_id := odb_jwt.claim(l_token, 'sid')")
     expect(sql).toContain("l_token_version := TO_NUMBER(odb_jwt.claim(l_token, 'ver'))")
-    expect(sql).toContain('FROM odb_auth_sessions s WHERE')
-    expect(sql).toContain('SELECT token_version INTO l_token_version FROM odb_auth_users')
-    expect(sql).toContain('s.id = l_session_id')
-    expect(sql).toContain('s.user_id = l_subject')
-    expect(sql).toContain('s.revoked_at IS NULL')
-    expect(sql).toContain('s.expires_at > SYSTIMESTAMP')
-    expect(sql).toContain('u.enabled = 1')
-    expect(sql).toContain('u.token_version = l_token_version')
-    expect(sql).toContain("odb_http.raise_error(401, 'INVALID_CREDENTIALS')")
-    expect(sql).toContain("odb_http.raise_error(401, 'UNAUTHORIZED')")
-    expect(sql).toContain('WHEN NO_DATA_FOUND THEN')
-  })
-
-  it('registers the auth API with ORDS when installed by a migration', () => {
-    const sql = defineMigration('auth', { schema: 'APP' })
-      .install(odbAuth)
-      .compile()
-      .up()
-      .join('\n')
-    expect(sql).toContain("p_base_path      => 'auth/'")
-    expect(sql).toContain("p_pattern        => 'login'")
-    expect(sql).toContain("p_pattern        => 'refresh'")
-    expect(sql).toContain("p_pattern        => 'me'")
-    expect(sql).toContain(
-      "p_login_username => JSON_VALUE(v_body, ''$.username'' RETURNING VARCHAR2(32767))",
-    )
-    expect(sql).toContain(
-      "p_password => JSON_VALUE(v_body, ''$.password'' RETURNING VARCHAR2(32767))",
-    )
-    expect(sql).not.toContain("p_bind_variable_name => 'loginUsername'")
-    expect(sql).not.toContain("p_bind_variable_name => 'password'")
-    expect(sql).toContain("p_name               => 'accessToken'")
-    expect(sql).toContain("p_name               => 'userId'")
-    expect(sql).toContain("p_name               => 'displayName'")
-    expect(sql).toContain("p_name               => 'Cookie'")
-    expect(sql).toContain("p_name               => 'Set-Cookie'")
-  })
-
-  it('upgrades deployed auth sessions before recompiling the refresh API', () => {
-    const sql = defineMigration('auth-upgrade', { schema: 'APP' })
-      .install(odbAuth.upgrade())
-      .compile()
-      .up()
-      .join('\n')
-
-    expect(sql).toContain(
-      'ALTER TABLE APP.odb_auth_sessions ADD (previous_refresh_token_hash VARCHAR2(128 CHAR))',
-    )
-    expect(sql).toContain('IF SQLCODE != -1430 THEN RAISE; END IF;')
-    expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_auth AS')
-  })
-
-  it('publishes access-token-only response contracts and keeps refresh cookies as headers', () => {
-    const openapi = generateApplicationOpenApi(odbAuth.application()) as {
-      components: { schemas: Record<string, { properties: Record<string, unknown> }> }
-    }
-
-    expect(openapi.components.schemas.OdbAuthLoginResponse.properties).toMatchObject({
-      accessToken: { type: 'string' },
-    })
-    expect(openapi.components.schemas.OdbAuthLoginResponse.properties).not.toHaveProperty(
-      'setCookie',
-    )
-    expect(openapi.components.schemas.OdbAuthLoginResponse.properties).not.toHaveProperty(
-      'refreshToken',
-    )
-    expect(openapi.components.schemas.OdbAuthLoginResponse.properties).not.toHaveProperty('userId')
-    expect(openapi.components.schemas.OdbAuthLoginResponse.properties).not.toHaveProperty(
-      'username',
-    )
-    expect(openapi.components.schemas.OdbAuthMeResponse.properties).toMatchObject({
-      userId: { type: 'string' },
-      displayName: { type: 'string' },
-    })
   })
 
   it('seeds an idempotent default user through the crypto package', () => {

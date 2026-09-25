@@ -1,11 +1,11 @@
 # Settings
 
-`odbSettings` exposes an odb framework package, `odb_settings`, plus an `odb_settings_store` table for application settings. Non-secret values are stored as plain text; secrets are encrypted at rest with AES-256. It is installed into your schema by a migration (it is not a native Oracle built-in).
+`odbSettings` installs the `odb_settings` package, `odb_settings_store` for application settings, and `odb_secrets_store` for write-only secret verification. Non-secret settings are stored as plain text; secret values are encrypted at rest with AES-256. It is installed into your schema by a migration (it is not a native Oracle built-in).
 
 Use it in migrations for two things:
 
-- install or drop the table and package with `toSQLUp()` and `toSQLDown()`
-- read and write settings from your own package bodies
+- install or drop the stores and package with `toSQLUp()` and `toSQLDown()`
+- read and write settings, or write and verify secrets, from your own package bodies
 
 ## Install In A Migration
 
@@ -19,7 +19,7 @@ export const migration = defineMigration('20260802140000_settings', {
 }).install(odbSettings)
 ```
 
-`install()` calls `toSQLUp({ schema })`, which bakes the fallback encryption key into the package body. That key defaults to a built-in development key and can be overridden with the `ODBVUE_SETTINGS_MASTER_KEY` environment variable or by passing `{ masterKey }` to `toSQLUp`. In production, prefer OCI Vault (see below) so the baked key is never the one in effect.
+`install()` calls `toSQLUp({ schema })`. By default it creates a random local development key in `APP_SETTINGS_MASTER_KEY_LOCAL` if one does not already exist. For OCI, install `odbSettings.vaultSecret(uri)` instead; see [The Master Key](#the-master-key).
 
 ## Seed Settings
 
@@ -74,34 +74,61 @@ const appPackage = odbPackage('pck_app', (p) => {
 })
 ```
 
-## The Master Key
+## Expose Settings Services
 
-Secrets are encrypted with AES-256-CBC using a random IV per value. The package resolves the master key at instantiation in two steps:
-
-1. **OCI Vault** — if an `ODB_SETTINGS_MASTER_KEY_URI` setting points at a secret bundle, the key is fetched from OCI Vault using the database's resource principal. This call is made through dynamic SQL, so the package still compiles where `DBMS_CLOUD` is unavailable (e.g. a local Oracle container).
-2. **Fallback** — otherwise the key baked into the package body at install time is used. It defaults to a built-in development key (a shared default, like `INITIAL_PASSWORD`); override it with `ODBVUE_SETTINGS_MASTER_KEY` or the `masterKey` option for anything beyond local development.
-
-To use OCI Vault, store the secret-bundle URI as a setting before the package first resolves its key:
+The optional `odbSettingsApi` exposes authenticated ORDS procedures for reading and writing
+regular and encrypted settings. Define the four services in an application migration and install
+the API after `odbSettings` and `odbAuth` have been installed:
 
 ```ts
-odbSettings.write(odbLiteral('ODB_SETTINGS_MASTER_KEY_URI'), odbLiteral('https://vaults...'), {
-  name: odbLiteral('Master Key URI'),
+const readSetting = odbSettingsApi.procedure('readSetting')
+defineService(readSetting, {
+  method: 'GET',
+  path: '/:id',
+  headers: { Authorization: readSetting.parameters.authorization },
+  uri: { id: readSetting.parameters.id },
+  response: { value: readSetting.parameters.value },
 })
+// Bind writeSetting, readSecretSetting and writeSecretSetting in the same way.
+export const migration = defineMigration('settings_api', { schema: schemaName }).install(
+  odbSettingsApi,
+)
 ```
+
+The settings API uses `GET` and `PUT` under `/settings/:id` and `/settings/secret/:id`.
+The regular read rejects encrypted values; the secret read rejects plain values. Both return
+the value to authenticated callers, so restrict access to these routes as appropriate for your app.
+
+## The Master Key
+
+Secrets are encrypted with AES-256-CBC using a random IV per value. The single `odb_settings` package owns key retrieval, settings encryption, and write-only secret verification:
+
+1. **Local development** — `odbSettings` generates a random key in `APP_SETTINGS_MASTER_KEY_LOCAL` on first install and reuses it on reinstall. This is a convenience mock, not a security boundary: the key lives in the same database as the ciphertext. Local Podman needs only the ADB-Free container.
+2. **OCI** — `odbSettings.vaultSecret(uri)` fetches the key from OCI Vault with `DBMS_CLOUD` and the database resource principal. Set `ODBVUE_KMS_VAULT_SECRET_URI` to the Vault secret-bundle URI before building the bootstrap migration; no local key table is created.
+
+`odbSettings.secretWrite(id, value)` and `odbSettings.secretMatches(id, value)` use the separate encrypted `odb_secrets_store` table, but do not expose a secret read operation. Both stores and the provider are installed by the same migration artifact.
+
+The provider boundary is inside PL/SQL: local development reads the key from the database, while OCI retrieves it from Vault. Both paths feed the same `odb_settings` encryption and verification code. ADB-Free does not need or reach a local KMS container; other cloud dependencies, such as future object storage support, should be mocked at their PL/SQL provider boundary rather than by adding local network services. Unlike the local key, the OCI master key is not stored in the application schema. Configure OCI resource principal access and its IAM policies before using the Vault provider.
+
+Do not switch providers or delete the local key table while you still need to decrypt existing secrets. The local key is removed when the bootstrap migration is rolled back.
 
 ## Expression Helpers
 
-| Helper                                           | PL/SQL                | Notes                                                    |
-| ------------------------------------------------ | --------------------- | -------------------------------------------------------- |
-| `read(id)`                                       | `odb_settings.read`   | `VARCHAR2` — decrypts secrets                            |
-| `write(id, value, { name?, options?, secret? })` | `odb_settings.write`  | Upsert; `name` defaults to `id`, `secret: true` encrypts |
-| `remove(id)`                                     | `odb_settings.remove` | Delete a setting                                         |
-| `seed(...settings)`                              | —                     | Migration artifact that upserts settings on `up`         |
+| Helper                                           | PL/SQL                        | Notes                                                    |
+| ------------------------------------------------ | ----------------------------- | -------------------------------------------------------- |
+| `read(id)`                                       | `odb_settings.read`           | `VARCHAR2` — decrypts secrets                            |
+| `readRegular(id)`                                | `odb_settings.read_regular`   | Reads only plain settings                                |
+| `readSecret(id)`                                 | `odb_settings.read_secret`    | Reads only encrypted settings                            |
+| `write(id, value, { name?, options?, secret? })` | `odb_settings.write`          | Upsert; `name` defaults to `id`, `secret: true` encrypts |
+| `remove(id)`                                     | `odb_settings.remove`         | Delete a setting                                         |
+| `secretWrite(id, value)`                         | `odb_settings.secret_write`   | Encrypt and store a write-only secret                    |
+| `secretMatches(id, value)`                       | `odb_settings.secret_matches` | Verify a secret without returning it                     |
+| `seed(...settings)`                              | —                             | Migration artifact that upserts settings on `up`         |
 
 Arguments are PL/SQL expressions — use `odbLiteral('KEY')` for a literal id/value and a bare string (e.g. `'p_api_key'`) for a variable.
 
 ## Notes
 
-- The `ODBVUE_SETTINGS_MASTER_KEY` value overrides the built-in default; when you set it, keep it out of source control. Changing the key makes secrets encrypted with the previous key unrecoverable.
+- Changing or losing the master key makes previously encrypted secrets unrecoverable.
 - The `value` column is `VARCHAR2(2000)`; encrypted values are base64-encoded, so keep secrets well within that budget.
 - `options` accepts JSON metadata (`IS JSON` constraint); `secret` is constrained to `Y` / `N`.

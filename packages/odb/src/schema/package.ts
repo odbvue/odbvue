@@ -1309,6 +1309,7 @@ export type Package<
     member: TMemberName,
     ...args: PlsqlRenderable[]
   ): PackageMemberReturnValue<TMembers[TMemberName]>
+  procedure<TMemberName extends keyof TMembers>(member: TMemberName): TMembers[TMemberName]
   application(): OdbApplication
   toSQLUp(options?: PackageSqlOptions): string
   toSQLDown(options?: PackageSqlOptions): string
@@ -1450,6 +1451,10 @@ export class PackageImpl<
     ...args: PlsqlRenderable[]
   ): PackageMemberReturnValue<TMembers[TMemberName]> {
     return this.invoke(member as string, ...args) as PackageMemberReturnValue<TMembers[TMemberName]>
+  }
+
+  procedure<TMemberName extends keyof TMembers>(member: TMemberName): TMembers[TMemberName] {
+    return this._memberLookup[member as string] as TMembers[TMemberName]
   }
 
   application(): OdbApplication {

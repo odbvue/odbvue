@@ -17,6 +17,10 @@ CREATE OR REPLACE PACKAGE odb_settings AS -- Key/value settings store with trans
         p_id IN VARCHAR2 -- Setting id
     ) RETURN VARCHAR2; -- Decrypted value
 
+    FUNCTION read_regular (p_id IN VARCHAR2) RETURN VARCHAR2;
+
+    FUNCTION read_secret (p_id IN VARCHAR2) RETURN VARCHAR2;
+
     PROCEDURE remove ( -- Deletes a setting
         p_id IN VARCHAR2 -- Setting id
     );

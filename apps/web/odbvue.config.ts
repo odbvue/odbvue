@@ -8,7 +8,7 @@ export default defineOdbVueApp({
   version: '1.0.0',
   auth: true,
   audit: false,
-  settings: false,
+  settings: true,
   storage: false,
   ai: false,
   email: false,

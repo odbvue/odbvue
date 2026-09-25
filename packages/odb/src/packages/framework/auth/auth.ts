@@ -1,6 +1,14 @@
 import { pbkdf2Sync } from 'node:crypto'
-import { defineService, odbPackage, odbType } from '../../../schema/package.js'
-import { cond, odbLiteral, plsqlExpr, type PlsqlValue } from '../../../schema/attribute.js'
+import { odbPackage, odbType } from '../../../schema/package.js'
+import {
+  cond,
+  odbLiteral,
+  PlsqlExpression,
+  plsqlExpr,
+  renderPlsql,
+  type PlsqlRenderable,
+  type PlsqlValue,
+} from '../../../schema/attribute.js'
 import { plsqlBlock, qualify } from '../../../schema/ddl.js'
 import { odbTable } from '../../../schema/table.js'
 import { odbQuery } from '../../../query/index.js'
@@ -363,14 +371,6 @@ export const odbAuthApi = odbPackage('odb_auth', { basePath: '/auth' }, (pkg) =>
       statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized('INVALID_CREDENTIALS'))
     },
   )
-  defineService(login, {
-    method: 'POST',
-    path: '/login',
-    summary: 'Authenticate using username and password',
-    body: { username: login.parameters.loginUsername, password: login.parameters.password },
-    response: { accessToken: login.parameters.accessToken },
-    headers: { 'Set-Cookie': login.parameters.setCookie },
-  })
 
   const refresh = pkg.proc(
     'refresh',
@@ -469,16 +469,6 @@ export const odbAuthApi = odbPackage('odb_auth', { basePath: '/auth' }, (pkg) =>
       statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized())
     },
   )
-  defineService(refresh, {
-    method: 'POST',
-    path: '/refresh',
-    summary: 'Rotate a refresh token and issue an access token',
-    headers: {
-      Cookie: refresh.parameters.cookieHeader,
-      'Set-Cookie': refresh.parameters.setCookie,
-    },
-    response: { accessToken: refresh.parameters.accessToken },
-  })
 
   const logout = pkg.proc(
     'logout',
@@ -519,12 +509,6 @@ export const odbAuthApi = odbPackage('odb_auth', { basePath: '/auth' }, (pkg) =>
       statements.set(logoutSetCookie, expiredRefreshCookie(authCookieOptions))
     },
   )
-  defineService(logout, {
-    method: 'POST',
-    path: '/logout',
-    summary: 'Revoke an authentication session',
-    headers: { Cookie: logout.parameters.cookieHeader, 'Set-Cookie': logout.parameters.setCookie },
-  })
 
   const me = pkg.proc(
     'me',
@@ -548,17 +532,6 @@ export const odbAuthApi = odbPackage('odb_auth', { basePath: '/auth' }, (pkg) =>
       )
     },
   )
-  defineService(me, {
-    method: 'GET',
-    path: '/me',
-    summary: 'Return the authenticated user',
-    headers: { Authorization: me.parameters.authorization },
-    response: {
-      userId: me.parameters.userId,
-      username: me.parameters.username,
-      displayName: me.parameters.displayName,
-    },
-  })
 
   return {
     login,
@@ -574,7 +547,7 @@ export interface OdbAuthOptions {
   refreshCookieSecure?: boolean
 }
 
-/** Installable framework artifact: tables, primitives, ORDS API, and auth OpenAPI contract. */
+/** Installable framework artifact: auth tables and PL/SQL primitives only. */
 export const odbAuth = {
   toSQLUp(options: { schema?: string; jwtSecret?: string } = {}): string {
     const secret = options.jwtSecret ?? process.env.ODBVUE_AUTH_JWT_SECRET ?? DEFAULT_JWT_SECRET
@@ -586,7 +559,6 @@ export const odbAuth = {
       odbHttp.toSQLUp(options),
       odbAuthCrypto.toSQLUp(options),
       odbAuthJwt.toSQLUp({ ...options, substitutions: { jwtSecret: secret } }),
-      odbAuthApi.toSQLUp({ ...options, substitutions: { dummyPasswordHash: dummyPasswordHash() } }),
     ].join('\n')
   },
   upgrade() {
@@ -601,14 +573,23 @@ export const odbAuth = {
           '  IF SQLCODE != -1430 THEN RAISE; END IF;',
           'END;',
           '/',
-          odbAuthApi.toSQLUp({
-            ...options,
-            substitutions: { dummyPasswordHash: dummyPasswordHash() },
-          }),
         ].join('\n')
       },
       toSQLDown() {
         return ''
+      },
+    }
+  },
+  api() {
+    return {
+      toSQLUp(options: { schema?: string } = {}): string {
+        return odbAuthApi.toSQLUp({
+          ...options,
+          substitutions: { dummyPasswordHash: dummyPasswordHash() },
+        })
+      },
+      toSQLDown(options: { schema?: string } = {}): string {
+        return odbAuthApi.toSQLDown(options)
       },
       application() {
         return odbAuthApi.application()
@@ -616,12 +597,16 @@ export const odbAuth = {
     }
   },
   toSQLDown(options: { schema?: string } = {}): string {
-    return [odbAuthApi, odbAuthJwt, odbAuthCrypto, odbHttp, odbJwt, authSessions, authUsers]
+    return [odbAuthJwt, odbAuthCrypto, odbHttp, odbJwt, authSessions, authUsers]
       .map((artifact) => artifact.toSQLDown(options))
       .join('\n')
   },
-  application() {
-    return odbAuthApi.application()
+  /** Require a valid access token and return its authenticated user identifier. */
+  requireUser(authorization: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
+    return new PlsqlExpression(
+      'VARCHAR2',
+      `odb_auth_jwt.require_user(${renderPlsql(authorization)})`,
+    )
   },
   seedUser(user: { username: string; password: string; displayName?: string }) {
     if (!user.username || !user.password)
