@@ -7,7 +7,8 @@ export const registerInfraDownCommand = (program: Command) => {
     .command('infra-down')
     .alias('id')
     .description('Infrastructure shutdown')
-    .action(async () => {
-      await runInfraDownPodman()
+    .option('-y, --yes', 'skip typed DELETE confirmation')
+    .action(async (options: { yes?: boolean }) => {
+      await runInfraDownPodman(options.yes)
     })
 }

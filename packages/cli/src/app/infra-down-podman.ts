@@ -1,9 +1,24 @@
+import prompts from 'prompts'
+
 import { logger } from '../shared/logger.js'
 import { EnvironmentStore } from '../adapters/environment-store.js'
 import { ConfigStore } from '../adapters/config-store.js'
 import { PodmanClient } from '../adapters/podman-client.js'
 
-export const runInfraDownPodman = async () => {
+export const runInfraDownPodman = async (yes = false) => {
+  if (!yes) {
+    logger.warn('This shuts down local infrastructure.')
+    const { confirmation } = await prompts({
+      type: 'text',
+      name: 'confirmation',
+      message: 'Type DELETE to confirm infrastructure shutdown',
+    })
+    if (confirmation !== 'DELETE') {
+      logger.info('Infrastructure shutdown cancelled.')
+      return
+    }
+  }
+
   logger.info('Shutting down local infrastructure...')
 
   const environmentStore = new EnvironmentStore()
