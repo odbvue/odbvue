@@ -523,7 +523,7 @@ export class ProcedureBody {
    * nested call). Requires the `odb_audit` framework package to be installed.
    *
    * Duplicates the `odb_audit.*` call strings here (rather than importing from
-   * `packages/framework/audit`) to keep the schema layer free of a
+   * `capabilities/audit`) to keep the schema layer free of a
    * schema→packages import cycle.
    */
   private audit(

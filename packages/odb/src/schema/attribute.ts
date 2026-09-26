@@ -359,10 +359,10 @@ export class LocalVar<
 // lives in the pre-installed `odb_lob` package. Each helper returns a
 // PL/SQL expression that can be passed to `body.set(target, expr)`.
 //
-// Kept alongside LocalVar (rather than in packages/framework/lob/lob.ts) so
+// Kept alongside LocalVar (rather than in helpers/lob/lob.ts) so
 // `ProcedureBody` can dispatch on the type literal without introducing a
 // schema→packages import cycle. The `odb_lob.*` strings are duplicated in
-// `packages/framework/lob/lob.ts` — trivial duplication kept intentionally.
+// `helpers/lob/lob.ts` — trivial duplication kept intentionally.
 
 export class ClobVar extends LocalVar<'CLOB'> {
   /** `odb_lob.clob_to_base64(<this>)` — returns CLOB. */

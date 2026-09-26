@@ -4,7 +4,7 @@ import {
   OdbExecutor,
   type OracleConnectionLike,
   type OracleExecuteResult,
-} from '../src/oracle/execution/executor.js'
+} from '../src/execution/executor.js'
 
 type Call = { sql: string; binds?: Record<string, unknown> }
 

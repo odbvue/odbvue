@@ -10,8 +10,8 @@
       "import": "./dist/index.js"
     },
     "./auth": {
-      "types": "./dist/packages/framework/auth/index.d.ts",
-      "import": "./dist/packages/framework/auth/index.js"
+      "types": "./dist/capabilities/auth/index.d.ts",
+      "import": "./dist/capabilities/auth/index.js"
     }
   },
   "scripts": {

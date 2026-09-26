@@ -1,0 +1,109 @@
+// Pre-installed API: JSON Web Token helpers (odb_jwt).
+//
+// This module exposes two things:
+//
+// 1. `odbJwt.toSQLUp()` / `odbJwt.toSQLDown()` — SQL to install / drop the
+//    `odb_jwt` package in the target schema. Call these from a migration's
+//    `.up()` / `.down()` (or via `defineMigration(...).install(odbJwt)`).
+//
+// 2. `odbJwt.<fn>(...)` — pure functions returning PL/SQL expression strings
+//    that call into `odb_jwt.*`. Use them anywhere a PL/SQL expression is
+//    accepted (e.g. `body.set(v_token, odbJwt.encode('v_payload', 'v_secret'))`).
+//
+// The package signs and verifies HS256 tokens. It is deliberately generic:
+// callers build whatever JSON claims payload they need (with `JSON_OBJECT`)
+// and pass it to `encode`. Reading claims back is done with `payload` / `claim`.
+//
+// The PL/SQL sources below are the source-of-truth for `odb_jwt`.
+
+import { readFileSync } from 'node:fs'
+import { PlsqlExpression, renderPlsql, type PlsqlRenderable } from '../../schema/attribute.js'
+import { dropPackageIfExists, qualify } from '../../schema/ddl.js'
+
+const spec = readFileSync(new URL('./jwt.pks', import.meta.url), 'utf8')
+const body = readFileSync(new URL('./jwt.pkb', import.meta.url), 'utf8')
+
+const JWT_PKG_NAME = 'odb_jwt'
+
+function call<T extends string>(
+  type: T,
+  name: string,
+  args: readonly PlsqlRenderable[],
+): PlsqlExpression<T> {
+  return new PlsqlExpression(type, `odb_jwt.${name}(${args.map(renderPlsql).join(', ')})`)
+}
+
+/**
+ * Pre-installed JSON Web Token API (`odb_jwt`).
+ *
+ * Call `odbJwt.toSQLUp()` from a migration `.up()` to install the package,
+ * and `odbJwt.toSQLDown()` from `.down()` to drop it.
+ *
+ * The `<fn>(...)` helpers return PL/SQL expression strings suitable for
+ * `body.set(target, expr)`. Every argument
+ * should be a valid PL/SQL expression (bare variable name, literal, or
+ * nested call).
+ */
+export const odbJwt = {
+  /** Install `odb_jwt` (spec + body). Optional schema qualifies the name. */
+  toSQLUp(options: { schema?: string } = {}): string {
+    if (!options.schema) return `${spec}\n${body}`
+    // Re-qualify the package name so it is created in the target schema.
+    const specHeader = `CREATE OR REPLACE PACKAGE ${qualify(JWT_PKG_NAME, options.schema)} AS`
+    const bodyHeader = `CREATE OR REPLACE PACKAGE BODY ${qualify(JWT_PKG_NAME, options.schema)} AS`
+    return [
+      spec.replace(/^CREATE OR REPLACE PACKAGE odb_jwt AS/, specHeader),
+      body.replace(/^CREATE OR REPLACE PACKAGE BODY odb_jwt AS/, bodyHeader),
+    ].join('\n')
+  },
+
+  /** Drop `odb_jwt`. Optional schema qualifies the name. */
+  toSQLDown(options: { schema?: string } = {}): string {
+    return dropPackageIfExists(JWT_PKG_NAME, options.schema)
+  },
+
+  /** `odb_jwt.encode(<payload>, <secret>)` → VARCHAR2 (signed JWT) */
+  encode(payload: PlsqlRenderable, secret: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
+    return call('VARCHAR2', 'encode', [payload, secret])
+  },
+
+  /** `odb_jwt.verify(<token>, <secret>)` → 0/1 */
+  verify(token: PlsqlRenderable, secret: PlsqlRenderable): PlsqlExpression<'NUMBER'> {
+    return call('NUMBER', 'verify', [token, secret])
+  },
+
+  /** `odb_jwt.payload(<token>)` → VARCHAR2 (decoded JSON claims, no signature check) */
+  payload(token: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
+    return call('VARCHAR2', 'payload', [token])
+  },
+
+  /** `odb_jwt.claim(<token>, <name>)` → VARCHAR2 (single claim, no signature check) */
+  claim(token: PlsqlRenderable, name: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
+    return call('VARCHAR2', 'claim', [token, name])
+  },
+
+  /** `odb_jwt.is_expired(<token>[, <leeway>])` → 0/1 */
+  isExpired(token: PlsqlRenderable, leeway?: PlsqlRenderable): PlsqlExpression<'NUMBER'> {
+    return call('NUMBER', 'is_expired', leeway === undefined ? [token] : [token, leeway])
+  },
+
+  /** `odb_jwt.base64url_encode(<input>)` → VARCHAR2 */
+  base64urlEncode(input: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
+    return call('VARCHAR2', 'base64url_encode', [input])
+  },
+
+  /** `odb_jwt.base64url_decode(<input>)` → VARCHAR2 */
+  base64urlDecode(input: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
+    return call('VARCHAR2', 'base64url_decode', [input])
+  },
+
+  /** `odb_jwt.to_epoch([<timestamp>])` → INTEGER (Unix seconds) */
+  toEpoch(timestamp?: PlsqlRenderable): PlsqlExpression<'INTEGER'> {
+    return call('INTEGER', 'to_epoch', timestamp === undefined ? [] : [timestamp])
+  },
+
+  /** `odb_jwt.from_epoch(<epoch>)` → TIMESTAMP */
+  fromEpoch(epoch: PlsqlRenderable): PlsqlExpression<'TIMESTAMP'> {
+    return call('TIMESTAMP', 'from_epoch', [epoch])
+  },
+}

@@ -3,8 +3,8 @@ import { dirname, extname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const sourceDir = resolve(rootDir, 'src/packages')
-const targetDir = resolve(rootDir, 'dist/packages')
+const sourceDir = resolve(rootDir, 'src')
+const targetDir = resolve(rootDir, 'dist')
 const assetExtensions = new Set(['.pkb', '.pks'])
 
 function copyAssets(dir) {

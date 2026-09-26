@@ -6,7 +6,7 @@ import {
   prepareStatement,
   splitBySemicolon,
   splitSqlStatements,
-} from '../src/oracle/execution/sql.js'
+} from '../src/execution/sql.js'
 
 describe('Oracle SQL helpers', () => {
   it('detects PL/SQL and preserves its terminator', () => {

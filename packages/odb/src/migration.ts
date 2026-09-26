@@ -6,7 +6,7 @@ import { Column, emitColumnDef, type ColumnOptions, type ColumnType } from './sc
 import { odbLiteral } from './schema/attribute.js'
 import { odbOrdsSchema } from './ords.js'
 import { odbQuery } from './query/index.js'
-import { odbOracle } from './packages/oracle/index.js'
+import { odbOracle } from './oracle/index.js'
 import { type Schema } from './schema/schema.js'
 import { type Table } from './schema/table.js'
 import type { AnyQueryBuilder } from './schema/package.js'

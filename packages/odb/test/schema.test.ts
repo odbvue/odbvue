@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { odbSchema } from '../src/schema/schema.js'
-import { splitSqlStatements } from '../src/oracle/execution/sql.js'
+import { splitSqlStatements } from '../src/execution/sql.js'
 
 describe('odbSchema', () => {
   it('enables OCI resource principals only when requested', () => {
