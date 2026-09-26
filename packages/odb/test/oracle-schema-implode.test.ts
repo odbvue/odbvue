@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  implodeSchema,
-  type SchemaImplodeExecutor,
-} from '../src/execution/schema-implode.js'
+import { implodeSchema, type SchemaImplodeExecutor } from '../src/execution/schema-implode.js'
 
 class FakeExecutor implements SchemaImplodeExecutor {
   readonly calls: Array<{ sql: string; bindings?: Record<string, unknown> }> = []
