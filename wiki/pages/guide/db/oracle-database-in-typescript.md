@@ -348,7 +348,7 @@ export const migration = defineMigration('20260704120000_lob', {
 
 Once installed, call them from your own package bodies (`odbLob.varchar2ToBase64('v_text')`) or through the typed variable helpers (`ClobVar.toBase64()`). See the LOB capability page for details.
 
-Other framework packages follow the same pattern — for example `odb_jwt` (`odbJwt`) signs and verifies JSON Web Tokens with HS256, `odb_audit` (`odbAudit`) writes OpenTelemetry-aligned audit logs, and `odb_settings` (`odbSettings`) is a key/value store with AES-256 encryption for secrets. See the JWT, Audit, and Settings capability pages for details.
+Other framework packages follow the same pattern — for example `odb_jwt` (`odbJwt`) signs and verifies JSON Web Tokens with HS256, and `odb_audit` (`odbAudit`) writes OpenTelemetry-aligned audit logs. `odb_settings` (`odbSettings`) is a key/value store whose table and CRUD package are also defined in TypeScript. See the JWT, Audit, and Settings capability pages for details.
 
 `odbAuth` installs an ORDS-ready authentication API with user and session storage, password hashing, access JWTs, and rotating refresh-token cookies. See the [Authentication capability](./capabilities/auth) for its migration and web-runtime setup.
 

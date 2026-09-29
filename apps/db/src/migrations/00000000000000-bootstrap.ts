@@ -16,7 +16,6 @@ import {
 
 const schemaName = odbEnv.read('ODBVUE_ADB_SCHEMA_USERNAME')
 const schemaPassword = odbEnv.read('ODBVUE_ADB_SCHEMA_PASSWORD')
-const vaultSecretUri = odbEnv.read('ODBVUE_KMS_VAULT_SECRET_URI', '')
 
 const appUsersTable = odbTable('app_users', (t) => ({
   id: t.number().identity().primaryKey().comment('Primary Key'),
@@ -83,7 +82,6 @@ export const schema = odbSchema(schemaName, schemaPassword, (definition) => {
   definition.grant('EXECUTE ON UTL_I18N')
   definition.grant('EXECUTE ON UTL_INADDR')
   definition.grant('EXECUTE ON UTL_TCP')
-  if (vaultSecretUri) definition.enableResourcePrincipal()
 })
 
 export const migration = defineMigration('00000000000000_bootstrap', {
@@ -92,10 +90,17 @@ export const migration = defineMigration('00000000000000_bootstrap', {
   .install(odbHttp)
   .install(odbRateLimit)
   .install(odbAuth)
-  .install(vaultSecretUri ? odbSettings.vaultSecret(vaultSecretUri) : odbSettings)
+  .install(odbAuth.api())
+  .install(odbSettings)
   .install(odbLob)
   .install(odbAudit)
-  .install(odbSettings.seed({ id: 'APP_VERSION', name: 'Application version', value: '1.0.0' }))
+  .install(
+    odbSettings.seed({
+      id: 'APP_VERSION',
+      value: '1.0.0',
+      meta: { label: 'Application version', type: 'string' },
+    }),
+  )
   .install(appUsersTable)
   .install(appPackage)
   .install(testPackage)

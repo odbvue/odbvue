@@ -3,6 +3,9 @@
     <v-row align="center">
       <v-col cols="12" md>
         <h3>Settings</h3>
+        <p class="text-medium-emphasis">
+          Write and read settings through pck_sandbox → odb_settings.
+        </p>
       </v-col>
       <v-col cols="12" md="auto">
         <v-chip
@@ -24,45 +27,79 @@
     />
 
     <v-row class="mt-2">
-      <v-col v-for="kind in kinds" :key="kind" cols="12" md="6">
-        <v-card
-          :title="kind === 'regular' ? 'Regular setting' : 'Secret setting'"
-          :prepend-icon="kind === 'regular' ? '$mdiCog' : '$mdiDatabaseLock'"
-        >
+      <v-col cols="12" md="5">
+        <v-card title="Setting" prepend-icon="$mdiCog">
           <v-card-text>
             <v-text-field
-              v-model="settings[kind].id"
-              label="Setting ID"
+              v-model="id"
+              label="ID"
               hide-details="auto"
               class="mb-3"
+              maxlength="128"
             />
-            <v-text-field
-              v-model="settings[kind].value"
-              label="Value"
-              :type="kind === 'secret' && !showSecret ? 'password' : 'text'"
-              :autocomplete="kind === 'secret' ? 'new-password' : 'off'"
-              :append-inner-icon="
-                kind === 'secret' ? (showSecret ? '$mdiEyeOff' : '$mdiEye') : undefined
-              "
-              hide-details="auto"
-              @click:append-inner="showSecret = !showSecret"
-            />
+            <v-text-field v-model="value" label="Value" hide-details="auto" maxlength="2000" />
           </v-card-text>
           <v-card-actions>
             <v-btn
               color="primary"
               prepend-icon="$mdiContentSave"
-              :disabled="!settings[kind].id || !settings[kind].value || !auth.authenticated.value"
-              :loading="settings[kind].writing"
-              @click="write(kind)"
+              :disabled="!id || !auth.authenticated.value || !!busy"
+              :loading="busy === 'write'"
+              @click="write"
               >Write</v-btn
             >
             <v-btn
               prepend-icon="$mdiDatabaseSearch"
-              :disabled="!settings[kind].id || !auth.authenticated.value"
-              :loading="settings[kind].reading"
-              @click="read(kind)"
+              :disabled="!id || !auth.authenticated.value || !!busy"
+              :loading="busy === 'read'"
+              @click="read"
               >Read</v-btn
+            >
+            <v-btn
+              color="error"
+              prepend-icon="$mdiDelete"
+              :disabled="!id || !auth.authenticated.value || !!busy"
+              :loading="busy === 'remove'"
+              @click="remove"
+              >Delete</v-btn
+            >
+          </v-card-actions>
+        </v-card>
+      </v-col>
+
+      <v-col cols="12" md="7">
+        <v-card title="All settings" prepend-icon="$mdiDatabaseSearch">
+          <v-table density="compact">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in items" :key="item.id" class="cursor-pointer" @click="pick(item)">
+                <td>{{ item.id }}</td>
+                <td>{{ item.value }}</td>
+              </tr>
+              <tr v-if="!items.length">
+                <td colspan="2" class="text-medium-emphasis">Nothing loaded.</td>
+              </tr>
+            </tbody>
+          </v-table>
+          <v-card-actions>
+            <v-btn
+              prepend-icon="$mdiRefresh"
+              :disabled="!auth.authenticated.value || !!busy"
+              :loading="busy === 'list'"
+              @click="list()"
+              >Load</v-btn
+            >
+            <v-btn
+              v-if="items.length >= pageSize"
+              prepend-icon="$mdiChevronRight"
+              :disabled="!auth.authenticated.value || !!busy"
+              @click="list(items.at(-1)?.id)"
+              >Next</v-btn
             >
           </v-card-actions>
         </v-card>
@@ -73,7 +110,7 @@
 
 <script setup lang="ts">
 import { httpContract, useAuth, useOdbVue } from '@odbvue/web'
-import { reactive, ref } from 'vue'
+import { ref } from 'vue'
 
 definePage({
   meta: {
@@ -85,48 +122,64 @@ definePage({
   },
 })
 
-type Kind = 'regular' | 'secret'
-type Message = { type: 'success' | 'error'; text: string }
+type Item = { id: string; value: string | null; meta: string }
+type Action = 'read' | 'write' | 'remove' | 'list'
 
-const kinds: Kind[] = ['regular', 'secret']
-const settings = reactive({
-  regular: { id: 'SANDBOX_DEMO', value: '', reading: false, writing: false },
-  secret: { id: 'SANDBOX_SECRET', value: '', reading: false, writing: false },
-})
+const pageSize = 50
 const auth = useAuth()
 const http = useOdbVue().get(httpContract)
-const message = ref<Message>()
-const showSecret = ref(false)
+const id = ref('SANDBOX_DEMO')
+const value = ref('')
+const items = ref<Item[]>([])
+const busy = ref<Action>()
+const message = ref<{ type: 'success' | 'error'; text: string }>()
 
-function url(kind: Kind) {
-  return `/settings/${kind === 'secret' ? 'secret/' : ''}${encodeURIComponent(settings[kind].id)}`
+const url = () => `/sandbox/settings/${encodeURIComponent(id.value)}`
+
+async function run(action: Action, success: string, failure: string, call: () => Promise<void>) {
+  busy.value = action
+  message.value = undefined
+  try {
+    await call()
+    message.value = { type: 'success', text: success }
+  } catch {
+    message.value = { type: 'error', text: failure }
+  } finally {
+    busy.value = undefined
+  }
 }
 
-async function write(kind: Kind) {
-  settings[kind].writing = true
-  try {
-    const response = await http.put(url(kind), { value: settings[kind].value })
+const write = () =>
+  run('write', 'Setting saved.', 'Setting could not be saved.', async () => {
+    const response = await http.put(url(), { value: value.value })
     if (response.error) throw response.error
-    if (kind === 'secret') settings[kind].value = ''
-    message.value = { type: 'success', text: 'Setting saved.' }
-  } catch {
-    message.value = { type: 'error', text: 'Setting could not be saved.' }
-  } finally {
-    settings[kind].writing = false
-  }
-}
+  })
 
-async function read(kind: Kind) {
-  settings[kind].reading = true
-  try {
-    const response = await http.get<{ value: string }>(url(kind))
-    if (response.error || !response.data) throw response.error ?? new Error('Setting not found.')
-    settings[kind].value = response.data.value
-    message.value = { type: 'success', text: 'Setting loaded.' }
-  } catch {
-    message.value = { type: 'error', text: 'Setting could not be loaded.' }
-  } finally {
-    settings[kind].reading = false
-  }
+const read = () =>
+  run('read', 'Setting loaded.', 'Setting could not be loaded.', async () => {
+    const response = await http.get<{ value: string | null }>(url())
+    if (response.error || !response.data) throw response.error ?? new Error('Not found')
+    value.value = response.data.value ?? ''
+  })
+
+const remove = () =>
+  run('remove', 'Setting deleted.', 'Setting could not be deleted.', async () => {
+    const response = await http.delete(url())
+    if (response.error) throw response.error
+    value.value = ''
+  })
+
+const list = (after?: string) =>
+  run('list', 'Settings loaded.', 'Settings could not be loaded.', async () => {
+    const response = await http.get<{ items: Item[] }>('/sandbox/settings', {
+      headers: after ? { 'X-After': after } : undefined,
+    })
+    if (response.error || !response.data) throw response.error ?? new Error('No data')
+    items.value = response.data.items
+  })
+
+function pick(item: Item) {
+  id.value = item.id
+  value.value = item.value ?? ''
 }
 </script>

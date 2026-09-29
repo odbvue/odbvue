@@ -116,44 +116,34 @@ See the [JWT capability page](./jwt) for details.
 
 ## Settings
 
-Key/value settings store with AES-256 encryption for secrets. Backed by the odb framework package `odb_settings` and the `odb_settings_store` table.
+Settings store defined in TypeScript: the `odb_settings_store` table and the `odb_settings` PL/SQL package (`list`, `read`, `write`, `remove`). See the [Settings guide](./settings) for details.
 
 ### Install
 
 ```ts
 import { odbSettings } from '@odbvue/odb'
 
-// Local development: generate or reuse the database-resident master key
 odbSettings.toSQLUp({ schema: 'APP_USER' })
 odbSettings.toSQLDown({ schema: 'APP_USER' })
-
-// OCI: use Vault instead of a local master-key table
-odbSettings.vaultSecret(vaultSecretUri).toSQLUp({ schema: 'APP_USER' })
 ```
 
-### Expression Helpers
+### Calling the package
+
+Each helper returns a typed call to `odb_settings`, for use with `body.call(...)`:
 
 ```ts
-odbSettings.read(odbLiteral('API_URL'))
-odbSettings.write(odbLiteral('API_URL'), 'v_url', { name: odbLiteral('Api Url') })
-odbSettings.write(odbLiteral('API_KEY'), 'v_key', { secret: true }) // encrypted at rest
-odbSettings.remove(odbLiteral('API_URL'))
+body.call(odbSettings.read(id, value, meta)) // OUT value, meta
+body.call(odbSettings.write(id, value)) // upsert, keeps existing meta
+body.call(odbSettings.list(after, items)) // OUT SYS_REFCURSOR, 50 rows per page
+body.call(odbSettings.remove(id))
 ```
 
 ### Seed
 
-Schema-aware migration artifact that upserts settings (install after `odbSettings`):
+Schema-aware migration artifact that upserts settings through `odb_settings.write` (install after `odbSettings`):
 
 ```ts
-odbSettings.seed({ id: 'APP_VERSION', name: 'Application version', value: '1.0.0' })
-```
-
-### Example
-
-```ts
-const getUrl = pkg.proc('get_url', { out: { url: odbType.string() } }, ({ params, body }) => {
-  body.set(params.url, odbSettings.read(odbLiteral('API_URL')))
-})
+odbSettings.seed({ id: 'APP_VERSION', value: '1.0.0', meta: { label: 'Application version' } })
 ```
 
 ## ORDS Services

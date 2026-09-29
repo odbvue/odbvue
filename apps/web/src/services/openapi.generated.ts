@@ -47,7 +47,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Authenticate using username and password */
-        post: operations["odb-auth_login"];
+        post: operations["auth_login"];
         delete?: never;
         options?: never;
         head?: never;
@@ -64,7 +64,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Rotate a refresh token and issue an access token */
-        post: operations["odb-auth_refresh"];
+        post: operations["auth_refresh"];
         delete?: never;
         options?: never;
         head?: never;
@@ -81,7 +81,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Revoke an authentication session */
-        post: operations["odb-auth_logout"];
+        post: operations["auth_logout"];
         delete?: never;
         options?: never;
         head?: never;
@@ -96,7 +96,7 @@ export interface paths {
             cookie?: never;
         };
         /** Return the authenticated user */
-        get: operations["odb-auth_me"];
+        get: operations["auth_me"];
         put?: never;
         post?: never;
         delete?: never;
@@ -105,17 +105,16 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/settings/{id}": {
+    "/sandbox/settings": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Read a regular setting */
-        get: operations["odb-settings-api_read_setting"];
-        /** Write a regular setting */
-        put: operations["odb-settings-api_write_setting"];
+        /** List settings, 50 per page */
+        get: operations["sandbox_list_settings"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -123,19 +122,20 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/settings/secret/{id}": {
+    "/sandbox/settings/{id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Read an encrypted setting */
-        get: operations["odb-settings-api_read_secret_setting"];
-        /** Write an encrypted setting */
-        put: operations["odb-settings-api_write_secret_setting"];
+        /** Read a setting */
+        get: operations["sandbox_read_setting"];
+        /** Create or update a setting */
+        put: operations["sandbox_write_setting"];
         post?: never;
-        delete?: never;
+        /** Delete a setting */
+        delete: operations["sandbox_remove_setting"];
         options?: never;
         head?: never;
         patch?: never;
@@ -149,26 +149,27 @@ export interface components {
         TestTestResponse: {
             result: string;
         };
-        OdbAuthLoginResponse: {
+        AuthLoginResponse: {
             accessToken: string;
         };
-        OdbAuthRefreshResponse: {
+        AuthRefreshResponse: {
             accessToken: string;
         };
-        OdbAuthLogoutResponse: Record<string, never>;
-        OdbAuthMeResponse: {
+        AuthLogoutResponse: Record<string, never>;
+        AuthMeResponse: {
             userId: string;
             username: string;
             displayName: string;
         };
-        OdbSettingsApiReadSettingResponse: {
-            value: string;
+        SandboxListSettingsResponse: {
+            items: unknown[];
         };
-        OdbSettingsApiWriteSettingResponse: Record<string, never>;
-        OdbSettingsApiReadSecretSettingResponse: {
+        SandboxReadSettingResponse: {
             value: string;
+            meta: string;
         };
-        OdbSettingsApiWriteSecretSettingResponse: Record<string, never>;
+        SandboxWriteSettingResponse: Record<string, never>;
+        SandboxRemoveSettingResponse: Record<string, never>;
     };
     responses: never;
     parameters: never;
@@ -225,7 +226,7 @@ export interface operations {
             };
         };
     };
-    "odb-auth_login": {
+    auth_login: {
         parameters: {
             query?: never;
             header?: never;
@@ -247,12 +248,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OdbAuthLoginResponse"];
+                    "application/json": components["schemas"]["AuthLoginResponse"];
                 };
             };
         };
     };
-    "odb-auth_refresh": {
+    auth_refresh: {
         parameters: {
             query?: never;
             header?: {
@@ -269,12 +270,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OdbAuthRefreshResponse"];
+                    "application/json": components["schemas"]["AuthRefreshResponse"];
                 };
             };
         };
     };
-    "odb-auth_logout": {
+    auth_logout: {
         parameters: {
             query?: never;
             header?: {
@@ -291,12 +292,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OdbAuthLogoutResponse"];
+                    "application/json": components["schemas"]["AuthLogoutResponse"];
                 };
             };
         };
     };
-    "odb-auth_me": {
+    auth_me: {
         parameters: {
             query?: never;
             header?: {
@@ -313,12 +314,35 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OdbAuthMeResponse"];
+                    "application/json": components["schemas"]["AuthMeResponse"];
                 };
             };
         };
     };
-    "odb-settings-api_read_setting": {
+    sandbox_list_settings: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string;
+                "X-After"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxListSettingsResponse"];
+                };
+            };
+        };
+    };
+    sandbox_read_setting: {
         parameters: {
             query?: never;
             header?: {
@@ -337,12 +361,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OdbSettingsApiReadSettingResponse"];
+                    "application/json": components["schemas"]["SandboxReadSettingResponse"];
                 };
             };
         };
     };
-    "odb-settings-api_write_setting": {
+    sandbox_write_setting: {
         parameters: {
             query?: never;
             header?: {
@@ -367,12 +391,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OdbSettingsApiWriteSettingResponse"];
+                    "application/json": components["schemas"]["SandboxWriteSettingResponse"];
                 };
             };
         };
     };
-    "odb-settings-api_read_secret_setting": {
+    sandbox_remove_setting: {
         parameters: {
             query?: never;
             header?: {
@@ -391,37 +415,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OdbSettingsApiReadSecretSettingResponse"];
-                };
-            };
-        };
-    };
-    "odb-settings-api_write_secret_setting": {
-        parameters: {
-            query?: never;
-            header?: {
-                Authorization?: string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    value?: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OdbSettingsApiWriteSecretSettingResponse"];
+                    "application/json": components["schemas"]["SandboxRemoveSettingResponse"];
                 };
             };
         };
