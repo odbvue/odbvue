@@ -47,6 +47,8 @@ export type AnyQueryBuilder = {
 export type OdbTypeDescriptor<TType extends PlsqlType | string> = {
   type: TType
   length?: number
+  /** Logical ODB type when it is richer than the PL/SQL type (e.g. `json` stored as CLOB). */
+  odbType?: OdbType
 }
 
 type ParameterInput =
@@ -146,7 +148,9 @@ function inputParameterType(input: ParameterInput): PlsqlType | string {
 }
 
 function inputParameterOdbType(input: ParameterInput): OdbType {
-  return input instanceof Column ? input.type : odbTypeFromPlsql(inputParameterType(input))
+  return input instanceof Column
+    ? input.type
+    : (input.odbType ?? odbTypeFromPlsql(inputParameterType(input)))
 }
 
 /** ODB type descriptors for use with named parameters and local variables. */
@@ -181,6 +185,10 @@ export const odbType = {
   },
   clob(): OdbTypeDescriptor<'CLOB'> {
     return { type: 'CLOB' }
+  },
+  /** JSON text stored as a CLOB; surfaces as `json` in the generated contract. */
+  json(): OdbTypeDescriptor<'CLOB'> {
+    return { type: 'CLOB', odbType: 'json' }
   },
   blob(): OdbTypeDescriptor<'BLOB'> {
     return { type: 'BLOB' }
@@ -930,6 +938,8 @@ export type OrdsServiceParameterGroups = {
   header?: Record<string, PlsqlReference>
   /** Values read from route parameters. */
   uri?: Record<string, PlsqlReference>
+  /** Values read from URL query-string parameters. */
+  query?: Record<string, PlsqlReference>
   /** OUT values returned in the JSON response. */
   response?: Record<string, PlsqlReference>
 }
@@ -949,6 +959,12 @@ export type ProcedureServiceDefinition<TParameters extends ProcedureParameters> 
   headers?: Record<string, NamedParameters<TParameters>[keyof NamedParameters<TParameters>]>
   /** Direct typed bindings for route parameters. */
   uri?: Record<
+    string,
+    | ParameterGroup<TParameters, 'in'>[keyof ParameterGroup<TParameters, 'in'>]
+    | ParameterGroup<TParameters, 'inOut'>[keyof ParameterGroup<TParameters, 'inOut'>]
+  >
+  /** Direct typed bindings for URL query-string parameters. */
+  query?: Record<
     string,
     | ParameterGroup<TParameters, 'in'>[keyof ParameterGroup<TParameters, 'in'>]
     | ParameterGroup<TParameters, 'inOut'>[keyof ParameterGroup<TParameters, 'inOut'>]
@@ -1005,11 +1021,16 @@ export function defineService<TParameters extends ProcedureParameters>(
   definition: ProcedureServiceDefinition<TParameters>,
 ): ProcedureDefinition<TParameters> {
   const directParams =
-    definition.body || definition.headers || definition.uri || definition.response
+    definition.body ||
+    definition.headers ||
+    definition.uri ||
+    definition.query ||
+    definition.response
       ? {
           body: definition.body,
           header: definition.headers,
           uri: definition.uri,
+          query: definition.query,
           response: definition.response,
         }
       : undefined
@@ -1017,6 +1038,7 @@ export function defineService<TParameters extends ProcedureParameters>(
     body: _body,
     headers: _headers,
     uri: _uri,
+    query: _query,
     response: _response,
     ...serviceDefinition
   } = definition
@@ -1068,7 +1090,7 @@ function buildOrdsEndpoint(
       transport?.name,
       transport?.transport === 'header'
         ? 'HEADER'
-        : transport?.transport === 'uri'
+        : transport?.transport === 'uri' || transport?.transport === 'query'
           ? 'URI'
           : transport?.transport === 'body'
             ? 'BODY'
@@ -1180,7 +1202,7 @@ export class Procedure {
         }
         const direction = (parameter as Param).toNode().direction
         if (
-          (transport === 'body' || transport === 'uri') &&
+          (transport === 'body' || transport === 'uri' || transport === 'query') &&
           direction !== 'IN' &&
           direction !== 'IN OUT'
         ) {

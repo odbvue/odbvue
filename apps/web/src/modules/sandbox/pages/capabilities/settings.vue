@@ -95,10 +95,10 @@
               >Load</v-btn
             >
             <v-btn
-              v-if="items.length >= pageSize"
+              v-if="nextCursor"
               prepend-icon="$mdiChevronRight"
               :disabled="!auth.authenticated.value || !!busy"
-              @click="list(items.at(-1)?.id)"
+              @click="list(nextCursor)"
               >Next</v-btn
             >
           </v-card-actions>
@@ -132,6 +132,7 @@ const http = useOdbVue().get(httpContract)
 const id = ref('SANDBOX_DEMO')
 const value = ref('')
 const items = ref<Item[]>([])
+const nextCursor = ref<string>()
 const busy = ref<Action>()
 const message = ref<{ type: 'success' | 'error'; text: string }>()
 
@@ -170,16 +171,18 @@ const remove = () =>
     value.value = ''
   })
 
-const list = (after?: string) =>
+const list = (cursor?: string) =>
   run('list', 'Settings loaded.', 'Settings could not be loaded.', async () => {
+    const query = new URLSearchParams({ limit: String(pageSize + 1) })
+    if (cursor) query.set('cursor', cursor)
     const response = await http.get<components['schemas']['SandboxListSettingsResponse']>(
-      '/sandbox/settings',
-      {
-        headers: after ? { 'X-After': after } : undefined,
-      },
+      `/sandbox/settings?${query}`,
     )
     if (response.error || !response.data) throw response.error ?? new Error('No data')
-    items.value = response.data.items
+    // An extra row means another page exists.
+    const page = response.data.items.slice(0, pageSize)
+    items.value = page
+    nextCursor.value = response.data.items.length > pageSize ? page.at(-1)?.id : undefined
   })
 
 function pick(item: Item) {

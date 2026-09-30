@@ -107,6 +107,9 @@ export function generateApplicationsOpenApi(
         .map((part) => part.replace(/^\/+|\/+$/g, ''))
         .filter(Boolean)
         .join('/')}`.replace(/:([A-Za-z0-9_-]+)/g, '{$1}')
+      const routeParameters = new Set(
+        [...endpoint.pattern.matchAll(/:([A-Za-z0-9_-]+)/g)].map((match) => match[1]),
+      )
       const parameters = endpoint.params
         .filter(
           (param) =>
@@ -114,12 +117,20 @@ export function generateApplicationsOpenApi(
             param.plsqlArg.toUpperCase() !== 'P_BODY' &&
             param.sourceType !== 'BODY',
         )
-        .map((param) => ({
-          name: param.name,
-          in: param.sourceType === 'URI' ? 'path' : 'header',
-          required: param.sourceType === 'URI',
-          schema: openApiSchema(param.paramType, param.odbType),
-        }))
+        .map((param) => {
+          const location =
+            param.sourceType === 'URI'
+              ? routeParameters.has(param.name)
+                ? 'path'
+                : 'query'
+              : 'header'
+          return {
+            name: param.name,
+            in: location,
+            required: location === 'path',
+            schema: openApiSchema(param.paramType, param.odbType),
+          }
+        })
       const bodyParams = endpoint.params.filter(
         (param) =>
           (param.direction === 'IN' || param.direction === 'IN OUT') &&
@@ -134,7 +145,7 @@ export function generateApplicationsOpenApi(
           (value.direction === 'OUT' || value.direction === 'IN OUT') &&
           value.sourceType === 'RESPONSE',
       )) {
-        const outputName = oracleParameterName(param.plsqlArg)
+        const outputName = param.name
         requiredOutputs.push(outputName)
         if (param.resultColumns?.length) {
           const itemName = `${operationName}${toPascalCase(param.name)}Item`

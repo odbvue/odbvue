@@ -7,7 +7,6 @@ import {
   odbPackage,
   odbSettings,
   odbType,
-  odbLiteral,
 } from '@odbvue/odb'
 
 // One application package: ORDS services only, each delegating to framework packages.
@@ -100,31 +99,33 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
   const listSettings = pkg.proc(
     'list_settings',
     {
-      in: { authorization: odbType.string(4000), after: odbType.string(128) },
+      in: {
+        authorization: odbType.string(4000),
+        after: odbSettings.types.id,
+        limit: odbType.integer(),
+      },
       out: { items: odbType.resultset() },
     },
-    ({ params: { authorization, after, items }, body }) => {
+    ({ params: { authorization, after, limit, items }, body }) => {
       const { subject } = body.variables({ subject: odbType.guid() })
       body.set(subject, odbAuth.requireUser(authorization))
-      body.call(odbSettings.list(after, odbLiteral(10), items))
+      body.call(odbSettings.list(after, limit, items))
     },
   )
   defineService(listSettings, {
     method: 'GET',
     path: '/settings',
-    summary: 'List settings, 10 per page',
-    headers: {
-      Authorization: listSettings.parameters.authorization,
-      'X-After': listSettings.parameters.after,
-    },
+    summary: 'List settings',
+    headers: { Authorization: listSettings.parameters.authorization },
+    query: { cursor: listSettings.parameters.after, limit: listSettings.parameters.limit },
     response: { items: listSettings.parameters.items },
   })
 
   const readSetting = pkg.proc(
     'read_setting',
     {
-      in: { authorization: odbType.string(4000), id: odbType.string(128) },
-      out: { value: odbType.string(2000), meta: odbType.string(2000) },
+      in: { authorization: odbType.string(4000), id: odbSettings.types.id },
+      out: { value: odbSettings.types.value, meta: odbSettings.types.meta },
     },
     ({ params: { authorization, id, value, meta }, body }) => {
       const { subject } = body.variables({ subject: odbType.guid() })
@@ -146,8 +147,8 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
     {
       in: {
         authorization: odbType.string(4000),
-        id: odbType.string(128),
-        value: odbType.string(2000),
+        id: odbSettings.types.id,
+        value: odbSettings.types.value,
       },
     },
     ({ params: { authorization, id, value }, body }) => {

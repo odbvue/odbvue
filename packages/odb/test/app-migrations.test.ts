@@ -58,7 +58,7 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain("p_pattern        => 'settings'")
     expect(sql).toContain("p_pattern        => 'settings/:id'")
     expect(sql).toContain('odb_auth_jwt.require_user(p_authorization)')
-    expect(sql).toContain('odb_settings.list(p_after, 10, p_items)')
+    expect(sql).toContain('odb_settings.list(p_after, p_limit, p_items)')
     expect(sql).toContain('odb_settings.read(p_id, p_value, p_meta)')
     expect(sql).toContain('odb_settings.write(p_id, p_value, NULL)')
     expect(sql).toContain('odb_settings.remove(p_id)')
@@ -76,5 +76,27 @@ describe('app-owned ORDS migrations', () => {
     expect(login?.properties).toMatchObject({ accessToken: { type: 'string' } })
     expect(login?.properties).not.toHaveProperty('refreshToken')
     expect(login?.properties).not.toHaveProperty('setCookie')
+  })
+
+  it('keeps settings meta typed as JSON and lists with limit/cursor query parameters', async () => {
+    const migration = await load('00000000000001-sandbox')
+    const openapi = generateApplicationOpenApi(migration.applications()[0]) as {
+      paths: Record<string, Record<string, { parameters: { name: string; in: string }[] }>>
+      components: { schemas: Record<string, { properties: Record<string, unknown> }> }
+    }
+    expect(openapi.components.schemas.SandboxReadSettingResponse?.properties.meta).toEqual({
+      'x-odb-type': 'json',
+    })
+    expect(openapi.components.schemas.SandboxListSettingsResponse?.properties).toHaveProperty(
+      'items',
+    )
+    const parameters = openapi.paths['/sandbox/settings']?.get?.parameters ?? []
+    expect(parameters.filter((parameter) => parameter.in === 'query').map((p) => p.name)).toEqual([
+      'cursor',
+      'limit',
+    ])
+
+    const sql = migration.compile().up().join('\n')
+    expect(sql).toContain('list_settings(p_authorization => :authorization, p_after => :after')
   })
 })

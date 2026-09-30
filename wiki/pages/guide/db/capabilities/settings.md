@@ -26,7 +26,7 @@ export const migration = defineMigration('20260802140000_settings', {
 
 | Procedure | Parameters                                  | Behavior                                                                                                             |
 | --------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `list`    | `p_after` IN, `p_limit` IN, `p_items` OUT `SYS_REFCURSOR` | Up to `p_limit` rows (`NULL` = 50) ordered by `id`, starting after `p_after` (`NULL` for the first page). Columns: `id`, `value`, `meta`. |
+| `list`    | `p_after` IN, `p_limit` IN, `p_items` OUT `SYS_REFCURSOR` | Up to `p_limit` rows (`NULL` = 50) ordered by `id`, starting after `p_after` (`NULL` for the first page). Columns: `id`, `value`, `meta`. Callers detect a further page by requesting `p_limit + 1` rows. |
 | `read`    | `p_id` IN, `p_value` OUT, `p_meta` OUT      | Returns one setting; responds `404 NOT_FOUND` if it does not exist.                                                  |
 | `write`   | `p_id`, `p_value`, `p_meta` IN              | Creates or updates a setting. A `NULL` `p_meta` keeps existing metadata (`{}` on create).                            |
 | `remove`  | `p_id` IN                                   | Deletes a setting.                                                                                                   |

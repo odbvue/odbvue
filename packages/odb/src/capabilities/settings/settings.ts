@@ -10,12 +10,14 @@ import { odbQuery } from '../../query/index.js'
 
 const PACKAGE_NAME = 'odb_settings'
 const DEFAULT_LIMIT = 50
+const ID_LENGTH = 128
+const VALUE_LENGTH = 2000
 
 export type SettingMeta = Record<string, unknown>
 
 export const settingsStore = odbTable('odb_settings_store', (t) => ({
-  id: t.string(128).primaryKey(),
-  value: t.string(2000),
+  id: t.string(ID_LENGTH).primaryKey(),
+  value: t.string(VALUE_LENGTH),
   meta: t.json<SettingMeta>().notNull().default({}),
 })).comment('Application settings')
 
@@ -109,6 +111,13 @@ export const odbSettings = {
 
   toSQLDown(options: { schema?: string } = {}): string {
     return [odbSettingsPackage.toSQLDown(options), settingsStore.toSQLDown(options)].join('\n')
+  },
+
+  /** Parameter types for declaring procedures that pass settings through, without knowing the table. */
+  types: {
+    id: odbType.string(ID_LENGTH),
+    value: odbType.string(VALUE_LENGTH),
+    meta: odbType.json(),
   },
 
   /** `odb_settings.list(<after>, <limit>, <items>)`; a `NULL` limit returns up to 50 settings. */

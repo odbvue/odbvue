@@ -40,10 +40,9 @@ GET {{baseUrl}}/auth/me
 GET {{baseUrl}}/sandbox/settings
 Authorization: Bearer {{accessToken}}
 
-### List settings (next page, after given id)
-GET {{baseUrl}}/sandbox/settings
+### List settings (next page, from a previous nextCursor)
+GET {{baseUrl}}/sandbox/settings?limit=50&cursor={{settingId}}
 Authorization: Bearer {{accessToken}}
-X-After: {{settingId}}
 
 ### Read setting
 GET {{baseUrl}}/sandbox/settings/{{settingId}}

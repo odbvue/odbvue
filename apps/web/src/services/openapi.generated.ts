@@ -79,7 +79,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List settings, 10 per page */
+        /** List settings */
         get: operations["sandbox_list_settings"];
         put?: never;
         post?: never;
@@ -134,7 +134,7 @@ export interface components {
         };
         SandboxReadSettingResponse: {
             value: string;
-            meta: string;
+            meta: unknown;
         };
         SandboxWriteSettingResponse: Record<string, never>;
         SandboxRemoveSettingResponse: Record<string, never>;
@@ -242,10 +242,12 @@ export interface operations {
     };
     sandbox_list_settings: {
         parameters: {
-            query?: never;
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
             header?: {
                 Authorization?: string;
-                "X-After"?: string;
             };
             path?: never;
             cookie?: never;
