@@ -3,6 +3,7 @@ export * from './application.js'
 export * from './schema/column.js'
 export * from './schema/table.js'
 export * from './schema/attribute.js'
+export * from './schema/errors.js'
 export {
   odbPackage,
   defineService,

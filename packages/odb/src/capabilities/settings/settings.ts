@@ -1,6 +1,6 @@
 // Settings capability: `odb_settings_store` table and the `odb_settings` PL/SQL package,
-// both defined in TypeScript. The package owns the CRUD logic; ORDS exposure and
-// authorization belong to the application package that calls it.
+// both defined in TypeScript. The package owns the CRUD logic and raises transport-independent
+// ODB errors; ORDS exposure, HTTP status mapping and authorization belong to the application package.
 
 import { cond, odbLiteral, plsqlExpr, type PlsqlRenderable } from '../../schema/attribute.js'
 import { plsqlBlock, qualify } from '../../schema/ddl.js'
@@ -45,7 +45,7 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
     },
   )
 
-  /** Reads one setting; responds 404 when it does not exist. */
+  /** Reads one setting; raises a NOT_FOUND ODB error when it does not exist. */
   const read = pkg.proc(
     'read',
     {
@@ -60,7 +60,7 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
           .into(value, meta)
           .where(cond.eq(settingsStore.id, id)),
       )
-      body.when('NO_DATA_FOUND', (handler) => handler.httpError(404, 'NOT_FOUND'))
+      body.when('NO_DATA_FOUND', (handler) => handler.notFound())
     },
   )
 

@@ -29,6 +29,12 @@ import { odbTypeFromPlsql, oracleParameterName, ordsTypeFromPlsql, type OdbType 
 import { Column, type ColumnNode } from './column.js'
 import { odbQuery } from '../query/index.js'
 import type { Insertable, Table } from './table.js'
+import {
+  ODB_ERROR_CODE_PATTERN,
+  ODB_ERROR_NUMBER,
+  ODB_ERROR_STATUS,
+  type OdbErrorKind,
+} from './errors.js'
 
 // ── Query builder integration ─────────────────────────────────────────────────
 
@@ -490,7 +496,7 @@ export class ProcedureBody {
     return this
   }
 
-  /** Raise an explicit HTTP response handled by generated ORDS services. */
+  /** Raise an explicit HTTP response; prefer the transport-independent `raiseError()` helpers. */
   httpError(status: number, code: string): this {
     if (!Number.isInteger(status) || status < 400 || status > 599) {
       throw new Error('httpError: status must be an integer from 400 through 599.')
@@ -501,19 +507,48 @@ export class ProcedureBody {
     return this.raw(`odb_http.raise_error(${status}, '${code}')`)
   }
 
-  /** Raise a 401 HTTP response handled by generated ORDS services. */
-  unauthorized(code = 'UNAUTHORIZED'): this {
-    return this.httpError(401, code)
+  /**
+   * Raise a transport-independent ODB error. Services translate the kind to
+   * a transport status (HTTP for ORDS); `code` defaults to the kind.
+   */
+  raiseError(kind: OdbErrorKind, code: string = kind): this {
+    if (!Object.hasOwn(ODB_ERROR_STATUS, kind)) {
+      throw new Error(`raiseError: unknown error kind ${kind}.`)
+    }
+    if (!ODB_ERROR_CODE_PATTERN.test(code)) {
+      throw new Error('raiseError: code must be uppercase alphanumeric with optional underscores.')
+    }
+    return this.raw(`raise_application_error(${ODB_ERROR_NUMBER}, 'ODB_ERROR|${kind}|${code}')`)
   }
 
-  /** Raise a 403 HTTP response handled by generated ORDS services. */
-  forbidden(code = 'FORBIDDEN'): this {
-    return this.httpError(403, code)
+  /** Raise a `VALIDATION_ERROR` ODB error. */
+  invalid(code?: string): this {
+    return this.raiseError('VALIDATION_ERROR', code)
   }
 
-  /** Raise a 429 HTTP response handled by generated ORDS services. */
-  tooManyRequests(code = 'TOO_MANY_REQUESTS'): this {
-    return this.httpError(429, code)
+  /** Raise an `UNAUTHORIZED` ODB error. */
+  unauthorized(code?: string): this {
+    return this.raiseError('UNAUTHORIZED', code)
+  }
+
+  /** Raise a `FORBIDDEN` ODB error. */
+  forbidden(code?: string): this {
+    return this.raiseError('FORBIDDEN', code)
+  }
+
+  /** Raise a `NOT_FOUND` ODB error. */
+  notFound(code?: string): this {
+    return this.raiseError('NOT_FOUND', code)
+  }
+
+  /** Raise a `CONFLICT` ODB error. */
+  conflict(code?: string): this {
+    return this.raiseError('CONFLICT', code)
+  }
+
+  /** Raise a `TOO_MANY_REQUESTS` ODB error. */
+  tooManyRequests(code?: string): this {
+    return this.raiseError('TOO_MANY_REQUESTS', code)
   }
 
   /**

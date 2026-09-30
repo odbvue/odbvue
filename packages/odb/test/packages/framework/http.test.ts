@@ -14,18 +14,36 @@ describe('odbHttp framework package', () => {
 
   it('renders validated error calls and convenience methods', () => {
     const body = new ProcedureBody()
-    body.httpError(422, 'INVALID_INPUT').unauthorized().forbidden().tooManyRequests()
+    body.httpError(422, 'INVALID_INPUT')
+
+    expect(
+      body.toNode().statements.map((statement) => ('sql' in statement ? statement.sql : '')),
+    ).toEqual(["odb_http.raise_error(422, 'INVALID_INPUT')"])
+    expect(() => body.httpError(200, 'OK')).toThrow('status must be an integer')
+    expect(() => body.httpError(429, 'too-many')).toThrow('code must be uppercase')
+  })
+
+  it('renders transport-independent ODB errors', () => {
+    const body = new ProcedureBody()
+    body
+      .notFound()
+      .conflict()
+      .invalid()
+      .unauthorized('INVALID_CREDENTIALS')
+      .forbidden()
+      .tooManyRequests()
 
     expect(
       body.toNode().statements.map((statement) => ('sql' in statement ? statement.sql : '')),
     ).toEqual([
-      "odb_http.raise_error(422, 'INVALID_INPUT')",
-      "odb_http.raise_error(401, 'UNAUTHORIZED')",
-      "odb_http.raise_error(403, 'FORBIDDEN')",
-      "odb_http.raise_error(429, 'TOO_MANY_REQUESTS')",
+      "raise_application_error(-20998, 'ODB_ERROR|NOT_FOUND|NOT_FOUND')",
+      "raise_application_error(-20998, 'ODB_ERROR|CONFLICT|CONFLICT')",
+      "raise_application_error(-20998, 'ODB_ERROR|VALIDATION_ERROR|VALIDATION_ERROR')",
+      "raise_application_error(-20998, 'ODB_ERROR|UNAUTHORIZED|INVALID_CREDENTIALS')",
+      "raise_application_error(-20998, 'ODB_ERROR|FORBIDDEN|FORBIDDEN')",
+      "raise_application_error(-20998, 'ODB_ERROR|TOO_MANY_REQUESTS|TOO_MANY_REQUESTS')",
     ])
-    expect(() => body.httpError(200, 'OK')).toThrow('status must be an integer')
-    expect(() => body.httpError(429, 'too-many')).toThrow('code must be uppercase')
+    expect(() => body.notFound('not-found')).toThrow('code must be uppercase')
   })
 
   it('renders typed Set-Cookie values', () => {
@@ -56,6 +74,10 @@ describe('odbHttp framework package', () => {
     expect(source).toContain(':status_code := TO_NUMBER(REGEXP_SUBSTR(SQLERRM')
     expect(source).toContain("htp.p(JSON_OBJECT('code' VALUE REGEXP_SUBSTR(SQLERRM")
     expect(source).not.toContain('RETURNING CLOB')
+    expect(source).toContain('ELSIF SQLCODE = -20998 THEN')
+    expect(source).toContain("WHEN 'NOT_FOUND' THEN 404")
+    expect(source).toContain("WHEN 'CONFLICT' THEN 409")
+    expect(source).toContain("WHEN 'UNAUTHORIZED' THEN 401")
     expect(source).toContain(':status_code := 500;')
     expect(source).toContain(`htp.p('{"code":"INTERNAL_SERVER_ERROR"}');`)
   })

@@ -2,6 +2,7 @@
 
 import { oracleParameterName, toKebabCase, type OdbOrdsType, type OdbType } from './model.js'
 import type { ColumnType } from './schema/column.js'
+import { ODB_ERROR_NUMBER, ODB_ERROR_STATUS } from './schema/errors.js'
 
 export type OrdsHttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
@@ -266,13 +267,25 @@ export class OrdsEndpoint {
       'owa_util.http_header_close;',
       `htp.p(JSON_OBJECT('code' VALUE ${code}));`,
     ].join(' ')
+    const odbEnvelope = "'ODB_ERROR\\|([A-Z][A-Z0-9_]{0,99})\\|([A-Z][A-Z0-9_]{0,99})'"
+    const odbKind = `REGEXP_SUBSTR(SQLERRM, ${odbEnvelope}, 1, 1, NULL, 1)`
+    const odbCode = `REGEXP_SUBSTR(SQLERRM, ${odbEnvelope}, 1, 1, NULL, 2)`
+    const odbStatus = Object.entries(ODB_ERROR_STATUS)
+      .map(([kind, httpStatus]) => `WHEN '${kind}' THEN ${httpStatus}`)
+      .join(' ')
+    const odbErrorResponse = [
+      `:status_code := CASE ${odbKind} ${odbStatus} ELSE 500 END;`,
+      "owa_util.mime_header('application/json', FALSE);",
+      'owa_util.http_header_close;',
+      `htp.p(JSON_OBJECT('code' VALUE ${odbCode}));`,
+    ].join(' ')
     const fallbackResponse = [
       ':status_code := 500;',
       "owa_util.mime_header('application/json', FALSE);",
       'owa_util.http_header_close;',
       `htp.p('{"code":"INTERNAL_SERVER_ERROR"}');`,
     ].join(' ')
-    return `${declaration}BEGIN ${call} EXCEPTION WHEN OTHERS THEN IF SQLCODE = -20999 THEN ${explicitResponse} ELSE ${fallbackResponse} END IF; END;`
+    return `${declaration}BEGIN ${call} EXCEPTION WHEN OTHERS THEN IF SQLCODE = -20999 THEN ${explicitResponse} ELSIF SQLCODE = ${ODB_ERROR_NUMBER} THEN ${odbErrorResponse} ELSE ${fallbackResponse} END IF; END;`
   }
 
   private paramSourceType(param: OrdsParam): OrdsParamNode['sourceType'] {
