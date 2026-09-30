@@ -7,6 +7,7 @@ import {
   odbPackage,
   odbSettings,
   odbType,
+  odbLiteral,
 } from '@odbvue/odb'
 
 // One application package: ORDS services only, each delegating to framework packages.
@@ -105,13 +106,13 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
     ({ params: { authorization, after, items }, body }) => {
       const { subject } = body.variables({ subject: odbType.guid() })
       body.set(subject, odbAuth.requireUser(authorization))
-      body.call(odbSettings.list(after, items))
+      body.call(odbSettings.list(after, odbLiteral(10), items))
     },
   )
   defineService(listSettings, {
     method: 'GET',
     path: '/settings',
-    summary: 'List settings, 50 per page',
+    summary: 'List settings, 10 per page',
     headers: {
       Authorization: listSettings.parameters.authorization,
       'X-After': listSettings.parameters.after,

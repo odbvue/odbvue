@@ -16,7 +16,7 @@ describe('Settings', () => {
   it('implements list, read, write and remove in PL/SQL', () => {
     expect(sql).toContain('OPEN p_items FOR SELECT id, value, meta FROM odb_settings_store')
     expect(sql).toContain('p_after IS NULL OR id > p_after')
-    expect(sql).toContain('ORDER BY id ASC FETCH FIRST 50 ROWS ONLY')
+    expect(sql).toContain('ORDER BY id ASC FETCH FIRST NVL(p_limit, 50) ROWS ONLY')
     expect(sql).toContain('INTO p_value, p_meta FROM odb_settings_store WHERE id = p_id')
     expect(sql).toContain("odb_http.raise_error(404, 'NOT_FOUND')")
     expect(sql).toContain('MERGE INTO odb_settings_store target')
@@ -30,7 +30,9 @@ describe('Settings', () => {
     expect(odbSettings.write('p_id', 'p_value').toSQL()).toBe(
       'odb_settings.write(p_id, p_value, NULL)',
     )
-    expect(odbSettings.list('NULL', 'p_items').toSQL()).toBe('odb_settings.list(NULL, p_items)')
+    expect(odbSettings.list('NULL', 'NULL', 'p_items').toSQL()).toBe(
+      'odb_settings.list(NULL, NULL, p_items)',
+    )
     expect(odbSettings.remove('p_id').toSQL()).toBe('odb_settings.remove(p_id)')
   })
 

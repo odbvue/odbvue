@@ -9,7 +9,7 @@ import { odbTable } from '../../schema/table.js'
 import { odbQuery } from '../../query/index.js'
 
 const PACKAGE_NAME = 'odb_settings'
-const PAGE_SIZE = 50
+const DEFAULT_LIMIT = 50
 
 export type SettingMeta = Record<string, unknown>
 
@@ -25,11 +25,14 @@ function lit(text: string): string {
 
 /** PL/SQL API for the settings store. Callers own authorization and transactions. */
 export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
-  /** Up to 50 settings ordered by id, starting after `after` (null for the first page). */
+  /** Settings ordered by id after `after` (null for the start); `limit` null means the default page size. */
   const list = pkg.proc(
     'list',
-    { in: { after: settingsStore.id }, out: { items: odbType.resultset() } },
-    ({ params: { after, items }, body }) => {
+    {
+      in: { after: settingsStore.id, limit: odbType.integer() },
+      out: { items: odbType.resultset() },
+    },
+    ({ params: { after, limit, items }, body }) => {
       body.openFor(
         items,
         odbQuery()
@@ -37,7 +40,7 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
           .select([settingsStore.id, settingsStore.value, settingsStore.meta])
           .where(cond.or([cond.isNull(after), cond.gt(settingsStore.id, after)]))
           .orderBy(settingsStore.id)
-          .limit(PAGE_SIZE),
+          .limit(plsqlExpr.call('PLS_INTEGER', 'NVL', limit, odbLiteral(DEFAULT_LIMIT))),
       )
     },
   )
@@ -108,9 +111,9 @@ export const odbSettings = {
     return [odbSettingsPackage.toSQLDown(options), settingsStore.toSQLDown(options)].join('\n')
   },
 
-  /** `odb_settings.list(<after>, <items>)`; `items` receives a result set of up to 50 settings. */
-  list(after: PlsqlRenderable, items: PlsqlRenderable) {
-    return odbSettingsPackage.list(after, items)
+  /** `odb_settings.list(<after>, <limit>, <items>)`; a `NULL` limit returns up to 50 settings. */
+  list(after: PlsqlRenderable, limit: PlsqlRenderable, items: PlsqlRenderable) {
+    return odbSettingsPackage.list(after, limit, items)
   },
 
   /** `odb_settings.read(<id>, <value>, <meta>)` with OUT `value` and `meta`. */

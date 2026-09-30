@@ -134,7 +134,7 @@ Each helper returns a typed call to `odb_settings`, for use with `body.call(...)
 ```ts
 body.call(odbSettings.read(id, value, meta)) // OUT value, meta
 body.call(odbSettings.write(id, value)) // upsert, keeps existing meta
-body.call(odbSettings.list(after, items)) // OUT SYS_REFCURSOR, 50 rows per page
+body.call(odbSettings.list(after, limit, items)) // OUT SYS_REFCURSOR; limit NULL = 50 rows
 body.call(odbSettings.remove(id))
 ```
 

@@ -58,7 +58,7 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain("p_pattern        => 'settings'")
     expect(sql).toContain("p_pattern        => 'settings/:id'")
     expect(sql).toContain('odb_auth_jwt.require_user(p_authorization)')
-    expect(sql).toContain('odb_settings.list(p_after, p_items)')
+    expect(sql).toContain('odb_settings.list(p_after, 10, p_items)')
     expect(sql).toContain('odb_settings.read(p_id, p_value, p_meta)')
     expect(sql).toContain('odb_settings.write(p_id, p_value, NULL)')
     expect(sql).toContain('odb_settings.remove(p_id)')

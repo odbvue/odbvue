@@ -101,7 +101,7 @@ export class SelectQueryBuilder<
   private _where: ExpressionNode[] = []
   private _joins: JoinClause[] = []
   private _orderBy: OrderByClause[] = []
-  private _limit?: number
+  private _limit?: number | { toSQL(): string }
   private _forUpdate = false
   private _into?: string
   private _schema?: string
@@ -224,9 +224,14 @@ export class SelectQueryBuilder<
     return this
   }
 
-  limit(n: number): this {
+  /** Limit rows by a literal count or a PL/SQL expression such as a procedure parameter. */
+  limit(n: number | { toSQL(): string }): this {
     this._limit = n
     return this
+  }
+
+  private limitSql(): string {
+    return typeof this._limit === 'number' ? String(this._limit) : exprSql(this._limit!)
   }
 
   /** Lock the selected rows for update. */
@@ -269,7 +274,7 @@ export class SelectQueryBuilder<
     }
 
     if (this._limit !== undefined) {
-      sql += ` FETCH FIRST ${this._limit} ROWS ONLY`
+      sql += ` FETCH FIRST ${this.limitSql()} ROWS ONLY`
     }
     if (this._forUpdate) sql += ' FOR UPDATE'
 
@@ -290,7 +295,7 @@ export class SelectQueryBuilder<
       const parts = this._orderBy.map((o) => `${o.column} ${o.direction.toUpperCase()}`)
       sql += ` ORDER BY ${parts.join(', ')}`
     }
-    if (this._limit !== undefined) sql += ` FETCH FIRST ${this._limit} ROWS ONLY`
+    if (this._limit !== undefined) sql += ` FETCH FIRST ${this.limitSql()} ROWS ONLY`
     if (this._forUpdate) sql += ' FOR UPDATE'
     return sql
   }
