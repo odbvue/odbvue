@@ -416,6 +416,9 @@ export class OrdsEndpoint {
 
 function jsonValueExpression(param: OrdsParam): string {
   const path = `$.${param.name}`
+  if (param.odbType === 'json') {
+    return `JSON_QUERY(v_body, '${path}' RETURNING CLOB)`
+  }
   if (param.paramType === 'BOOLEAN') {
     return `CASE JSON_VALUE(v_body, '${path}' RETURNING VARCHAR2(5)) WHEN 'true' THEN TRUE WHEN 'false' THEN FALSE END`
   }

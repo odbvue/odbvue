@@ -3,6 +3,9 @@ import { defineCapability } from '../../runtime/capability.js'
 import { defineContract } from '../../runtime/contract.js'
 import type { OdbVueHooks } from '../../runtime/hooks.js'
 import { authContract } from '../auth/index.js'
+import { decodeOdbJson, type OdbOpenApiDocument } from './json.js'
+
+export { decodeOdbJson, type OdbOpenApiDocument } from './json.js'
 
 const baseURL = (import.meta as ImportMeta & { env?: { DEV?: boolean; VITE_API_URI?: string } }).env
   ?.DEV
@@ -37,6 +40,8 @@ export interface HttpConfiguration {
   refreshAccessToken?: () => Promise<boolean>
   shouldRefresh?: (request: string, options?: FetchOptions<'json'>) => boolean
   onRefreshFailure?: (context: HttpRefreshFailureContext) => void
+  /** OpenAPI document used to parse ODB `json` response fields into values. */
+  openapi?: OdbOpenApiDocument
 }
 export interface HttpClientOptions {
   /** Overrides fetch for a dedicated client, such as deterministic tests or a sandbox. */
@@ -177,7 +182,17 @@ async function executeRequest<T>(
       void hooks?.emit('http:slow', context)
     }
     return {
-      data: response._data ?? null,
+      data:
+        response._data === undefined || response._data === null
+          ? null
+          : configuration.openapi
+            ? decodeOdbJson(
+                configuration.openapi,
+                options?.method ?? 'GET',
+                request,
+                response._data,
+              )
+            : response._data,
       error: null,
       status: response.status,
       headers: response.headers,

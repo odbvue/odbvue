@@ -6,6 +6,7 @@ export type OdbType =
   | 'date'
   | 'timestamp'
   | 'clob'
+  | 'json'
   | 'blob'
   | 'resultset'
   | 'unknown'
@@ -29,6 +30,7 @@ export type OdbValueTypeMap = {
   date: Date
   timestamp: Date
   clob: string
+  json: unknown
   blob: Buffer
   resultset: unknown[]
   unknown: unknown
@@ -88,6 +90,12 @@ export const odbTypes = {
     oracle: () => 'CLOB',
     columnBuilder: 'clob',
   },
+  json: {
+    typescript: { model: 'unknown', json: 'unknown' },
+    ords: 'STRING',
+    oracle: () => 'CLOB',
+    columnBuilder: 'json',
+  },
   blob: { typescript: { model: 'Buffer', json: 'string' }, ords: 'STRING' },
   resultset: {
     typescript: { model: 'unknown[]', json: 'unknown[]' },
@@ -115,6 +123,8 @@ export function odbTypeToJsonSchema(type: OdbType): Record<string, unknown> {
       return { type: 'array', items: {} }
     case 'unknown':
       return {}
+    case 'json':
+      return { 'x-odb-type': 'json' }
     default:
       return { type: 'string' }
   }

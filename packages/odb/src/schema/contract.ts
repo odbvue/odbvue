@@ -25,6 +25,10 @@ export function plsqlToTsType(type: PlsqlType | string): string {
   return emitTypeScriptType(odbTypeFromPlsql(type))
 }
 
+function paramTsType(param: ParamNode): string {
+  return param.odbType === 'json' ? emitTypeScriptType('json') : plsqlToTsType(param.type)
+}
+
 function paramFieldName(plsqlArg: string, stripPrefix: boolean): string {
   return oracleParameterName(plsqlArg, { stripPrefix })
 }
@@ -38,13 +42,13 @@ function objectType(fields: { name: string; type: string }[]): string {
 function inputFields(params: ParamNode[], stripPrefix: boolean): { name: string; type: string }[] {
   return params
     .filter((p) => p.direction === 'IN' || p.direction === 'IN OUT')
-    .map((p) => ({ name: paramFieldName(p.name, stripPrefix), type: plsqlToTsType(p.type) }))
+    .map((p) => ({ name: paramFieldName(p.name, stripPrefix), type: paramTsType(p) }))
 }
 
 function outputFields(params: ParamNode[], stripPrefix: boolean): { name: string; type: string }[] {
   return params
     .filter((p) => p.direction === 'OUT' || p.direction === 'IN OUT')
-    .map((p) => ({ name: paramFieldName(p.name, stripPrefix), type: plsqlToTsType(p.type) }))
+    .map((p) => ({ name: paramFieldName(p.name, stripPrefix), type: paramTsType(p) }))
 }
 
 function inputSignature(fields: { name: string; type: string }[]): string {

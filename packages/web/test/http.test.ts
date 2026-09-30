@@ -12,6 +12,41 @@ function response(status: number, data: unknown = {}): Response {
 }
 
 describe('HTTP capability', () => {
+  it('parses ODB json fields using the OpenAPI document', async () => {
+    const openapi = {
+      paths: {
+        '/sandbox/settings/{id}': {
+          get: {
+            responses: {
+              '200': {
+                content: {
+                  'application/json': { schema: { $ref: '#/components/schemas/Read' } },
+                },
+              },
+            },
+          },
+        },
+      },
+      components: {
+        schemas: {
+          Read: {
+            type: 'object',
+            properties: { value: { type: 'string' }, meta: { 'x-odb-type': 'json' } },
+          },
+        },
+      },
+    }
+    const http = useHttp({
+      fetch: vi.fn<FetchMock>(() =>
+        Promise.resolve(response(200, { value: '1.0.0', meta: '{"label":"Version"}' })),
+      ),
+      configuration: { openapi },
+    })
+
+    const result = await http.get('/sandbox/settings/VERSION?x=1')
+
+    expect(result.data).toEqual({ value: '1.0.0', meta: { label: 'Version' } })
+  })
   it('shares one refresh and retries concurrent unauthorized requests once', async () => {
     let token = 'expired'
     const refreshAccessToken = vi.fn<RefreshMock>(async () => {

@@ -197,6 +197,10 @@ export function emitColumnDef(column: ColumnNode): string {
     parts.push('NOT NULL')
   }
 
+  if (column.type === 'json') {
+    parts.push(`CHECK (${column.name} IS JSON)`)
+  }
+
   if (column.options.unique) {
     parts.push('UNIQUE')
   }
@@ -214,6 +218,11 @@ function renderDefaultLiteral(type: ColumnType, value: unknown): string {
     case 'guid':
     case 'clob':
       return `'${String(value).replace(/'/g, "''")}'`
+    case 'json': {
+      const text = JSON.stringify(value)
+      if (text === undefined) throw new Error('JSON column defaults must be JSON-serializable.')
+      return `'${text.replace(/'/g, "''")}'`
+    }
     case 'number': {
       if (typeof value !== 'number' || !Number.isFinite(value)) {
         throw new Error('Number column defaults must be finite numbers.')

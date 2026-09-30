@@ -16,7 +16,7 @@ export type SettingMeta = Record<string, unknown>
 export const settingsStore = odbTable('odb_settings_store', (t) => ({
   id: t.string(128).primaryKey(),
   value: t.string(2000),
-  meta: t.string(2000).notNull().default('{}'),
+  meta: t.json<SettingMeta>().notNull().default({}),
 })).comment('Application settings')
 
 function lit(text: string): string {
@@ -79,12 +79,12 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
           .on((t, source) => cond.eq(t.id, source.id))
           .whenMatched({
             value: sourceValue,
-            meta: plsqlExpr.call('VARCHAR2', 'NVL', sourceMeta, target.meta),
+            meta: plsqlExpr.call('CLOB', 'NVL', sourceMeta, target.meta),
           })
           .whenNotMatched({
             id: sourceId,
             value: sourceValue,
-            meta: plsqlExpr.call('VARCHAR2', 'NVL', sourceMeta, odbLiteral('{}')),
+            meta: plsqlExpr.call('CLOB', 'NVL', sourceMeta, odbLiteral('{}')),
           }),
       )
     },

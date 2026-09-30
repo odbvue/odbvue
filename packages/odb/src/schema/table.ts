@@ -367,6 +367,15 @@ export class Table<TColumns extends TableColumnMap = Record<string, never>> {
     return this.createColumn(name, 'clob')
   }
 
+  /** CLOB constrained with `IS JSON`; exposed as a parsed value of type `T` at the API boundary. */
+  json<T = unknown>(): Column<T, '', true, false, false, false, 'json'>
+  json<T = unknown, TName extends string = string>(
+    name: TName,
+  ): Column<T, TName, true, false, false, false, 'json'>
+  json(name = ''): Column<unknown, string, true, false, false, false, 'json'> {
+    return this.createColumn(name, 'json')
+  }
+
   private createColumn<TName extends string, TType extends ColumnType>(
     name: TName,
     type: TType,
@@ -567,6 +576,10 @@ function emitOracleColumn(column: ColumnNode): string {
 
   if (column.options.nullable === false) {
     parts.push('NOT NULL')
+  }
+
+  if (column.type === 'json') {
+    parts.push(`CHECK (${column.name} IS JSON)`)
   }
 
   if (column.options.unique) {

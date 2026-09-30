@@ -37,6 +37,17 @@ describe('odbTable', () => {
     expect(table.toSQLUp()).toContain('EMAIL VARCHAR2(255 CHAR) UNIQUE')
   })
 
+  it('emits a json column as CLOB with an IS JSON check and typed value', () => {
+    const table = odbTable('APP_CONFIG', (t) => ({
+      meta: t.json<{ label: string }>('meta').notNull().default({ label: "it's" }),
+    }))
+
+    expect(table.toSQLUp()).toContain(
+      `meta CLOB DEFAULT '{"label":"it''s"}' NOT NULL CHECK (meta IS JSON)`,
+    )
+    expectTypeOf(table.meta).toMatchTypeOf<Column<{ label: string }, 'meta'>>()
+  })
+
   it('emits an identity primary key column', () => {
     const table = odbTable('APP_USERS', (t) => ({
       id: t.number('id').identity().primaryKey(),

@@ -24,6 +24,10 @@ describe('Settings', () => {
     expect(sql).toContain('DELETE FROM odb_settings_store WHERE id = p_id')
   })
 
+  it('stores meta as a CLOB constrained to JSON', () => {
+    expect(sql).toContain("meta CLOB DEFAULT '{}' NOT NULL CHECK (meta IS JSON)")
+  })
+
   it('emits typed calls to the package procedures', () => {
     expect(odbSettings.read('p_id', 'l_value', 'l_meta').toSQL()).toBe(
       'odb_settings.read(p_id, l_value, l_meta)',
