@@ -1,16 +1,3 @@
-// Application-service contract. The database capabilities (e.g. `odb_settings.list(after, limit, items)`)
-// stay keyset-based and do not know about cursors; the application layer translates
-// `{ limit, cursor }` into `after`/`limit` and the result set into `{ items, nextCursor }`.
-export type OdbListInput = {
-  limit?: number
-  cursor?: string
-}
-
-export type OdbList<T> = {
-  items: T[]
-  nextCursor?: string
-}
-
 export type OdbFieldError = {
   rule?: string
   message: string
