@@ -79,7 +79,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List settings, 50 per page */
+        /** List settings, 10 per page */
         get: operations["sandbox_list_settings"];
         put?: never;
         post?: never;
@@ -124,8 +124,13 @@ export interface components {
             username: string;
             displayName: string;
         };
+        SandboxListSettingsItemsItem: {
+            id: string;
+            value?: string | null;
+            meta: string;
+        };
         SandboxListSettingsResponse: {
-            items: unknown[];
+            items: components["schemas"]["SandboxListSettingsItemsItem"][];
         };
         SandboxReadSettingResponse: {
             value: string;

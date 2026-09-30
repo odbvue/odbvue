@@ -111,6 +111,7 @@
 <script setup lang="ts">
 import { httpContract, useAuth, useOdbVue } from '@odbvue/web'
 import { ref } from 'vue'
+import type { components } from '@/services/openapi.generated'
 
 definePage({
   meta: {
@@ -122,7 +123,7 @@ definePage({
   },
 })
 
-type Item = { id: string; value: string | null; meta: string }
+type Item = components['schemas']['SandboxListSettingsItemsItem']
 type Action = 'read' | 'write' | 'remove' | 'list'
 
 const pageSize = 50
@@ -171,9 +172,12 @@ const remove = () =>
 
 const list = (after?: string) =>
   run('list', 'Settings loaded.', 'Settings could not be loaded.', async () => {
-    const response = await http.get<{ items: Item[] }>('/sandbox/settings', {
-      headers: after ? { 'X-After': after } : undefined,
-    })
+    const response = await http.get<components['schemas']['SandboxListSettingsResponse']>(
+      '/sandbox/settings',
+      {
+        headers: after ? { 'X-After': after } : undefined,
+      },
+    )
     if (response.error || !response.data) throw response.error ?? new Error('No data')
     items.value = response.data.items
   })

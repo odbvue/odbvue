@@ -190,4 +190,35 @@ describe('ODB application contract', () => {
       },
     })
   })
+
+  it('keeps typed cursor rows when a service delegates to another package procedure', () => {
+    const inner = odbPackage('PCK_INNER', (p) => {
+      const listUsers = p.proc(
+        'LIST_USERS',
+        { out: { rows: odbType.resultset() } },
+        ({ params, body }) =>
+          body.openFor(params.rows, odbQuery().selectFrom(users).select([users.id, users.email])),
+      )
+      return { listUsers }
+    })
+    const outer = odbPackage('PCK_OUTER', (p) => {
+      const list = p.proc('LIST', { out: { items: odbType.resultset() } }, ({ params, body }) =>
+        body.call(inner.listUsers(params.items)),
+      )
+      defineService(list, {
+        method: 'GET',
+        path: '/items',
+        response: { items: list.parameters.items },
+      })
+    })
+
+    const document = generateApplicationsOpenApi([outer]) as {
+      components: { schemas: Record<string, Record<string, any>> }
+    }
+
+    expect(document.components.schemas.OuterListItemsItem).toMatchObject({
+      required: ['id'],
+      properties: { id: { type: 'number' }, email: { type: ['string', 'null'] } },
+    })
+  })
 })

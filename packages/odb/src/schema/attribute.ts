@@ -1,4 +1,5 @@
 import type { OdbType } from '../model.js'
+import type { OrdsResultColumnNode } from '../ords.js'
 
 export type PlsqlType =
   | 'VARCHAR2'
@@ -71,7 +72,14 @@ export type PlsqlBooleanExpression = PlsqlBooleanExpressionImpl
 
 /** A typed PL/SQL statement produced by a procedure-call wrapper. */
 export class PlsqlStatement {
-  constructor(private readonly sql: string) {}
+  /**
+   * @param cursors Row columns of typed cursor OUT arguments, keyed by the upper-cased
+   *                argument text, so a caller passing its own cursor parameter inherits them.
+   */
+  constructor(
+    private readonly sql: string,
+    readonly cursors?: Readonly<Record<string, readonly OrdsResultColumnNode[]>>,
+  ) {}
 
   toSQL(): string {
     return this.sql

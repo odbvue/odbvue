@@ -486,6 +486,12 @@ export class ProcedureBody {
 
   /** Emit a typed PL/SQL procedure-call statement. */
   call(statement: PlsqlStatement): this {
+    for (const [cursor, columns] of Object.entries(statement.cursors ?? {})) {
+      this._cursorResultColumns.set(
+        cursor,
+        columns.map((column) => ({ ...column })),
+      )
+    }
     this._statements.push({ kind: 'call', sql: statement.toSQL() })
     return this
   }
@@ -977,6 +983,11 @@ export class ProcedureDefinition<TParameters extends ProcedureParameters> {
     return this
   }
 
+  /** @internal Typed cursor columns per parameter position (undefined for non-cursors). */
+  cursorColumnsByPosition(): (OrdsResultColumnNode[] | undefined)[] {
+    return this.procedure.cursorColumnsByPosition()
+  }
+
   /** @internal Emit the procedure application node. */
   toNode(): ProcedureNode {
     return this.procedure.toNode()
@@ -1217,6 +1228,10 @@ export class Procedure {
     return this
   }
 
+  cursorColumnsByPosition(): (OrdsResultColumnNode[] | undefined)[] {
+    return this._params.map((p) => this._body?.cursorResultColumns(p.name))
+  }
+
   toNode(): ProcedureNode {
     return {
       kind: 'procedure',
@@ -1397,10 +1412,17 @@ export class PackageImpl<
       throw new Error(`Unknown package member: ${alias}`)
     }
 
-    const rendered = args.map(renderPlsql).join(', ')
+    const renderedArgs = args.map(renderPlsql)
+    const rendered = renderedArgs.join(', ')
     if (!(member instanceof PlsqlFunction)) {
+      const cursors: Record<string, OrdsResultColumnNode[]> = {}
+      member.cursorColumnsByPosition().forEach((columns, index) => {
+        const arg = renderedArgs[index]
+        if (columns && arg !== undefined) cursors[arg.toUpperCase()] = columns
+      })
       return new PlsqlStatement(
         `${this.name}.${member.name}(${rendered})`,
+        Object.keys(cursors).length > 0 ? cursors : undefined,
       ) as PackageMemberReturnValue<PackageMemberDefinition>
     }
     return new PlsqlExpression(
