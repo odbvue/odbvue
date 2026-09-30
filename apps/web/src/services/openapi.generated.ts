@@ -127,7 +127,7 @@ export interface components {
         SandboxListSettingsItemsItem: {
             id: string;
             value?: string | null;
-            meta: string;
+            meta: unknown;
         };
         SandboxListSettingsResponse: {
             items: components["schemas"]["SandboxListSettingsItemsItem"][];
