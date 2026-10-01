@@ -185,7 +185,7 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
 })
 
 export const migration = defineMigration('00000000000001_sandbox', {
-  schema: odbEnv.read('ODBVUE_ADB_SCHEMA_USERNAME'),
+  schema: odbEnv.adb.schemaUsername,
 })
   .install(
     odbSettings.seed({

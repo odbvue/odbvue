@@ -5,6 +5,8 @@ const ENV_NAME = 'ODBVUE_TEST_ENV'
 
 afterEach(() => {
   delete process.env[ENV_NAME]
+  delete process.env.ODBVUE_ADB_SCHEMA_USERNAME
+  delete process.env.ODBVUE_ADB_SCHEMA_PASSWORD
 })
 
 describe('odbEnv', () => {
@@ -20,5 +22,19 @@ describe('odbEnv', () => {
 
   it('returns the default when the environment variable is not set', () => {
     expect(odbEnv.read(ENV_NAME, 'ABC')).toBe('ABC')
+  })
+
+  it('reads the schema credentials through adb getters', () => {
+    process.env.ODBVUE_ADB_SCHEMA_USERNAME = 'APP'
+    process.env.ODBVUE_ADB_SCHEMA_PASSWORD = 'secret'
+
+    expect(odbEnv.adb.schemaUsername).toBe('APP')
+    expect(odbEnv.adb.schemaPassword).toBe('secret')
+  })
+
+  it('throws with the variable name when an adb value is not set', () => {
+    expect(() => odbEnv.adb.schemaUsername).toThrow(
+      'ODBVUE_ADB_SCHEMA_USERNAME environment variable is not set',
+    )
   })
 })

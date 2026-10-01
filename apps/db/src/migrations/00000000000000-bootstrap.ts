@@ -10,8 +10,8 @@ import {
   odbAudit,
 } from '@odbvue/odb'
 
-const schemaName = odbEnv.read('ODBVUE_ADB_SCHEMA_USERNAME')
-const schemaPassword = odbEnv.read('ODBVUE_ADB_SCHEMA_PASSWORD')
+const schemaName = odbEnv.adb.schemaUsername
+const schemaPassword = odbEnv.adb.schemaPassword
 
 export const schema = odbSchema(schemaName, schemaPassword, (definition) => {
   definition.grant('EXECUTE ON DBMS_CRYPTO')
