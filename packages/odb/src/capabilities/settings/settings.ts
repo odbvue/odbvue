@@ -2,106 +2,20 @@
 // both defined in TypeScript. The package owns the CRUD logic and raises transport-independent
 // ODB errors; ORDS exposure, HTTP status mapping and authorization belong to the application package.
 
-import { cond, odbLiteral, plsqlExpr, type PlsqlRenderable } from '../../schema/attribute.js'
+import type { PlsqlRenderable } from '../../schema/attribute.js'
 import { plsqlBlock, qualify } from '../../schema/ddl.js'
-import { odbPackage, odbType } from '../../schema/package.js'
-import { odbTable } from '../../schema/table.js'
-import { odbQuery } from '../../query/index.js'
+import { PACKAGE_NAME } from './constants.js'
+import { odbSettingsPackage } from './package.js'
+import { settingsStore } from './tables.js'
+import { settingsTypes, type SettingMeta } from './types.js'
 
-const PACKAGE_NAME = 'odb_settings'
-const DEFAULT_LIMIT = 50
-const ID_LENGTH = 128
-const VALUE_LENGTH = 2000
-
-export type SettingMeta = Record<string, unknown>
-
-export const settingsStore = odbTable('odb_settings_store', (t) => ({
-  id: t.string(ID_LENGTH).primaryKey(),
-  value: t.string(VALUE_LENGTH),
-  meta: t.json<SettingMeta>().notNull().default({}),
-})).comment('Application settings')
+export { odbSettingsPackage } from './package.js'
+export { settingsStore } from './tables.js'
+export type { SettingMeta } from './types.js'
 
 function lit(text: string): string {
   return `'${text.replace(/'/g, "''")}'`
 }
-
-/** PL/SQL API for the settings store. Callers own authorization and transactions. */
-export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
-  /** Settings ordered by id after `after` (null for the start); `limit` null means the default page size. */
-  const list = pkg.proc(
-    'list',
-    {
-      in: { after: settingsStore.id, limit: odbType.integer() },
-      out: { items: odbType.resultset() },
-    },
-    ({ params: { after, limit, items }, body }) => {
-      body.openFor(
-        items,
-        odbQuery()
-          .selectFrom(settingsStore)
-          .select([settingsStore.id, settingsStore.value, settingsStore.meta])
-          .where(cond.or([cond.isNull(after), cond.gt(settingsStore.id, after)]))
-          .orderBy(settingsStore.id)
-          .limit(plsqlExpr.call('PLS_INTEGER', 'NVL', limit, odbLiteral(DEFAULT_LIMIT))),
-      )
-    },
-  )
-
-  /** Reads one setting; raises a NOT_FOUND ODB error when it does not exist. */
-  const read = pkg.proc(
-    'read',
-    {
-      in: { id: settingsStore.id },
-      out: { value: settingsStore.value, meta: settingsStore.meta },
-    },
-    ({ params: { id, value, meta }, body }) => {
-      body.query(
-        odbQuery()
-          .selectFrom(settingsStore)
-          .select([settingsStore.value, settingsStore.meta])
-          .into(value, meta)
-          .where(cond.eq(settingsStore.id, id)),
-      )
-      body.when('NO_DATA_FOUND', (handler) => handler.notFound())
-    },
-  )
-
-  /** Creates or updates a setting; a null `meta` keeps the existing metadata (or `{}` on create). */
-  const write = pkg.proc(
-    'write',
-    { in: { id: settingsStore.id, value: settingsStore.value, meta: settingsStore.meta } },
-    ({ params: { id, value, meta }, body }) => {
-      const target = settingsStore.as('target')
-      const merge = odbQuery().mergeInto(target).using({ id, value, meta }, 'source')
-      const sourceId = merge.sourceRef('id')
-      const sourceValue = merge.sourceRef('value')
-      const sourceMeta = merge.sourceRef('meta')
-      body.query(
-        merge
-          .on((t, source) => cond.eq(t.id, source.id))
-          .whenMatched({
-            value: sourceValue,
-            meta: plsqlExpr.call('CLOB', 'NVL', sourceMeta, target.meta),
-          })
-          .whenNotMatched({
-            id: sourceId,
-            value: sourceValue,
-            meta: plsqlExpr.call('CLOB', 'NVL', sourceMeta, odbLiteral('{}')),
-          }),
-      )
-    },
-  )
-
-  const remove = pkg.proc(
-    'remove',
-    { in: { id: settingsStore.id } },
-    ({ params: { id }, body }) => {
-      body.query(odbQuery().deleteFrom(settingsStore).where(cond.eq(settingsStore.id, id)))
-    },
-  )
-
-  return { list, read, write, remove }
-})
 
 /** Installable settings capability plus typed calls into `odb_settings`. */
 export const odbSettings = {
@@ -114,11 +28,7 @@ export const odbSettings = {
   },
 
   /** Parameter types for declaring procedures that pass settings through, without knowing the table. */
-  types: {
-    id: odbType.string(ID_LENGTH),
-    value: odbType.string(VALUE_LENGTH),
-    meta: odbType.json(),
-  },
+  types: settingsTypes,
 
   /** `odb_settings.list(<after>, <limit>, <items>)`; a `NULL` limit returns up to 50 settings. */
   list(after: PlsqlRenderable, limit: PlsqlRenderable, items: PlsqlRenderable) {

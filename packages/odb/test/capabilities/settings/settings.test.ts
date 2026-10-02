@@ -1,8 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { odbSettings } from '../../../src/capabilities/settings/settings.js'
+import {
+  odbSettings,
+  odbSettingsPackage,
+  settingsStore,
+} from '../../../src/capabilities/settings/settings.js'
+import * as settings from '../../../src/capabilities/settings/index.js'
 
 describe('Settings', () => {
   const sql = odbSettings.toSQLUp({ schema: 'APP' })
+
+  it('exports the same capability, package and table through the barrel', () => {
+    expect(settings.odbSettings).toBe(odbSettings)
+    expect(settings.odbSettingsPackage).toBe(odbSettingsPackage)
+    expect(settings.settingsStore).toBe(settingsStore)
+    expect(settings.settingsTypes).toBe(odbSettings.types)
+  })
 
   it('installs the table and the odb_settings package', () => {
     expect(sql).toContain('CREATE TABLE APP.odb_settings_store')

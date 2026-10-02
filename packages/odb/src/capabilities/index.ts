@@ -1,5 +1,5 @@
 export * from './contracts.js'
 export * from './audit/index.js'
-export * from './settings/settings.js'
+export * from './settings/index.js'
 export * from './auth/index.js'
 export * from './rate-limit/rate-limit.js'
