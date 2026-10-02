@@ -28,10 +28,8 @@
               />
             </v-list>
           </v-card-text>
+          <v-ov-form :options="loginOptions" :loading="auth.loading.value" @submit="login" />
           <v-card-actions>
-            <v-btn :loading="auth.loading.value" prepend-icon="$mdiLogin" @click="login"
-              >Login as admin</v-btn
-            >
             <v-btn :loading="auth.loading.value" prepend-icon="$mdiRefresh" @click="restore"
               >Restore</v-btn
             >
@@ -64,6 +62,7 @@
 
 <script setup lang="ts">
 import { useAuth } from '@odbvue/web'
+import type { OvFormData, OvFormOptions } from '@odbvue/web/components'
 import { ref } from 'vue'
 
 definePage({
@@ -80,9 +79,35 @@ const events = ref<string[]>([])
 const auth = useAuth()
 const callingMe = ref(false)
 
-async function login() {
+const loginOptions: OvFormOptions = {
+  fields: [
+    {
+      type: 'text',
+      name: 'username',
+      label: 'Username',
+      rules: [{ type: 'required', params: true, message: 'Username is required' }],
+    },
+    {
+      type: 'password',
+      name: 'password',
+      label: 'Password',
+      rules: [{ type: 'required', params: true, message: 'Password is required' }],
+    },
+  ],
+  actions: [{ name: 'login', format: { text: 'Login', color: 'primary' } }],
+  actionSubmit: 'login',
+  focusFirst: true,
+}
+
+async function login(data: OvFormData) {
   events.value.push('POST /auth/login')
-  await auth.login({ username: 'admin', password: 'ChangeMe123!' })
+  try {
+    await auth.login({ username: String(data.username), password: String(data.password) })
+  } catch (error) {
+    events.value.push(
+      `POST /auth/login -> ${error instanceof Error ? error.message : 'network error'}`,
+    )
+  }
 }
 async function restore() {
   events.value.push('POST /auth/refresh')

@@ -68,7 +68,6 @@ export default defineConfig({
                 { text: 'Oracle Packages', link: '/guide/db/capabilities/oracle-packages' },
                 { text: 'Authentication', link: '/guide/db/capabilities/auth' },
                 { text: 'Lob', link: '/guide/db/capabilities/lob' },
-                { text: 'JWT', link: '/guide/db/capabilities/jwt' },
                 { text: 'Audit', link: '/guide/db/capabilities/audit' },
                 { text: 'Settings', link: '/guide/db/capabilities/settings' },
               ],

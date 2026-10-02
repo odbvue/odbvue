@@ -32,11 +32,14 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain("ODBVUE.odb_settings.write('APP_VERSION', '1.0.0'")
   })
 
-  it('installs the odb_auth package in bootstrap', async () => {
+  it('installs the transport-independent odb_auth package in bootstrap', async () => {
     const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE ODBVUE.odb_auth AS')
     expect(sql).toContain('odb_auth_crypto.verify_password(p_password, l_password_hash) = FALSE')
     expect(sql).toContain('IF l_presented_refresh_token_hash = l_previous_refresh_token_hash THEN')
+    expect(sql).not.toContain('Set-Cookie')
+    expect(sql).not.toContain('__Host-odb_refresh')
+    expect(sql).not.toContain("p_base_path      => 'auth/'")
   })
 
   it('exposes auth and settings services from a single pck_sandbox package', async () => {
@@ -45,19 +48,25 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain('CREATE OR REPLACE PACKAGE ODBVUE.PCK_SANDBOX_BLUE AS')
     expect(sql.match(/CREATE OR REPLACE PACKAGE (?:BODY )?ODBVUE\.\w+/g)).toHaveLength(2)
 
-    // auth keeps its public URLs and delegates to odb_auth
+    // auth keeps its public URLs; cookies and headers are handled in the app package
     expect(sql).toContain("p_base_path      => 'auth/'")
     for (const route of ['login', 'refresh', 'logout', 'me']) {
       expect(sql).toContain(`p_pattern        => '${route}'`)
     }
-    expect(sql).toContain('odb_auth.login(p_username, p_password, p_access_token, p_set_cookie)')
+    expect(sql).toContain('odb_auth.login(p_username, p_password, p_access_token, l_refresh_token)')
+    expect(sql).toContain("p_set_cookie := '__Host-odb_refresh=' || l_refresh_token")
+    expect(sql).toContain(
+      "odb_auth.refresh(REGEXP_SUBSTR(p_cookie, '(^|;[[:space:]]*)__Host-odb_refresh=([^;]*)'",
+    )
     expect(sql).toContain("p_name               => 'Set-Cookie'")
 
     // settings are authenticated and delegate to odb_settings
     expect(sql).toContain("p_base_path      => 'sandbox/'")
     expect(sql).toContain("p_pattern        => 'settings'")
     expect(sql).toContain("p_pattern        => 'settings/:id'")
-    expect(sql).toContain('odb_auth_jwt.require_user(p_authorization)')
+    expect(sql).toContain(
+      "odb_auth.require_user(REGEXP_SUBSTR(p_authorization, '^Bearer[[:space:]]+(.+)$'",
+    )
     expect(sql).toContain('odb_settings.list(p_after, p_limit, p_items)')
     expect(sql).toContain('odb_settings.read(p_id, p_value, p_meta)')
     expect(sql).toContain('odb_settings.write(p_id, p_value, NULL)')

@@ -11,6 +11,7 @@
   },
   "scripts": {
     "dev": "pnpm -r run dev",
+    "dev:web": "pnpm --filter apps run dev",
     "check": "pnpm -r run check",
     "build": "pnpm -r run build",
     "build:odb": "pnpm --filter @odbvue/odb run check && pnpm --filter @odbvue/odb run build && pnpm --filter @odbvue/db run check && pnpm --filter @odbvue/db run build",

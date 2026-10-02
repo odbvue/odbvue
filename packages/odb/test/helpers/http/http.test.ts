@@ -67,6 +67,38 @@ describe('odbHttp framework package', () => {
     )
   })
 
+  it('extracts bearer tokens and named cookies from header values', () => {
+    expect(odbHttp.bearerToken('p_authorization').toSQL()).toBe(
+      "REGEXP_SUBSTR(p_authorization, '^Bearer[[:space:]]+(.+)$', 1, 1, 'i', 1)",
+    )
+    expect(odbHttp.cookie('p_cookie', '__Host-token').toSQL()).toBe(
+      "REGEXP_SUBSTR(p_cookie, '(^|;[[:space:]]*)__Host-token=([^;]*)', 1, 1, NULL, 2)",
+    )
+    expect(() => odbHttp.cookie('p_cookie', "a.b'c")).toThrow('name may contain only')
+  })
+
+  it('defines a cookie with fixed attributes for read, set and expire', () => {
+    const cookie = odbHttp.defineCookie({
+      name: '__Host-token',
+      path: '/',
+      httpOnly: true,
+      secure: true,
+      sameSite: 'Lax',
+      maxAge: 60,
+    })
+    expect(cookie.read('p_cookie').toSQL()).toBe(
+      "REGEXP_SUBSTR(p_cookie, '(^|;[[:space:]]*)__Host-token=([^;]*)', 1, 1, NULL, 2)",
+    )
+    expect(cookie.set(new PlsqlExpression('VARCHAR2', 'l_token')).toSQL()).toBe(
+      "'__Host-token=' || l_token || '; Path=/' || '; HttpOnly' || '; Secure' || '; SameSite=Lax' || '; Max-Age=60'",
+    )
+    expect(cookie.expire().toSQL()).toContain("'__Host-token=' || '' || '; Path=/'")
+    expect(cookie.expire().toSQL()).toContain("'; Max-Age=0'")
+    expect(() => odbHttp.defineCookie({ name: '__Host-token', path: '/' })).toThrow(
+      '__Host- cookie requires',
+    )
+  })
+
   it('maps explicit errors and unexpected exceptions to JSON responses', () => {
     const source = odbOrdsEndpoint('test', 'api', 'limited').toNode().source
 

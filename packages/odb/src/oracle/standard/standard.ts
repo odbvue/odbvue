@@ -63,6 +63,68 @@ export const odbOracle = {
     return call('VARCHAR2', 'TRIM', [value])
   },
 
+  /** `LENGTH(<value>)` -> NUMBER */
+  length(value: PlsqlRenderable): PlsqlExpression<'NUMBER'> {
+    return call('NUMBER', 'LENGTH', [value])
+  },
+
+  /** `SUBSTR(<value>, <position>[, <length>])` -> VARCHAR2 */
+  substr(
+    value: PlsqlRenderable,
+    position: PlsqlRenderable | number,
+    length?: PlsqlRenderable | number,
+  ): PlsqlExpression<'VARCHAR2'> {
+    return call(
+      'VARCHAR2',
+      'SUBSTR',
+      length === undefined ? [value, position] : [value, position, length],
+    )
+  },
+
+  /** `INSTR(<value>, <search>[, <position>[, <occurrence>]])` -> NUMBER */
+  instr(
+    value: PlsqlRenderable,
+    search: PlsqlRenderable,
+    position?: PlsqlRenderable | number,
+    occurrence?: PlsqlRenderable | number,
+  ): PlsqlExpression<'NUMBER'> {
+    const args: (PlsqlRenderable | number)[] = [value, search]
+    if (position !== undefined) args.push(position)
+    if (occurrence !== undefined) args.push(occurrence)
+    return call('NUMBER', 'INSTR', args)
+  },
+
+  /** `TRANSLATE(<value>, <from>, <to>)` -> VARCHAR2; characters in `from` without a `to` counterpart are removed. */
+  translate(
+    value: PlsqlRenderable,
+    from: PlsqlRenderable,
+    to: PlsqlRenderable,
+  ): PlsqlExpression<'VARCHAR2'> {
+    return call('VARCHAR2', 'TRANSLATE', [value, from, to])
+  },
+
+  /** `RPAD(<value>, <length>, <pad>)` -> VARCHAR2 */
+  rpad(
+    value: PlsqlRenderable,
+    length: PlsqlRenderable | number,
+    pad: PlsqlRenderable,
+  ): PlsqlExpression<'VARCHAR2'> {
+    return call('VARCHAR2', 'RPAD', [value, length, pad])
+  },
+
+  /** `MOD(<value>, <divisor>)` -> NUMBER */
+  mod(
+    value: PlsqlRenderable | number,
+    divisor: PlsqlRenderable | number,
+  ): PlsqlExpression<'NUMBER'> {
+    return call('NUMBER', 'MOD', [value, divisor])
+  },
+
+  /** `CHR(<code>)` -> VARCHAR2 */
+  chr(code: PlsqlRenderable | number): PlsqlExpression<'VARCHAR2'> {
+    return call('VARCHAR2', 'CHR', [code])
+  },
+
   /** `NVL(<value>, <fallback>)` retains the first argument's type. */
   nvl<T extends PlsqlType | string>(
     value: import('../../schema/attribute.js').PlsqlValue<T>,

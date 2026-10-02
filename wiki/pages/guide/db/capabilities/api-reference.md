@@ -36,46 +36,6 @@ pkg.proc('encode', { out: { result: odbType.clob() } }, ({ params, body }) => {
 })
 ```
 
-## JWT
-
-Sign and verify JSON Web Tokens (HS256). Backed by the odb framework package `odb_jwt`.
-
-### Install
-
-```ts
-import { odbJwt } from '@odbvue/odb'
-
-odbJwt.toSQLUp({ schema: 'APP_USER' })
-odbJwt.toSQLDown({ schema: 'APP_USER' })
-```
-
-### Expression Helpers
-
-```ts
-odbJwt.encode('v_payload', 'v_secret')
-odbJwt.verify('v_token', 'v_secret')
-odbJwt.payload('v_token')
-odbJwt.claim('v_token', "'sub'")
-odbJwt.isExpired('v_token')
-odbJwt.isExpired('v_token', '30')
-odbJwt.base64urlEncode('v_text')
-odbJwt.base64urlDecode('v_b64')
-odbJwt.toEpoch()
-odbJwt.fromEpoch('v_epoch')
-```
-
-### Example
-
-```ts
-pkg.proc('issue_token', { out: { token: odbType.string() } }, ({ params, body }) => {
-  const { vPayload } = body.variables({ vPayload: odbType.string(2000) })
-  body.raw(
-    `${vPayload.name} := JSON_OBJECT('sub' VALUE 'u1', 'exp' VALUE odb_jwt.to_epoch() + 3600)`,
-  )
-  body.raw(`${params.token.name} := ${odbJwt.encode(vPayload.name, `'my-secret'`)}`)
-})
-```
-
 ## Audit
 
 OpenTelemetry-aligned audit logging (logs only). Backed by the odb framework package `odb_audit` and the `odb_audit_logs` table.
@@ -111,8 +71,6 @@ pkg.proc('log_event', {}, ({ body }) => {
   body.auditEvent('user logged in', { 'user.id': 'p_uuid' })
 })
 ```
-
-See the [JWT capability page](./jwt) for details.
 
 ## Settings
 
@@ -173,4 +131,4 @@ For example, a POST request body is explicit: `body: { username: procedure.param
 
 ## Authentication
 
-`odbAuth` installs the `odb_auth` REST API, user and session tables, JWT support, and HTTP error helpers. It provides password login, refresh-token rotation through an `HttpOnly` cookie, logout, and the authenticated-user endpoint. See the [Authentication capability](./auth) for installation and client integration.
+`odbAuth` installs the `odb_auth` PL/SQL package, user and session tables, and JWT support. It provides `login`, `refresh`, `logout`, `read_user`, and `require_user` as transport-independent database operations; the application package exposes them over HTTP and owns headers, cookies, and routes. See the [Authentication capability](./auth) for installation and client integration.

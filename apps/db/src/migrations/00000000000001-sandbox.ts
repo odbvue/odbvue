@@ -2,23 +2,34 @@ import {
   defineMigration,
   defineService,
   odbAuth,
-  odbAuthApi,
   odbEnv,
+  odbHttp,
   odbPackage,
   odbSettings,
   odbType,
 } from '@odbvue/odb'
 
-// One application package: ORDS services only, each delegating to framework packages.
+const refreshCookie = odbHttp.defineCookie({
+  name: '__Host-odb_refresh',
+  path: '/',
+  httpOnly: true,
+  secure: true,
+  sameSite: 'Lax',
+  maxAge: odbAuth.refreshTokenMaxAge,
+})
+
+// One application package: the HTTP layer (headers, cookies, routes) over the framework packages.
 const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
   const login = pkg.proc(
     'login',
     {
-      in: { username: odbType.string(128), password: odbType.string(512) },
-      out: { accessToken: odbType.clob(), setCookie: odbType.string() },
+      in: { username: odbAuth.types.username, password: odbAuth.types.password },
+      out: { accessToken: odbAuth.types.accessToken, setCookie: odbType.string() },
     },
     ({ params: { username, password, accessToken, setCookie }, body }) => {
-      body.call(odbAuthApi.login(username, password, accessToken, setCookie))
+      const { refreshToken } = body.variables({ refreshToken: odbAuth.types.refreshToken })
+      body.call(odbAuth.login(username, password, accessToken, refreshToken))
+      body.set(setCookie, refreshCookie.set(refreshToken))
     },
   )
   defineService(login, {
@@ -36,10 +47,12 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
     'refresh',
     {
       in: { cookie: odbType.string(4000) },
-      out: { accessToken: odbType.clob(), setCookie: odbType.string() },
+      out: { accessToken: odbAuth.types.accessToken, setCookie: odbType.string() },
     },
     ({ params: { cookie, accessToken, setCookie }, body }) => {
-      body.call(odbAuthApi.refresh(cookie, accessToken, setCookie))
+      const { nextRefreshToken } = body.variables({ nextRefreshToken: odbAuth.types.refreshToken })
+      body.call(odbAuth.refresh(refreshCookie.read(cookie), accessToken, nextRefreshToken))
+      body.set(setCookie, refreshCookie.set(nextRefreshToken))
     },
   )
   defineService(refresh, {
@@ -56,7 +69,8 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
     'logout',
     { in: { cookie: odbType.string(4000) }, out: { setCookie: odbType.string() } },
     ({ params: { cookie, setCookie }, body }) => {
-      body.call(odbAuthApi.logout(cookie, setCookie))
+      body.call(odbAuth.logout(refreshCookie.read(cookie)))
+      body.set(setCookie, refreshCookie.expire())
     },
   )
   defineService(logout, {
@@ -73,13 +87,14 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
     {
       in: { authorization: odbType.string(4000) },
       out: {
-        userId: odbType.guid(),
-        username: odbType.string(128),
-        displayName: odbType.string(256),
+        userId: odbAuth.types.userId,
+        username: odbAuth.types.username,
+        displayName: odbAuth.types.displayName,
       },
     },
     ({ params: { authorization, userId, username, displayName }, body }) => {
-      body.call(odbAuthApi.me(authorization, userId, username, displayName))
+      body.set(userId, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
+      body.call(odbAuth.readUser(userId, username, displayName))
     },
   )
   defineService(me, {
@@ -108,7 +123,7 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
     },
     ({ params: { authorization, after, limit, items }, body }) => {
       const { subject } = body.variables({ subject: odbType.guid() })
-      body.set(subject, odbAuth.requireUser(authorization))
+      body.set(subject, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
       body.call(odbSettings.list(after, limit, items))
     },
   )
@@ -129,7 +144,7 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
     },
     ({ params: { authorization, id, value, meta }, body }) => {
       const { subject } = body.variables({ subject: odbType.guid() })
-      body.set(subject, odbAuth.requireUser(authorization))
+      body.set(subject, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
       body.call(odbSettings.read(id, value, meta))
     },
   )
@@ -153,7 +168,7 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
     },
     ({ params: { authorization, id, value }, body }) => {
       const { subject } = body.variables({ subject: odbType.guid() })
-      body.set(subject, odbAuth.requireUser(authorization))
+      body.set(subject, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
       body.call(odbSettings.write(id, value))
     },
   )
@@ -171,7 +186,7 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
     { in: { authorization: odbType.string(4000), id: odbType.string(128) } },
     ({ params: { authorization, id }, body }) => {
       const { subject } = body.variables({ subject: odbType.guid() })
-      body.set(subject, odbAuth.requireUser(authorization))
+      body.set(subject, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
       body.call(odbSettings.remove(id))
     },
   )

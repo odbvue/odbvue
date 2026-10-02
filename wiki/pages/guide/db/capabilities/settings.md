@@ -93,7 +93,7 @@ If more than `pageSize` rows come back, the application returns the first `pageS
 Call the package from an application package and attach an explicit service contract. Authorize in the wrapper:
 
 ```ts
-import { defineService, odbAuth, odbPackage, odbSettings, odbType } from '@odbvue/odb'
+import { defineService, odbAuth, odbHttp, odbPackage, odbSettings, odbType } from '@odbvue/odb'
 
 const api = odbPackage('pck_app_api', (pkg) => {
   const readSetting = pkg.proc(
@@ -104,7 +104,7 @@ const api = odbPackage('pck_app_api', (pkg) => {
     },
     ({ params: { authorization, id, value, meta }, body }) => {
       const { subject } = body.variables({ subject: odbType.guid() })
-      body.set(subject, odbAuth.requireUser(authorization))
+      body.set(subject, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
       body.call(odbSettings.read(id, value, meta))
     },
   )

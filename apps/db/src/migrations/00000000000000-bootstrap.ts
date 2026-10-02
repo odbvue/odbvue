@@ -27,7 +27,6 @@ export const migration = defineMigration('00000000000000_bootstrap', {
   .install(odbHttp)
   .install(odbRateLimit)
   .install(odbAuth)
-  .install(odbAuth.api())
   .install(odbSettings)
   .install(odbLob)
   .install(odbAudit)
@@ -40,8 +39,8 @@ export const migration = defineMigration('00000000000000_bootstrap', {
   )
   .install(
     odbAuth.seedUser({
-      username: 'admin',
-      password: odbEnv.read('ODBVUE_AUTH_INITIAL_PASSWORD', 'ChangeMe123!'),
+      username: 'admin@odbvue.com',
+      password: odbEnv.read('ODBVUE_AUTH_INITIAL_PASSWORD', 'MySecurePass123!'),
       displayName: 'Administrator',
     }),
   )
