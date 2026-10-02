@@ -10,6 +10,7 @@ import {
   type PlsqlExpression,
 } from '../../src/schema/attribute.js'
 import {
+  compileApplicationEndpoints,
   defineService,
   emitApplicationSql,
   odbPackage,
@@ -76,6 +77,32 @@ describe('odbPackage member typing', () => {
 })
 
 describe('Procedure ORDS contracts', () => {
+  it('binds a named BLOB body directly without JSON parsing', () => {
+    const pkg = odbPackage('PCK_API', (p) => {
+      const upload = p.proc(
+        'UPLOAD',
+        { in: { content: odbType.blob(), fileName: odbType.string() } },
+        () => {},
+      )
+      defineService(upload, {
+        auth: 'authenticated',
+        method: 'POST',
+        path: '/files',
+        body: { content: upload.parameters.content },
+        query: { fileName: upload.parameters.fileName },
+      })
+      return { upload }
+    })
+    const sql = compileApplicationEndpoints(pkg.application())[0]!.toSQLUp()
+    expect(sql).toContain('v_binary_body BLOB := :body')
+    expect(sql).toContain('p_content => v_binary_body')
+    expect(sql).toContain('DBMS_LOB.CREATETEMPORARY(v_binary_body, TRUE, DBMS_LOB.CALL)')
+    expect(sql).toContain('p_file_name => :fileName')
+    expect(sql).toContain('odb_auth.require_user')
+    expect(sql).not.toContain(':body_text')
+    expect(sql).not.toContain('JSON_VALUE')
+  })
+
   it('declares a procedure with proc() and direct typed service bindings', () => {
     const pkg = odbPackage('PCK_API', (p) => {
       const login = p.proc(

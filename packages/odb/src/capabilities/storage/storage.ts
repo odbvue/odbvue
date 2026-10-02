@@ -26,8 +26,8 @@ export const odbStorage = {
     fileName: PlsqlRenderable,
     mimeType: PlsqlRenderable,
     content: PlsqlRenderable,
+    meta: PlsqlRenderable,
     id: PlsqlRenderable,
-    meta: PlsqlRenderable = 'NULL',
   ) {
     return odbStoragePackage.write(ownerId, fileName, mimeType, content, meta, id)
   },

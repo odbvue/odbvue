@@ -1039,7 +1039,7 @@ export type ProcedureServiceDefinition<TParameters extends ProcedureParameters> 
   'params'
 > & {
   context?: { userId: ParameterGroup<TParameters, 'in'>[keyof ParameterGroup<TParameters, 'in'>] }
-  /** Direct typed bindings for JSON request-body values. */
+  /** JSON fields, or a single BLOB parameter bound to the raw binary request body. */
   body?: Record<
     string,
     | ParameterGroup<TParameters, 'in'>[keyof ParameterGroup<TParameters, 'in'>]
@@ -1281,6 +1281,14 @@ export class Procedure {
       Array.from(definition.path.matchAll(/:([A-Za-z][A-Za-z0-9_]*)/g), (match) => match[1]),
     )
     const mappedRouteParameters = new Set<string>()
+    const bodyParameters = Object.values(definition.params?.body ?? {}) as Param[]
+    if (bodyParameters.some((parameter) => odbTypeFromPlsql(parameter.toNode().type) === 'blob')) {
+      if (bodyParameters.length !== 1 || !['POST', 'PUT'].includes(definition.method)) {
+        throw new Error(
+          `ORDS service ${this.name}: a binary body requires one BLOB binding and POST or PUT.`,
+        )
+      }
+    }
 
     for (const [transport, bindings] of Object.entries(definition.params ?? {})) {
       for (const [publicName, parameter] of Object.entries(bindings ?? {})) {

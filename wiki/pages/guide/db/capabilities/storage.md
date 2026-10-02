@@ -16,20 +16,20 @@ export const migration = defineMigration('20261002120000_storage', {
 
 This installs the table before the package. Rollback drops the package and then the table, including all stored files.
 
-Applications that expose the sandbox's Base64 upload path also install `odbLob`. The existing bootstrap migration already installs both capabilities.
+Binary uploads use the native ORDS BLOB body binding; they do not require `odbLob`.
 
 ## Data Model
 
-| Column | Type | Purpose |
-| --- | --- | --- |
-| `id` | `CHAR(32)` | Generated lowercase hexadecimal file ID. |
-| `owner_id` | `VARCHAR2(32)` | Owner supplied by the trusted caller. |
-| `file_name` | `VARCHAR2(255)` | Trimmed filename, without directory separators or control characters. |
-| `mime_type` | `VARCHAR2(200)` | Validated MIME type; defaults to `application/octet-stream` when NULL. |
-| `file_size` | `NUMBER(19)` | Byte count calculated from the BLOB with `DBMS_LOB.GETLENGTH`. |
-| `content` | `BLOB` | File bytes, including a non-NULL empty BLOB for an empty file. |
-| `meta` | `CLOB` constrained to JSON | Free-form metadata; defaults to `{}`. |
-| `created_at` | `TIMESTAMP(6)` | Database-generated creation timestamp. |
+| Column       | Type                       | Purpose                                                                |
+| ------------ | -------------------------- | ---------------------------------------------------------------------- |
+| `id`         | `CHAR(32)`                 | Generated lowercase hexadecimal file ID.                               |
+| `owner_id`   | `VARCHAR2(32)`             | Owner supplied by the trusted caller.                                  |
+| `file_name`  | `VARCHAR2(255)`            | Trimmed filename, without directory separators or control characters.  |
+| `mime_type`  | `VARCHAR2(200)`            | Validated MIME type; defaults to `application/octet-stream` when NULL. |
+| `file_size`  | `NUMBER(19)`               | Byte count calculated from the BLOB with `DBMS_LOB.GETLENGTH`.         |
+| `content`    | `BLOB`                     | File bytes, including a non-NULL empty BLOB for an empty file.         |
+| `meta`       | `CLOB` constrained to JSON | Free-form metadata; defaults to `{}`.                                  |
+| `created_at` | `TIMESTAMP(6)`             | Database-generated creation timestamp.                                 |
 
 The table has a primary key on `id`, an index on `(owner_id, id)`, and a check limiting file size to 10 MiB. The list operation does not select file content.
 
@@ -37,22 +37,22 @@ The table has a primary key on `id`, an index on `(owner_id, id)`, and a check l
 
 The TypeScript helpers return typed PL/SQL calls for `body.call(...)`. Bare strings represent PL/SQL expressions; use `odbLiteral(...)` for literal values. Reuse `odbStorage.types` for procedure parameters and local variables.
 
-| Helper | Parameters | Behavior |
-| --- | --- | --- |
-| `list` | `ownerId`, `after`, `limit`, `items` OUT | Lists one owner's file metadata, ordered by ID after `after`. |
-| `write` | `ownerId`, `fileName`, `mimeType`, `content`, `id` OUT, optional `meta` | Creates a new file and returns its ID. It does not replace an existing file. |
-| `read` | `ownerId`, `id`, `fileName` OUT, `mimeType` OUT, `fileSize` OUT, `content` OUT, `meta` OUT | Reads a file's BLOB and metadata. |
-| `remove` | `ownerId`, `id` | Deletes a file belonging to that owner. |
+| Helper   | Parameters                                                                                 | Behavior                                                                                                      |
+| -------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `list`   | `ownerId`, `after`, `limit`, `items` OUT                                                   | Lists one owner's file metadata, ordered by ID after `after`.                                                 |
+| `write`  | `ownerId`, `fileName`, `mimeType`, `content`, `meta`, `id` OUT                             | Creates a new file and returns its ID. Use `NULL` for default metadata. It does not replace an existing file. |
+| `read`   | `ownerId`, `id`, `fileName` OUT, `mimeType` OUT, `fileSize` OUT, `content` OUT, `meta` OUT | Reads a file's BLOB and metadata.                                                                             |
+| `remove` | `ownerId`, `id`                                                                            | Deletes a file belonging to that owner.                                                                       |
 
 ```ts
-body.call(odbStorage.write(ownerId, fileName, mimeType, content, id))
-body.call(odbStorage.write(ownerId, fileName, mimeType, content, id, meta))
+body.call(odbStorage.write(ownerId, fileName, mimeType, content, 'NULL', id))
+body.call(odbStorage.write(ownerId, fileName, mimeType, content, meta, id))
 body.call(odbStorage.read(ownerId, id, fileName, mimeType, fileSize, content, meta))
 body.call(odbStorage.list(ownerId, after, limit, items))
 body.call(odbStorage.remove(ownerId, id))
 ```
 
-The TypeScript `write` helper puts the OUT `id` before optional `meta` for convenience. The underlying PL/SQL signature puts all IN parameters first:
+The TypeScript helper and PL/SQL procedure use the same order, with the OUT parameter last:
 
 ```sql
 odb_storage.write(p_owner_id, p_file_name, p_mime_type, p_content, p_meta, p_id);
@@ -85,34 +85,39 @@ The result set contains `id`, `file_name`, `mime_type`, `file_size`, `meta`, and
 
 The sandbox migration exposes the following authenticated routes:
 
-| Method | Route | Result |
-| --- | --- | --- |
-| `POST` | `/sandbox/storage` | Upload a file; returns JSON `{ "id": "..." }`. |
-| `GET` | `/sandbox/storage?limit=51&cursor=...` | List the current user's files as `{ "items": [...] }`. Omit `cursor` for the first page. |
-| `GET` | `/sandbox/storage/:id` | Download a binary attachment, not a JSON/Base64 response. |
-| `DELETE` | `/sandbox/storage/:id` | Delete a file belonging to the current user. |
+| Method   | Route                                  | Result                                                                                   |
+| -------- | -------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `POST`   | `/sandbox/storage`                     | Upload a file; returns JSON `{ "id": "..." }`.                                           |
+| `GET`    | `/sandbox/storage?limit=51&cursor=...` | List the current user's files as `{ "items": [...] }`. Omit `cursor` for the first page. |
+| `GET`    | `/sandbox/storage/:id`                 | Download a binary attachment, not a JSON/Base64 response.                                |
+| `DELETE` | `/sandbox/storage/:id`                 | Delete a file belonging to the current user.                                             |
 
 All routes require `Authorization: Bearer <accessToken>`. The web development proxy prefixes them with `/api`.
 
 ### Upload
 
-Send JSON containing a filename, MIME type, original byte count, Base64 content without a data-URL prefix, and optional JSON metadata:
+Send the file bytes as the request body with `Content-Type: application/octet-stream`. Supply `fileName`, `mimeType`, and optional JSON-serialized `meta` as URL-encoded query parameters:
 
-```json
-{
-  "fileName": "hello.txt",
-  "mimeType": "text/plain",
-  "fileSize": 5,
-  "content": "SGVsbG8=",
-  "meta": { "label": "Example" }
-}
+```http
+POST /sandbox/storage?fileName=hello.txt&mimeType=text%2Fplain&meta=%7B%7D
+Authorization: Bearer <accessToken>
+Content-Type: application/octet-stream
+
+hello
 ```
 
-The application validates the encoded size and Base64 syntax, then calls `odbLob.base64ToBlob(content)`. It compares the decoded BLOB length with `fileSize` before calling `odbStorage.write`. A missing content value for a nonempty file or a byte-count mismatch is rejected rather than silently saving an empty file.
+Bind a single BLOB parameter with `defineService(..., { body: { content: upload.parameters.content }, ... })`. The ORDS handler reads `:body` once into a BLOB and passes it directly to the procedure. Binary bodies are supported for POST and PUT and cannot be mixed with JSON body fields. Metadata can use the existing `query` or `headers` bindings.
 
-Empty files use `fileSize: 0` and `content: ""`; the application creates an empty temporary BLOB. Files are limited to `odbStorage.maxFileBytes`, currently 10,485,760 bytes (10 MiB).
+The application calls `odbStorage.write(ownerId, fileName, mimeType, content, meta, id)`. Storage computes and validates the byte count directly from the BLOB. The transport normalizes a NULL ORDS body locator to an empty temporary BLOB for zero-byte uploads. Files remain limited to `odbStorage.maxFileBytes`, currently 10,485,760 bytes (10 MiB).
 
-The ORDS generator reads CLOB string inputs with `JSON_OBJECT_T.get_clob`, preserving values larger than 32,767 characters. Base64 adds approximately one third to the request size; reverse-proxy and ORDS request limits must allow for that overhead and the JSON envelope.
+The shared web client sends raw bytes, URL-encodes query values, and retains bearer-token attachment and refresh behavior:
+
+```ts
+const response = await http.upload('/sandbox/storage', file, { meta: { label: 'Example' } })
+if (response.error) throw response.error
+```
+
+Keep query metadata small and non-sensitive: URLs may be logged and are subject to proxy/ORDS URL limits. Configure request-body limits for the actual binary size, without Base64 overhead. This replaces the previous JSON/Base64 upload contract; redeploy the sandbox migration and web client together. `odbStorage.write` also now takes `meta` before `id` in every call.
 
 ### Download
 
@@ -152,34 +157,30 @@ const api = odbPackage('pck_files', (pkg) => {
 
 `responseMediaType` declares a binary response in OpenAPI; it does not emit the response itself. `odbHttp.download` emits the stored MIME type (or `application/octet-stream`), the actual BLOB length, attachment headers with a safe fallback filename and UTF-8 filename, `Cache-Control: private, no-store`, and `X-Content-Type-Options: nosniff`. It closes the HTTP headers and calls `WPG_DOCLOAD.DOWNLOAD_FILE`.
 
-Use the shared HTTP client to download a Blob while retaining bearer-token attachment and refresh behavior:
+Use the shared HTTP client to save a binary response while retaining bearer-token attachment and refresh behavior:
 
 ```ts
-const response = await http.get<Blob>(`/sandbox/storage/${encodeURIComponent(id)}`, {
-  responseType: 'blob',
+await http.download(`/sandbox/storage/${encodeURIComponent(id)}`, fileName, {
+  expectedSize: fileSize,
 })
-if (response.error || !response.data) throw new Error('Download failed')
 ```
 
-The sandbox page checks the returned Blob size against the listed byte count, creates an object URL, and saves the file using the listed filename. It revokes the object URL after triggering the download. Download bytes are not converted to Base64.
+`http.download` throws on request errors or an optional `expectedSize` mismatch, creates an object URL, saves using the supplied filename, removes the temporary anchor, and revokes the URL after triggering the download. Download bytes are not converted to Base64. `http.upload`, like other HTTP request methods, returns a response envelope rather than throwing on HTTP errors.
 
 ## Errors
 
 The capability raises transport-independent ODB errors. The sandbox's ORDS handler maps validation errors to HTTP 422 and `NOT_FOUND` to HTTP 404; unauthenticated requests receive HTTP 401.
 
-| Code | Meaning |
-| --- | --- |
-| `STORAGE_OWNER_REQUIRED` | An owner ID is required for write and list. |
-| `STORAGE_FILENAME_INVALID` | Filename is blank, exceeds 255 characters, or contains directory separators or control characters. |
-| `STORAGE_MIME_TYPE_INVALID` | MIME type is malformed or exceeds 200 characters. |
-| `STORAGE_META_INVALID` | Metadata is not valid JSON. |
-| `STORAGE_CONTENT_REQUIRED` | A BLOB is required; the sandbox also rejects absent content for a nonempty upload. |
-| `STORAGE_FILE_TOO_LARGE` | File or encoded upload exceeds the supported size. |
-| `STORAGE_LIMIT_INVALID` | Explicit list limit is outside 1 through 101. |
-| `STORAGE_FILE_NOT_FOUND` | File does not exist for the supplied owner. |
-| `STORAGE_FILE_SIZE_REQUIRED` | Sandbox upload byte count is missing or negative. |
-| `STORAGE_BASE64_INVALID` | Sandbox upload content is malformed or cannot be decoded. |
-| `STORAGE_FILE_SIZE_MISMATCH` | Decoded upload byte count differs from the supplied byte count. |
+| Code                        | Meaning                                                                                            |
+| --------------------------- | -------------------------------------------------------------------------------------------------- |
+| `STORAGE_OWNER_REQUIRED`    | An owner ID is required for write and list.                                                        |
+| `STORAGE_FILENAME_INVALID`  | Filename is blank, exceeds 255 characters, or contains directory separators or control characters. |
+| `STORAGE_MIME_TYPE_INVALID` | MIME type is malformed or exceeds 200 characters.                                                  |
+| `STORAGE_META_INVALID`      | Metadata is not valid JSON.                                                                        |
+| `STORAGE_CONTENT_REQUIRED`  | A BLOB is required for internal Storage calls.                                                     |
+| `STORAGE_FILE_TOO_LARGE`    | File exceeds the supported size.                                                                   |
+| `STORAGE_LIMIT_INVALID`     | Explicit list limit is outside 1 through 101.                                                      |
+| `STORAGE_FILE_NOT_FOUND`    | File does not exist for the supplied owner.                                                        |
 
 ## Limits And Scope
 

@@ -38,8 +38,11 @@ describe('Storage', () => {
   })
 
   it('emits typed calls and drops the package before the store', () => {
-    expect(odbStorage.write('u', 'f', 'm', 'b', 'id').toSQL()).toBe(
+    expect(odbStorage.write('u', 'f', 'm', 'b', 'NULL', 'id').toSQL()).toBe(
       'odb_storage.write(u, f, m, b, NULL, id)',
+    )
+    expect(odbStorage.write('u', 'f', 'm', 'b', 'meta', 'id').toSQL()).toBe(
+      'odb_storage.write(u, f, m, b, meta, id)',
     )
     expect(odbStorage.read('u', 'id', 'f', 'm', 's', 'b', 'meta').toSQL()).toBe(
       'odb_storage.read(u, id, f, m, s, b, meta)',

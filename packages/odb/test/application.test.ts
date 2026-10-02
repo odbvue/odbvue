@@ -49,6 +49,50 @@ const application = odbPackage('PCK_USERS', (p) => {
 })
 
 describe('ODB application contract', () => {
+  it('documents a single BLOB body and rejects mixed binary/JSON or GET bodies', () => {
+    const binary = odbPackage('PCK_FILES', (pkg) => {
+      const upload = pkg.proc(
+        'UPLOAD',
+        { in: { content: odbType.blob(), name: odbType.string() } },
+        () => {},
+      )
+      expect(() =>
+        defineService(upload, {
+          auth: 'anonymous',
+          method: 'POST',
+          path: '/upload',
+          body: { content: upload.parameters.content, name: upload.parameters.name },
+        }),
+      ).toThrow('one BLOB binding')
+      expect(() =>
+        defineService(upload, {
+          auth: 'anonymous',
+          method: 'GET',
+          path: '/upload',
+          body: { content: upload.parameters.content },
+          query: { name: upload.parameters.name },
+        }),
+      ).toThrow('POST or PUT')
+      defineService(upload, {
+        auth: 'anonymous',
+        method: 'POST',
+        path: '/upload',
+        body: { content: upload.parameters.content },
+        query: { name: upload.parameters.name },
+      })
+    })
+    const model = JSON.parse(JSON.stringify(binary.application())) as OdbApplication
+    const document = generateApplicationOpenApi(model) as {
+      paths: Record<string, Record<string, unknown>>
+    }
+    expect(document.paths['/files/upload']?.post).toMatchObject({
+      requestBody: {
+        content: { 'application/octet-stream': { schema: { type: 'string', format: 'binary' } } },
+      },
+      parameters: [{ name: 'name', in: 'query' }],
+    })
+  })
+
   it('retains implementation and service metadata in one serializable model', () => {
     const model = JSON.parse(JSON.stringify(application.application())) as OdbApplication
     const procedure = model.procedures[0]

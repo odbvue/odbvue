@@ -2,32 +2,69 @@
   <v-container class="storage-page">
     <div class="d-flex align-center justify-space-between flex-wrap ga-3 mb-5">
       <h3>Storage</h3>
-      <v-chip :color="auth.authenticated.value ? 'success' : 'warning'" prepend-icon="$mdiShieldLock">
+      <v-chip
+        :color="auth.authenticated.value ? 'success' : 'warning'"
+        prepend-icon="$mdiShieldLock"
+      >
         {{ auth.authenticated.value ? 'My files' : 'Authentication required' }}
       </v-chip>
     </div>
 
-    <v-alert v-if="message" :type="message.type" :text="message.text" closable class="mb-4"
-      @click:close="message = undefined" />
+    <v-alert
+      v-if="message"
+      :type="message.type"
+      :text="message.text"
+      closable
+      class="mb-4"
+      @click:close="message = undefined"
+    />
 
     <form class="d-flex align-start flex-wrap ga-3 mb-6" @submit.prevent="upload">
-      <v-file-input v-model="file" label="File" show-size hide-details="auto" class="file-input"
-        :disabled="!!busy || !auth.authenticated.value" :error-messages="fileError" />
-      <v-btn type="submit" color="primary" prepend-icon="$mdiUpload" :loading="busy === 'upload'"
-        :disabled="!file || !!fileError || !!busy || !auth.authenticated.value">Upload</v-btn>
+      <v-file-input
+        v-model="file"
+        label="File"
+        show-size
+        hide-details="auto"
+        class="file-input"
+        :disabled="!!busy || !auth.authenticated.value"
+        :error-messages="fileError"
+      />
+      <v-btn
+        type="submit"
+        color="primary"
+        prepend-icon="$mdiUpload"
+        :loading="busy === 'upload'"
+        :disabled="!file || !!fileError || !!busy || !auth.authenticated.value"
+        >Upload</v-btn
+      >
     </form>
 
     <div class="d-flex align-center justify-space-between mb-2">
       <h4>Files</h4>
       <v-tooltip text="Refresh files">
         <template #activator="{ props }">
-          <v-btn v-bind="props" icon="$mdiRefresh" variant="text" aria-label="Refresh files"
-            :loading="busy === 'list'" :disabled="!!busy || !auth.authenticated.value" @click="list()" />
+          <v-btn
+            v-bind="props"
+            icon="$mdiRefresh"
+            variant="text"
+            aria-label="Refresh files"
+            :loading="busy === 'list'"
+            :disabled="!!busy || !auth.authenticated.value"
+            @click="list()"
+          />
         </template>
       </v-tooltip>
     </div>
     <v-table density="comfortable">
-      <thead><tr><th>Filename</th><th>Type</th><th>Size</th><th>Uploaded</th><th class="text-right">Actions</th></tr></thead>
+      <thead>
+        <tr>
+          <th>Filename</th>
+          <th>Type</th>
+          <th>Size</th>
+          <th>Uploaded</th>
+          <th class="text-right">Actions</th>
+        </tr>
+      </thead>
       <tbody>
         <tr v-for="item in items" :key="item.id">
           <td class="file-name">{{ item.fileName }}</td>
@@ -37,35 +74,78 @@
           <td class="text-right text-no-wrap">
             <v-tooltip text="Download file">
               <template #activator="{ props }">
-                <v-btn v-bind="props" icon="$mdiDownload" size="small" variant="text" aria-label="Download file"
-                  :loading="busy === `download:${item.id}`" :disabled="!!busy || !auth.authenticated.value" @click="download(item)" />
+                <v-btn
+                  v-bind="props"
+                  icon="$mdiDownload"
+                  size="small"
+                  variant="text"
+                  aria-label="Download file"
+                  :loading="busy === `download:${item.id}`"
+                  :disabled="!!busy || !auth.authenticated.value"
+                  @click="download(item)"
+                />
               </template>
             </v-tooltip>
             <v-tooltip text="Delete file">
               <template #activator="{ props }">
-                <v-btn v-bind="props" icon="$mdiDelete" color="error" size="small" variant="text" aria-label="Delete file"
-                  :disabled="!!busy || !auth.authenticated.value" @click="pendingDelete = item" />
+                <v-btn
+                  v-bind="props"
+                  icon="$mdiDelete"
+                  color="error"
+                  size="small"
+                  variant="text"
+                  aria-label="Delete file"
+                  :disabled="!!busy || !auth.authenticated.value"
+                  @click="pendingDelete = item"
+                />
               </template>
             </v-tooltip>
           </td>
         </tr>
-        <tr v-if="!items.length"><td colspan="5" class="text-medium-emphasis py-6">
-          {{ busy === 'list' ? 'Loading files...' : auth.authenticated.value ? 'No files.' : 'Sign in to access your files.' }}
-        </td></tr>
+        <tr v-if="!items.length">
+          <td colspan="5" class="text-medium-emphasis py-6">
+            {{
+              busy === 'list'
+                ? 'Loading files...'
+                : auth.authenticated.value
+                  ? 'No files.'
+                  : 'Sign in to access your files.'
+            }}
+          </td>
+        </tr>
       </tbody>
     </v-table>
     <div class="d-flex justify-end mt-3">
-      <v-btn v-if="nextCursor" prepend-icon="$mdiChevronRight" :disabled="!!busy || !auth.authenticated.value"
-        @click="list(nextCursor)">Next</v-btn>
+      <v-btn
+        v-if="nextCursor"
+        prepend-icon="$mdiChevronRight"
+        :disabled="!!busy || !auth.authenticated.value"
+        @click="list(nextCursor)"
+        >Next</v-btn
+      >
     </div>
 
-    <v-dialog :model-value="!!pendingDelete" max-width="440" :persistent="busy === 'remove'"
-      @update:model-value="(open) => { if (!open) pendingDelete = undefined }">
+    <v-dialog
+      :model-value="!!pendingDelete"
+      max-width="440"
+      :persistent="busy === 'remove'"
+      @update:model-value="
+        (open) => {
+          if (!open) pendingDelete = undefined
+        }
+      "
+    >
       <v-card title="Delete file?">
         <v-card-text class="file-name">{{ pendingDelete?.fileName }}</v-card-text>
         <v-card-actions>
           <v-btn :disabled="busy === 'remove'" @click="pendingDelete = undefined">Cancel</v-btn>
-          <v-btn color="error" prepend-icon="$mdiDelete" :loading="busy === 'remove'" @click="remove">Delete</v-btn>
+          <v-btn
+            color="error"
+            prepend-icon="$mdiDelete"
+            :loading="busy === 'remove'"
+            @click="remove"
+            >Delete</v-btn
+          >
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -76,10 +156,15 @@
 import { httpContract, useAuth, useOdbVue } from '@odbvue/web'
 import { computed, ref, watch } from 'vue'
 import type { components } from '@/services/openapi.generated'
-import type { operations } from '@/services/openapi.generated'
 
 definePage({
-  meta: { title: 'Storage', icon: '$mdiFolder', visibility: 'with-role', access: 'with-role', roles: ['developer'] },
+  meta: {
+    title: 'Storage',
+    icon: '$mdiFolder',
+    visibility: 'with-role',
+    access: 'with-role',
+    roles: ['developer'],
+  },
 })
 
 type Item = components['schemas']['SandboxListStorageItemsItem']
@@ -101,7 +186,9 @@ const nextCursor = ref<string>()
 const busy = ref<string>()
 const pendingDelete = ref<Item>()
 const message = ref<{ type: 'success' | 'error'; text: string }>()
-const fileError = computed(() => file.value && file.value.size > maxFileBytes ? 'Maximum file size is 10 MiB.' : '')
+const fileError = computed(() =>
+  file.value && file.value.size > maxFileBytes ? 'Maximum file size is 10 MiB.' : '',
+)
 
 async function run(action: string, call: () => Promise<void>) {
   if (busy.value || !auth.authenticated.value) return
@@ -110,7 +197,10 @@ async function run(action: string, call: () => Promise<void>) {
   try {
     await call()
   } catch (error) {
-    message.value = { type: 'error', text: error instanceof Error ? error.message : 'The storage request failed.' }
+    message.value = {
+      type: 'error',
+      text: error instanceof Error ? error.message : 'The storage request failed.',
+    }
   } finally {
     busy.value = undefined
   }
@@ -134,59 +224,39 @@ async function load(cursor?: string) {
 
 const list = (cursor?: string) => run('list', () => load(cursor))
 
-function encodeFile(value: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') return reject(new Error('File could not be read.'))
-      resolve(reader.result.slice(reader.result.indexOf(',') + 1))
-    }
-    reader.onerror = () => reject(new Error('File could not be read.'))
-    reader.onabort = () => reject(new Error('File reading was cancelled.'))
-    reader.readAsDataURL(value)
+const upload = () =>
+  run('upload', async () => {
+    const selected = file.value
+    if (!selected || fileError.value) return
+    const response = await http.upload<components['schemas']['SandboxUploadStorageResponse']>(
+      '/sandbox/storage',
+      selected,
+      { meta: {} },
+    )
+    if (response.error || !response.data?.id) throw new Error('File could not be uploaded.')
+    file.value = undefined
+    message.value = { type: 'success', text: `${selected.name} uploaded.` }
+    await load()
   })
-}
 
-const upload = () => run('upload', async () => {
-  const selected = file.value
-  if (!selected || fileError.value) return
-  const body: NonNullable<operations['sandbox_upload_storage']['requestBody']>['content']['application/json'] = {
-    fileName: selected.name, mimeType: selected.type || 'application/octet-stream',
-    fileSize: selected.size,
-    content: await encodeFile(selected), meta: {},
-  }
-  const response = await http.post<components['schemas']['SandboxUploadStorageResponse']>('/sandbox/storage', body)
-  if (response.error || !response.data?.id) throw new Error('File could not be uploaded.')
-  file.value = undefined
-  message.value = { type: 'success', text: `${selected.name} uploaded.` }
-  await load()
-})
+const download = (item: Item) =>
+  run(`download:${item.id}`, async () => {
+    await http.download(`/sandbox/storage/${encodeURIComponent(item.id)}`, item.fileName, {
+      expectedSize: Number(item.fileSize),
+    })
+    message.value = { type: 'success', text: `${item.fileName} downloaded.` }
+  })
 
-const download = (item: Item) => run(`download:${item.id}`, async () => {
-  const response = await http.get<Blob>(`/sandbox/storage/${encodeURIComponent(item.id)}`, { responseType: 'blob' })
-  if (response.error || !response.data) throw new Error('File could not be downloaded.')
-  const expectedSize = Number(item.fileSize)
-  if (!Number.isSafeInteger(expectedSize) || response.data.size !== expectedSize) throw new Error('Downloaded file size does not match.')
-  const url = URL.createObjectURL(response.data)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = item.fileName
-  document.body.append(anchor)
-  anchor.click()
-  anchor.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
-  message.value = { type: 'success', text: `${item.fileName} downloaded.` }
-})
-
-const remove = () => run('remove', async () => {
-  const item = pendingDelete.value
-  if (!item) return
-  const response = await http.delete(`/sandbox/storage/${encodeURIComponent(item.id)}`)
-  if (response.error) throw new Error('File could not be deleted.')
-  pendingDelete.value = undefined
-  items.value = items.value.filter((stored) => stored.id !== item.id)
-  message.value = { type: 'success', text: `${item.fileName} deleted.` }
-})
+const remove = () =>
+  run('remove', async () => {
+    const item = pendingDelete.value
+    if (!item) return
+    const response = await http.delete(`/sandbox/storage/${encodeURIComponent(item.id)}`)
+    if (response.error) throw new Error('File could not be deleted.')
+    pendingDelete.value = undefined
+    items.value = items.value.filter((stored) => stored.id !== item.id)
+    message.value = { type: 'success', text: `${item.fileName} deleted.` }
+  })
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
@@ -199,17 +269,27 @@ function formatDate(value: string) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
 }
 
-watch(auth.authenticated, (authenticated) => {
-  items.value = []
-  nextCursor.value = undefined
-  pendingDelete.value = undefined
-  file.value = undefined
-  message.value = undefined
-  if (authenticated) void list()
-}, { immediate: true })
+watch(
+  auth.authenticated,
+  (authenticated) => {
+    items.value = []
+    nextCursor.value = undefined
+    pendingDelete.value = undefined
+    file.value = undefined
+    message.value = undefined
+    if (authenticated) void list()
+  },
+  { immediate: true },
+)
 </script>
 
 <style scoped>
-.file-input { flex: 1 1 280px; min-width: 0; }
-.file-name { overflow-wrap: anywhere; max-width: 320px; }
+.file-input {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+.file-name {
+  overflow-wrap: anywhere;
+  max-width: 320px;
+}
 </style>

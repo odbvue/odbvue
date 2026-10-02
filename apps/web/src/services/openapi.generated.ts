@@ -186,7 +186,7 @@ export interface paths {
         /** List your stored files */
         get: operations["sandbox_list_storage"];
         put?: never;
-        /** Upload a Base64-encoded file (up to 10 MiB) */
+        /** Upload a binary file (up to 10 MiB) */
         post: operations["sandbox_upload_storage"];
         delete?: never;
         options?: never;
@@ -724,20 +724,18 @@ export interface operations {
     };
     sandbox_upload_storage: {
         parameters: {
-            query?: never;
+            query?: {
+                fileName?: string;
+                mimeType?: string;
+                meta?: unknown;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: {
             content: {
-                "application/json": {
-                    fileName?: string;
-                    mimeType?: string;
-                    fileSize?: number;
-                    content?: string;
-                    meta?: unknown;
-                };
+                "application/octet-stream": string;
             };
         };
         responses: {

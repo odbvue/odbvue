@@ -137,6 +137,7 @@ export function generateApplicationsOpenApi(
           (param.plsqlArg.toUpperCase() === 'P_BODY' || param.sourceType === 'BODY'),
       )
       const operationName = toPascalCase(`${endpoint.module}_${endpoint.procedureName}`)
+      const binaryBody = bodyParams.some((param) => param.odbType === 'blob')
       const outputs: Record<string, Record<string, unknown>> = {}
       const requiredOutputs: string[] = []
 
@@ -184,18 +185,20 @@ export function generateApplicationsOpenApi(
           ? {
               requestBody: {
                 content: {
-                  'application/json': {
-                    schema: bodyParams.some((param) => param.plsqlArg.toUpperCase() === 'P_BODY')
-                      ? {}
-                      : objectSchema(
-                          Object.fromEntries(
-                            bodyParams.map((param) => [
-                              param.name,
-                              openApiSchema(param.paramType, param.odbType),
-                            ]),
+                  [binaryBody ? 'application/octet-stream' : 'application/json']: {
+                    schema: binaryBody
+                      ? { type: 'string', format: 'binary' }
+                      : bodyParams.some((param) => param.plsqlArg.toUpperCase() === 'P_BODY')
+                        ? {}
+                        : objectSchema(
+                            Object.fromEntries(
+                              bodyParams.map((param) => [
+                                param.name,
+                                openApiSchema(param.paramType, param.odbType),
+                              ]),
+                            ),
+                            [],
                           ),
-                          [],
-                        ),
                   },
                 },
               },

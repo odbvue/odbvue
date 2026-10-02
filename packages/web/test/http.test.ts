@@ -12,6 +12,79 @@ function response(status: number, data: unknown = {}): Response {
 }
 
 describe('HTTP capability', () => {
+  it('uploads raw bytes with encoded metadata and replays the File after refresh', async () => {
+    let token = 'expired'
+    const file = new File(['binary content'], 'caf\u00e9 & report.txt', { type: 'text/plain' })
+    const fetch = vi.fn<FetchMock>((_input, init) =>
+      Promise.resolve(
+        new Headers(init?.headers).get('Authorization') === 'Bearer fresh'
+          ? response(200, { id: 'file' })
+          : response(401),
+      ),
+    )
+    const http = useHttp({
+      fetch,
+      configuration: {
+        getAccessToken: () => token,
+        refreshAccessToken: async () => {
+          token = 'fresh'
+          return true
+        },
+      },
+    })
+    const result = await http.upload('/storage?existing=1', file, { meta: { label: 'Test' } })
+    expect(result.data).toEqual({ id: 'file' })
+    expect(fetch).toHaveBeenCalledTimes(2)
+    for (const [request, init] of fetch.mock.calls) {
+      const url = new URL(String(request), 'https://example.test')
+      expect(url.searchParams.get('fileName')).toBe(file.name)
+      expect(url.searchParams.get('mimeType')).toBe('text/plain')
+      expect(url.searchParams.get('meta')).toBe('{"label":"Test"}')
+      expect(url.searchParams.get('existing')).toBe('1')
+      expect(init?.body).toBe(file)
+      expect(new Headers(init?.headers).get('Content-Type')).toBe('application/octet-stream')
+    }
+  })
+
+  it('saves downloaded blobs and cleans up anchors and object URLs', async () => {
+    vi.useFakeTimers()
+    const createObjectURL = vi.fn<typeof URL.createObjectURL>(() => 'blob:test')
+    const revokeObjectURL = vi.fn<typeof URL.revokeObjectURL>()
+    vi.stubGlobal(
+      'URL',
+      class extends URL {
+        static createObjectURL = createObjectURL
+        static revokeObjectURL = revokeObjectURL
+      },
+    )
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function () {
+      expect(this.download).toBe('report.txt')
+      expect(this.href).toBe('blob:test')
+      expect(this.isConnected).toBe(true)
+    })
+    try {
+      const http = useHttp({ fetch: vi.fn<FetchMock>(() => Promise.resolve(new Response('abc'))) })
+      await http.download('/storage/file', 'report.txt', { expectedSize: 3 })
+      expect(click).toHaveBeenCalledOnce()
+      expect(document.querySelector('a[download]')).toBeNull()
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:test')
+      await expect(
+        http.download('/storage/file', 'report.txt', { expectedSize: 4 }),
+      ).rejects.toThrow('size does not match')
+      expect(createObjectURL).toHaveBeenCalledOnce()
+      const failed = useHttp({ fetch: vi.fn<FetchMock>(() => Promise.resolve(response(403))) })
+      await expect(failed.download('/storage/file', 'report.txt')).rejects.toMatchObject({
+        status: 403,
+      })
+      expect(createObjectURL).toHaveBeenCalledOnce()
+    } finally {
+      click.mockRestore()
+      vi.unstubAllGlobals()
+      vi.useRealTimers()
+    }
+  })
+
   it('downloads binary responses and preserves authentication through refresh', async () => {
     let token = 'expired'
     const bytes = new Uint8Array([0, 1, 127, 128, 255])
@@ -19,16 +92,24 @@ describe('HTTP capability', () => {
       token = 'fresh'
       return true
     })
-    const fetch = vi.fn<FetchMock>((_input, init) => Promise.resolve(
-      new Headers(init?.headers).get('Authorization') === 'Bearer fresh'
-        ? new Response(bytes, { headers: { 'Content-Type': 'application/octet-stream' } })
-        : response(401),
-    ))
-    const http = useHttp({ fetch, configuration: {
-      getAccessToken: () => token, refreshAccessToken,
-      openapi: { paths: { '/storage/{id}': { get: { security: [{ bearerAuth: [] }] } } },
-        components: { securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer' } } } },
-    } })
+    const fetch = vi.fn<FetchMock>((_input, init) =>
+      Promise.resolve(
+        new Headers(init?.headers).get('Authorization') === 'Bearer fresh'
+          ? new Response(bytes, { headers: { 'Content-Type': 'application/octet-stream' } })
+          : response(401),
+      ),
+    )
+    const http = useHttp({
+      fetch,
+      configuration: {
+        getAccessToken: () => token,
+        refreshAccessToken,
+        openapi: {
+          paths: { '/storage/{id}': { get: { security: [{ bearerAuth: [] }] } } },
+          components: { securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer' } } },
+        },
+      },
+    })
     const result = await http.get<Blob>('/storage/file', { responseType: 'blob' })
     expect(result.error).toBeNull()
     expect(result.data?.size).toBe(bytes.length)

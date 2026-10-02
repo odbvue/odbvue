@@ -297,20 +297,28 @@ export class OrdsEndpoint {
   }
 
   private get handlerSource(): string {
+    const binaryBody = this._params.some(
+      (param) => this.paramSourceType(param) === 'BODY' && param.odbType === 'blob',
+    )
     const args = this._params
       .map((p) =>
         p.plsqlArg.toUpperCase() === this._contextUserId
           ? `${p.plsqlArg.toLowerCase()} => v_auth_user_id`
-          : p.plsqlArg.toUpperCase() === 'P_BODY'
-            ? `${p.plsqlArg.toLowerCase()} => :body`
-            : this.paramSourceType(p) === 'BODY'
-              ? `${p.plsqlArg.toLowerCase()} => ${jsonValueExpression(p)}`
-              : `${p.plsqlArg.toLowerCase()} => :${p.bindVariable}`,
+          : this.paramSourceType(p) === 'BODY' && p.odbType === 'blob'
+            ? `${p.plsqlArg.toLowerCase()} => v_binary_body`
+            : p.plsqlArg.toUpperCase() === 'P_BODY'
+              ? `${p.plsqlArg.toLowerCase()} => :body`
+              : this.paramSourceType(p) === 'BODY'
+                ? `${p.plsqlArg.toLowerCase()} => ${jsonValueExpression(p)}`
+                : `${p.plsqlArg.toLowerCase()} => :${p.bindVariable}`,
       )
       .join(', ')
     const protectedEndpoint = this._auth !== undefined && this._auth !== 'anonymous'
     const declarations = [
-      ...(this._params.some((param) => this.paramSourceType(param) === 'BODY')
+      ...(binaryBody ? ['v_binary_body BLOB := :body;'] : []),
+      ...(this._params.some(
+        (param) => this.paramSourceType(param) === 'BODY' && param.odbType !== 'blob',
+      )
         ? ['v_body CLOB := :body_text;']
         : []),
       ...(this._params.some(
@@ -339,7 +347,10 @@ export class OrdsEndpoint {
     const enforcement = checks.length
       ? `IF NOT (${checks.join(policy && typeof policy === 'object' && policy.match === 'any' ? ' OR ' : ' AND ')}) THEN raise_application_error(${ODB_ERROR_NUMBER}, 'ODB_ERROR|FORBIDDEN|FORBIDDEN'); END IF; `
       : ''
-    const call = `${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args});`
+    const normalizeBody = binaryBody
+      ? 'IF v_binary_body IS NULL THEN DBMS_LOB.CREATETEMPORARY(v_binary_body, TRUE, DBMS_LOB.CALL); END IF; '
+      : ''
+    const call = `${normalizeBody}${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args});`
     const envelope = "'ODB_HTTP\\|([4-5][0-9]{2})\\|([A-Z][A-Z0-9_]{0,99})'"
     const status = `REGEXP_SUBSTR(SQLERRM, ${envelope}, 1, 1, NULL, 1)`
     const code = `REGEXP_SUBSTR(SQLERRM, ${envelope}, 1, 1, NULL, 2)`

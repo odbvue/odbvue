@@ -53,6 +53,12 @@ export interface HttpClientOptions {
   /** Emits HTTP lifecycle events to this application's hook dispatcher. */
   hooks?: OdbVueHooks
 }
+export interface HttpUploadMetadata {
+  fileName?: string
+  mimeType?: string
+  meta?: unknown
+}
+export type HttpDownloadOptions = HttpRequestOptions & { expectedSize?: number }
 export interface HttpClient {
   <T>(request: string, options?: HttpRequestOptions): Promise<HttpResponse<T>>
   get<T>(url: string, options?: HttpRequestOptions): Promise<HttpResponse<T>>
@@ -60,6 +66,13 @@ export interface HttpClient {
   put<T>(url: string, body?: unknown, options?: HttpRequestOptions): Promise<HttpResponse<T>>
   delete<T>(url: string, options?: HttpRequestOptions): Promise<HttpResponse<T>>
   patch<T>(url: string, body?: unknown, options?: HttpRequestOptions): Promise<HttpResponse<T>>
+  upload<T>(
+    url: string,
+    file: File,
+    metadata?: HttpUploadMetadata,
+    options?: HttpRequestOptions,
+  ): Promise<HttpResponse<T>>
+  download(url: string, fileName: string, options?: HttpDownloadOptions): Promise<void>
 }
 
 export const httpContract = defineContract<HttpClient>('http')
@@ -197,7 +210,7 @@ async function executeRequest<T>(
                 request,
                 response._data as T,
               )
-            : response._data as T,
+            : (response._data as T),
       error: null,
       status: response.status,
       headers: response.headers,
@@ -290,5 +303,44 @@ export function useHttp(clientOptions: HttpClientOptions = {}): HttpClient {
       method: 'PATCH',
       body: body as Record<string, unknown>,
     })
+  http.upload = (url, file, metadata = {}, options) => {
+    const headers = new Headers(options?.headers as HeadersInit | undefined)
+    headers.set('Content-Type', 'application/octet-stream')
+    return http.post(url, file, {
+      ...options,
+      headers,
+      query: {
+        ...options?.query,
+        fileName: metadata.fileName ?? file.name,
+        mimeType: metadata.mimeType ?? (file.type || 'application/octet-stream'),
+        meta: JSON.stringify(metadata.meta ?? {}),
+      },
+    })
+  }
+  http.download = async (url, fileName, options = {}) => {
+    const { expectedSize, ...requestOptions } = options
+    const response = await http.get<Blob>(url, { ...requestOptions, responseType: 'blob' })
+    if (response.error) throw response.error
+    if (!response.data) throw new Error('File could not be downloaded.')
+    if (
+      expectedSize !== undefined &&
+      (!Number.isSafeInteger(expectedSize) ||
+        expectedSize < 0 ||
+        response.data.size !== expectedSize)
+    ) {
+      throw new Error('Downloaded file size does not match.')
+    }
+    const anchor = document.createElement('a')
+    const objectUrl = URL.createObjectURL(response.data)
+    try {
+      anchor.href = objectUrl
+      anchor.download = fileName
+      document.body.append(anchor)
+      anchor.click()
+    } finally {
+      anchor.remove()
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+    }
+  }
   return http
 }
