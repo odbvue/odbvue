@@ -4,6 +4,18 @@ import { ProcedureBody } from '../../../src/schema/package.js'
 
 describe('odbAudit (framework package odb_audit)', () => {
   describe('install / drop SQL', () => {
+    it('lists newest first with a timestamp and id keyset', () => {
+      const sql = odbAudit.toSQLUp()
+      expect(sql).toContain(
+        'PROCEDURE list(p_after IN VARCHAR2, p_limit IN PLS_INTEGER, p_items OUT SYS_REFCURSOR)',
+      )
+      expect(sql).toContain('observed_timestamp < l_after_timestamp')
+      expect(sql).toContain('id < p_after')
+      expect(sql).toContain('ORDER BY observed_timestamp DESC, id DESC')
+      expect(sql).toContain('FETCH FIRST NVL(p_limit, 50) ROWS ONLY')
+      expect(sql).toContain('AUDIT_CURSOR_NOT_FOUND')
+    })
+
     it('toSQLUp() emits the table, spec and body under the odb_audit name', () => {
       const sql = odbAudit.toSQLUp()
       expect(sql).toContain('CREATE TABLE odb_audit_logs (')
@@ -23,10 +35,17 @@ describe('odbAudit (framework package odb_audit)', () => {
       expect(sql).toContain("severity_text IN ('TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL')")
     })
 
-    it('toSQLUp() guards the table DDL so re-installs are idempotent', () => {
+    it('toSQLUp() writes an OTel log in an autonomous transaction', () => {
       const sql = odbAudit.toSQLUp()
-      expect(sql).toContain('EXECUTE IMMEDIATE')
-      expect(sql).toContain('SQLCODE != -955')
+      expect(sql).toContain('PRAGMA AUTONOMOUS_TRANSACTION')
+      expect(sql).toContain('json_object_t.parse')
+      expect(sql).toContain("owa_util.get_cgi_env('REQUEST_METHOD')")
+      expect(sql).toContain("'exception.message'")
+      expect(sql).toContain('JSON_TABLE')
+      expect(sql).toContain('GENERATED ALWAYS AS')
+      expect(sql).toContain('CREATE INDEX odb_audit_logs_ix_event')
+      expect(sql).toContain('p_attributes IN CLOB DEFAULT NULL')
+      expect(sql).toContain('p_event_timestamp IN TIMESTAMP DEFAULT SYSTIMESTAMP')
     })
 
     it('toSQLUp({ schema }) qualifies the table and package names', () => {
@@ -69,6 +88,9 @@ describe('odbAudit (framework package odb_audit)', () => {
     })
 
     it('renders utility helpers', () => {
+      expect(odbAudit.list('p_after', 'p_limit', 'p_items').toSQL()).toBe(
+        'odb_audit.list(p_after, p_limit, p_items)',
+      )
       expect(odbAudit.severityNumber("'WARN'").toSQL()).toBe("odb_audit.severity_number('WARN')")
       expect(odbAudit.bulk('v_data').toSQL()).toBe('odb_audit.bulk(v_data)')
       expect(odbAudit.purge('v_cutoff').toSQL()).toBe('odb_audit.purge(v_cutoff)')

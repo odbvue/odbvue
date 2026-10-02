@@ -1,12 +1,15 @@
 import {
+  cond,
   defineMigration,
   defineService,
+  odbAudit,
   odbAuth,
   odbEnv,
   odbHttp,
   odbPackage,
   odbSettings,
   odbType,
+  PlsqlStatement,
 } from '@odbvue/odb'
 
 const refreshCookie = odbHttp.defineCookie({
@@ -197,6 +200,64 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
     headers: { Authorization: removeSetting.parameters.authorization },
     uri: { id: removeSetting.parameters.id },
   })
+
+  const listAudit = pkg.proc(
+    'list_audit',
+    {
+      in: {
+        authorization: odbType.string(4000),
+        after: odbAudit.types.id,
+        limit: odbType.integer(),
+      },
+      out: { items: odbType.resultset() },
+    },
+    ({ params: { authorization, after, limit, items }, body }) => {
+      const { subject } = body.variables({ subject: odbType.guid() })
+      body.set(subject, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
+      body.call(odbAudit.list(after, limit, items))
+    },
+  )
+  defineService(listAudit, {
+    method: 'GET',
+    path: '/audit',
+    summary: 'List audit logs',
+    headers: { Authorization: listAudit.parameters.authorization },
+    query: { cursor: listAudit.parameters.after, limit: listAudit.parameters.limit },
+    response: { items: listAudit.parameters.items },
+  })
+
+  for (const severity of ['info', 'warn', 'error'] as const) {
+    const writeAudit = pkg.proc(
+      `audit_${severity}`,
+      { in: { authorization: odbType.string(4000), message: odbAudit.types.body } },
+      ({ params: { authorization, message }, body }) => {
+        const { subject } = body.variables({ subject: odbType.guid() })
+        body.set(subject, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
+        body.ifThen(cond.isNull(message), (then) => then.invalid('AUDIT_MESSAGE_REQUIRED'))
+        if (severity === 'error') {
+          body.block((inner) => {
+            inner.invalid('SANDBOX_AUDIT_ERROR')
+            inner.whenOthers((handler) => {
+              handler.call(odbAudit.error(message))
+              handler.call(new PlsqlStatement('RAISE'))
+            })
+          })
+        } else {
+          body.call(odbAudit[severity](message))
+        }
+      },
+    )
+    defineService(writeAudit, {
+      method: 'POST',
+      path: `/audit/${severity}`,
+      summary:
+        severity === 'error'
+          ? 'Raise and audit a sandbox error'
+          : `Write an audit ${severity} entry`,
+      headers: { Authorization: writeAudit.parameters.authorization },
+      body: { message: writeAudit.parameters.message },
+    })
+  }
 })
 
 export const migration = defineMigration('00000000000001_sandbox', {

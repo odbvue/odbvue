@@ -350,7 +350,7 @@ export const migration = defineMigration('20260704120000_lob', {
 
 Once installed, call them from your own package bodies (`odbLob.varchar2ToBase64('v_text')`) or through the typed variable helpers (`ClobVar.toBase64()`). See the LOB capability page for details.
 
-Other framework packages follow the same pattern — for example `odb_audit` (`odbAudit`) writes OpenTelemetry-aligned audit logs. `odb_settings` (`odbSettings`) is a key/value store whose table and CRUD package are also defined in TypeScript. See the Audit and Settings capability pages for details.
+Other framework packages follow the same pattern. `odb_audit` (`odbAudit`) and `odb_settings` (`odbSettings`) define both their tables and PL/SQL packages in TypeScript: audit logs follow the OpenTelemetry LogRecord model, and settings is a key/value store. See the Audit and Settings capability pages for details.
 
 `odbAuth` installs an ORDS-ready authentication API with user and session storage, password hashing, access JWTs, and rotating refresh-token cookies. See the [Authentication capability](./capabilities/auth) for its migration and web-runtime setup.
 

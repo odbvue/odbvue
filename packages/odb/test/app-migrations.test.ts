@@ -87,6 +87,33 @@ describe('app-owned ORDS migrations', () => {
     expect(login?.properties).not.toHaveProperty('setCookie')
   })
 
+  it('exposes authenticated audit listing and severity actions', async () => {
+    const migration = await load('00000000000001-sandbox')
+    const sql = migration.compile().up().join('\n')
+    expect(sql).toContain('odb_audit.list(p_after, p_limit, p_items)')
+    expect(sql).toContain('odb_audit.info(p_message)')
+    expect(sql).toContain('odb_audit.warn(p_message)')
+    expect(sql).toMatch(/WHEN OTHERS THEN\s+odb_audit.error\(p_message\);\s+RAISE;/)
+    expect(sql).toContain('SANDBOX_AUDIT_ERROR')
+    expect(sql).toContain('AUDIT_MESSAGE_REQUIRED')
+    expect(sql).not.toContain('odb_audit_logs')
+    const openapi = generateApplicationOpenApi(migration.applications()[0]) as {
+      paths: Record<string, Record<string, { parameters: { name: string; in: string }[] }>>
+    }
+    const list = openapi.paths['/sandbox/audit']?.get
+    expect(list).toBeDefined()
+    expect(
+      list?.parameters.filter((parameter) => parameter.in === 'query').map((p) => p.name),
+    ).toEqual(['cursor', 'limit'])
+    for (const severity of ['info', 'warn', 'error']) {
+      const action = openapi.paths[`/sandbox/audit/${severity}`]?.post
+      expect(action).toBeDefined()
+      expect(action?.parameters).toContainEqual(
+        expect.objectContaining({ name: 'Authorization', in: 'header' }),
+      )
+    }
+  })
+
   it('keeps settings meta typed as JSON and lists with limit/cursor query parameters', async () => {
     const migration = await load('00000000000001-sandbox')
     const openapi = generateApplicationOpenApi(migration.applications()[0]) as {

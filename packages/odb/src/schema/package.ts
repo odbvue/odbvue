@@ -49,6 +49,8 @@ export type OdbTypeDescriptor<TType extends PlsqlType | string> = {
   length?: number
   /** Logical ODB type when it is richer than the PL/SQL type (e.g. `json` stored as CLOB). */
   odbType?: OdbType
+  /** Parameter default expression. Ignored when the descriptor is used as a local variable. */
+  default?: string
 }
 
 type ParameterInput =
@@ -153,6 +155,11 @@ function inputParameterOdbType(input: ParameterInput): OdbType {
     : (input.odbType ?? odbTypeFromPlsql(inputParameterType(input)))
 }
 
+function parameterOptions(input: ParameterInput): { length?: number; default?: string } {
+  if (input instanceof Column) return {}
+  return { length: input.length, default: input.default }
+}
+
 /** ODB type descriptors for use with named parameters and local variables. */
 export const odbType = {
   /** Use a database-specific type not covered by the built-in descriptors. */
@@ -224,6 +231,19 @@ export type CaseNode = {
   elseStatements?: StatementNode[]
 }
 
+export type BlockNode = {
+  kind: 'block'
+  statements: StatementNode[]
+  exceptionHandlers?: ExceptionHandlerNode[]
+}
+
+export type ForQueryNode = {
+  kind: 'for-query'
+  record: string
+  query: string
+  statements: StatementNode[]
+}
+
 export type StatementNode =
   | { kind: 'assign'; target: string; value: string }
   | { kind: 'return'; value?: string }
@@ -235,6 +255,8 @@ export type StatementNode =
   | ForRangeNode
   | WhileNode
   | CaseNode
+  | BlockNode
+  | ForQueryNode
 
 export type OraclePredefinedException =
   | 'ACCESS_INTO_NULL'
@@ -375,6 +397,15 @@ export class CaseStatementBuilder {
   toNode(): CaseNode {
     if (this.branches.length === 0) throw new Error('case: at least one WHEN branch is required.')
     return { kind: 'case', branches: this.branches, elseStatements: this.elseStatements }
+  }
+}
+
+/** Implicit record of a `FOR rec IN (SELECT ...) LOOP`. */
+export class QueryRecord {
+  constructor(readonly name: string) {}
+
+  column<T extends PlsqlType | string = 'VARCHAR2'>(field: string, type?: T): PlsqlExpression<T> {
+    return new PlsqlExpression((type ?? 'VARCHAR2') as T, `${this.name}.${field}`)
   }
 }
 
@@ -774,6 +805,55 @@ export class ProcedureBody {
     return this
   }
 
+  /**
+   * Emit `FOR <record> IN (<query>) LOOP ... END LOOP;`. The record is implicit;
+   * reference its fields with `record.column(name)`.
+   */
+  forQuery(
+    record: string,
+    query: string | { toSQL(): string },
+    build: (record: QueryRecord, body: ProcedureBody) => void,
+  ): this {
+    if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(record)) {
+      throw new Error(`forQuery: invalid record name ${record}.`)
+    }
+    const sql = (typeof query === 'string' ? query : query.toSQL()).replace(/;\s*$/, '')
+    this._statements.push({
+      kind: 'for-query',
+      record,
+      query: sql,
+      statements: this.childStatements((body) => build(new QueryRecord(record), body)),
+    })
+    return this
+  }
+
+  /**
+   * Emit a nested `BEGIN ... [EXCEPTION ...] END;` block. Locals declared inside
+   * are hoisted. Use it to isolate statements that must not abort the caller.
+   */
+  block(build: (body: ProcedureBody) => void): this {
+    const child = new ProcedureBody(this._returnType, this._returnLength)
+    build(child)
+    for (const declaration of child._declarations) this._declarations.push(declaration)
+    for (const procedure of child._localProcedures) this._localProcedures.push(procedure)
+    for (const fn of child._localFunctions) this._localFunctions.push(fn)
+    for (const [name, columns] of child._cursorResultColumns) {
+      this._cursorResultColumns.set(name, columns)
+    }
+    this._statements.push({
+      kind: 'block',
+      statements: [...child._statements],
+      exceptionHandlers:
+        child._exceptionHandlers.length > 0
+          ? child._exceptionHandlers.map((handler) => ({
+              when: handler.when,
+              statements: [...handler.statements],
+            }))
+          : undefined,
+    })
+    return this
+  }
+
   /** Emit a searched `CASE WHEN ... THEN ... [ELSE ...] END CASE;` statement. */
   case(build: (cases: CaseStatementBuilder) => void): this {
     const cases = new CaseStatementBuilder((branch) => this.childStatements(branch))
@@ -1145,12 +1225,7 @@ export class Procedure {
           inputParameterName(key),
           inputParameterType(definition),
           direction === 'out' ? 'OUT' : direction === 'inOut' ? 'IN OUT' : 'IN',
-          {
-            length:
-              typeof definition === 'object' && !(definition instanceof Column)
-                ? definition.length
-                : undefined,
-          },
+          parameterOptions(definition),
           inputParameterOdbType(definition),
         )
         this._params.push(parameter)
@@ -1307,12 +1382,7 @@ export class PlsqlFunction<TReturnType extends PlsqlType | string = PlsqlType | 
         inputParameterName(key),
         inputParameterType(definition),
         'IN',
-        {
-          length:
-            typeof definition === 'object' && !(definition instanceof Column)
-              ? definition.length
-              : undefined,
-        },
+        parameterOptions(definition),
         inputParameterOdbType(definition),
       )
       this._params.push(parameter)
@@ -1767,6 +1837,18 @@ function emitStatement(stmt: StatementNode, indent: string): string[] {
         ...emitStatementBlock(stmt.statements, `${indent}  `),
         `${indent}END LOOP;`,
       ]
+    case 'for-query':
+      return [
+        `${indent}FOR ${stmt.record} IN (${stmt.query}) LOOP`,
+        ...emitStatementBlock(stmt.statements, `${indent}  `),
+        `${indent}END LOOP;`,
+      ]
+    case 'block': {
+      const lines = [`${indent}BEGIN`, ...emitStatementBlock(stmt.statements, `${indent}  `)]
+      emitExceptionSection(lines, stmt.exceptionHandlers, indent)
+      lines.push(`${indent}END;`)
+      return lines
+    }
     case 'case': {
       const lines = [`${indent}CASE`]
       for (const branch of stmt.branches) {

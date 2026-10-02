@@ -23,10 +23,17 @@ describe('odbAudit (framework package odb_audit)', () => {
       expect(sql).toContain("severity_text IN ('TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL')")
     })
 
-    it('toSQLUp() guards the table DDL so re-installs are idempotent', () => {
+    it('toSQLUp() writes an OTel log in an autonomous transaction', () => {
       const sql = odbAudit.toSQLUp()
-      expect(sql).toContain('EXECUTE IMMEDIATE')
-      expect(sql).toContain('SQLCODE != -955')
+      expect(sql).toContain('PRAGMA AUTONOMOUS_TRANSACTION')
+      expect(sql).toContain('json_object_t.parse')
+      expect(sql).toContain("owa_util.get_cgi_env('REQUEST_METHOD')")
+      expect(sql).toContain("'exception.message'")
+      expect(sql).toContain('JSON_TABLE')
+      expect(sql).toContain('GENERATED ALWAYS AS')
+      expect(sql).toContain('CREATE INDEX odb_audit_logs_ix_event')
+      expect(sql).toContain('p_attributes IN CLOB DEFAULT NULL')
+      expect(sql).toContain('p_event_timestamp IN TIMESTAMP DEFAULT SYSTIMESTAMP')
     })
 
     it('toSQLUp({ schema }) qualifies the table and package names', () => {

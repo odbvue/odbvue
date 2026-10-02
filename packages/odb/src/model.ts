@@ -130,7 +130,11 @@ export function odbTypeToJsonSchema(type: OdbType): Record<string, unknown> {
   }
 }
 
-export function emitOracleType(type: OdbColumnType, options: { length?: number } = {}): string {
+export function emitOracleType(
+  type: OdbColumnType,
+  options: { length?: number; precision?: number } = {},
+): string {
+  if (type === 'number' && options.precision !== undefined) return `NUMBER(${options.precision})`
   return odbTypes[type].oracle(options)
 }
 

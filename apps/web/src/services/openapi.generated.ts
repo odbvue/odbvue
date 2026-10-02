@@ -108,6 +108,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sandbox/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List audit logs */
+        get: operations["sandbox_list_audit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sandbox/audit/info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Write an audit info entry */
+        post: operations["sandbox_audit_info"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sandbox/audit/warn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Write an audit warn entry */
+        post: operations["sandbox_audit_warn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sandbox/audit/error": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Raise and audit a sandbox error */
+        post: operations["sandbox_audit_error"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -138,6 +206,22 @@ export interface components {
         };
         SandboxWriteSettingResponse: Record<string, never>;
         SandboxRemoveSettingResponse: Record<string, never>;
+        SandboxListAuditItemsItem: {
+            id: string;
+            /** Format: date-time */
+            observedTimestamp: string;
+            /** Format: date-time */
+            eventTimestamp: string;
+            severityText: string;
+            body: string;
+            attributes?: unknown;
+        };
+        SandboxListAuditResponse: {
+            items: components["schemas"]["SandboxListAuditItemsItem"][];
+        };
+        SandboxAuditInfoResponse: Record<string, never>;
+        SandboxAuditWarnResponse: Record<string, never>;
+        SandboxAuditErrorResponse: Record<string, never>;
     };
     responses: never;
     parameters: never;
@@ -339,6 +423,115 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SandboxRemoveSettingResponse"];
+                };
+            };
+        };
+    };
+    sandbox_list_audit: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: {
+                Authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxListAuditResponse"];
+                };
+            };
+        };
+    };
+    sandbox_audit_info: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    message?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxAuditInfoResponse"];
+                };
+            };
+        };
+    };
+    sandbox_audit_warn: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    message?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxAuditWarnResponse"];
+                };
+            };
+        };
+    };
+    sandbox_audit_error: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    message?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxAuditErrorResponse"];
                 };
             };
         };

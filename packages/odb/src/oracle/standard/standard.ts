@@ -53,6 +53,11 @@ export const odbOracle = {
     return call('VARCHAR2', 'LOWER', [value])
   },
 
+  /** `UPPER(<value>)` -> VARCHAR2 */
+  upper(value: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
+    return call('VARCHAR2', 'UPPER', [value])
+  },
+
   /** `STANDARD_HASH(<value>, <algorithm>)` -> VARCHAR2 */
   standardHash(value: PlsqlRenderable, algorithm: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
     return call('VARCHAR2', 'STANDARD_HASH', [value, algorithm])

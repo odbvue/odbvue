@@ -297,6 +297,26 @@ describe('ProcedureBody control flow and exceptions', () => {
     expect(sql).toContain('    END IF;')
   })
 
+  it('emits parameter defaults, nested blocks, and query loops', () => {
+    const sql = bodyLines((proc) => {
+      proc.parameters({
+        in: { data: { ...odbType.clob(), default: 'NULL' } },
+      })
+      proc.body((body) => {
+        body.block((inner) => {
+          inner.null()
+          inner.whenOthers((handler) => handler.null())
+        })
+        body.forQuery('rec', 'SELECT id FROM dual', (_rec, loop) => loop.null())
+      })
+    })
+
+    expect(sql).toContain('PROCEDURE DO_IT(p_data IN CLOB DEFAULT NULL) IS')
+    expect(sql).toContain('BEGIN')
+    expect(sql).toContain('WHEN OTHERS THEN')
+    expect(sql).toContain('FOR rec IN (SELECT id FROM dual) LOOP')
+  })
+
   it('emits ELSIF, WHILE, CASE, and local subprograms', () => {
     const sql = bodyLines((proc) => {
       const { result } = proc.parameters({ out: { result: odbType.string() } })
