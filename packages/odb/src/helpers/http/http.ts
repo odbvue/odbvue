@@ -3,6 +3,7 @@ const ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]{0,99}$/
 import {
   odbLiteral,
   plsqlExpr,
+  renderPlsql,
   PlsqlExpression,
   PlsqlStatement,
   type PlsqlRenderable,
@@ -74,6 +75,31 @@ export const odbHttp = {
   },
   tooManyRequests(code = 'TOO_MANY_REQUESTS'): PlsqlStatement {
     return this.error(429, code)
+  },
+  download(
+    content: PlsqlRenderable,
+    fileName: PlsqlRenderable,
+    mimeType: PlsqlRenderable,
+  ): PlsqlStatement {
+    return new PlsqlStatement(
+      [
+        'DECLARE',
+        `  v_download_name VARCHAR2(255) := ${renderPlsql(fileName)};`,
+        `  v_download_mime VARCHAR2(200) := ${renderPlsql(mimeType)};`,
+        'BEGIN',
+        "  IF v_download_mime IS NULL OR NOT REGEXP_LIKE(v_download_mime, '^[a-zA-Z0-9!#$&^_.+-]+/[a-zA-Z0-9!#$&^_.+-]+$') THEN",
+        "    v_download_mime := 'application/octet-stream';",
+        '  END IF;',
+        '  owa_util.mime_header(v_download_mime, FALSE);',
+        `  htp.p('Content-Length: ' || DBMS_LOB.GETLENGTH(${renderPlsql(content)}));`,
+        `  htp.p('Content-Disposition: attachment; filename="' || REGEXP_REPLACE(v_download_name, '[^A-Za-z0-9._ -]', '_') || '"; filename*=UTF-8''''' || REPLACE(UTL_URL.ESCAPE(v_download_name, TRUE, 'AL32UTF8'), '''', '%27'));`,
+        "  htp.p('Cache-Control: private, no-store');",
+        "  htp.p('X-Content-Type-Options: nosniff');",
+        '  owa_util.http_header_close;',
+        `  wpg_docload.download_file(${renderPlsql(content)});`,
+        'END',
+      ].join('\n'),
+    )
   },
   setCookie(options: SetCookieOptions): PlsqlExpression<'VARCHAR2'> {
     if (!options.name) throw new Error('odbHttp.setCookie: name is required.')

@@ -4,10 +4,15 @@ import {
   defineService,
   odbAudit,
   odbAuth,
+  odbDbmsLob,
   odbEnv,
   odbHttp,
+  odbLob,
+  odbLiteral,
+  odbOracle,
   odbPackage,
   odbSettings,
+  odbStorage,
   odbType,
   PlsqlStatement,
   type Package,
@@ -253,6 +258,146 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
       body: { message: writeAudit.parameters.message },
     })
   }
+  const listStorage = pkg.proc(
+    'list_storage',
+    {
+      in: {
+        ownerId: odbStorage.types.ownerId,
+        after: odbStorage.types.id,
+        limit: odbType.integer(),
+      },
+      out: { items: odbType.resultset() },
+    },
+    ({ params: { ownerId, after, limit, items }, body }) => {
+      body.call(odbStorage.list(ownerId, after, limit, items))
+    },
+  )
+  defineService(listStorage, {
+    auth: 'authenticated',
+    method: 'GET',
+    path: '/storage',
+    summary: 'List your stored files',
+    context: { userId: listStorage.parameters.ownerId },
+    query: { cursor: listStorage.parameters.after, limit: listStorage.parameters.limit },
+    response: { items: listStorage.parameters.items },
+  })
+
+  const uploadStorage = pkg.proc(
+    'upload_storage',
+    {
+      in: {
+        ownerId: odbStorage.types.ownerId,
+        fileName: odbStorage.types.fileName,
+        mimeType: odbStorage.types.mimeType,
+        fileSize: odbType.integer(),
+        content: odbType.clob(),
+        meta: odbStorage.types.meta,
+      },
+      out: { id: odbStorage.types.id },
+    },
+    ({ params: { ownerId, fileName, mimeType, fileSize, content, meta, id }, body }) => {
+      const { binaryContent } = body.variables({ binaryContent: odbStorage.types.content })
+      body.ifThen(cond.or([cond.isNull(fileSize), cond.lt(fileSize, 0)]), (then) =>
+        then.invalid('STORAGE_FILE_SIZE_REQUIRED'),
+      )
+      body.ifThen(cond.gt(fileSize, odbStorage.maxFileBytes), (then) =>
+        then.invalid('STORAGE_FILE_TOO_LARGE'),
+      )
+      body.ifThen(cond.and([cond.isNull(content), cond.gt(fileSize, 0)]), (then) =>
+        then.invalid('STORAGE_CONTENT_REQUIRED'),
+      )
+      body.ifThen(
+        cond.gt(odbOracle.length(content), Math.ceil(odbStorage.maxFileBytes / 3) * 4),
+        (then) => then.invalid('STORAGE_FILE_TOO_LARGE'),
+      )
+      body.ifThen(cond.isNotNull(content), (then) => {
+        then.ifThen(
+          cond.or([
+            cond.not(
+              cond.regexpLike(
+                content,
+                '^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$',
+              ),
+            ),
+            cond.ne(odbOracle.mod(odbOracle.length(content), odbLiteral(4)), 0),
+          ]),
+          (invalid) => invalid.invalid('STORAGE_BASE64_INVALID'),
+        )
+      })
+      body.block((decode) => {
+        decode.ifThen(
+          cond.isNull(content),
+          (empty) => {
+            empty.call(odbDbmsLob.createTemporary(binaryContent, true, odbDbmsLob.CALL))
+          },
+          (nonempty) => {
+            nonempty.set(binaryContent, odbLob.base64ToBlob(content))
+          },
+        )
+        decode.whenOthers((handler) => handler.invalid('STORAGE_BASE64_INVALID'))
+      })
+      body.ifThen(cond.ne(odbDbmsLob.getLength(binaryContent), fileSize), (then) =>
+        then.invalid('STORAGE_FILE_SIZE_MISMATCH'),
+      )
+      body.call(odbStorage.write(ownerId, fileName, mimeType, binaryContent, id, meta))
+    },
+  )
+  defineService(uploadStorage, {
+    auth: 'authenticated',
+    method: 'POST',
+    path: '/storage',
+    summary: 'Upload a Base64-encoded file (up to 10 MiB)',
+    context: { userId: uploadStorage.parameters.ownerId },
+    body: {
+      fileName: uploadStorage.parameters.fileName,
+      mimeType: uploadStorage.parameters.mimeType,
+      fileSize: uploadStorage.parameters.fileSize,
+      content: uploadStorage.parameters.content,
+      meta: uploadStorage.parameters.meta,
+    },
+    response: { id: uploadStorage.parameters.id },
+  })
+
+  const downloadStorage = pkg.proc(
+    'download_storage',
+    {
+      in: { ownerId: odbStorage.types.ownerId, id: odbStorage.types.id },
+    },
+    ({ params: { ownerId, id }, body }) => {
+      const { fileName, mimeType, fileSize, binaryContent, meta } = body.variables({
+        fileName: odbStorage.types.fileName,
+        mimeType: odbStorage.types.mimeType,
+        fileSize: odbStorage.types.fileSize,
+        binaryContent: odbStorage.types.content,
+        meta: odbStorage.types.meta,
+      })
+      body.call(odbStorage.read(ownerId, id, fileName, mimeType, fileSize, binaryContent, meta))
+      body.call(odbHttp.download(binaryContent, fileName, mimeType))
+    },
+  )
+  defineService(downloadStorage, {
+    auth: 'authenticated',
+    method: 'GET',
+    path: '/storage/:id',
+    summary: 'Download your file',
+    responseMediaType: 'application/octet-stream',
+    context: { userId: downloadStorage.parameters.ownerId },
+    uri: { id: downloadStorage.parameters.id },
+  })
+
+  const removeStorage = pkg.proc(
+    'remove_storage',
+    { in: { ownerId: odbStorage.types.ownerId, id: odbStorage.types.id } },
+    ({ params: { ownerId, id }, body }) => body.call(odbStorage.remove(ownerId, id)),
+  )
+  defineService(removeStorage, {
+    auth: 'authenticated',
+    method: 'DELETE',
+    path: '/storage/:id',
+    summary: 'Delete your file',
+    context: { userId: removeStorage.parameters.ownerId },
+    uri: { id: removeStorage.parameters.id },
+  })
   return {}
 })
 

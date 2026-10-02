@@ -70,6 +70,7 @@ export default defineConfig({
                 { text: 'Lob', link: '/guide/db/capabilities/lob' },
                 { text: 'Audit', link: '/guide/db/capabilities/audit' },
                 { text: 'Settings', link: '/guide/db/capabilities/settings' },
+                { text: 'Storage', link: '/guide/db/capabilities/storage' },
               ],
             },
             { text: 'Under the hood', link: '/guide/db/under-the-hood' },

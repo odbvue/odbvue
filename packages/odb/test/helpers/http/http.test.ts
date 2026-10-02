@@ -2,9 +2,40 @@ import { describe, expect, it } from 'vitest'
 import { odbOrdsEndpoint } from '../../../src/ords.js'
 import { PlsqlExpression } from '../../../src/schema/attribute.js'
 import { odbHttp } from '../../../src/helpers/http/http.js'
-import { ProcedureBody } from '../../../src/schema/package.js'
+import { odbPackage, odbType, ProcedureBody } from '../../../src/schema/package.js'
 
 describe('odbHttp framework package', () => {
+  it('streams a BLOB with attachment headers and safe filenames', () => {
+    const sql = odbHttp.download('l_content', 'l_file_name', 'l_mime_type').toSQL()
+    expect(sql).toContain('owa_util.mime_header(v_download_mime, FALSE)')
+    expect(sql).toContain("htp.p('Content-Length: ' || DBMS_LOB.GETLENGTH(l_content))")
+    expect(sql).toContain('Content-Disposition: attachment; filename="')
+    expect(sql).toContain("REGEXP_REPLACE(v_download_name, '[^A-Za-z0-9._ -]', '_')")
+    expect(sql).toContain("UTL_URL.ESCAPE(v_download_name, TRUE, 'AL32UTF8')")
+    expect(sql).toContain('Cache-Control: private, no-store')
+    expect(sql).toContain('X-Content-Type-Options: nosniff')
+    expect(sql.indexOf('owa_util.http_header_close')).toBeLessThan(
+      sql.indexOf('wpg_docload.download_file(l_content)'),
+    )
+  })
+
+  it('embeds the download block with exactly one terminating semicolon', () => {
+    const pkg = odbPackage('download_test', (definition) => ({
+      download: definition.proc(
+        'download',
+        {
+          in: { content: odbType.blob(), fileName: odbType.string(), mimeType: odbType.string() },
+        },
+        ({ params: { content, fileName, mimeType }, body }) => {
+          body.call(odbHttp.download(content, fileName, mimeType))
+        },
+      ),
+    }))
+    const sql = pkg.toSQLUp()
+    expect(sql).toContain('wpg_docload.download_file(p_content);\nEND;')
+    expect(sql).not.toContain('END;;')
+  })
+
   it('installs a validated explicit HTTP error primitive', () => {
     const sql = odbHttp.toSQLUp({ schema: 'APP' })
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_http AS')

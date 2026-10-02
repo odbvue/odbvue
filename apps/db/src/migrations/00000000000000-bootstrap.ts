@@ -8,6 +8,7 @@ import {
   odbSchema,
   odbSettings,
   odbAudit,
+  odbStorage,
 } from '@odbvue/odb'
 
 const schemaName = odbEnv.adb.schemaUsername
@@ -30,6 +31,7 @@ export const migration = defineMigration('00000000000000_bootstrap', {
   .install(odbSettings)
   .install(odbLob)
   .install(odbAudit)
+  .install(odbStorage)
   .install(
     odbSettings.seed({
       id: 'APP_VERSION',

@@ -169,6 +169,9 @@ export const cond = {
   isNotNull(value: { toSQL(): string }): PlsqlBooleanExpression {
     return condition(`${value.toSQL()} IS NOT NULL`)
   },
+  isJson(value: { toSQL(): string }): PlsqlBooleanExpression {
+    return condition(`${value.toSQL()} IS JSON`)
+  },
   regexpLike(value: { toSQL(): string }, pattern: string): PlsqlBooleanExpression {
     return condition(`REGEXP_LIKE(${value.toSQL()}, ${renderExpressionValue(pattern)})`)
   },

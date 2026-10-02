@@ -238,6 +238,8 @@ function emitColumnClauses(column: ColumnNode, typeSql: string): string {
 
 function renderDefaultLiteral(type: ColumnType, value: unknown): string {
   switch (type) {
+    case 'blob':
+      throw new Error('BLOB column defaults require a SQL expression, not a literal.')
     case 'string':
     case 'guid':
     case 'clob':

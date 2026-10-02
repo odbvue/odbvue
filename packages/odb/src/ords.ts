@@ -77,6 +77,7 @@ export type OrdsEndpointNode = {
   source: string
   params: OrdsParamNode[]
   auth?: ServiceAuthorization
+  responseMediaType?: string
   comment?: string
 }
 
@@ -162,6 +163,7 @@ export class OrdsEndpoint {
   private _params: OrdsParam[] = []
   private _comment?: string
   private _auth?: ServiceAuthorization
+  private _responseMediaType?: string
   private _contextUserId?: string
 
   contextUserId(parameter: string): this {
@@ -172,6 +174,11 @@ export class OrdsEndpoint {
   auth(policy: ServiceAuthorization): this {
     validateServiceAuthorization(policy)
     this._auth = structuredClone(policy)
+    return this
+  }
+
+  responseMediaType(value: string): this {
+    this._responseMediaType = value
     return this
   }
 
@@ -306,6 +313,11 @@ export class OrdsEndpoint {
       ...(this._params.some((param) => this.paramSourceType(param) === 'BODY')
         ? ['v_body CLOB := :body_text;']
         : []),
+      ...(this._params.some(
+        (param) => this.paramSourceType(param) === 'BODY' && param.odbType === 'clob',
+      )
+        ? ['v_body_json JSON_OBJECT_T := JSON_OBJECT_T.parse(v_body);']
+        : []),
       ...(protectedEndpoint ? ['v_auth_user_id VARCHAR2(32);'] : []),
     ]
     const declaration = declarations.length ? `DECLARE ${declarations.join(' ')} ` : ''
@@ -384,6 +396,7 @@ export class OrdsEndpoint {
         .filter((p) => p.plsqlArg.toUpperCase() !== this._contextUserId)
         .map((p) => p.toNode(this.paramSourceType(p))),
       auth: this._auth,
+      responseMediaType: this._responseMediaType,
       comment: this._comment,
     }
   }
@@ -497,6 +510,9 @@ function jsonValueExpression(param: OrdsParam): string {
   const path = `$.${param.name}`
   if (param.odbType === 'json') {
     return `JSON_QUERY(v_body, '${path}' RETURNING CLOB)`
+  }
+  if (param.odbType === 'clob') {
+    return `v_body_json.get_clob(${sqlStr(param.name)})`
   }
   if (param.paramType === 'BOOLEAN') {
     return `CASE JSON_VALUE(v_body, '${path}' RETURNING VARCHAR2(5)) WHEN 'true' THEN TRUE WHEN 'false' THEN FALSE END`

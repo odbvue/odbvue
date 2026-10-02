@@ -215,6 +215,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/sandbox/capabilities/storage': RouteRecordInfo<
+      '/sandbox/capabilities/storage',
+      '/sandbox/capabilities/storage',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/sandbox/capabilities/ui': RouteRecordInfo<
       '/sandbox/capabilities/ui',
       '/sandbox/capabilities/ui',
@@ -447,6 +454,14 @@ declare module 'vue-router/auto-routes' {
     'src/modules/sandbox/pages/capabilities/state.vue': {
       routes:
         | '/sandbox/capabilities/state'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/modules/sandbox/pages/capabilities/storage.vue': {
+      routes:
+        | '/sandbox/capabilities/storage'
       views:
         | never
       pathParamNames:

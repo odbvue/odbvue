@@ -5,6 +5,8 @@ import type { OdbVueHooks } from '../../runtime/hooks.js'
 import { authContract } from '../auth/index.js'
 import { decodeOdbJson, requiresBearerToken, type OdbOpenApiDocument } from './json.js'
 
+type HttpRequestOptions = FetchOptions<'json' | 'blob'>
+
 export { decodeOdbJson, type OdbOpenApiDocument } from './json.js'
 
 const baseURL = (import.meta as ImportMeta & { env?: { DEV?: boolean; VITE_API_URI?: string } }).env
@@ -26,19 +28,19 @@ export interface HttpError extends Error {
 export interface HttpSlowRequestContext {
   request: string
   duration: number
-  options?: FetchOptions<'json'>
+  options?: HttpRequestOptions
 }
 export interface HttpRefreshFailureContext {
   request: string
   error?: unknown
-  options?: FetchOptions<'json'>
+  options?: HttpRequestOptions
 }
 export interface HttpConfiguration {
   getAccessToken?: () => string | null | undefined
   slowRequestThresholdMs?: number
   onSlowRequest?: (context: HttpSlowRequestContext) => void
   refreshAccessToken?: () => Promise<boolean>
-  shouldRefresh?: (request: string, options?: FetchOptions<'json'>) => boolean
+  shouldRefresh?: (request: string, options?: HttpRequestOptions) => boolean
   onRefreshFailure?: (context: HttpRefreshFailureContext) => void
   /** OpenAPI document used to parse ODB `json` response fields into values. */
   openapi?: OdbOpenApiDocument
@@ -52,12 +54,12 @@ export interface HttpClientOptions {
   hooks?: OdbVueHooks
 }
 export interface HttpClient {
-  <T>(request: string, options?: FetchOptions<'json'>): Promise<HttpResponse<T>>
-  get<T>(url: string, options?: FetchOptions<'json'>): Promise<HttpResponse<T>>
-  post<T>(url: string, body?: unknown, options?: FetchOptions<'json'>): Promise<HttpResponse<T>>
-  put<T>(url: string, body?: unknown, options?: FetchOptions<'json'>): Promise<HttpResponse<T>>
-  delete<T>(url: string, options?: FetchOptions<'json'>): Promise<HttpResponse<T>>
-  patch<T>(url: string, body?: unknown, options?: FetchOptions<'json'>): Promise<HttpResponse<T>>
+  <T>(request: string, options?: HttpRequestOptions): Promise<HttpResponse<T>>
+  get<T>(url: string, options?: HttpRequestOptions): Promise<HttpResponse<T>>
+  post<T>(url: string, body?: unknown, options?: HttpRequestOptions): Promise<HttpResponse<T>>
+  put<T>(url: string, body?: unknown, options?: HttpRequestOptions): Promise<HttpResponse<T>>
+  delete<T>(url: string, options?: HttpRequestOptions): Promise<HttpResponse<T>>
+  patch<T>(url: string, body?: unknown, options?: HttpRequestOptions): Promise<HttpResponse<T>>
 }
 
 export const httpContract = defineContract<HttpClient>('http')
@@ -146,7 +148,7 @@ function retryDelay(context: FetchContext): number {
   return 300 + Math.random() * 150
 }
 
-function requestRetryOptions(options?: FetchOptions<'json'>): FetchOptions<'json'> {
+function requestRetryOptions(options?: HttpRequestOptions): HttpRequestOptions {
   if (options?.retry !== undefined) return options
   const method = (options?.method ?? 'GET').toUpperCase()
   return { ...options, retry: ['GET', 'HEAD', 'OPTIONS'].includes(method) ? 3 : 0 }
@@ -158,7 +160,7 @@ async function executeRequest<T>(
   hooks: OdbVueHooks | undefined,
   refresh: () => Promise<boolean>,
   request: string,
-  options?: FetchOptions<'json'>,
+  options?: HttpRequestOptions,
   didRefresh = false,
 ): Promise<HttpResponse<T>> {
   const authenticatedRequest =
@@ -171,7 +173,7 @@ async function executeRequest<T>(
     const headers = new Headers(options?.headers as HeadersInit | undefined)
     const accessToken = authenticatedRequest ? configuration.getAccessToken?.() : null
     if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
-    const response = await client.raw<T>(request, {
+    const response = await client.raw<T, 'json' | 'blob'>(request, {
       ...requestRetryOptions(options),
       headers,
     })
@@ -188,14 +190,14 @@ async function executeRequest<T>(
       data:
         response._data === undefined || response._data === null
           ? null
-          : configuration.openapi
+          : configuration.openapi && options?.responseType !== 'blob'
             ? decodeOdbJson(
                 configuration.openapi,
                 options?.method ?? 'GET',
                 request,
-                response._data,
+                response._data as T,
               )
-            : response._data,
+            : response._data as T,
       error: null,
       status: response.status,
       headers: response.headers,
@@ -251,7 +253,7 @@ export function useHttp(clientOptions: HttpClientOptions = {}): HttpClient {
     },
     { fetch: clientOptions.fetch },
   )
-  const http = (<T>(request: string, options?: FetchOptions<'json'>) =>
+  const http = (<T>(request: string, options?: HttpRequestOptions) =>
     executeRequest<T>(
       client,
       configuration,

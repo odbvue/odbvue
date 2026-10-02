@@ -22,6 +22,7 @@ describe('canonical ODB model', () => {
   it('maps source systems into ODB types', () => {
     expect(odbTypeFromOracle('TIMESTAMP(6)')).toBe('timestamp')
     expect(odbTypeFromOracle('RAW', 16)).toBe('guid')
+    expect(odbTypeFromOracle('BLOB')).toBe('blob')
     expect(odbTypeFromPlsql('SYS_REFCURSOR')).toBe('resultset')
     expect(odbTypeFromOrds('DOUBLE')).toBe('number')
   })
@@ -35,6 +36,8 @@ describe('canonical ODB model', () => {
     expect(columnBuilderMethod('clob')).toBe('clob')
     expect(columnBuilderMethod('json')).toBe('json')
     expect(emitOracleType('json')).toBe('CLOB')
+    expect(emitOracleType('blob')).toBe('BLOB')
+    expect(columnBuilderMethod('blob')).toBe('column')
     expect(emitTypeScriptType('json')).toBe('unknown')
     expect(odbTypeToJsonSchema('json')).toEqual({ 'x-odb-type': 'json' })
     expect(ordsTypeFromPlsql('PLS_INTEGER')).toBe('INT')

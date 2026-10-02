@@ -12,6 +12,31 @@ function response(status: number, data: unknown = {}): Response {
 }
 
 describe('HTTP capability', () => {
+  it('downloads binary responses and preserves authentication through refresh', async () => {
+    let token = 'expired'
+    const bytes = new Uint8Array([0, 1, 127, 128, 255])
+    const refreshAccessToken = vi.fn<RefreshMock>(async () => {
+      token = 'fresh'
+      return true
+    })
+    const fetch = vi.fn<FetchMock>((_input, init) => Promise.resolve(
+      new Headers(init?.headers).get('Authorization') === 'Bearer fresh'
+        ? new Response(bytes, { headers: { 'Content-Type': 'application/octet-stream' } })
+        : response(401),
+    ))
+    const http = useHttp({ fetch, configuration: {
+      getAccessToken: () => token, refreshAccessToken,
+      openapi: { paths: { '/storage/{id}': { get: { security: [{ bearerAuth: [] }] } } },
+        components: { securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer' } } } },
+    } })
+    const result = await http.get<Blob>('/storage/file', { responseType: 'blob' })
+    expect(result.error).toBeNull()
+    expect(result.data?.size).toBe(bytes.length)
+    expect(result.data?.type).toBe('application/octet-stream')
+    expect(new Uint8Array(await result.data!.arrayBuffer())).toEqual(bytes)
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1)
+  })
+
   it('inherits document security but honors anonymous operation overrides', async () => {
     const fetch = vi.fn<FetchMock>(() => Promise.resolve(response(200)))
     const http = useHttp({

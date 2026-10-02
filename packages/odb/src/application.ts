@@ -210,11 +210,17 @@ export function generateApplicationsOpenApi(
             : {}),
           '200': {
             description: 'Successful response',
-            content: {
-              'application/json': {
-                schema: { $ref: `#/components/schemas/${responseName}` },
-              },
-            },
+            content: endpoint.responseMediaType
+              ? {
+                  [endpoint.responseMediaType]: {
+                    schema: { type: 'string', format: 'binary' },
+                  },
+                }
+              : {
+                  'application/json': {
+                    schema: { $ref: `#/components/schemas/${responseName}` },
+                  },
+                },
           },
         },
       }

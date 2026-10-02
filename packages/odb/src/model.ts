@@ -11,7 +11,7 @@ export type OdbType =
   | 'resultset'
   | 'unknown'
 
-export type OdbColumnType = Exclude<OdbType, 'blob' | 'resultset' | 'unknown'>
+export type OdbColumnType = Exclude<OdbType, 'resultset' | 'unknown'>
 export type TypeScriptTarget = 'model' | 'json'
 export type OdbOrdsType =
   | 'STRING'
@@ -96,7 +96,12 @@ export const odbTypes = {
     oracle: () => 'CLOB',
     columnBuilder: 'json',
   },
-  blob: { typescript: { model: 'Buffer', json: 'string' }, ords: 'STRING' },
+  blob: {
+    typescript: { model: 'Buffer', json: 'string' },
+    ords: 'STRING',
+    oracle: () => 'BLOB',
+    columnBuilder: 'column',
+  },
   resultset: {
     typescript: { model: 'unknown[]', json: 'unknown[]' },
     ords: 'RESULTSET',
@@ -155,6 +160,7 @@ export function odbTypeFromOracle(dataType: string, length?: number): OdbColumnT
   if (type.startsWith('TIMESTAMP')) return 'timestamp'
   if (type === 'DATE') return 'date'
   if (type === 'CLOB' || type === 'NCLOB') return 'clob'
+  if (type === 'BLOB') return 'blob'
   if (type === 'RAW') return length === 16 ? 'guid' : 'string'
   if (type === 'NUMBER' || type === 'FLOAT' || type === 'INTEGER') return 'number'
   if (/^(N?VARCHAR|N?CHAR)/.test(type)) return 'string'

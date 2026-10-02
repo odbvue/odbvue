@@ -16,6 +16,62 @@ const migrations = {
 const load = async (file: keyof typeof migrations) => (await migrations[file]()).migration
 
 describe('app-owned ORDS migrations', () => {
+  it('installs storage and exposes owner-scoped upload, download, list and delete', async () => {
+    const bootstrap = (await load('00000000000000-bootstrap')).compile().up().join('\n')
+    expect(bootstrap).toContain('CREATE TABLE ODBVUE.odb_storage_files')
+    expect(bootstrap).toContain('CREATE OR REPLACE PACKAGE ODBVUE.odb_storage AS')
+    const migration = await load('00000000000001-sandbox')
+    const sql = migration.compile().up().join('\n')
+    expect(sql).toContain('odb_storage.list(p_owner_id, p_after, p_limit, p_items)')
+    expect(sql).toContain(
+      'odb_storage.write(p_owner_id, p_file_name, p_mime_type, l_binary_content, p_meta, p_id)',
+    )
+    expect(sql).toContain(
+      'odb_storage.read(p_owner_id, p_id, l_file_name, l_mime_type, l_file_size, l_binary_content, l_meta)',
+    )
+    expect(sql).toContain('odb_storage.remove(p_owner_id, p_id)')
+    expect(sql).toContain('odb_lob.base64_to_blob(p_content)')
+    expect(sql).toContain('v_body_json JSON_OBJECT_T := JSON_OBJECT_T.parse(v_body)')
+    expect(sql).toContain("p_content => v_body_json.get_clob(''content'')")
+    expect(sql).not.toContain("JSON_VALUE(v_body, ''$.content'' RETURNING VARCHAR2(32767))")
+    expect(sql).toContain('wpg_docload.download_file(l_binary_content)')
+    expect(sql).toContain('Content-Disposition: attachment;')
+    expect(sql).not.toContain('odb_lob.blob_to_base64(l_binary_content)')
+    expect(sql).toContain('STORAGE_BASE64_INVALID')
+    expect(sql).toContain('STORAGE_FILE_TOO_LARGE')
+    expect(sql).toContain('DBMS_LOB.CREATETEMPORARY(l_binary_content, TRUE, DBMS_LOB.CALL)')
+    expect(sql).toContain('DBMS_LOB.GETLENGTH(l_binary_content) != p_file_size')
+    expect(sql).toContain('STORAGE_FILE_SIZE_MISMATCH')
+    expect(sql).toContain('STORAGE_CONTENT_REQUIRED')
+    expect(sql).not.toContain('odb_storage_files')
+    const openapi = generateApplicationOpenApi(migration.applications()[0]) as {
+      paths: Record<
+        string,
+        Record<
+          string,
+          {
+            security: unknown
+            parameters?: { name: string }[]
+            responses: Record<string, { content: unknown }>
+          }
+        >
+      >
+    }
+    for (const [path, method] of [
+      ['/sandbox/storage', 'post'],
+      ['/sandbox/storage', 'get'],
+      ['/sandbox/storage/{id}', 'get'],
+      ['/sandbox/storage/{id}', 'delete'],
+    ]) {
+      const operation = openapi.paths[path!]?.[method!]
+      expect(operation?.security).toEqual([{ bearerAuth: [] }])
+      expect(operation?.parameters).not.toContainEqual(expect.objectContaining({ name: 'ownerId' }))
+    }
+    expect(openapi.paths['/sandbox/storage/{id}']?.get?.responses['200']?.content).toEqual({
+      'application/octet-stream': { schema: { type: 'string', format: 'binary' } },
+    })
+  })
+
   it('keeps auth and settings routes out of bootstrap', async () => {
     const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
     expect(sql).not.toContain("p_base_path      => 'auth/'")
