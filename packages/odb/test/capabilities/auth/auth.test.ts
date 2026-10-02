@@ -104,6 +104,21 @@ describe('service authorization generation', () => {
 })
 
 describe('odbAuth framework package', () => {
+  it('preserves the declared foreign keys in installs and idempotent upgrades', () => {
+    const install = odbAuth.toSQLUp({ schema: 'APP', jwtSecret: 'x'.repeat(32) })
+    const upgrade = odbAuth.upgrade().toSQLUp({ schema: 'APP' })
+    const constraints = [
+      'ALTER TABLE APP.odb_auth_user_roles ADD CONSTRAINT odb_auth_user_roles_fk_user FOREIGN KEY (user_id) REFERENCES APP.odb_auth_users (id) ON DELETE CASCADE',
+      'ALTER TABLE APP.odb_auth_user_roles ADD CONSTRAINT odb_auth_user_roles_fk_role FOREIGN KEY (role) REFERENCES APP.odb_auth_roles (role) ON DELETE CASCADE',
+      'ALTER TABLE APP.odb_auth_role_permissions ADD CONSTRAINT odb_auth_role_perms_fk_role FOREIGN KEY (role) REFERENCES APP.odb_auth_roles (role) ON DELETE CASCADE',
+    ]
+    for (const constraint of constraints) {
+      expect(install.split(constraint)).toHaveLength(2)
+      expect(upgrade).toContain(`EXECUTE IMMEDIATE '${constraint}'`)
+    }
+    expect(upgrade).toContain('IF SQLCODE NOT IN (-955, -2264, -2275) THEN RAISE;')
+  })
+
   it('stores normalized roles, grants and permissions with live validity and enabled-user checks', () => {
     const sql = odbAuth.toSQLUp({ schema: 'APP', jwtSecret: 'x'.repeat(32) })
     expect(sql).toContain('CREATE TABLE APP.odb_auth_roles')

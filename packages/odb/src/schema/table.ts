@@ -44,6 +44,39 @@ type TableCheckDefinition = Omit<CheckNode, 'name'> & {
   columns?: TableIndexColumn[]
 }
 
+export type ForeignKeyOptions = {
+  onDelete?: 'cascade' | 'set null'
+}
+
+export type ForeignKeyNode = ForeignKeyOptions & {
+  kind: 'foreignKey'
+  name: string
+  columns: string[]
+  referencedTable: string
+  referencedColumns: string[]
+}
+
+type TableForeignKeyDefinition = ForeignKeyOptions & {
+  name: string
+  columns: TableColumnMap[string][]
+  referencedTable: Table<any>
+  referencedColumns: TableColumnMap[string][]
+}
+
+type CompatibleForeignKeyColumns<TColumns extends readonly TableColumnMap[string][]> = {
+  [TKey in keyof TColumns]: TColumns[TKey] extends Column<
+    infer TValue,
+    any,
+    any,
+    any,
+    any,
+    any,
+    infer TType
+  >
+    ? Column<TValue, string, any, any, any, any, TType>
+    : never
+}
+
 export type TableNode = {
   kind: 'table'
   name: string
@@ -51,6 +84,7 @@ export type TableNode = {
   columns: ColumnNode[]
   indexes: IndexNode[]
   checks: CheckNode[]
+  foreignKeys: ForeignKeyNode[]
 }
 
 export type TableSqlOptions = {
@@ -251,6 +285,7 @@ export class Table<TColumns extends TableColumnMap = Record<string, never>> {
   private columnNamesByKey = new Map<string, string>()
   private indexes: TableIndexDefinition[] = []
   private checks: TableCheckDefinition[] = []
+  private foreignKeys: TableForeignKeyDefinition[] = []
   private tableComment?: string
 
   constructor(readonly name: string) {}
@@ -427,6 +462,36 @@ export class Table<TColumns extends TableColumnMap = Record<string, never>> {
     return this
   }
 
+  foreignKey<
+    const TLocal extends readonly [TColumns[keyof TColumns], ...TColumns[keyof TColumns][]],
+    TReferenced extends TableColumnMap,
+  >(
+    name: string,
+    select: (columns: TColumns) => TLocal,
+    referencedTable: Table<TReferenced>,
+    references: (
+      columns: TReferenced,
+    ) => CompatibleForeignKeyColumns<NoInfer<TLocal>> & readonly TReferenced[keyof TReferenced][],
+    options: ForeignKeyOptions = {},
+  ): this {
+    const columns = [...select(this.columnShape())]
+    const referencedColumns = [...references(referencedTable.columnShape())]
+    if (columns.length === 0 || columns.length !== referencedColumns.length) {
+      throw new Error('Foreign keys require matching nonempty column lists.')
+    }
+    if (
+      columns.some((column) => !this.columns.includes(column)) ||
+      referencedColumns.some((column) => !referencedTable.columns.includes(column))
+    ) {
+      throw new Error('Foreign key columns must belong to their declared tables.')
+    }
+    if (columns.some((column, index) => column.type !== referencedColumns[index]?.type)) {
+      throw new Error('Foreign key column types must match their referenced column types.')
+    }
+    this.foreignKeys.push({ name, columns, referencedTable, referencedColumns, ...options })
+    return this
+  }
+
   check(columns: TableIndexColumn[], condition: string): this
   check(name: string, condition: string): this
   check(build: (columns: TColumns, expression: CheckExpressionBuilder) => ExpressionNode): this
@@ -503,6 +568,14 @@ export class Table<TColumns extends TableColumnMap = Record<string, never>> {
           condition: check.condition,
         }
       }),
+      foreignKeys: this.foreignKeys.map((foreignKey) => ({
+        kind: 'foreignKey',
+        name: foreignKey.name,
+        columns: foreignKey.columns.map((column) => column.name),
+        referencedTable: foreignKey.referencedTable.name,
+        referencedColumns: foreignKey.referencedColumns.map((column) => column.name),
+        onDelete: foreignKey.onDelete,
+      })),
     }
   }
 
@@ -534,6 +607,10 @@ function emitOracleCreateTable(table: TableNode, options: TableSqlOptions = {}):
     `  ${columnSql.join(',\n  ')}`,
     `);`,
     ...table.indexes.map((index) => emitOracleIndex(table.name, index, options)),
+    ...table.foreignKeys.map(
+      (foreignKey) =>
+        `ALTER TABLE ${tableName} ADD CONSTRAINT ${foreignKey.name} FOREIGN KEY (${foreignKey.columns.join(', ')}) REFERENCES ${qualifyName(foreignKey.referencedTable, options.schema)} (${foreignKey.referencedColumns.join(', ')})${foreignKey.onDelete ? ` ON DELETE ${foreignKey.onDelete.toUpperCase()}` : ''};`,
+    ),
     ...(table.comment
       ? [`COMMENT ON TABLE ${tableName} IS ${quoteOracleString(table.comment)};`]
       : []),

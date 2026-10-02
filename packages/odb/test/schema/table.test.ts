@@ -3,6 +3,109 @@ import { Column } from '../../src/schema/column.js'
 import { odbTable } from '../../src/schema/table.js'
 
 describe('odbTable', () => {
+  it('emits typed foreign keys with schema-qualified tables and delete actions', () => {
+    const users = odbTable('APP_USERS', (table) => ({
+      id: table.guid().primaryKey(),
+      tenantId: table.number().primaryKey(),
+    }))
+    const sessions = odbTable('APP_SESSIONS', (table) => ({
+      userId: table.guid(),
+      tenantId: table.number(),
+    }))
+      .foreignKey(
+        'fk_session_user',
+        (columns) => [columns.userId],
+        users,
+        (columns) => [columns.id],
+        { onDelete: 'cascade' },
+      )
+      .foreignKey(
+        'fk_session_tenant_user',
+        (columns) => [columns.tenantId, columns.userId],
+        users,
+        (columns) => [columns.tenantId, columns.id],
+        { onDelete: 'set null' },
+      )
+
+    expect(sessions.toSQLUp({ schema: 'APP' })).toContain(
+      'ALTER TABLE APP.APP_SESSIONS ADD CONSTRAINT fk_session_user FOREIGN KEY (user_id) REFERENCES APP.APP_USERS (id) ON DELETE CASCADE;',
+    )
+    expect(sessions.toSQLUp()).toContain(
+      'FOREIGN KEY (tenant_id, user_id) REFERENCES APP_USERS (tenant_id, id) ON DELETE SET NULL;',
+    )
+    expect(sessions.toNode().foreignKeys[0]).toEqual({
+      kind: 'foreignKey',
+      name: 'fk_session_user',
+      columns: ['user_id'],
+      referencedTable: 'APP_USERS',
+      referencedColumns: ['id'],
+      onDelete: 'cascade',
+    })
+
+    if (process.env.TYPE_CHECK_ONLY) {
+      // @ts-expect-error unknown local columns are rejected
+      sessions.foreignKey(
+        'bad',
+        (columns) => [columns.missing],
+        users,
+        (columns) => [columns.id],
+      )
+      // @ts-expect-error unknown referenced columns are rejected
+      sessions.foreignKey(
+        'bad',
+        (columns) => [columns.userId],
+        users,
+        (columns) => [columns.missing],
+      )
+      // @ts-expect-error mismatched column types are rejected
+      sessions.foreignKey(
+        'bad',
+        (columns) => [columns.userId],
+        users,
+        (columns) => [columns.tenantId],
+      )
+      // @ts-expect-error mismatched tuple lengths are rejected
+      sessions.foreignKey(
+        'bad',
+        (columns) => [columns.userId, columns.tenantId],
+        users,
+        (columns) => [columns.id],
+      )
+      // @ts-expect-error empty column lists are rejected
+      sessions.foreignKey(
+        'bad',
+        () => [],
+        users,
+        (columns) => [columns.id],
+      )
+    }
+  })
+
+  it('rejects foreign key columns from the wrong table', () => {
+    const users = odbTable('USERS', (table) => ({ id: table.guid().primaryKey() }))
+    const other = odbTable('OTHER', (table) => ({
+      id: table.guid().primaryKey(),
+      userId: table.guid(),
+    }))
+    const sessions = odbTable('SESSIONS', (table) => ({ userId: table.guid() }))
+    expect(() =>
+      sessions.foreignKey(
+        'bad',
+        () => [other.userId],
+        users,
+        (columns) => [columns.id],
+      ),
+    ).toThrow('Foreign key columns must belong to their declared tables.')
+    expect(() =>
+      sessions.foreignKey(
+        'bad',
+        (columns) => [columns.userId],
+        users,
+        () => [other.id],
+      ),
+    ).toThrow('Foreign key columns must belong to their declared tables.')
+  })
+
   it('preserves the table name when a returned column uses a reserved property name', () => {
     const users = odbTable('APP_USERS', (t) => ({
       id: t.number('id').notNull(),

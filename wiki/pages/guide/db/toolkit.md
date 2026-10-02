@@ -37,6 +37,23 @@ users.index((columns) => [columns.email, columns.createdAt]).unique((columns) =>
 
 Constraint and index names are generated from the table and selected columns. An explicit name can be supplied as the first argument when required. Column-level `.unique()` is also available for a single inline unique constraint.
 
+Named foreign keys belong to the referencing table and select typed columns from both tables:
+
+```ts
+const sessions = odbTable('APP_SESSIONS', (t) => ({
+  id: t.guid().primaryKey(),
+  userId: t.number().notNull(),
+})).foreignKey(
+  'sessions_fk_user',
+  (columns) => [columns.userId],
+  users,
+  (columns) => [columns.id],
+  { onDelete: 'cascade' },
+)
+```
+
+Selectors reject unknown columns, mismatched column types, empty lists, and mismatched tuple lengths. Composite foreign keys use matching ordered tuples. Omit `onDelete` for Oracle's default behavior, or use `'cascade'` or `'set null'`. `toSQLUp({ schema })` qualifies both tables and emits an `ALTER TABLE ... ADD CONSTRAINT` after table creation; create referenced tables first.
+
 Typed checks use the same column shape and validate values against the selected column type:
 
 ```ts

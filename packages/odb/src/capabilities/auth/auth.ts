@@ -263,11 +263,6 @@ function authorizationTablesSQL(schema?: string, upgrade = false): string {
       .map((statement) => statement.trim())
       .filter(Boolean),
   )
-  statements.push(
-    `ALTER TABLE ${qualify('odb_auth_user_roles', schema)} ADD CONSTRAINT odb_auth_user_roles_fk_user FOREIGN KEY (user_id) REFERENCES ${qualify('odb_auth_users', schema)} (id) ON DELETE CASCADE`,
-    `ALTER TABLE ${qualify('odb_auth_user_roles', schema)} ADD CONSTRAINT odb_auth_user_roles_fk_role FOREIGN KEY (role) REFERENCES ${qualify('odb_auth_roles', schema)} (role) ON DELETE CASCADE`,
-    `ALTER TABLE ${qualify('odb_auth_role_permissions', schema)} ADD CONSTRAINT odb_auth_role_perms_fk_role FOREIGN KEY (role) REFERENCES ${qualify('odb_auth_roles', schema)} (role) ON DELETE CASCADE`,
-  )
   return statements
     .map((statement) =>
       upgrade
