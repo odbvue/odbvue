@@ -45,6 +45,7 @@ const appPackage = odbPackage('pck_app', (p) => {
   })
 
   defineService(version, {
+    auth: 'anonymous',
     method: 'GET',
     path: '/version',
     summary: 'Returns the application version',
@@ -374,6 +375,7 @@ const usersApi = odbPackage('pck_users', (pkg) => {
     },
   )
   defineService(getUser, {
+    auth: 'anonymous',
     method: 'GET',
     path: '/users/:user-id',
     summary: 'Fetch a single user',

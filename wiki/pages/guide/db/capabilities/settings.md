@@ -90,29 +90,27 @@ If more than `pageSize` rows come back, the application returns the first `pageS
 
 ## Expose Settings Over ORDS
 
-Call the package from an application package and attach an explicit service contract. Authorize in the wrapper:
+Call the package from an application package and declare authorization in its service contract:
 
 ```ts
-import { defineService, odbAuth, odbHttp, odbPackage, odbSettings, odbType } from '@odbvue/odb'
+import { defineService, odbPackage, odbSettings } from '@odbvue/odb'
 
 const api = odbPackage('pck_app_api', (pkg) => {
   const readSetting = pkg.proc(
     'read_setting',
     {
-      in: { authorization: odbType.string(4000), id: odbSettings.types.id },
+      in: { id: odbSettings.types.id },
       out: { value: odbSettings.types.value, meta: odbSettings.types.meta },
     },
-    ({ params: { authorization, id, value, meta }, body }) => {
-      const { subject } = body.variables({ subject: odbType.guid() })
-      body.set(subject, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
+    ({ params: { id, value, meta }, body }) => {
       body.call(odbSettings.read(id, value, meta))
     },
   )
 
   defineService(readSetting, {
+    auth: { roles: ['admin'] },
     method: 'GET',
     path: '/settings/:id',
-    headers: { Authorization: readSetting.parameters.authorization },
     uri: { id: readSetting.parameters.id },
     response: { value: readSetting.parameters.value, meta: readSetting.parameters.meta },
   })

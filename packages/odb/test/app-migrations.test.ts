@@ -30,6 +30,7 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain('CREATE TABLE ODBVUE.odb_settings_store')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE ODBVUE.odb_settings AS')
     expect(sql).toContain("ODBVUE.odb_settings.write('APP_VERSION', '1.0.0'")
+    expect(sql).toContain("ODBVUE.odb_settings.write('SANDBOX_DEMO'")
   })
 
   it('installs the transport-independent odb_auth package in bootstrap', async () => {
@@ -65,13 +66,15 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain("p_pattern        => 'settings'")
     expect(sql).toContain("p_pattern        => 'settings/:id'")
     expect(sql).toContain(
-      "odb_auth.require_user(REGEXP_SUBSTR(p_authorization, '^Bearer[[:space:]]+(.+)$'",
+      "odb_auth.require_user(REGEXP_SUBSTR(:odb_authorization, ''^Bearer[[:space:]]+(.+)$''",
     )
+    expect(sql).toContain("odb_auth.has_role(v_auth_user_id, ''admin'')")
+    expect(sql).not.toContain('p_authorization IN')
     expect(sql).toContain('odb_settings.list(p_after, p_limit, p_items)')
     expect(sql).toContain('odb_settings.read(p_id, p_value, p_meta)')
     expect(sql).toContain('odb_settings.write(p_id, p_value, NULL)')
     expect(sql).toContain('odb_settings.remove(p_id)')
-    expect(sql).toContain("ODBVUE.odb_settings.write('SANDBOX_DEMO'")
+    expect(sql).not.toContain("ODBVUE.odb_settings.write('SANDBOX_DEMO'")
     expect(sql).not.toContain('odb_settings_store')
   })
 
@@ -98,7 +101,10 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain('AUDIT_MESSAGE_REQUIRED')
     expect(sql).not.toContain('odb_audit_logs')
     const openapi = generateApplicationOpenApi(migration.applications()[0]) as {
-      paths: Record<string, Record<string, { parameters: { name: string; in: string }[] }>>
+      paths: Record<
+        string,
+        Record<string, { parameters: { name: string; in: string }[]; security: unknown }>
+      >
     }
     const list = openapi.paths['/sandbox/audit']?.get
     expect(list).toBeDefined()
@@ -108,8 +114,9 @@ describe('app-owned ORDS migrations', () => {
     for (const severity of ['info', 'warn', 'error']) {
       const action = openapi.paths[`/sandbox/audit/${severity}`]?.post
       expect(action).toBeDefined()
-      expect(action?.parameters).toContainEqual(
-        expect.objectContaining({ name: 'Authorization', in: 'header' }),
+      expect(action?.security).toEqual([{ bearerAuth: [] }])
+      expect(action?.parameters).not.toContainEqual(
+        expect.objectContaining({ name: 'Authorization' }),
       )
     }
   })
@@ -133,6 +140,20 @@ describe('app-owned ORDS migrations', () => {
     ])
 
     const sql = migration.compile().up().join('\n')
-    expect(sql).toContain('list_settings(p_authorization => :authorization, p_after => :after')
+    expect(sql).toContain('list_settings(p_after => :after')
+  })
+
+  it('seeds an admin grant and an unprivileged test user in bootstrap', async () => {
+    const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
+    expect(sql).toContain('CREATE TABLE ODBVUE.odb_auth_user_roles')
+    expect(sql).toContain("ODBVUE.odb_auth.define_role('admin'")
+    expect(sql).toContain("ODBVUE.odb_auth.grant_role(v_user_id, 'admin')")
+    expect(sql).toContain("'test@odbvue.com'")
+    expect(sql).toContain("ODBVUE.odb_auth_crypto.hash_password('MySecurePass123!')")
+    expect(sql.match(/ODBVUE\.odb_auth\.grant_role\(/g)).toHaveLength(1)
+    const grants = sql.match(/DECLARE v_user_id[\s\S]*?END;\n\//g)
+    expect(grants).toHaveLength(1)
+    expect(grants?.[0]).toContain("'admin@odbvue.com'")
+    expect(grants?.[0]).not.toContain("'test@odbvue.com'")
   })
 })

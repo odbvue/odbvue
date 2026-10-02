@@ -3,7 +3,7 @@ import { defineCapability } from '../../runtime/capability.js'
 import { defineContract } from '../../runtime/contract.js'
 import type { OdbVueHooks } from '../../runtime/hooks.js'
 import { authContract } from '../auth/index.js'
-import { decodeOdbJson, type OdbOpenApiDocument } from './json.js'
+import { decodeOdbJson, requiresBearerToken, type OdbOpenApiDocument } from './json.js'
 
 export { decodeOdbJson, type OdbOpenApiDocument } from './json.js'
 
@@ -90,7 +90,7 @@ export const httpCapability = defineCapability({
 
 function isTokenEndpoint(request: string): boolean {
   const pathname = request.split(/[?#]/, 1)[0].replace(/\/+$/, '')
-  return /(?:^|\/)(?:refresh|login)$/.test(pathname)
+  return /(?:^|\/)(?:refresh|login|logout)$/.test(pathname)
 }
 
 const defaultHttpConfiguration: HttpConfiguration = {
@@ -161,16 +161,19 @@ async function executeRequest<T>(
   options?: FetchOptions<'json'>,
   didRefresh = false,
 ): Promise<HttpResponse<T>> {
+  const authenticatedRequest =
+    !/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(request) &&
+    (configuration.openapi
+      ? requiresBearerToken(configuration.openapi, options?.method ?? 'GET', request)
+      : !isTokenEndpoint(request))
   try {
     const startTime = performance.now()
+    const headers = new Headers(options?.headers as HeadersInit | undefined)
+    const accessToken = authenticatedRequest ? configuration.getAccessToken?.() : null
+    if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
     const response = await client.raw<T>(request, {
       ...requestRetryOptions(options),
-      headers: {
-        ...(configuration.getAccessToken?.()
-          ? { Authorization: `Bearer ${configuration.getAccessToken?.()}` }
-          : {}),
-        ...(options?.headers as Record<string, string>),
-      },
+      headers,
     })
     const duration = performance.now() - startTime
     if (
@@ -201,6 +204,7 @@ async function executeRequest<T>(
     const status = getErrorStatus(error)
     const shouldRefresh =
       status === 401 &&
+      authenticatedRequest &&
       !!configuration.refreshAccessToken &&
       (configuration.shouldRefresh?.(request, options) ?? true)
     if (shouldRefresh && !didRefresh) {

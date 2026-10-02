@@ -106,6 +106,7 @@ const listUsers = pkg.proc(
     body.openFor(params.result, odbQuery().selectFrom(users).select([users.id, users.email])),
 )
 defineService(listUsers, {
+  auth: 'anonymous',
   method: 'GET',
   path: '/users',
   response: { result: listUsers.parameters.result },

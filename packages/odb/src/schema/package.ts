@@ -21,6 +21,8 @@ import {
 } from './attribute.js'
 import {
   OrdsEndpoint,
+  validateServiceAuthorization,
+  type ServiceAuthorization,
   type OrdsHttpMethod,
   type OrdsParamType,
   type OrdsResultColumnNode,
@@ -298,6 +300,7 @@ export type ProcedureBodyNode = {
 }
 
 export type ServiceNode = {
+  auth: ServiceAuthorization
   method?: OrdsHttpMethod
   path?: string
   summary?: string
@@ -989,6 +992,7 @@ function normalizeBasePath(path: string): string {
 
 /** Explicit public ORDS contract for a package procedure. */
 export type OrdsServiceDefinition = {
+  auth: ServiceAuthorization
   /** HTTP method exposed by ORDS. */
   method: OrdsHttpMethod
   /** Route within the module, written as an application-style path such as `/users/:id`. */
@@ -1012,6 +1016,7 @@ export type OdbPackageOptions = {
 }
 
 export type OrdsServiceParameterGroups = {
+  context?: { userId?: PlsqlReference }
   /** IN values read from a JSON request body. */
   body?: Record<string, PlsqlReference>
   /** Values read from HTTP headers. */
@@ -1029,6 +1034,7 @@ export type ProcedureServiceDefinition<TParameters extends ProcedureParameters> 
   OrdsServiceDefinition,
   'params'
 > & {
+  context?: { userId: ParameterGroup<TParameters, 'in'>[keyof ParameterGroup<TParameters, 'in'>] }
   /** Direct typed bindings for JSON request-body values. */
   body?: Record<
     string,
@@ -1101,12 +1107,14 @@ export function defineService<TParameters extends ProcedureParameters>(
   definition: ProcedureServiceDefinition<TParameters>,
 ): ProcedureDefinition<TParameters> {
   const directParams =
+    definition.context ||
     definition.body ||
     definition.headers ||
     definition.uri ||
     definition.query ||
     definition.response
       ? {
+          context: definition.context,
           body: definition.body,
           header: definition.headers,
           uri: definition.uri,
@@ -1115,6 +1123,7 @@ export function defineService<TParameters extends ProcedureParameters>(
         }
       : undefined
   const {
+    context: _context,
     body: _body,
     headers: _headers,
     uri: _uri,
@@ -1138,6 +1147,7 @@ function buildOrdsEndpoint(
 
   const module = service.module ?? deriveOrdsModule(packageName)
   const endpoint = new OrdsEndpoint(module, packageName, procedure.name)
+  endpoint.auth(service.auth)
   if (service.basePath !== undefined) endpoint.basePath(service.basePath)
   if (service.method) endpoint.method(service.method)
   if (service.path !== undefined) endpoint.pattern(service.path)
@@ -1157,6 +1167,7 @@ function buildOrdsEndpoint(
     const derivedName = oracleParameterName(param.name).toUpperCase()
     const overriddenType = typeOverrides.get(parameterName) ?? typeOverrides.get(derivedName)
     const transport = transportOverrides.get(parameterName)
+    if (transport?.transport === 'context') endpoint.contextUserId(param.name)
     const ordsType = overriddenType ?? plsqlToOrdsType(param.type)
     endpoint.param(
       param.name,
@@ -1258,6 +1269,7 @@ export class Procedure {
 
   /** @internal Used by defineService() to attach a validated ORDS service contract. */
   attachService(definition: OrdsServiceDefinition): this {
+    validateServiceAuthorization(definition.auth)
     const declaredParameters = new Set(this._params)
     const mappedParameters = new Set<Param>()
     const routeParameters = new Set(
@@ -1276,6 +1288,29 @@ export class Procedure {
           )
         }
         const direction = (parameter as Param).toNode().direction
+        if (
+          transport === 'context' &&
+          (publicName !== 'userId' ||
+            definition.auth === 'anonymous' ||
+            direction !== 'IN' ||
+            odbTypeFromPlsql((parameter as Param).toNode().type) !== 'string')
+        ) {
+          throw new Error(
+            `ORDS service ${this.name}: context.userId requires a protected service and an IN string parameter.`,
+          )
+        }
+        if (
+          transport === 'header' &&
+          publicName.toLowerCase() === 'authorization' &&
+          definition.auth !== 'anonymous'
+        ) {
+          throw new Error(
+            `ORDS service ${this.name}: Authorization is managed by the service auth policy.`,
+          )
+        }
+        if (oracleParameterName((parameter as Param).name) === 'odb_authorization') {
+          throw new Error(`ORDS service ${this.name}: odb_authorization is reserved.`)
+        }
         if (
           (transport === 'body' || transport === 'uri' || transport === 'query') &&
           direction !== 'IN' &&

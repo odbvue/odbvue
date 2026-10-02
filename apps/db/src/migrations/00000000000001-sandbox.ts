@@ -10,6 +10,7 @@ import {
   odbSettings,
   odbType,
   PlsqlStatement,
+  type Package,
 } from '@odbvue/odb'
 
 const refreshCookie = odbHttp.defineCookie({
@@ -22,7 +23,7 @@ const refreshCookie = odbHttp.defineCookie({
 })
 
 // One application package: the HTTP layer (headers, cookies, routes) over the framework packages.
-const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
+export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_sandbox', (pkg) => {
   const login = pkg.proc(
     'login',
     {
@@ -36,6 +37,7 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
     },
   )
   defineService(login, {
+    auth: 'anonymous',
     method: 'POST',
     path: '/login',
     module: 'auth',
@@ -59,6 +61,7 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
     },
   )
   defineService(refresh, {
+    auth: 'anonymous',
     method: 'POST',
     path: '/refresh',
     module: 'auth',
@@ -77,6 +80,7 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
     },
   )
   defineService(logout, {
+    auth: 'anonymous',
     method: 'POST',
     path: '/logout',
     module: 'auth',
@@ -88,29 +92,35 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
   const me = pkg.proc(
     'me',
     {
-      in: { authorization: odbType.string(4000) },
+      in: { subject: odbAuth.types.userId },
       out: {
         userId: odbAuth.types.userId,
         username: odbAuth.types.username,
         displayName: odbAuth.types.displayName,
+        roles: odbType.json(),
+        permissions: odbType.json(),
       },
     },
-    ({ params: { authorization, userId, username, displayName }, body }) => {
-      body.set(userId, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
+    ({ params: { subject, userId, username, displayName, roles, permissions }, body }) => {
+      body.set(userId, subject)
       body.call(odbAuth.readUser(userId, username, displayName))
+      body.call(odbAuth.readAuthorization(userId, roles, permissions))
     },
   )
   defineService(me, {
+    auth: 'authenticated',
     method: 'GET',
     path: '/me',
     module: 'auth',
     basePath: '/auth',
     summary: 'Return the authenticated user',
-    headers: { Authorization: me.parameters.authorization },
+    context: { userId: me.parameters.subject },
     response: {
       userId: me.parameters.userId,
       username: me.parameters.username,
       displayName: me.parameters.displayName,
+      roles: me.parameters.roles,
+      permissions: me.parameters.permissions,
     },
   })
 
@@ -118,23 +128,20 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
     'list_settings',
     {
       in: {
-        authorization: odbType.string(4000),
         after: odbSettings.types.id,
         limit: odbType.integer(),
       },
       out: { items: odbType.resultset() },
     },
-    ({ params: { authorization, after, limit, items }, body }) => {
-      const { subject } = body.variables({ subject: odbType.guid() })
-      body.set(subject, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
+    ({ params: { after, limit, items }, body }) => {
       body.call(odbSettings.list(after, limit, items))
     },
   )
   defineService(listSettings, {
+    auth: { roles: ['admin'] },
     method: 'GET',
     path: '/settings',
     summary: 'List settings',
-    headers: { Authorization: listSettings.parameters.authorization },
     query: { cursor: listSettings.parameters.after, limit: listSettings.parameters.limit },
     response: { items: listSettings.parameters.items },
   })
@@ -142,20 +149,18 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
   const readSetting = pkg.proc(
     'read_setting',
     {
-      in: { authorization: odbType.string(4000), id: odbSettings.types.id },
+      in: { id: odbSettings.types.id },
       out: { value: odbSettings.types.value, meta: odbSettings.types.meta },
     },
-    ({ params: { authorization, id, value, meta }, body }) => {
-      const { subject } = body.variables({ subject: odbType.guid() })
-      body.set(subject, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
+    ({ params: { id, value, meta }, body }) => {
       body.call(odbSettings.read(id, value, meta))
     },
   )
   defineService(readSetting, {
+    auth: { roles: ['admin'] },
     method: 'GET',
     path: '/settings/:id',
     summary: 'Read a setting',
-    headers: { Authorization: readSetting.parameters.authorization },
     uri: { id: readSetting.parameters.id },
     response: { value: readSetting.parameters.value, meta: readSetting.parameters.meta },
   })
@@ -164,40 +169,35 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
     'write_setting',
     {
       in: {
-        authorization: odbType.string(4000),
         id: odbSettings.types.id,
         value: odbSettings.types.value,
       },
     },
-    ({ params: { authorization, id, value }, body }) => {
-      const { subject } = body.variables({ subject: odbType.guid() })
-      body.set(subject, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
+    ({ params: { id, value }, body }) => {
       body.call(odbSettings.write(id, value))
     },
   )
   defineService(writeSetting, {
+    auth: { roles: ['admin'] },
     method: 'PUT',
     path: '/settings/:id',
     summary: 'Create or update a setting',
-    headers: { Authorization: writeSetting.parameters.authorization },
     uri: { id: writeSetting.parameters.id },
     body: { value: writeSetting.parameters.value },
   })
 
   const removeSetting = pkg.proc(
     'remove_setting',
-    { in: { authorization: odbType.string(4000), id: odbSettings.types.id } },
-    ({ params: { authorization, id }, body }) => {
-      const { subject } = body.variables({ subject: odbType.guid() })
-      body.set(subject, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
+    { in: { id: odbSettings.types.id } },
+    ({ params: { id }, body }) => {
       body.call(odbSettings.remove(id))
     },
   )
   defineService(removeSetting, {
+    auth: { roles: ['admin'] },
     method: 'DELETE',
     path: '/settings/:id',
     summary: 'Delete a setting',
-    headers: { Authorization: removeSetting.parameters.authorization },
     uri: { id: removeSetting.parameters.id },
   })
 
@@ -205,23 +205,20 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
     'list_audit',
     {
       in: {
-        authorization: odbType.string(4000),
         after: odbAudit.types.id,
         limit: odbType.integer(),
       },
       out: { items: odbType.resultset() },
     },
-    ({ params: { authorization, after, limit, items }, body }) => {
-      const { subject } = body.variables({ subject: odbType.guid() })
-      body.set(subject, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
+    ({ params: { after, limit, items }, body }) => {
       body.call(odbAudit.list(after, limit, items))
     },
   )
   defineService(listAudit, {
+    auth: { roles: ['admin'] },
     method: 'GET',
     path: '/audit',
     summary: 'List audit logs',
-    headers: { Authorization: listAudit.parameters.authorization },
     query: { cursor: listAudit.parameters.after, limit: listAudit.parameters.limit },
     response: { items: listAudit.parameters.items },
   })
@@ -229,10 +226,8 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
   for (const severity of ['info', 'warn', 'error'] as const) {
     const writeAudit = pkg.proc(
       `audit_${severity}`,
-      { in: { authorization: odbType.string(4000), message: odbAudit.types.body } },
-      ({ params: { authorization, message }, body }) => {
-        const { subject } = body.variables({ subject: odbType.guid() })
-        body.set(subject, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
+      { in: { message: odbAudit.types.body } },
+      ({ params: { message }, body }) => {
         body.ifThen(cond.isNull(message), (then) => then.invalid('AUDIT_MESSAGE_REQUIRED'))
         if (severity === 'error') {
           body.block((inner) => {
@@ -248,26 +243,19 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
       },
     )
     defineService(writeAudit, {
+      auth: { roles: ['admin'] },
       method: 'POST',
       path: `/audit/${severity}`,
       summary:
         severity === 'error'
           ? 'Raise and audit a sandbox error'
           : `Write an audit ${severity} entry`,
-      headers: { Authorization: writeAudit.parameters.authorization },
       body: { message: writeAudit.parameters.message },
     })
   }
+  return {}
 })
 
 export const migration = defineMigration('00000000000001_sandbox', {
   schema: odbEnv.adb.schemaUsername,
-})
-  .install(
-    odbSettings.seed({
-      id: 'SANDBOX_DEMO',
-      value: 'Hello from the sandbox',
-      meta: { label: 'Sandbox demo setting' },
-    }),
-  )
-  .install(sandboxPackage)
+}).install(sandboxPackage)

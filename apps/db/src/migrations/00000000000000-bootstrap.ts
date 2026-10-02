@@ -44,3 +44,19 @@ export const migration = defineMigration('00000000000000_bootstrap', {
       displayName: 'Administrator',
     }),
   )
+  .install(
+    odbAuth.seedUser({
+      username: 'test@odbvue.com',
+      password: 'MySecurePass123!',
+      displayName: 'Test user',
+    }),
+  )
+  .install(
+    odbSettings.seed({
+      id: 'SANDBOX_DEMO',
+      value: 'Hello from the sandbox',
+      meta: { label: 'Sandbox demo setting' },
+    }),
+  )
+  .install(odbAuth.role.seed({ name: 'admin', description: 'Application administrator' }))
+  .install(odbAuth.role.seedGrant({ username: 'admin@odbvue.com', role: 'admin' }))

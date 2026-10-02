@@ -87,6 +87,7 @@ describe('Procedure ORDS contracts', () => {
         ({ params, body }) => body.set(params.token, params.username),
       )
       defineService(login, {
+        auth: 'anonymous',
         method: 'POST',
         path: '/login',
         body: { username: login.parameters.username },
@@ -105,6 +106,7 @@ describe('Procedure ORDS contracts', () => {
     const pkg = odbPackage('PCK_AUTH', { basePath: '/auth' }, (p) => {
       const login = p.proc('LOGIN', { in: { username: odbType.string() } }, () => {})
       defineService(login, {
+        auth: 'anonymous',
         method: 'POST',
         path: '/login',
         body: { username: login.parameters.username },
@@ -112,6 +114,7 @@ describe('Procedure ORDS contracts', () => {
 
       const health = p.proc('HEALTH', {}, () => {})
       defineService(health, {
+        auth: 'anonymous',
         method: 'GET',
         path: '/health',
         basePath: '/internal',
@@ -132,6 +135,7 @@ describe('Procedure ORDS contracts', () => {
         ({ params, body }) => body.set(params.token, 'issued'),
       )
       defineService(login, {
+        auth: 'anonymous',
         method: 'POST',
         path: '/login',
         body: { username: login.parameters.username },
@@ -152,6 +156,7 @@ describe('Procedure ORDS contracts', () => {
           () => {},
         )
         defineService(login, {
+          auth: 'anonymous',
           method: 'POST',
           path: '/login',
           body: { username: login.parameters.username },
@@ -169,6 +174,7 @@ describe('Procedure ORDS contracts', () => {
           () => {},
         )
         defineService(getUser, {
+          auth: 'anonymous',
           method: 'GET',
           path: '/users/:id',
           uri: { id: getUser.parameters.userId },

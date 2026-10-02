@@ -3,8 +3,39 @@
 import { oracleParameterName, toKebabCase, type OdbOrdsType, type OdbType } from './model.js'
 import type { ColumnType } from './schema/column.js'
 import { ODB_ERROR_NUMBER, ODB_ERROR_STATUS } from './schema/errors.js'
+import { odbHttp } from './helpers/http/http.js'
 
 export type OrdsHttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
+
+export type ServiceAuthorization =
+  | 'anonymous'
+  | 'authenticated'
+  | ({ match?: 'all' | 'any' } & (
+      | { roles: readonly [string, ...string[]]; permissions?: readonly [string, ...string[]] }
+      | { roles?: readonly [string, ...string[]]; permissions: readonly [string, ...string[]] }
+    ))
+
+export function validateServiceAuthorization(auth: ServiceAuthorization): void {
+  if (auth === 'anonymous' || auth === 'authenticated') return
+  if (!auth || typeof auth !== 'object' || (!auth.roles?.length && !auth.permissions?.length)) {
+    throw new Error(
+      'Service auth requires anonymous, authenticated, or non-empty roles/permissions.',
+    )
+  }
+  if (auth.match !== undefined && auth.match !== 'all' && auth.match !== 'any') {
+    throw new Error('Service auth match must be all or any.')
+  }
+  for (const names of [auth.roles, auth.permissions]) {
+    if (names !== undefined && (!Array.isArray(names) || !names.length)) {
+      throw new Error('Service auth roles/permissions must be non-empty arrays.')
+    }
+    for (const name of names ?? []) {
+      if (typeof name !== 'string' || !name.trim() || name.length > 200) {
+        throw new Error('Service auth names must contain 1 to 200 characters.')
+      }
+    }
+  }
+}
 
 /**
  * Native ORDS parameter type.
@@ -45,6 +76,7 @@ export type OrdsEndpointNode = {
   pattern: string
   source: string
   params: OrdsParamNode[]
+  auth?: ServiceAuthorization
   comment?: string
 }
 
@@ -129,6 +161,19 @@ export class OrdsEndpoint {
   private _basePath?: string
   private _params: OrdsParam[] = []
   private _comment?: string
+  private _auth?: ServiceAuthorization
+  private _contextUserId?: string
+
+  contextUserId(parameter: string): this {
+    this._contextUserId = parameter.toUpperCase()
+    return this
+  }
+
+  auth(policy: ServiceAuthorization): this {
+    validateServiceAuthorization(policy)
+    this._auth = structuredClone(policy)
+    return this
+  }
 
   constructor(
     /** ORDS module name (typically derived from the package name). */
@@ -247,15 +292,40 @@ export class OrdsEndpoint {
   private get handlerSource(): string {
     const args = this._params
       .map((p) =>
-        p.plsqlArg.toUpperCase() === 'P_BODY'
-          ? `${p.plsqlArg.toLowerCase()} => :body`
-          : this.paramSourceType(p) === 'BODY'
-            ? `${p.plsqlArg.toLowerCase()} => ${jsonValueExpression(p)}`
-            : `${p.plsqlArg.toLowerCase()} => :${p.bindVariable}`,
+        p.plsqlArg.toUpperCase() === this._contextUserId
+          ? `${p.plsqlArg.toLowerCase()} => v_auth_user_id`
+          : p.plsqlArg.toUpperCase() === 'P_BODY'
+            ? `${p.plsqlArg.toLowerCase()} => :body`
+            : this.paramSourceType(p) === 'BODY'
+              ? `${p.plsqlArg.toLowerCase()} => ${jsonValueExpression(p)}`
+              : `${p.plsqlArg.toLowerCase()} => :${p.bindVariable}`,
       )
       .join(', ')
-    const declaration = this._params.some((param) => this.paramSourceType(param) === 'BODY')
-      ? 'DECLARE v_body CLOB := :body_text; '
+    const protectedEndpoint = this._auth !== undefined && this._auth !== 'anonymous'
+    const declarations = [
+      ...(this._params.some((param) => this.paramSourceType(param) === 'BODY')
+        ? ['v_body CLOB := :body_text;']
+        : []),
+      ...(protectedEndpoint ? ['v_auth_user_id VARCHAR2(32);'] : []),
+    ]
+    const declaration = declarations.length ? `DECLARE ${declarations.join(' ')} ` : ''
+    const authorization = protectedEndpoint
+      ? `v_auth_user_id := odb_auth.require_user(${odbHttp.bearerToken(':odb_authorization').toSQL()}); `
+      : ''
+    const policy = this._auth
+    const checks =
+      typeof policy === 'object'
+        ? [
+            ...(policy.roles ?? []).map(
+              (role) => `odb_auth.has_role(v_auth_user_id, ${sqlStr(role)})`,
+            ),
+            ...(policy.permissions ?? []).map(
+              (permission) => `odb_auth.has_permission(v_auth_user_id, ${sqlStr(permission)})`,
+            ),
+          ]
+        : []
+    const enforcement = checks.length
+      ? `IF NOT (${checks.join(policy && typeof policy === 'object' && policy.match === 'any' ? ' OR ' : ' AND ')}) THEN raise_application_error(${ODB_ERROR_NUMBER}, 'ODB_ERROR|FORBIDDEN|FORBIDDEN'); END IF; `
       : ''
     const call = `${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args});`
     const envelope = "'ODB_HTTP\\|([4-5][0-9]{2})\\|([A-Z][A-Z0-9_]{0,99})'"
@@ -285,7 +355,7 @@ export class OrdsEndpoint {
       'owa_util.http_header_close;',
       `htp.p('{"code":"INTERNAL_SERVER_ERROR"}');`,
     ].join(' ')
-    return `${declaration}BEGIN ${call} EXCEPTION WHEN OTHERS THEN IF SQLCODE = -20999 THEN ${explicitResponse} ELSIF SQLCODE = ${ODB_ERROR_NUMBER} THEN ${odbErrorResponse} ELSE ${fallbackResponse} END IF; END;`
+    return `${declaration}BEGIN ${authorization}${enforcement}${call} EXCEPTION WHEN OTHERS THEN IF SQLCODE = -20999 THEN ${explicitResponse} ELSIF SQLCODE = ${ODB_ERROR_NUMBER} THEN ${odbErrorResponse} ELSE ${fallbackResponse} END IF; END;`
   }
 
   private paramSourceType(param: OrdsParam): OrdsParamNode['sourceType'] {
@@ -310,7 +380,10 @@ export class OrdsEndpoint {
       method: this.effectiveMethod,
       pattern: this.effectivePattern,
       source: this.handlerSource,
-      params: this._params.map((p) => p.toNode(this.paramSourceType(p))),
+      params: this._params
+        .filter((p) => p.plsqlArg.toUpperCase() !== this._contextUserId)
+        .map((p) => p.toNode(this.paramSourceType(p))),
+      auth: this._auth,
       comment: this._comment,
     }
   }
@@ -358,7 +431,13 @@ export class OrdsEndpoint {
       `    p_comments       => ${comment}`,
       `  );`,
       `  COMMIT;`,
+      ...(this._auth !== undefined && this._auth !== 'anonymous'
+        ? [
+            `  ords.define_parameter(p_module_name => '${this.module}', p_pattern => '${pattern}', p_method => '${method}', p_name => 'Authorization', p_bind_variable_name => 'odb_authorization', p_source_type => 'HEADER', p_param_type => 'STRING', p_access_method => 'IN');`,
+          ]
+        : []),
       ...this._params.flatMap((p) => {
+        if (p.plsqlArg.toUpperCase() === this._contextUserId) return []
         if (p.plsqlArg.toUpperCase() === 'P_BODY' || this.paramSourceType(p) === 'BODY') return []
         return [
           '',

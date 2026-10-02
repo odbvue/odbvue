@@ -2,11 +2,13 @@ import { createLocalStorageErrorReporter, defineOdbVueApp } from '@odbvue/web'
 
 import { light, dark } from './src/themes/themes.json'
 import icons from './src/themes/icons'
+import openapi from '../db/dist/openapi.json'
 
 export default defineOdbVueApp({
   title: 'OdbVue',
   version: '1.0.0',
   auth: true,
+  http: { openapi },
   audit: false,
   settings: true,
   storage: false,

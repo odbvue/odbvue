@@ -10,6 +10,24 @@ function response<T>(data: T | null, status = 200) {
 }
 
 describe('authentication capability', () => {
+  it('hydrates roles and permissions from JSON text or decoded arrays', async () => {
+    const auth = createOdbVueAuth({
+      http: {
+        get: vi.fn<HttpGetMock>().mockResolvedValue(
+          response({
+            userId: 7,
+            username: 'ada',
+            roles: '["admin"]',
+            permissions: ['settings.read'],
+          }),
+        ),
+      } as unknown as HttpClient,
+    })
+    await auth.me()
+    expect(auth.hasRole('admin')).toBe(true)
+    expect(auth.can('settings.read')).toBe(true)
+    expect(auth.can('settings.write')).toBe(false)
+  })
   it('hydrates the authenticated user after token issuance', async () => {
     const post = vi.fn<HttpPostMock>()
     post

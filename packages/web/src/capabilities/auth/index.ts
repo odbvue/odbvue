@@ -25,6 +25,8 @@ interface AuthUserResponse {
   userId: string | number
   username: string
   displayName?: string | null
+  roles?: readonly string[] | string
+  permissions?: readonly string[] | string
 }
 
 export interface AuthCredentials {
@@ -79,6 +81,15 @@ function toError(error: HttpError | null, fallback: string): Error {
   return error ?? new Error(fallback)
 }
 
+function authorizationNames(value: readonly string[] | string | undefined): readonly string[] {
+  try {
+    const parsed: unknown = typeof value === 'string' ? JSON.parse(value) : value
+    return Array.isArray(parsed) && parsed.every((name) => typeof name === 'string') ? parsed : []
+  } catch {
+    return []
+  }
+}
+
 /** Creates application-scoped authentication state backed by ORDS auth endpoints. */
 export function createOdbVueAuth<User extends AuthUser = AuthUser>(
   options: OdbVueAuthOptions = {},
@@ -108,6 +119,8 @@ export function createOdbVueAuth<User extends AuthUser = AuthUser>(
     user.value = {
       id: response.userId,
       username: response.username,
+      roles: authorizationNames(response.roles),
+      permissions: authorizationNames(response.permissions),
       ...(response.displayName === undefined || response.displayName === null
         ? {}
         : { displayName: response.displayName }),

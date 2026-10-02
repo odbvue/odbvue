@@ -27,6 +27,7 @@ const application = odbPackage('PCK_USERS', (p) => {
       ),
   )
   defineService(getUser, {
+    auth: 'anonymous',
     method: 'GET',
     path: '/users/:id',
     summary: 'Fetch a user',
@@ -40,6 +41,7 @@ const application = odbPackage('PCK_USERS', (p) => {
 
   const postUser = p.proc('POST_USER', { in: { body: odbType.clob() } }, () => {})
   defineService(postUser, {
+    auth: 'anonymous',
     method: 'POST',
     path: '/users',
     body: { body: postUser.parameters.body },
@@ -111,6 +113,7 @@ describe('ODB application contract', () => {
         () => {},
       )
       defineService(postLogin, {
+        auth: 'anonymous',
         method: 'POST',
         path: '/login',
         body: {
@@ -153,6 +156,7 @@ describe('ODB application contract', () => {
     const output = odbPackage('PCK_OUTPUT', (p) => {
       const postValue = p.proc('POST_VALUE', { out: { accessToken: odbType.string() } }, () => {})
       defineService(postValue, {
+        auth: 'anonymous',
         method: 'POST',
         path: '/value',
         response: { 'access-token': postValue.parameters.accessToken },
@@ -206,6 +210,7 @@ describe('ODB application contract', () => {
         body.call(inner.listUsers(params.items)),
       )
       defineService(list, {
+        auth: 'anonymous',
         method: 'GET',
         path: '/items',
         response: { items: list.parameters.items },

@@ -9,13 +9,21 @@ type Schema = {
 }
 
 type Operation = {
-  responses?: Record<string, { content?: Record<string, { schema?: Schema }> }>
+  security?: Record<string, readonly string[]>[]
+  responses?: Record<
+    string,
+    { description?: string; content?: Record<string, { schema?: Schema }> }
+  >
 }
 
 /** The subset of an OpenAPI 3.1 document needed to locate ODB `json` fields. */
 export interface OdbOpenApiDocument {
+  security?: Record<string, readonly string[]>[]
   paths?: Record<string, Record<string, Operation | undefined>>
-  components?: { schemas?: Record<string, Schema> }
+  components?: {
+    schemas?: Record<string, Schema>
+    securitySchemes?: Record<string, { type?: string; scheme?: string }>
+  }
 }
 
 function resolve(document: OdbOpenApiDocument, schema: Schema | undefined): Schema | undefined {
@@ -36,6 +44,8 @@ function findOperation(
   request: string,
 ): Operation | undefined {
   const actual = segments(request)
+  const exact = document.paths?.[`/${actual.join('/')}`]?.[method.toLowerCase()]
+  if (exact) return exact
   for (const [template, operations] of Object.entries(document.paths ?? {})) {
     const expected = segments(template)
     if (
@@ -46,6 +56,23 @@ function findOperation(
     }
   }
   return undefined
+}
+
+export function requiresBearerToken(
+  document: OdbOpenApiDocument,
+  method: string,
+  request: string,
+): boolean {
+  const operation = findOperation(document, method, request)
+  if (!operation) return false
+  const security = operation.security ?? document.security ?? []
+  if (security.some((requirement) => Object.keys(requirement).length === 0)) return false
+  return security.some((requirement) =>
+    Object.keys(requirement).some((name) => {
+      const scheme = document.components?.securitySchemes?.[name]
+      return scheme?.type === 'http' && scheme.scheme?.toLowerCase() === 'bearer'
+    }),
+  )
 }
 
 function decode(document: OdbOpenApiDocument, schema: Schema | undefined, value: unknown): unknown {

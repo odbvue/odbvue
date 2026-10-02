@@ -1,7 +1,146 @@
 import { describe, expect, it } from 'vitest'
 import { odbAuth } from '../../../src/capabilities/auth/auth.js'
+import { OrdsEndpoint } from '../../../src/ords.js'
+import {
+  compileApplicationEndpoints,
+  defineService,
+  odbPackage,
+  odbType,
+} from '../../../src/schema/package.js'
+import { generateApplicationOpenApi } from '../../../src/application.js'
+
+describe('service authorization generation', () => {
+  it('binds verified identity without a public request parameter and emits OpenAPI security', () => {
+    const pkg = odbPackage('pck_app', (builder) => {
+      const me = builder.proc('me', { in: { userId: odbType.string() } }, () => {})
+      defineService(me, {
+        method: 'GET',
+        path: '/me',
+        auth: 'authenticated',
+        context: { userId: me.parameters.userId },
+      })
+      const login = builder.proc('login', {}, () => {})
+      defineService(login, { method: 'POST', path: '/login', auth: 'anonymous' })
+    })
+    const document = generateApplicationOpenApi(pkg.application()) as any
+    expect(document.paths['/app/me'].get.security).toEqual([{ bearerAuth: [] }])
+    expect(document.paths['/app/me'].get.parameters).toEqual([])
+    expect(document.paths['/app/login'].post.security).toEqual([])
+    expect(compileApplicationEndpoints(pkg.application())[0].toNode().source).toContain(
+      'p_user_id => v_auth_user_id',
+    )
+  })
+  it('authenticates and checks live roles before calling the application', () => {
+    const endpoint = new OrdsEndpoint('app', 'pck_app', 'settings').auth({ roles: ['admin'] })
+    const source = endpoint.toNode().source
+    expect(source).toContain(
+      "odb_auth.require_user(REGEXP_SUBSTR(:odb_authorization, '^Bearer[[:space:]]+(.+)$'",
+    )
+    expect(source).toContain("odb_auth.has_role(v_auth_user_id, 'admin')")
+    expect(source.indexOf('odb_auth.has_role')).toBeLessThan(source.indexOf('pck_app.settings('))
+    expect(source).toContain('ODB_ERROR|FORBIDDEN|FORBIDDEN')
+    expect(endpoint.toSQLUp()).toContain("p_name => 'Authorization'")
+  })
+
+  it('keeps anonymous handlers free of authentication plumbing', () => {
+    const endpoint = new OrdsEndpoint('app', 'pck_app', 'login').auth('anonymous')
+    expect(endpoint.toNode().source).not.toContain('odb_auth')
+    expect(endpoint.toSQLUp()).not.toContain('odb_authorization')
+  })
+
+  it('rejects missing or ambiguous policies', () => {
+    expect(() => new OrdsEndpoint('app', 'pck_app', 'settings').auth({} as never)).toThrow()
+    expect(() =>
+      new OrdsEndpoint('app', 'pck_app', 'settings').auth({ roles: [] } as never),
+    ).toThrow()
+  })
+
+  it('supports all and any matching across roles and permissions with escaped names', () => {
+    const endpoint = new OrdsEndpoint('app', 'pck_app', 'settings')
+    expect(
+      endpoint.auth({ roles: ['admin'], permissions: ["settings'write"] }).toNode().source,
+    ).toContain(
+      "odb_auth.has_role(v_auth_user_id, 'admin') AND odb_auth.has_permission(v_auth_user_id, 'settings''write')",
+    )
+    expect(endpoint.auth({ roles: ['admin', 'operator'], match: 'any' }).toNode().source).toContain(
+      "odb_auth.has_role(v_auth_user_id, 'admin') OR odb_auth.has_role(v_auth_user_id, 'operator')",
+    )
+  })
+
+  it('requires a policy at runtime and in the typed service contract', () => {
+    expect(() =>
+      odbPackage('pck_app', (builder) => {
+        const proc = builder.proc('settings', {}, () => {})
+        // @ts-expect-error Every service must make an authorization decision.
+        defineService(proc, { method: 'GET', path: '/settings' })
+      }),
+    ).toThrow('Service auth requires')
+  })
+
+  it('rejects caller-controlled identity and authorization bindings', () => {
+    expect(() =>
+      odbPackage('pck_app', (builder) => {
+        const proc = builder.proc('settings', { in: { userId: odbType.string() } }, () => {})
+        defineService(proc, {
+          method: 'GET',
+          path: '/settings',
+          auth: 'anonymous',
+          context: { userId: proc.parameters.userId },
+        })
+      }),
+    ).toThrow('context.userId')
+    expect(() =>
+      odbPackage('pck_app', (builder) => {
+        const proc = builder.proc('settings', { in: { token: odbType.string() } }, () => {})
+        defineService(proc, {
+          method: 'GET',
+          path: '/settings',
+          auth: 'authenticated',
+          headers: { Authorization: proc.parameters.token },
+        })
+      }),
+    ).toThrow('Authorization is managed')
+  })
+})
 
 describe('odbAuth framework package', () => {
+  it('stores normalized roles, grants and permissions with live validity and enabled-user checks', () => {
+    const sql = odbAuth.toSQLUp({ schema: 'APP', jwtSecret: 'x'.repeat(32) })
+    expect(sql).toContain('CREATE TABLE APP.odb_auth_roles')
+    expect(sql).toContain('CREATE TABLE APP.odb_auth_user_roles')
+    expect(sql).toContain('CREATE TABLE APP.odb_auth_role_permissions')
+    expect(sql).toContain('PRIMARY KEY (user_id, role)')
+    expect(sql).toContain('CHECK (valid_to > valid_from)')
+    expect(sql).toContain('FOREIGN KEY (user_id) REFERENCES APP.odb_auth_users (id)')
+    expect(sql).toContain('ur.valid_from <= SYSTIMESTAMP')
+    expect(sql).toContain('ur.valid_to > SYSTIMESTAMP')
+    expect(sql).toContain('u.enabled = 1')
+    expect(sql).toContain('JOIN odb_auth_role_permissions rp ON rp.role = ur.role')
+    expect(sql).toContain('JOIN odb_auth_users u ON u.id = ur.user_id')
+    expect(sql).toContain('FUNCTION has_role(')
+    expect(sql).toContain('FUNCTION has_permission(')
+    expect(sql).toContain(
+      'MERGE INTO odb_auth_roles target USING (SELECT p_role AS role FROM dual) source ON (target.role = source.role)',
+    )
+    expect(sql).toContain('ON ((target.user_id = source.userId AND target.role = source.role))')
+    expect(sql).toContain(
+      'ON ((target.role = source.role AND target.permission = source.permission))',
+    )
+    expect(sql).toContain('SELECT DISTINCT rp.permission')
+    expect(sql).toContain('l_permission_array.append(permission_row.permission)')
+    expect(odbAuth.role.has('l_id', 'p_role').toSQL()).toBe('odb_auth.has_role(l_id, p_role)')
+    expect(odbAuth.perm.require('l_id', 'p_permission').toSQL()).toBe(
+      'odb_auth.require_permission(l_id, p_permission)',
+    )
+    expect(
+      odbAuth.role
+        .seed({ name: 'admin', permissions: ['settings.read'] })
+        .toSQLUp({ schema: 'APP' }),
+    ).toContain("APP.odb_auth.grant_permission('admin', 'settings.read')")
+    expect(
+      odbAuth.role.seedGrant({ username: 'admin', role: 'admin' }).toSQLUp({ schema: 'APP' }),
+    ).toContain("APP.odb_auth.grant_role(v_user_id, 'admin')")
+  })
   it('emits tables and auth primitives without ORDS endpoints', () => {
     const sql = odbAuth.toSQLUp({ schema: 'APP', jwtSecret: 'x'.repeat(32) })
     expect(sql).toContain('CREATE TABLE APP.odb_auth_users')

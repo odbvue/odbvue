@@ -18,7 +18,7 @@ import { REFRESH_TOKEN_MAX_AGE_SECONDS } from './constants.js'
 import { odbAuthCrypto, dummyPasswordHash } from './crypto.js'
 import { odbAuthJwt, jwtSecretOf } from './jwt.js'
 import { odbAuthPackage } from './package.js'
-import { authSessions, authUsers } from './tables.js'
+import { authSessions, authUsers, authRoles, authUserRoles, authRolePermissions } from './tables.js'
 import { authTypes, type OdbAuthOptions } from './types.js'
 /** Installable auth capability plus typed calls into `odb_auth`. Install it after `odbRateLimit`. */
 export const odbAuth = {
@@ -27,6 +27,7 @@ export const odbAuth = {
     return [
       authUsers.toSQLUp({ schema }),
       authSessions.toSQLUp({ schema }),
+      authorizationTablesSQL(schema),
       odbAuthCrypto.toSQLUp({ schema }),
       odbAuthJwt.toSQLUp({ schema, substitutions: { jwtSecret: jwtSecretOf(options) } }),
       odbAuthPackage.toSQLUp({
@@ -48,6 +49,7 @@ export const odbAuth = {
           '  IF SQLCODE != -1430 THEN RAISE; END IF;',
           'END;',
           '/',
+          authorizationTablesSQL(schema, true),
           odbAuthPackage.toSQLUp({
             schema,
             substitutions: { dummyPasswordHash: dummyPasswordHash() },
@@ -60,7 +62,16 @@ export const odbAuth = {
     }
   },
   toSQLDown(options: { schema?: string } = {}): string {
-    return [odbAuthPackage, odbAuthJwt, odbAuthCrypto, authSessions, authUsers]
+    return [
+      odbAuthPackage,
+      odbAuthJwt,
+      odbAuthCrypto,
+      authRolePermissions,
+      authUserRoles,
+      authRoles,
+      authSessions,
+      authUsers,
+    ]
       .map((artifact) => artifact.toSQLDown(options))
       .join('\n')
   },
@@ -70,6 +81,92 @@ export const odbAuth = {
 
   /** Lifetime of a refresh token in seconds; use it for transport-level expiry such as cookie Max-Age. */
   refreshTokenMaxAge: REFRESH_TOKEN_MAX_AGE_SECONDS,
+
+  role: {
+    has(userId: PlsqlRenderable, role: PlsqlRenderable) {
+      return odbAuthPackage.hasRole(userId, role)
+    },
+    require(userId: PlsqlRenderable, role: PlsqlRenderable) {
+      return odbAuthPackage.requireRole(userId, role)
+    },
+    define(role: PlsqlRenderable, description: PlsqlRenderable = odbOracle.null()) {
+      return odbAuthPackage.defineRole(role, description)
+    },
+    grant(
+      userId: PlsqlRenderable,
+      role: PlsqlRenderable,
+      options: { validFrom?: PlsqlRenderable; validTo?: PlsqlRenderable } = {},
+    ) {
+      return odbAuthPackage.grantRole(
+        userId,
+        role,
+        options.validFrom ?? odbOracle.sysTimestamp(),
+        options.validTo ?? odbOracle.null(),
+      )
+    },
+    revoke(userId: PlsqlRenderable, role: PlsqlRenderable) {
+      return odbAuthPackage.revokeRole(userId, role)
+    },
+    seed(role: { name: string; description?: string; permissions?: readonly string[] }) {
+      validateName(role.name)
+      role.permissions?.forEach(validateName)
+      return {
+        toSQLUp(options: { schema?: string } = {}) {
+          const pkg = qualify('odb_auth', options.schema)
+          return plsqlBlock(
+            [
+              `${pkg}.define_role(${odbLiteral(role.name).toSQL()}, ${role.description === undefined ? 'NULL' : odbLiteral(role.description).toSQL()})`,
+              ...(role.permissions ?? []).map(
+                (permission) =>
+                  `${pkg}.grant_permission(${odbLiteral(role.name).toSQL()}, ${odbLiteral(permission).toSQL()})`,
+              ),
+            ].join(';\n'),
+          )
+        },
+        toSQLDown() {
+          return ''
+        },
+      }
+    },
+    seedGrant(grant: { username: string; role: string }) {
+      validateName(grant.role)
+      if (!grant.username.trim()) throw new Error('odbAuth.role.seedGrant(): username is required.')
+      return {
+        toSQLUp(options: { schema?: string } = {}) {
+          const query = odbQuery()
+            .selectFrom(authUsers)
+            .select(authUsers.id)
+            .into('v_user_id')
+            .where(
+              cond.eq(
+                odbOracle.lower(authUsers.username),
+                odbOracle.lower(odbLiteral(grant.username)),
+              ),
+            )
+          if (options.schema) query.resolveSchema(options.schema)
+          return `DECLARE v_user_id VARCHAR2(32); BEGIN ${query.toSQL()}; ${qualify('odb_auth', options.schema)}.grant_role(v_user_id, ${odbLiteral(grant.role).toSQL()}); END;\n/`
+        },
+        toSQLDown() {
+          return ''
+        },
+      }
+    },
+  },
+
+  perm: {
+    has(userId: PlsqlRenderable, permission: PlsqlRenderable) {
+      return odbAuthPackage.hasPermission(userId, permission)
+    },
+    require(userId: PlsqlRenderable, permission: PlsqlRenderable) {
+      return odbAuthPackage.requirePermission(userId, permission)
+    },
+    grant(role: PlsqlRenderable, permission: PlsqlRenderable) {
+      return odbAuthPackage.grantPermission(role, permission)
+    },
+    revoke(role: PlsqlRenderable, permission: PlsqlRenderable) {
+      return odbAuthPackage.revokePermission(role, permission)
+    },
+  },
 
   /** `odb_auth.login(<username>, <password>, <accessToken>, <refreshToken>)` with OUT tokens. */
   login(
@@ -98,6 +195,10 @@ export const odbAuth = {
   /** `odb_auth.read_user(<userId>, <username>, <displayName>)` with OUT profile fields. */
   readUser(userId: PlsqlRenderable, username: PlsqlRenderable, displayName: PlsqlRenderable) {
     return odbAuthPackage.readUser(userId, username, displayName)
+  },
+
+  readAuthorization(userId: PlsqlRenderable, roles: PlsqlRenderable, permissions: PlsqlRenderable) {
+    return odbAuthPackage.readAuthorization(userId, roles, permissions)
   },
 
   /** Require a valid access token and return its authenticated user identifier. */
@@ -147,4 +248,31 @@ export const odbAuth = {
       },
     }
   },
+}
+
+function validateName(name: string): void {
+  if (!name.trim() || name.length > 200)
+    throw new Error('Auth names must contain 1 to 200 characters.')
+}
+
+function authorizationTablesSQL(schema?: string, upgrade = false): string {
+  const statements = [authRoles, authUserRoles, authRolePermissions].flatMap((table) =>
+    table
+      .toSQLUp({ schema })
+      .split(';')
+      .map((statement) => statement.trim())
+      .filter(Boolean),
+  )
+  statements.push(
+    `ALTER TABLE ${qualify('odb_auth_user_roles', schema)} ADD CONSTRAINT odb_auth_user_roles_fk_user FOREIGN KEY (user_id) REFERENCES ${qualify('odb_auth_users', schema)} (id) ON DELETE CASCADE`,
+    `ALTER TABLE ${qualify('odb_auth_user_roles', schema)} ADD CONSTRAINT odb_auth_user_roles_fk_role FOREIGN KEY (role) REFERENCES ${qualify('odb_auth_roles', schema)} (role) ON DELETE CASCADE`,
+    `ALTER TABLE ${qualify('odb_auth_role_permissions', schema)} ADD CONSTRAINT odb_auth_role_perms_fk_role FOREIGN KEY (role) REFERENCES ${qualify('odb_auth_roles', schema)} (role) ON DELETE CASCADE`,
+  )
+  return statements
+    .map((statement) =>
+      upgrade
+        ? `BEGIN EXECUTE IMMEDIATE '${statement.replace(/'/g, "''")}'; EXCEPTION WHEN OTHERS THEN IF SQLCODE NOT IN (-955, -2264, -2275) THEN RAISE; END IF; END;\n/`
+        : `${statement};`,
+    )
+    .join('\n')
 }

@@ -117,6 +117,7 @@ const api = odbPackage('pck_api', (pkg) => {
   )
 
   defineService(version, {
+    auth: 'anonymous',
     method: 'GET',
     path: '/version',
     summary: 'Returns the application version',

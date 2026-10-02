@@ -12,6 +12,68 @@ function response(status: number, data: unknown = {}): Response {
 }
 
 describe('HTTP capability', () => {
+  it('inherits document security but honors anonymous operation overrides', async () => {
+    const fetch = vi.fn<FetchMock>(() => Promise.resolve(response(200)))
+    const http = useHttp({
+      fetch,
+      configuration: {
+        getAccessToken: () => 'current',
+        openapi: {
+          security: [{ token: [] }],
+          components: { securitySchemes: { token: { type: 'http', scheme: 'bearer' } } },
+          paths: { '/protected': { get: {} }, '/public': { get: { security: [] } } },
+        },
+      },
+    })
+    await http.get('/protected')
+    await http.get('/public')
+    await http.get('/unknown')
+    expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('Authorization')).toBe(
+      'Bearer current',
+    )
+    expect(new Headers(fetch.mock.calls[1]?.[1]?.headers).has('Authorization')).toBe(false)
+    expect(new Headers(fetch.mock.calls[2]?.[1]?.headers).has('Authorization')).toBe(false)
+  })
+
+  it('does not refresh authenticated requests rejected with forbidden', async () => {
+    const refreshAccessToken = vi.fn<RefreshMock>(async () => true)
+    const http = useHttp({
+      fetch: vi.fn<FetchMock>(() => Promise.resolve(response(403))),
+      configuration: { getAccessToken: () => 'current', refreshAccessToken },
+    })
+    expect((await http.get('/protected')).status).toBe(403)
+    expect(refreshAccessToken).not.toHaveBeenCalled()
+  })
+  it('uses operation security to attach tokens, preserves Headers, and skips anonymous refresh', async () => {
+    const refreshAccessToken = vi.fn<RefreshMock>(async () => true)
+    const fetch = vi.fn<FetchMock>(() => Promise.resolve(response(401)))
+    const http = useHttp({
+      fetch,
+      configuration: {
+        getAccessToken: () => 'current',
+        refreshAccessToken,
+        openapi: {
+          paths: {
+            '/settings/{id}': { get: { security: [{ bearerAuth: [] }] } },
+            '/auth/login': { post: { security: [] } },
+          },
+          components: { securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer' } } },
+        },
+      },
+    })
+    await http.post('/auth/login')
+    expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).has('Authorization')).toBe(false)
+    expect(refreshAccessToken).not.toHaveBeenCalled()
+    await http.get('/settings/demo?value=1', { headers: new Headers({ 'X-Test': 'preserved' }) })
+    expect(new Headers(fetch.mock.calls[1]?.[1]?.headers).get('Authorization')).toBe(
+      'Bearer current',
+    )
+    expect(new Headers(fetch.mock.calls[1]?.[1]?.headers).get('X-Test')).toBe('preserved')
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1)
+    await http.get('https://other.example/settings/demo')
+    expect(new Headers(fetch.mock.calls.at(-1)?.[1]?.headers).has('Authorization')).toBe(false)
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1)
+  })
   it('parses ODB json fields using the OpenAPI document', async () => {
     const openapi = {
       paths: {

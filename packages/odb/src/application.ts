@@ -177,6 +177,8 @@ export function generateApplicationsOpenApi(
       paths[path][endpoint.method.toLowerCase()] = {
         operationId: `${endpoint.module}_${endpoint.procedureName}`,
         summary: endpoint.comment,
+        security: endpoint.auth === 'anonymous' ? [] : [{ bearerAuth: [] }],
+        ...(typeof endpoint.auth === 'object' ? { 'x-odb-auth': endpoint.auth } : {}),
         parameters,
         ...(bodyParams.length > 0
           ? {
@@ -200,6 +202,12 @@ export function generateApplicationsOpenApi(
             }
           : {}),
         responses: {
+          ...(endpoint.auth !== 'anonymous'
+            ? { '401': { description: 'Authentication required' } }
+            : {}),
+          ...(typeof endpoint.auth === 'object'
+            ? { '403': { description: 'Insufficient authorization' } }
+            : {}),
           '200': {
             description: 'Successful response',
             content: {
@@ -217,7 +225,10 @@ export function generateApplicationsOpenApi(
     openapi: '3.1.0',
     info: { title: options.title ?? 'ODB API', version: options.version ?? '1.0.0' },
     paths,
-    components: { schemas },
+    components: {
+      schemas,
+      securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } },
+    },
   }
 }
 
