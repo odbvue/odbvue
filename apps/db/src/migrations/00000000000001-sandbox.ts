@@ -186,7 +186,7 @@ const sandboxPackage = odbPackage('pck_sandbox', (pkg) => {
 
   const removeSetting = pkg.proc(
     'remove_setting',
-    { in: { authorization: odbType.string(4000), id: odbType.string(128) } },
+    { in: { authorization: odbType.string(4000), id: odbSettings.types.id } },
     ({ params: { authorization, id }, body }) => {
       const { subject } = body.variables({ subject: odbType.guid() })
       body.set(subject, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
