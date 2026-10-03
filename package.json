@@ -21,6 +21,7 @@
     "link:cli": "pnpm --filter @odbvue/cli run build && pnpm -C packages/cli run link"
   },
   "devDependencies": {
+    "@changesets/cli": "^3.0.3",
     "oxfmt": "^0.44.0",
     "oxlint": "^1.59.0",
     "typescript": "^6.0.2"

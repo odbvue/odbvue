@@ -1,5 +1,6 @@
 {
   "name": "@odbvue/cli",
+  "version": "0.0.0",
   "description": "OdbVue CLI",
   "bin": {
     "ov": "dist/index.js"
