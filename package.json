@@ -10,6 +10,7 @@
     "node": "^22.18.0 || >=24.12.0"
   },
   "scripts": {
+    "prepare": "pnpm run link:cli",
     "dev": "pnpm -r run dev",
     "dev:web": "pnpm --filter apps run dev",
     "check": "pnpm -r run check",
@@ -18,9 +19,10 @@
     "build:web": "pnpm --filter @odbvue/web run check && pnpm --filter @odbvue/web run build && pnpm --filter apps run check && pnpm --filter apps run build",
     "build:cli": "pnpm --filter @odbvue/cli run check && pnpm --filter @odbvue/cli run build",
     "build:wiki": "pnpm --filter @odbvue/wiki run check && pnpm --filter @odbvue/wiki run build",
-    "link:cli": "pnpm --filter @odbvue/cli run build && pnpm -C packages/cli run link"
+    "link:cli": "pnpm --filter @odbvue/cli... run build && pnpm -C packages/cli run link"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "^1.0.1",
     "@changesets/cli": "^3.0.3",
     "oxfmt": "^0.44.0",
     "oxlint": "^1.59.0",
