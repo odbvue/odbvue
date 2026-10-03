@@ -38,6 +38,9 @@ type Service = {
 type Config = {
   platforms: Platform[]
   services: Service[]
+  runtime?: {
+    apiUrl?: string
+  }
 }
 
 export const availablePlatforms = [
@@ -69,6 +72,11 @@ export class ConfigStore {
 
   getConfig = (): Config => {
     return this.config
+  }
+
+  setRuntimeApiUrl = (apiUrl: string) => {
+    this.config.runtime = { ...this.config.runtime, apiUrl: new URL(apiUrl).href }
+    this.saveConfig()
   }
 
   getPlatforms = (): string[] => {

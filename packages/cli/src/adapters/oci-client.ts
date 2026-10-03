@@ -285,6 +285,18 @@ export class OciClient {
     }
   }
 
+  async getAdbOrdsUrl(autonomousDatabaseId: string): Promise<string> {
+    const databaseClient = new database.DatabaseClient({
+      authenticationDetailsProvider: this.provider,
+    })
+    const response = await databaseClient.getAutonomousDatabase({ autonomousDatabaseId })
+    const endpoint = response.autonomousDatabase.connectionUrls?.ordsUrl
+    if (!endpoint) {
+      throw new Error(`Autonomous Database ${autonomousDatabaseId} has no ORDS endpoint.`)
+    }
+    return endpoint
+  }
+
   async deleteAdbInstance(autonomousDatabaseId: string): Promise<void> {
     try {
       const databaseClient = new database.DatabaseClient({

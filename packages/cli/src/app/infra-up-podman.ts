@@ -8,10 +8,11 @@ import { unZip } from '../shared/zip.js'
 import { EnvironmentStore } from '../adapters/environment-store.js'
 import { ConfigStore } from '../adapters/config-store.js'
 import { PodmanClient } from '../adapters/podman-client.js'
+import { SecretsStore } from '../adapters/secrets-store.js'
 
 const composeFile = 'podman-compose.yaml'
 
-export const runInfraUpPodman = async () => {
+export const runInfraUpPodman = async (): Promise<void> => {
   const { projectName, currentEnv, envDir } = new EnvironmentStore().getCurrent()
   const projectNameWithEnv = `${projectName}-${currentEnv}`
 
@@ -61,7 +62,7 @@ export const runInfraUpPodman = async () => {
         { title: 'Exit', value: 'exit' },
       ],
     })
-    if (selectedAction !== 'use-existing' && selectedAction !== 'recreate') return false
+    if (selectedAction !== 'use-existing' && selectedAction !== 'recreate') return
     action = selectedAction
   }
   if (action === 'use-existing') {
@@ -102,4 +103,10 @@ export const runInfraUpPodman = async () => {
     `${container.name} is up and running (${container.state}, ${container.status}) [${container.ports.join(', ')}]`,
   )
   logger.lf()
+  const schemaName = new SecretsStore().get('ODBVUE_ADB_SCHEMA_USERNAME')?.trim().toLowerCase()
+  if (!schemaName)
+    throw new Error('ODBVUE_ADB_SCHEMA_USERNAME is required to configure the API URL.')
+  config.setRuntimeApiUrl(
+    `https://127.0.0.1:${service.spec.ordsPort}/ords/${encodeURIComponent(schemaName)}/`,
+  )
 }

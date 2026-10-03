@@ -7,7 +7,7 @@ import { SecretsStore } from '../adapters/secrets-store.js'
 
 import { logger } from '../shared/logger.js'
 
-export const runInfraUpOci = async () => {
+export const runInfraUpOci = async (): Promise<void> => {
   const config = new ConfigStore()
   const services = config
     .getConfig()
@@ -25,6 +25,7 @@ export const runInfraUpOci = async () => {
     .compartment.id as string
 
   const ociClient = new OciClient(ociFilePath, profile)
+  const urls = new Set<string>()
 
   for (const service of services) {
     const existing = await ociClient.findAdbInstance(service.service, compartmentId)
@@ -65,8 +66,18 @@ export const runInfraUpOci = async () => {
     const walletDir = path.join(envDir, '.wallets', `${service.service}.zip`)
     logger.info(`Downloading wallet for ${service.service} to ${walletDir}...`)
     await ociClient.getAdbWallet(adbId, password, walletDir)
+    const schemaName = secrets.get('ODBVUE_ADB_SCHEMA_USERNAME')?.trim().toLowerCase()
+    if (!schemaName)
+      throw new Error('ODBVUE_ADB_SCHEMA_USERNAME is required to configure the API URL.')
+    const apiUrl = new URL(await ociClient.getAdbOrdsUrl(adbId))
+    apiUrl.pathname = `${apiUrl.pathname.replace(/\/+$/, '')}/${encodeURIComponent(schemaName)}/`
+    urls.add(apiUrl.href)
   }
 
+  if (urls.size > 1) {
+    throw new Error('Multiple OCI ORDS endpoints found. Cannot select an API URL automatically.')
+  }
   logger.success('Oracle ADB instances on OCI are up and available.')
   logger.lf()
+  config.setRuntimeApiUrl([...urls][0]!)
 }
