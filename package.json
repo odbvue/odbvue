@@ -5,7 +5,7 @@
   "description": "The meta framework for Oracle Database and Vue.js",
   "author": "Jānis Erlihs",
   "license": "MIT",
-  "packageManager": "pnpm@11.23.0",
+  "packageManager": "pnpm@12.8.1",
   "engines": {
     "node": "^22.18.0 || >=24.12.0"
   },
