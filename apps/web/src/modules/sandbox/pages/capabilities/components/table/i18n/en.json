@@ -1,0 +1,20 @@
+{
+  "name": "name",
+  "email": "email",
+  "phone": "phone",
+  "website": "website",
+  "status": "status",
+  "actions": "actions",
+  "search": "search",
+  "refresh": "refresh",
+  "add": "add",
+  "status-all": "status-all",
+  "previous": "previous",
+  "next": "next",
+  "ascending": "ascending",
+  "descending": "descending",
+  "left": "left",
+  "right": "right",
+  "Phone": "Phone",
+  "copy.to.clipboard": "copy.to.clipboard"
+}

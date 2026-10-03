@@ -1,0 +1,137 @@
+# TypeScript Toolkit
+
+Beyond authoring SQL and PL/SQL, `@odbvue/odb` is a typed toolkit that turns a single Oracle model into queries, contracts, types, and a REST client. Highlights:
+
+## Typed schema and query builder
+
+Return an object from `odbTable()` to expose typed columns. The same definition infers selected rows, required inserts, nullable values, defaults, and updates.
+
+```ts
+import { odbQuery, odbTable } from '@odbvue/odb'
+import type { Insertable, Selectable, Updateable } from '@odbvue/odb'
+
+const users = odbTable('APP_USERS', (t) => ({
+  id: t.number().identity().primaryKey(),
+  uuid: t.guid().defaultSysGuid(),
+  email: t.string(255),
+  status: t.string(1).default('N').notNull(),
+  createdAt: t.timestamp().defaultSysTimestamp().notNull(),
+}))
+  .unique((columns) => [columns.uuid])
+  .check((columns, expression) => expression.in(columns.status, ['A', 'D', 'N']))
+
+odbQuery().selectFrom(users).select([users.id]).where(users.id, '=', 123)
+odbQuery().insertInto(users).values({ email: 'ada@example.com' })
+odbQuery().updateTable(users).set({ email: null }).where(users.id, '=', 123)
+
+type User = Selectable<typeof users>
+type NewUser = Insertable<typeof users>
+type UserUpdate = Updateable<typeof users>
+```
+
+Omitted names are inferred from object keys, so `createdAt` maps to `created_at`. Explicit names are supported for existing schemas. Table-level selectors provide autocomplete and reject unknown columns:
+
+```ts
+users.index((columns) => [columns.email, columns.createdAt]).unique((columns) => [columns.uuid])
+```
+
+Constraint and index names are generated from the table and selected columns. An explicit name can be supplied as the first argument when required. Column-level `.unique()` is also available for a single inline unique constraint.
+
+Named foreign keys belong to the referencing table and select typed columns from both tables:
+
+```ts
+const sessions = odbTable('APP_SESSIONS', (t) => ({
+  id: t.guid().primaryKey(),
+  userId: t.number().notNull(),
+})).foreignKey(
+  'sessions_fk_user',
+  (columns) => [columns.userId],
+  users,
+  (columns) => [columns.id],
+  { onDelete: 'cascade' },
+)
+```
+
+Selectors reject unknown columns, mismatched column types, empty lists, and mismatched tuple lengths. Composite foreign keys use matching ordered tuples. Omit `onDelete` for Oracle's default behavior, or use `'cascade'` or `'set null'`. `toSQLUp({ schema })` qualifies both tables and emits an `ALTER TABLE ... ADD CONSTRAINT` after table creation; create referenced tables first.
+
+Typed checks use the same column shape and validate values against the selected column type:
+
+```ts
+users.check((columns, expression) =>
+  expression.and([
+    expression.in(columns.status, ['A', 'D', 'N']),
+    expression(columns.email, 'IS NOT NULL'),
+  ]),
+)
+```
+
+Table and column comments emit Oracle `COMMENT ON` statements:
+
+```ts
+const files = odbTable('app_files', (t) => ({
+  id: t.number().identity().primaryKey().comment('Primary key'),
+})).comment('Application files')
+```
+
+## Query conditions
+
+Use `cond` for comparisons and logical groups in both PL/SQL control flow and query predicates. Query builders remain backed by a real AST + Oracle compiler (`compile()` returns SQL + binds).
+
+```ts
+.where(cond.or([cond.eq(users.id, 1), cond.isNull(users.email)]))
+```
+
+## Application contract
+
+`odbPackage()` is the application model. Procedures retain their inputs, outputs, implementation, and service metadata in one serializable contract. PL/SQL, ORDS, TypeScript clients, and OpenAPI are generated from that model.
+
+```ts
+const settings = odbPackage('PCK_SETTINGS', (p) => ({
+  getValue: p.func('GET_VALUE', odbType.string(), (fn) => {
+    fn.parameters({ in: { key: odbType.string() } })
+  }),
+}))
+
+body.set(result, settings.getValue(odbLiteral('APP_VERSION')))
+```
+
+Use `generateApplication(pkg)` to emit its TypeScript contract, ORDS registration SQL, and OpenAPI document together. Generate HTTP clients from the OpenAPI document with your preferred OpenAPI tool.
+
+## Introspection
+
+`introspect.ts` emits data-dictionary queries and maps the returned rows into ODB tables, TypeScript row interfaces, and `odbTable(...)` scaffolds — useful for adopting an existing database. It stays driver-free (you supply the rows).
+
+## Oracle execution
+
+`@odbvue/odb` runs compiled queries against Oracle with `OdbExecutor` (`execute`, `run`, `transaction`, `executeMany`) and includes its `oracledb` integration.
+
+```ts
+await withConnection(config, async (_conn, db) => {
+  await db.execute(odbQuery().selectFrom(users).select([users.id]))
+})
+```
+
+## OpenAPI contract
+
+Use `p.proc()` to declare the PL/SQL signature and implementation together, then attach its HTTP contract with `defineService()`. A typed table query passed to `body.openFor()` carries its selected row shape into the generated response.
+
+```ts
+const listUsers = pkg.proc(
+  'list_users',
+  { out: { result: odbType.resultset() } },
+  ({ params, body }) =>
+    body.openFor(params.result, odbQuery().selectFrom(users).select([users.id, users.email])),
+)
+defineService(listUsers, {
+  auth: 'anonymous',
+  method: 'GET',
+  path: '/users',
+  response: { result: listUsers.parameters.result },
+})
+```
+
+The CLI writes `apps/db/dist/openapi.json` after every successful database migration operation. The document describes the API currently deployed to ORDS: `ov du` includes newly applied migrations, `ov dd` removes rolled-back migrations, and `ov di` writes an empty document after the schema is removed.
+
+`SYS_REFCURSOR` outputs opened through a typed ODB query become reusable OpenAPI row schemas. The response preserves column types and nullability, so OpenAPI client generators can produce typed result arrays.
+
+The web app consumes this manifest through `openapi-typescript`; see [Consuming Web Services](/guide/web/consuming-web-services#generated-ords-types).

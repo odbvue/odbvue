@@ -1,0 +1,132 @@
+import { describe, expect, it } from 'vitest'
+import { odbAudit } from '../../../src/capabilities/audit/audit.js'
+import { ProcedureBody } from '../../../src/schema/package.js'
+
+describe('odbAudit (framework package odb_audit)', () => {
+  describe('install / drop SQL', () => {
+    it('lists newest first with a timestamp and id keyset', () => {
+      const sql = odbAudit.toSQLUp()
+      expect(sql).toContain(
+        'PROCEDURE list(p_after IN VARCHAR2, p_limit IN PLS_INTEGER, p_items OUT SYS_REFCURSOR)',
+      )
+      expect(sql).toContain('observed_timestamp < l_after_timestamp')
+      expect(sql).toContain('id < p_after')
+      expect(sql).toContain('ORDER BY observed_timestamp DESC, id DESC')
+      expect(sql).toContain('FETCH FIRST NVL(p_limit, 50) ROWS ONLY')
+      expect(sql).toContain('AUDIT_CURSOR_NOT_FOUND')
+    })
+
+    it('toSQLUp() emits the table, spec and body under the odb_audit name', () => {
+      const sql = odbAudit.toSQLUp()
+      expect(sql).toContain('CREATE TABLE odb_audit_logs (')
+      expect(sql).toContain('CREATE OR REPLACE PACKAGE odb_audit AS')
+      expect(sql).toContain('CREATE OR REPLACE PACKAGE BODY odb_audit AS')
+      expect(sql).not.toContain('pck_api_audit')
+      expect(sql).not.toContain('app_audit')
+    })
+
+    it('toSQLUp() models an OTel LogRecord (severity + attributes)', () => {
+      const sql = odbAudit.toSQLUp()
+      expect(sql).toContain('severity_number')
+      expect(sql).toContain('severity_text')
+      expect(sql).toContain('observed_timestamp')
+      expect(sql).toContain('event_timestamp')
+      expect(sql).toContain('attributes IS JSON')
+      expect(sql).toContain("severity_text IN ('TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL')")
+    })
+
+    it('toSQLUp() writes an OTel log in an autonomous transaction', () => {
+      const sql = odbAudit.toSQLUp()
+      expect(sql).toContain('PRAGMA AUTONOMOUS_TRANSACTION')
+      expect(sql).toContain('json_object_t.parse')
+      expect(sql).toContain("owa_util.get_cgi_env('REQUEST_METHOD')")
+      expect(sql).toContain("'exception.message'")
+      expect(sql).toContain('JSON_TABLE')
+      expect(sql).toContain('GENERATED ALWAYS AS')
+      expect(sql).toContain('CREATE INDEX odb_audit_logs_ix_event')
+      expect(sql).toContain('p_attributes IN CLOB DEFAULT NULL')
+      expect(sql).toContain('p_event_timestamp IN TIMESTAMP DEFAULT SYSTIMESTAMP')
+    })
+
+    it('toSQLUp({ schema }) qualifies the table and package names', () => {
+      const sql = odbAudit.toSQLUp({ schema: 'APP_USER' })
+      expect(sql).toContain('CREATE TABLE APP_USER.odb_audit_logs (')
+      expect(sql).toContain('CREATE OR REPLACE PACKAGE APP_USER.odb_audit AS')
+      expect(sql).toContain('CREATE OR REPLACE PACKAGE BODY APP_USER.odb_audit AS')
+    })
+
+    it('toSQLDown() drops the package and table', () => {
+      const sql = odbAudit.toSQLDown()
+      expect(sql).toContain('DROP PACKAGE odb_audit')
+      expect(sql).toContain('DROP TABLE odb_audit_logs')
+    })
+
+    it('toSQLDown({ schema }) drops the qualified objects', () => {
+      const sql = odbAudit.toSQLDown({ schema: 'APP_USER' })
+      expect(sql).toContain('DROP PACKAGE APP_USER.odb_audit')
+      expect(sql).toContain('DROP TABLE APP_USER.odb_audit_logs')
+    })
+  })
+
+  describe('call-expression helpers', () => {
+    it('renders severity helpers', () => {
+      expect(odbAudit.debug("'msg'").toSQL()).toBe("odb_audit.debug('msg')")
+      expect(odbAudit.info("'msg'", 'v_attr').toSQL()).toBe("odb_audit.info('msg', v_attr)")
+      expect(odbAudit.warn("'msg'").toSQL()).toBe("odb_audit.warn('msg')")
+      expect(odbAudit.error("'msg'", 'v_attr').toSQL()).toBe("odb_audit.error('msg', v_attr)")
+      expect(odbAudit.fatal("'msg'").toSQL()).toBe("odb_audit.fatal('msg')")
+    })
+
+    it('renders log() with optional arguments', () => {
+      expect(odbAudit.log("'INFO'", "'msg'").toSQL()).toBe("odb_audit.log('INFO', 'msg')")
+      expect(odbAudit.log("'INFO'", "'msg'", 'v_attr').toSQL()).toBe(
+        "odb_audit.log('INFO', 'msg', v_attr)",
+      )
+      expect(odbAudit.log("'INFO'", "'msg'", undefined, 'systimestamp').toSQL()).toBe(
+        "odb_audit.log('INFO', 'msg', NULL, systimestamp)",
+      )
+    })
+
+    it('renders utility helpers', () => {
+      expect(odbAudit.list('p_after', 'p_limit', 'p_items').toSQL()).toBe(
+        'odb_audit.list(p_after, p_limit, p_items)',
+      )
+      expect(odbAudit.severityNumber("'WARN'").toSQL()).toBe("odb_audit.severity_number('WARN')")
+      expect(odbAudit.bulk('v_data').toSQL()).toBe('odb_audit.bulk(v_data)')
+      expect(odbAudit.purge('v_cutoff').toSQL()).toBe('odb_audit.purge(v_cutoff)')
+    })
+  })
+
+  describe('ProcedureBody audit helpers', () => {
+    const statements = (build: (body: ProcedureBody) => void): string[] => {
+      const body = new ProcedureBody()
+      build(body)
+      return body.toNode().statements.map((s) => ('sql' in s ? s.sql : ''))
+    }
+
+    it('quotes the message and omits attributes when not provided', () => {
+      expect(statements((b) => b.auditInfo('started'))).toEqual(["odb_audit.info('started')"])
+      expect(statements((b) => b.auditWarn("O'Brien logged in"))).toEqual([
+        "odb_audit.warn('O''Brien logged in')",
+      ])
+    })
+
+    it('builds an attributes CLOB from the attributes map', () => {
+      expect(statements((b) => b.auditEvent('user logged in', { 'user.id': 'p_uuid' }))).toEqual([
+        "odb_audit.info('user logged in', odb_audit.attributes('user.id', p_uuid))",
+      ])
+      expect(
+        statements((b) =>
+          b.auditError('failed', { 'user.id': 'p_uuid', 'http.request.method': 'v_method' }),
+        ),
+      ).toEqual([
+        "odb_audit.error('failed', odb_audit.attributes('user.id', p_uuid, 'http.request.method', v_method))",
+      ])
+    })
+
+    it('maps each helper to its severity procedure', () => {
+      expect(statements((b) => b.auditDebug('m'))).toEqual(["odb_audit.debug('m')"])
+      expect(statements((b) => b.auditFatal('m'))).toEqual(["odb_audit.fatal('m')"])
+    })
+  })
+})

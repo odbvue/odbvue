@@ -1,0 +1,273 @@
+import { describe, expect, it } from 'vitest'
+import {
+  emitApplicationOrdsSql,
+  generateApplication,
+  generateApplicationsOpenApi,
+  generateApplicationOpenApi,
+} from '../src/application.js'
+import { odbQuery } from '../src/query/index.js'
+import { defineService, odbPackage, odbType, type OdbApplication } from '../src/schema/package.js'
+import { odbTable } from '../src/schema/table.js'
+
+const users = odbTable('APP_USERS', (table) => ({
+  id: table.number('ID').primaryKey(),
+  uuid: table.guid('UUID').notNull(),
+  createdAt: table.timestamp('CREATED_AT').notNull(),
+  email: table.string('EMAIL'),
+}))
+
+const application = odbPackage('PCK_USERS', (p) => {
+  const getUser = p.proc(
+    'GET_USER',
+    { in: { id: odbType.number() }, out: { result: odbType.resultset() } },
+    ({ params, body }) =>
+      body.openFor(
+        params.result,
+        odbQuery().selectFrom(users).select([users.id, users.uuid, users.createdAt, users.email]),
+      ),
+  )
+  defineService(getUser, {
+    auth: 'anonymous',
+    method: 'GET',
+    path: '/users/:id',
+    summary: 'Fetch a user',
+    uri: { id: getUser.parameters.id },
+    response: { result: getUser.parameters.result },
+  })
+
+  p.func('COUNT_USERS', odbType.number(), (fn) => {
+    fn.body((body) => body.return(0))
+  })
+
+  const postUser = p.proc('POST_USER', { in: { body: odbType.clob() } }, () => {})
+  defineService(postUser, {
+    auth: 'anonymous',
+    method: 'POST',
+    path: '/users',
+    body: { body: postUser.parameters.body },
+  })
+})
+
+describe('ODB application contract', () => {
+  it('documents a single BLOB body and rejects mixed binary/JSON or GET bodies', () => {
+    const binary = odbPackage('PCK_FILES', (pkg) => {
+      const upload = pkg.proc(
+        'UPLOAD',
+        { in: { content: odbType.blob(), name: odbType.string() } },
+        () => {},
+      )
+      expect(() =>
+        defineService(upload, {
+          auth: 'anonymous',
+          method: 'POST',
+          path: '/upload',
+          body: { content: upload.parameters.content, name: upload.parameters.name },
+        }),
+      ).toThrow('one BLOB binding')
+      expect(() =>
+        defineService(upload, {
+          auth: 'anonymous',
+          method: 'GET',
+          path: '/upload',
+          body: { content: upload.parameters.content },
+          query: { name: upload.parameters.name },
+        }),
+      ).toThrow('POST or PUT')
+      defineService(upload, {
+        auth: 'anonymous',
+        method: 'POST',
+        path: '/upload',
+        body: { content: upload.parameters.content },
+        query: { name: upload.parameters.name },
+      })
+    })
+    const model = JSON.parse(JSON.stringify(binary.application())) as OdbApplication
+    const document = generateApplicationOpenApi(model) as {
+      paths: Record<string, Record<string, unknown>>
+    }
+    expect(document.paths['/files/upload']?.post).toMatchObject({
+      requestBody: {
+        content: { 'application/octet-stream': { schema: { type: 'string', format: 'binary' } } },
+      },
+      parameters: [{ name: 'name', in: 'query' }],
+    })
+  })
+
+  it('retains implementation and service metadata in one serializable model', () => {
+    const model = JSON.parse(JSON.stringify(application.application())) as OdbApplication
+    const procedure = model.procedures[0]
+
+    expect(procedure.service).toMatchObject({
+      method: 'GET',
+      path: 'users/:id',
+      summary: 'Fetch a user',
+      params: { uri: { id: { name: 'p_id' } }, response: { result: { name: 'p_result' } } },
+    })
+    expect(procedure.body?.statements[0]).toEqual({
+      kind: 'raw',
+      sql: 'OPEN p_result FOR SELECT ID, UUID, CREATED_AT, EMAIL FROM APP_USERS',
+    })
+    expect(procedure.body?.resultSets?.P_RESULT).toEqual([
+      { name: 'ID', type: 'number', nullable: false },
+      { name: 'UUID', type: 'guid', nullable: false },
+      { name: 'CREATED_AT', type: 'timestamp', nullable: false },
+      { name: 'EMAIL', type: 'string', nullable: true },
+    ])
+  })
+
+  it('generates the contract and client directly from a plain application model', () => {
+    const model = JSON.parse(JSON.stringify(application.application())) as OdbApplication
+    const generated = generateApplication(model)
+
+    expect(generated.plsql).toContain('CREATE OR REPLACE PACKAGE PCK_USERS AS')
+    expect(generated.ords).toContain('ords.define_module(')
+    expect(generated.contract).toContain('getUser(input: { id: number })')
+    expect(generated.contract).toContain('countUsers(): Promise<number>')
+    expect(generated.openapi).toMatchObject({ openapi: '3.1.0' })
+  })
+
+  it('generates OpenAPI from procedure service metadata', () => {
+    const document = generateApplicationOpenApi(application, {
+      title: 'Users API',
+      version: '2.0.0',
+    }) as {
+      openapi: string
+      info: { title: string; version: string }
+      paths: Record<string, Record<string, unknown>>
+    }
+
+    expect(document.openapi).toBe('3.1.0')
+    expect(document.info).toEqual({ title: 'Users API', version: '2.0.0' })
+    expect(document.paths['/users/users/{id}']).toHaveProperty('get')
+    expect(document.paths['/users/users']?.post).toMatchObject({
+      parameters: [],
+      requestBody: { content: { 'application/json': { schema: {} } } },
+    })
+  })
+
+  it('binds P_BODY to ORDS request content', () => {
+    expect(emitApplicationOrdsSql(application)).toContain('p_body => :body')
+  })
+
+  it('maps POST inputs from a JSON request body instead of HTTP headers', () => {
+    const login = odbPackage('PCK_AUTH', (p) => {
+      const postLogin = p.proc(
+        'POST_LOGIN',
+        { in: { username: odbType.string(), password: odbType.string() } },
+        () => {},
+      )
+      defineService(postLogin, {
+        auth: 'anonymous',
+        method: 'POST',
+        path: '/login',
+        body: {
+          username: postLogin.parameters.username,
+          password: postLogin.parameters.password,
+        },
+      })
+    })
+
+    const sql = emitApplicationOrdsSql(login)
+    const document = generateApplicationOpenApi(login) as {
+      paths: Record<string, Record<string, any>>
+    }
+
+    expect(sql).toContain('DECLARE v_body CLOB := :body_text;')
+    expect(sql).toContain(
+      "p_username => JSON_VALUE(v_body, ''$.username'' RETURNING VARCHAR2(32767))",
+    )
+    expect(sql).toContain(
+      "p_password => JSON_VALUE(v_body, ''$.password'' RETURNING VARCHAR2(32767))",
+    )
+    expect(sql).not.toContain("p_name               => 'username'")
+    expect(sql).not.toContain("p_name               => 'password'")
+    expect(document.paths['/auth/login']?.post).toMatchObject({
+      parameters: [],
+      requestBody: {
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: { username: { type: 'string' }, password: { type: 'string' } },
+            },
+          },
+        },
+      },
+    })
+  })
+
+  it('uses identifier-safe bind variables for kebab-case ORDS parameters', () => {
+    const output = odbPackage('PCK_OUTPUT', (p) => {
+      const postValue = p.proc('POST_VALUE', { out: { accessToken: odbType.string() } }, () => {})
+      defineService(postValue, {
+        auth: 'anonymous',
+        method: 'POST',
+        path: '/value',
+        response: { 'access-token': postValue.parameters.accessToken },
+      })
+    })
+
+    const sql = emitApplicationOrdsSql(output)
+    expect(sql).toContain('p_access_token => :accessToken')
+    expect(sql).toContain("p_name               => 'access-token'")
+    expect(sql).toContain("p_bind_variable_name => 'accessToken'")
+  })
+
+  it('places typed cursor rows in reusable OpenAPI schemas', () => {
+    const document = generateApplicationsOpenApi([application]) as {
+      components: { schemas: Record<string, Record<string, any>> }
+    }
+
+    expect(document.components.schemas.UsersGetUserResultItem).toMatchObject({
+      type: 'object',
+      required: ['id', 'uuid', 'createdAt'],
+      properties: {
+        id: { type: 'number' },
+        uuid: { type: 'string', pattern: '^[0-9a-fA-F]{32}$' },
+        createdAt: { type: 'string', format: 'date-time' },
+        email: { type: ['string', 'null'] },
+      },
+    })
+    expect(document.components.schemas.UsersGetUserResponse).toMatchObject({
+      required: ['result'],
+      properties: {
+        result: {
+          type: 'array',
+          items: { $ref: '#/components/schemas/UsersGetUserResultItem' },
+        },
+      },
+    })
+  })
+
+  it('keeps typed cursor rows when a service delegates to another package procedure', () => {
+    const inner = odbPackage('PCK_INNER', (p) => {
+      const listUsers = p.proc(
+        'LIST_USERS',
+        { out: { rows: odbType.resultset() } },
+        ({ params, body }) =>
+          body.openFor(params.rows, odbQuery().selectFrom(users).select([users.id, users.email])),
+      )
+      return { listUsers }
+    })
+    const outer = odbPackage('PCK_OUTER', (p) => {
+      const list = p.proc('LIST', { out: { items: odbType.resultset() } }, ({ params, body }) =>
+        body.call(inner.listUsers(params.items)),
+      )
+      defineService(list, {
+        auth: 'anonymous',
+        method: 'GET',
+        path: '/items',
+        response: { items: list.parameters.items },
+      })
+    })
+
+    const document = generateApplicationsOpenApi([outer]) as {
+      components: { schemas: Record<string, Record<string, any>> }
+    }
+
+    expect(document.components.schemas.OuterListItemsItem).toMatchObject({
+      required: ['id'],
+      properties: { id: { type: 'number' }, email: { type: ['string', 'null'] } },
+    })
+  })
+})

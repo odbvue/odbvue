@@ -1,0 +1,271 @@
+import {
+  emitOracleType,
+  type OdbColumnType,
+  type OdbValueForType,
+  type OdbValueTypeMap,
+} from '../model.js'
+
+export type ColumnType = OdbColumnType
+
+export type ColumnValueTypeMap = Pick<OdbValueTypeMap, ColumnType>
+
+export type ColumnValueForType<TType extends ColumnType> = OdbValueForType<TType>
+
+export type ColumnOptions = {
+  length?: number
+  precision?: number
+  nullable?: boolean
+  primaryKey?: boolean
+  generated?: boolean
+  /** SQL expression for `GENERATED ALWAYS AS (...) VIRTUAL`. */
+  generatedExpression?: string
+  identity?: boolean
+  unique?: boolean
+  comment?: string
+  default?: 'sys_guid' | 'sys_timestamp' | 'current_timestamp' | string
+}
+
+export type ColumnNode = {
+  kind: 'column'
+  name: string
+  type: ColumnType
+  options: ColumnOptions
+}
+
+export class Column<
+  TValue = unknown,
+  TName extends string = string,
+  TNullable extends boolean = true,
+  TDefault extends boolean = false,
+  TGenerated extends boolean = false,
+  TPrimaryKey extends boolean = false,
+  TType extends ColumnType = ColumnType,
+> {
+  private options: ColumnOptions
+  private readonly _valueType?: TValue
+  private _name: string
+  private _tableName?: string
+
+  constructor(
+    name: TName,
+    readonly type: TType,
+    options: ColumnOptions = {},
+  ) {
+    this._name = name
+    this.options = {
+      nullable: true,
+      ...options,
+    }
+  }
+
+  get name(): TName {
+    return this._name as TName
+  }
+
+  /** @internal Assign the inferred SQL name to an unnamed column. */
+  assignName(name: string): this {
+    if (this._name === '') this._name = name
+    return this
+  }
+
+  /** @internal Attach the owning table used by column `%TYPE` references. */
+  attachTable(tableName: string): this {
+    this._tableName = tableName
+    return this
+  }
+
+  /** Render this column as an Oracle anchored datatype. */
+  typeReference(): string {
+    if (!this._tableName) {
+      throw new Error(`Column ${this.name} is not attached to a table`)
+    }
+    return `${this._tableName}.${this.name}%TYPE`
+  }
+
+  notNull(): Column<TValue, TName, false, TDefault, TGenerated, TPrimaryKey, TType> {
+    this.options.nullable = false
+    return this as Column<TValue, TName, false, TDefault, TGenerated, TPrimaryKey, TType>
+  }
+
+  nullable(): Column<TValue, TName, true, TDefault, TGenerated, TPrimaryKey, TType> {
+    this.options.nullable = true
+    return this as Column<TValue, TName, true, TDefault, TGenerated, TPrimaryKey, TType>
+  }
+
+  primaryKey(): Column<TValue, TName, false, TDefault, TGenerated, true, TType> {
+    this.options.primaryKey = true
+    this.options.nullable = false
+    return this as Column<TValue, TName, false, TDefault, TGenerated, true, TType>
+  }
+
+  unique(): this {
+    this.options.unique = true
+    return this
+  }
+
+  comment(value: string): this {
+    this.options.comment = value
+    return this
+  }
+
+  length(value: number): this {
+    this.options.length = value
+    return this
+  }
+
+  /** `NUMBER(<precision>)` for numeric columns. */
+  precision(value: number): this {
+    this.options.precision = value
+    return this
+  }
+
+  /** `GENERATED ALWAYS AS (<expression>) VIRTUAL`. The column is not insertable. */
+  generatedAs(
+    expression: string,
+  ): Column<TValue, TName, TNullable, TDefault, true, TPrimaryKey, TType> {
+    this.options.generated = true
+    this.options.generatedExpression = expression
+    return this as Column<TValue, TName, TNullable, TDefault, true, TPrimaryKey, TType>
+  }
+
+  default(value: TValue): Column<TValue, TName, TNullable, true, TGenerated, TPrimaryKey, TType> {
+    this.options.default = renderDefaultLiteral(this.type, value)
+    return this as Column<TValue, TName, TNullable, true, TGenerated, TPrimaryKey, TType>
+  }
+
+  defaultSql(
+    expression: string,
+  ): Column<TValue, TName, TNullable, true, TGenerated, TPrimaryKey, TType> {
+    this.options.default = expression
+    return this as Column<TValue, TName, TNullable, true, TGenerated, TPrimaryKey, TType>
+  }
+
+  defaultSysGuid(
+    this: Column<TValue, TName, TNullable, TDefault, TGenerated, TPrimaryKey, 'guid'>,
+  ): Column<TValue, TName, false, true, TGenerated, TPrimaryKey, 'guid'> {
+    this.options.default = 'sys_guid'
+    this.options.nullable = false
+    return this as Column<TValue, TName, false, true, TGenerated, TPrimaryKey, 'guid'>
+  }
+
+  defaultCurrentTimestamp(
+    this: Column<TValue, TName, TNullable, TDefault, TGenerated, TPrimaryKey, 'date' | 'timestamp'>,
+  ): Column<TValue, TName, TNullable, true, TGenerated, TPrimaryKey, TType> {
+    this.options.default = 'current_timestamp'
+    return this as Column<TValue, TName, TNullable, true, TGenerated, TPrimaryKey, TType>
+  }
+
+  defaultSysTimestamp(
+    this: Column<TValue, TName, TNullable, TDefault, TGenerated, TPrimaryKey, 'date' | 'timestamp'>,
+  ): Column<TValue, TName, TNullable, true, TGenerated, TPrimaryKey, TType> {
+    this.options.default = 'sys_timestamp'
+    return this as Column<TValue, TName, TNullable, true, TGenerated, TPrimaryKey, TType>
+  }
+
+  generated(): Column<TValue, TName, TNullable, TDefault, true, TPrimaryKey, TType> {
+    this.options.generated = true
+    return this as Column<TValue, TName, TNullable, TDefault, true, TPrimaryKey, TType>
+  }
+
+  /** `GENERATED BY DEFAULT AS IDENTITY` — a database-assigned, NOT NULL surrogate key. */
+  identity(): Column<TValue, TName, false, TDefault, true, TPrimaryKey, TType> {
+    this.options.identity = true
+    this.options.generated = true
+    this.options.nullable = false
+    return this as Column<TValue, TName, false, TDefault, true, TPrimaryKey, TType>
+  }
+
+  toSQL(): string {
+    return this.name
+  }
+
+  /** Create a column reference that renders under a table alias. */
+  withReference(name: string): this {
+    const column = new Column(name, this.type, this.options)
+    column._tableName = this._tableName
+    return column as this
+  }
+
+  toNode(): ColumnNode {
+    return {
+      kind: 'column',
+      name: this.name,
+      type: this.type,
+      options: { ...this.options },
+    }
+  }
+}
+
+export function emitColumnDef(column: ColumnNode): string {
+  return emitColumnClauses(column, emitColumnType(column))
+}
+
+export function emitColumnType(column: ColumnNode): string {
+  return emitOracleType(column.type, column.options)
+}
+
+function emitColumnClauses(column: ColumnNode, typeSql: string): string {
+  const parts = [column.name, typeSql]
+
+  if (column.options.generatedExpression) {
+    parts.push(`GENERATED ALWAYS AS (${column.options.generatedExpression}) VIRTUAL`)
+  } else if (column.options.identity) {
+    parts.push('GENERATED BY DEFAULT AS IDENTITY')
+  } else if (column.options.default === 'sys_guid') {
+    parts.push('DEFAULT LOWER(SYS_GUID())')
+  } else if (column.options.default === 'sys_timestamp') {
+    parts.push('DEFAULT SYSTIMESTAMP')
+  } else if (column.options.default === 'current_timestamp') {
+    parts.push('DEFAULT CURRENT_TIMESTAMP')
+  } else if (column.options.default) {
+    parts.push(`DEFAULT ${column.options.default}`)
+  }
+
+  if (column.options.nullable === false) {
+    parts.push('NOT NULL')
+  }
+
+  if (column.type === 'json') {
+    parts.push(`CHECK (${column.name} IS JSON)`)
+  }
+
+  if (column.options.unique) {
+    parts.push('UNIQUE')
+  }
+
+  return parts.join(' ')
+}
+
+function renderDefaultLiteral(type: ColumnType, value: unknown): string {
+  switch (type) {
+    case 'blob':
+      throw new Error('BLOB column defaults require a SQL expression, not a literal.')
+    case 'string':
+    case 'guid':
+    case 'clob':
+      return `'${String(value).replace(/'/g, "''")}'`
+    case 'json': {
+      const text = JSON.stringify(value)
+      if (text === undefined) throw new Error('JSON column defaults must be JSON-serializable.')
+      return `'${text.replace(/'/g, "''")}'`
+    }
+    case 'number': {
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        throw new Error('Number column defaults must be finite numbers.')
+      }
+      return String(value)
+    }
+    case 'boolean':
+      return value ? '1' : '0'
+    case 'date':
+    case 'timestamp': {
+      if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+        throw new Error(`${type} column defaults must be valid Date values.`)
+      }
+      const iso = value.toISOString()
+      return type === 'date'
+        ? `DATE '${iso.slice(0, 10)}'`
+        : `TIMESTAMP '${iso.slice(0, -1).replace('T', ' ')}'`
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 100,
+  "tabWidth": 2,
+  "useTabs": false,
+  "semi": false,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "endOfLine": "lf",
+  "insertFinalNewline": true,
+  "ignorePatterns": [
+    "**/auto-imports.d.ts",
+    "**/components.d.ts",
+    "**/typed-router.d.ts",
+    "**/src/themes/icons.ts",
+    "**/src/services/openapi.generated.ts"
+  ]
+}

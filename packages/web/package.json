@@ -1,0 +1,74 @@
+{
+  "name": "@odbvue/web",
+  "version": "0.0.0",
+  "description": "OdbVue web runtime and configuration API",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./vite": {
+      "types": "./dist/vite/index.d.ts",
+      "import": "./dist/vite/index.js"
+    },
+    "./components": {
+      "types": "./dist/components/index.d.ts",
+      "import": "./dist/components/index.js"
+    },
+    "./components.css": "./dist/web.css"
+  },
+  "scripts": {
+    "build": "tsc && vite build --config vite.components.config.ts && node scripts/build-components.mjs",
+    "dev": "tsc --watch",
+    "format": "oxfmt",
+    "lint": "oxlint",
+    "type-check": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "check": "pnpm format && pnpm lint && pnpm type-check && pnpm test:run"
+  },
+  "dependencies": {
+    "@intlify/unplugin-vue-i18n": "^11.2.4",
+    "@mdi/js": "^7.4.47",
+    "@tiptap/extension-image": "^3.14.0",
+    "@tiptap/markdown": "^3.27.1",
+    "@tiptap/pm": "^3.11.0",
+    "@tiptap/starter-kit": "^3.11.0",
+    "@tiptap/vue-3": "^3.11.0",
+    "@vue-leaflet/vue-leaflet": "^0.10.1",
+    "chart.js": "^4.5.1",
+    "chartjs-plugin-autocolors": "^0.3.1",
+    "gray-matter": "^4.0.3",
+    "leaflet": "^1.9.4",
+    "ofetch": "^1.5.1",
+    "vite": "^8.0.16",
+    "vue-chartjs": "^5.3.3",
+    "vue-socials": "^2.0.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "@unhead/vue": "^3.1.4",
+    "@vitejs/plugin-vue": "^6.0.7",
+    "@vue/test-utils": "^2.4.11",
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^29.1.1",
+    "pinia": "^4.0.2",
+    "unplugin-auto-import": "^21.0.0",
+    "vitest": "^4.1.9",
+    "vue": "^3.5.41",
+    "vue-i18n": "^11.4.6",
+    "vue-router": "^5.2.0",
+    "vuetify": "^4.1.2"
+  },
+  "peerDependencies": {
+    "@unhead/vue": "^3.1.4",
+    "pinia": "^4.0.2",
+    "vue": "^3.5.0",
+    "vue-i18n": "^11.4.6",
+    "vue-router": "^5.2.0",
+    "vuetify": "^4.1.2"
+  }
+}

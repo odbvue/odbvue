@@ -1,0 +1,19 @@
+{
+  "name": "@odbvue/wiki",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview",
+    "format": "oxfmt",
+    "lint": "oxlint",
+    "type-check": "tsc -p tsconfig.json --noEmit",
+    "check": "pnpm format && pnpm lint && pnpm type-check"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
+    "vitepress": "^1.6.4",
+    "vue": "^3.5.41"
+  }
+}

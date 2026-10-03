@@ -1,0 +1,518 @@
+# Oracle Database in TypeScript
+
+OdbVue uses a TypeScript-first database model that is conceptually similar to Kysely: you describe database objects and SQL operations with fluent builders in TypeScript, and those builders compile to Oracle SQL.
+
+In OdbVue TypeScript does not only describe queries. It also describes:
+
+- schema creation
+- table DDL
+- PL/SQL packages and procedures
+- ORDS REST endpoints
+- blue/green package deployment
+- migration scripts
+
+This makes TypeScript the authoring language, while Oracle SQL and PL/SQL remain the runtime language.
+
+## Overview
+
+At a high level, the flow is:
+
+1. Define Oracle objects in TypeScript with `@odbvue/odb`.
+2. Export those definitions from migration files in `apps/db/src/migrations`.
+3. Let the CLI compile migrations into `.sql` files.
+4. Execute the generated SQL against Oracle and record applied migrations in `odb_migrations`.
+
+In practice, the system is closer to a typed SQL and PL/SQL code generator than to a classic ORM.
+
+## How It Works
+
+The main pieces are:
+
+- `packages/odb`: fluent builders for Oracle concepts such as tables, packages, ORDS endpoints, and queries.
+- `apps/db`: project schema configuration plus migration source files that assemble builders into deployable database changes.
+- `cli db-*` commands: compile and execute the generated SQL.
+
+Example migration shape:
+
+```ts
+import { defineMigration, defineService, odbEnv, odbPackage, odbType } from '@odbvue/odb'
+
+const schemaName = odbEnv.adb.schemaUsername
+
+const appPackage = odbPackage('pck_app', (p) => {
+  const version = p.proc('version', { out: { version: odbType.string() } }, ({ params, body }) => {
+    body.set(params.version, '1.0.1')
+  })
+
+  defineService(version, {
+    auth: 'anonymous',
+    method: 'GET',
+    path: '/version',
+    summary: 'Returns the application version',
+    response: { version: version.parameters.version },
+  })
+})
+
+export const migration = defineMigration('20260628161706_test', {
+  schema: schemaName,
+})
+  .install(appPackage)
+  .expose(appPackage)
+```
+
+That single migration can emit package DDL, ORDS registration PL/SQL, and the matching rollback SQL, which the framework derives automatically.
+
+## Core Concepts
+
+### DDL: Schemas and Users
+
+`odbSchema()` describes an Oracle schema user and emits the SQL needed to create it. Export it from the canonical first migration, `apps/db/src/migrations/00000000000000-bootstrap.ts`; schema lifecycle runs before the migration plan is applied.
+
+```ts
+import { odbEnv, odbSchema } from '@odbvue/odb'
+
+export const schema = odbSchema(
+  odbEnv.adb.schemaUsername,
+  odbEnv.adb.schemaPassword,
+  (definition) => {
+    definition.grant('EXECUTE ON DBMS_CRYPTO')
+  },
+)
+```
+
+This compiles to statements such as:
+
+- `CREATE USER ...`
+- `GRANT CREATE SESSION ...`
+
+Before planning migrations, the CLI creates the schema if needed and ensures the ODB-owned `odb_migrations` and `odb_migration_objects` tables exist. This is infrastructure DDL, not application migration history. Everything stays in the default `ORA$BASE` edition — OdbVue does not use Oracle editions.
+
+### DDL: Tables and Indexes
+
+`odbTable()` describes a table and returns its columns as a typed table shape. When a column name is omitted, its object key becomes the Oracle name and camelCase is converted to snake_case.
+
+```ts
+import { odbTable } from '@odbvue/odb'
+
+const users = odbTable('app_users', (t) => ({
+  id: t.number().identity().primaryKey().comment('Primary key'),
+  uuid: t.guid().defaultSysGuid(),
+  status: t.string(1).default('N').notNull(),
+  displayName: t.string(240).notNull(),
+  created: t.timestamp().defaultSysTimestamp().notNull(),
+}))
+  .comment('Application users')
+  .unique((columns) => [columns.uuid])
+  .index((columns) => [columns.displayName])
+  .check((columns, expression) => expression.in(columns.status, ['A', 'D', 'N']))
+
+const sql = users.toSQLUp({ schema: 'APP_USER' })
+```
+
+The callbacks are type checked: unknown columns and check values of the wrong type fail during TypeScript compilation. The example emits `display_name`, `COMMENT ON TABLE`, `COMMENT ON COLUMN`, and generated object names:
+
+- `primary_key_app_users`
+- `unique_app_users_uuid`
+- `index_app_users_display_name`
+- `check_app_users_status`
+
+Explicit Oracle names remain available when mapping an existing schema, for example `t.string('DISPLAY_NAME', 240)` or `.unique('users_uuid_uq', [users.uuid])`.
+
+Column defaults accept JavaScript values and quote them for the column type: `.default('N')`, `.default(0)`, and `.default(true)`. Use `.defaultSql('1 + 1')` only for an Oracle expression. Typed helpers cover common Oracle defaults:
+
+- `.defaultSysGuid()` on `t.guid()` emits `CHAR(32 CHAR) DEFAULT LOWER(SYS_GUID()) NOT NULL`.
+- `.defaultSysTimestamp()` emits `DEFAULT SYSTIMESTAMP`.
+- `.defaultCurrentTimestamp()` emits `DEFAULT CURRENT_TIMESTAMP`.
+
+Columns are nullable unless `.notNull()`, `.primaryKey()`, `.identity()`, or `.defaultSysGuid()` makes them required. `.identity()` emits `GENERATED BY DEFAULT AS IDENTITY` and marks the column as generated for typed inserts and updates.
+
+### DDL: Incremental Table Changes
+
+For smaller follow-up changes, `alterTable()` emits `ALTER TABLE` statements.
+
+```ts
+import { alterTable } from '@odbvue/odb'
+
+const sql = alterTable('app_users', 'APP_USER')
+  .addColumn('display_name', 'string', { length: 200, nullable: false })
+  .compile()
+```
+
+This is useful for additive migrations where a full `CREATE TABLE` is no longer appropriate.
+
+### Environment Variables
+
+`odbEnv.read()` reads a required environment variable and returns it as a `string`. It throws when the variable is missing or empty, so migrations fail early instead of generating SQL with an invalid value.
+
+```ts
+import { odbEnv } from '@odbvue/odb'
+
+const schemaName = odbEnv.adb.schemaUsername
+const tablespaceName = odbEnv.read('ODBVUE_ADB_TABLESPACE', 'DATA')
+```
+
+`odbEnv.adb.schemaUsername` and `odbEnv.adb.schemaPassword` are shortcuts for `ODBVUE_ADB_SCHEMA_USERNAME` and `ODBVUE_ADB_SCHEMA_PASSWORD`.
+
+Pass a second argument to provide a default value. The default is used only when the environment variable is missing or empty; if no default is provided, the error identifies the missing variable by name.
+
+### Migrations
+
+`defineMigration()` is the unit of deployment. You declare what a release contains with `install()`; the framework derives the reverse `down` direction automatically.
+
+```ts
+import { defineMigration, odbTable } from '@odbvue/odb'
+
+const users = odbTable('app_users', (t) => {
+  return {
+    id: t.number().identity().primaryKey(),
+    uuid: t.guid().defaultSysGuid(),
+    email: t.string(320).notNull(),
+  }
+}).unique((columns) => [columns.email])
+
+export const migration = defineMigration('20260704120000_app_users', {
+  schema: 'APP_USER',
+}).install(users)
+```
+
+The `down` direction is generated as the mirror image: it drops the artifacts in reverse order. Tables and other plain DDL are installed and rolled back directly. Packages use blue/green deployment (see below), so a redeploy never blocks live callers and rolls back to the previous version instantly.
+
+- `install(artifact)` — application tables, packages, or pre-built APIs (anything with `toSQLUp` / `toSQLDown`). Schema provisioning is exported by `apps/db/src/migrations/00000000000000-bootstrap.ts`.
+- `upRaw(sql)` / `downRaw(sql)` — escape hatches for custom or irreversible SQL.
+
+Installed packages with service metadata publish their ORDS endpoints automatically.
+
+Artifacts run in the exact order you declare them in `up`, and in reverse for `down`, so dependencies install and roll back safely without hidden reordering.
+
+In this repository, migrations live in `apps/db/src/migrations`. The CLI compiles them from JavaScript modules in `apps/db/dist/migrations` and writes generated SQL into `apps/db/dist/sql`.
+
+### DML: Queries
+
+`odbQuery()` is the Kysely-like part most people expect first. It builds `SELECT`, `INSERT`, `UPDATE`, and `DELETE` statements.
+
+```ts
+import { odbQuery } from '@odbvue/odb'
+
+const query = odbQuery()
+
+const selectSql = query
+  .selectFrom('app_users')
+  .select(['id', 'email'])
+  .where('email', '=', 'a@example.com')
+  .orderBy('email')
+  .limit(1)
+  .toSQL()
+```
+
+You can also compile bind variables instead of inline literals:
+
+```ts
+const compiled = query
+  .insertInto('app_users')
+  .values({ id: '...', email: 'a@example.com' })
+  .compile()
+
+compiled.sql
+compiled.bindings
+```
+
+This is DML and read-query generation, not schema generation.
+
+Inside a package body, send selected values directly to PL/SQL variables or parameters with `into(...)`:
+
+```ts
+pkg.proc(
+  'lookup_user',
+  { out: { userId: odbType.guid(), username: odbType.string(128) } },
+  ({ params, body }) => {
+    body.query(
+      odbQuery()
+        .selectFrom(users)
+        .select([users.id, users.username])
+        .into(params.userId, params.username)
+        .where(users.email, '=', 'ada@example.com'),
+    )
+  },
+)
+```
+
+The generated statement is `SELECT id, username INTO p_user_id, p_username ...`.
+
+### PL/SQL Packages and Procedures
+
+`odbPackage()` models Oracle package specs and bodies in TypeScript.
+
+```ts
+import { odbPackage, odbType } from '@odbvue/odb'
+
+const appPackage = odbPackage('pck_app', (pkg) => {
+  const version = pkg.proc(
+    'version',
+    { out: { version: odbType.string() } },
+    ({ params, body }) => {
+      body.set(params.version, '1.0.1')
+    },
+  )
+})
+
+const sql = appPackage.toSQLUp({ schema: 'APP_USER' })
+```
+
+This emits both:
+
+- `CREATE OR REPLACE PACKAGE ...`
+- `CREATE OR REPLACE PACKAGE BODY ...`
+
+This is the main way to keep database business logic close to the data while still authoring it in TypeScript.
+
+For concise, type-aware declarations, use named parameter and variable groups. Object keys become camelCase TypeScript identifiers and snake_case PL/SQL names, while table columns retain their `%TYPE` declarations.
+
+```ts
+import { odbPackage, odbType } from '@odbvue/odb'
+
+const usersApi = odbPackage('pck_users', (pkg) => {
+  const getUser = pkg.proc(
+    'get_user',
+    { in: { userId: odbType.guid() }, out: { displayName: odbType.string(256) } },
+    ({ params, body }) => {
+      const { normalizedId } = body.variables({ normalizedId: odbType.guid() })
+      body.set(normalizedId, params.userId)
+      body.set(params.displayName, 'Ada Lovelace')
+    },
+  )
+})
+```
+
+This emits `p_user_id`, `p_display_name`, and `l_normalized_id`. `odbType` supplies descriptors for strings, numbers, GUIDs, booleans, dates, timestamps, LOBs, and result sets; pass a table column instead when the declaration should use `<table>.<column>%TYPE`.
+
+For numeric PL/SQL loops, use `forRange()`. The callback receives the implicit `PLS_INTEGER` loop index and a nested typed statement body.
+
+```ts
+pkg.proc('process', {}, ({ body }) => {
+  const { total, limit } = body.variables({
+    total: odbType.integer(),
+    limit: odbType.integer(),
+  })
+
+  body.forRange('attempt', 1, limit, (attempt, loop) => {
+    loop.set(total, attempt)
+  })
+})
+```
+
+This emits `FOR l_attempt IN 1..l_limit LOOP` without declaring `l_attempt` separately.
+
+### Oracle Built-in Packages
+
+Oracle ships many built-in packages (`UTL_RAW`, `UTL_ENCODE`, `UTL_I18N`, `DBMS_LOB`, `DBMS_CRYPTO`, and so on). OdbVue provides typed TypeScript wrappers for the most common ones and for standard Oracle expressions, so you can compose calls inside a package body without hand-writing PL/SQL strings. These packages already exist in every database, so there is no install step.
+
+```ts
+import { odbDbmsCrypto, odbPackage, odbType } from '@odbvue/odb'
+
+const secure = odbPackage('pck_secure', (pkg) => {
+  pkg.func('sha256', odbType.raw(), (fn) => {
+    const { data } = fn.parameters({ in: { data: odbType.raw() } })
+    fn.body((body) => {
+      body.return(odbDbmsCrypto.hash(data, odbDbmsCrypto.HASH_SH256))
+    })
+  })
+})
+```
+
+Functions return typed expressions whose PL/SQL return type flows into `body.set()`, so type mismatches are caught at compile time. Algorithm constants (`odbDbmsCrypto.HASH_SH256`) and helpers (`odbDbmsCrypto.cipherSuite(...)`) are provided too. Procedures with `OUT` parameters return typed statements for `body.call(...)`; `body.raw()` remains the escape hatch for unsupported SQL.
+
+```ts
+import { odbDbmsCrypto, odbOracle, odbUtlI18n, odbLiteral } from '@odbvue/odb'
+
+body.set(salt, odbOracle.rawToHex(odbDbmsCrypto.randomBytes(16)))
+body.set(passwordRaw, odbUtlI18n.stringToRaw(password, odbLiteral('AL32UTF8')))
+```
+
+Available wrappers:
+
+- `odbUtlRaw` — RAW manipulation, bitwise operations, and casts (`UTL_RAW`)
+- `odbUtlEncode` — Base64, quoted-printable, and uuencode (`UTL_ENCODE`)
+- `odbUtlI18n` — character-set-aware text/RAW conversion (`UTL_I18N`)
+- `odbOracle` — standard functions and pseudocolumns such as `RAWTOHEX`, `SYS_GUID()`, and `SYSTIMESTAMP`
+- `odbDbmsLob` — LOB length/substr/compare functions and read/write procedures (`DBMS_LOB`)
+- `odbDbmsCrypto` — hashing, MAC, encrypt/decrypt, sign/verify, and random generators (`DBMS_CRYPTO`)
+
+### Framework Packages
+
+OdbVue also ships a small set of reusable PL/SQL packages of its own — _framework packages_ — whose SQL source lives inside `@odbvue/odb`. Unlike the built-in wrappers, these must be created in your schema, so you `install()` them in a migration. They follow the `odb_*` naming convention; for example the LOB/Base64 helper is the `odb_lob` package, exposed in TypeScript as `odbLob`.
+
+```ts
+import { defineMigration, odbLob } from '@odbvue/odb'
+
+export const migration = defineMigration('20260704120000_lob', {
+  schema: 'APP_USER',
+}).install(odbLob)
+```
+
+Once installed, call them from your own package bodies (`odbLob.varchar2ToBase64('v_text')`) or through the typed variable helpers (`ClobVar.toBase64()`). See the LOB capability page for details.
+
+Other framework packages follow the same pattern. `odb_audit` (`odbAudit`) and `odb_settings` (`odbSettings`) define both their tables and PL/SQL packages in TypeScript: audit logs follow the OpenTelemetry LogRecord model, and settings is a key/value store. See the Audit and Settings capability pages for details.
+
+`odbAuth` installs an ORDS-ready authentication API with user and session storage, password hashing, access JWTs, and rotating refresh-token cookies. See the [Authentication capability](./capabilities/auth) for its migration and web-runtime setup.
+
+### ORDS: REST Endpoints From PL/SQL
+
+ORDS support is built into the same model.
+
+Define the procedure and its implementation with `pkg.proc()`, then attach its public HTTP contract with `defineService()`. The application generator emits the ORDS registration PL/SQL needed to expose the procedure as a REST endpoint.
+
+```ts
+import { defineService, generateApplication, odbPackage, odbType } from '@odbvue/odb'
+
+const usersApi = odbPackage('pck_users', (pkg) => {
+  const getUser = pkg.proc(
+    'get_user',
+    { in: { userId: odbType.number() }, out: { user: odbType.resultset() } },
+    ({ params, body }) => {
+      body.raw(
+        `OPEN ${params.user.name} FOR SELECT id, email FROM app_users WHERE id = ${params.userId.name}`,
+      )
+    },
+  )
+  defineService(getUser, {
+    auth: 'anonymous',
+    method: 'GET',
+    path: '/users/:user-id',
+    summary: 'Fetch a single user',
+    paramTypes: { p_user_id: 'INT' },
+    uri: { 'user-id': getUser.parameters.userId },
+    response: { user: getUser.parameters.user },
+  })
+})
+
+const sql = generateApplication(usersApi.application()).ords
+```
+
+The service contract makes the HTTP method and route visible during code review. The builder still derives infrastructure details:
+
+- package name becomes the ORDS module name
+- PL/SQL parameters map to ORDS parameters
+- direct `body`, `headers`, `uri`, and `response` bindings map each PL/SQL parameter to HTTP transport
+
+For example, a login procedure with `P_USERNAME` and `P_PASSWORD` receives:
+
+```json
+{
+  "username": "admin",
+  "password": "..."
+}
+```
+
+Service bindings are exhaustive: bind every declared parameter exactly once. `body` and `uri` accept `in`/`inOut` parameters, `response` accepts `out`/`inOut`, and `headers` accepts either direction.
+
+Service metadata belongs in `defineService(procedure, { method, path, body, headers, uri, response })`, making the application contract explicit and reusable by ORDS, client, and OpenAPI generators.
+
+The migration context enables schema-level ORDS automatically before the first `expose()` operation. It can still be managed explicitly outside the context:
+
+```ts
+import { odbOrdsSchema } from '@odbvue/odb'
+
+const sql = odbOrdsSchema('APP_USER').toSQLUp()
+```
+
+### Blue/Green Package Deployment
+
+Packages are deployed with a blue/green strategy so live callers (ORDS handlers, jobs, other packages) are never blocked by a recompile, and a release can be rolled back instantly. This is handled automatically — `install()` a package and the framework does the rest. Everything stays in `ORA$BASE`; no Oracle editions are used.
+
+How it works:
+
+- Each package is created under a colored physical name, e.g. `PCK_APP_BLUE` / `PCK_APP_GREEN`.
+- A stable synonym (`PCK_APP`) points at the active color. All callers reference the synonym, so they resolve to whichever color is live.
+- On each redeploy the framework compiles the **idle** color (the copy nobody is using), then repoints the synonym. Because the recompiled copy is never in use, there is no library-cache lock contention (`ORA-04021`).
+- The active color per object is tracked in the ODB-owned `odb_migration_objects` registry table.
+- `down` reverts by swapping the synonym back to the previous color, which is still present — an instant rollback with no recompile. The first install's `down` drops the package and synonym outright.
+
+Colors alternate deterministically per object across the ordered migration set, so the generated SQL is plain, reviewable DDL.
+
+## CLI Workflow
+
+The `cli` package is what turns these TypeScript definitions into deployed database changes.
+
+### `ov db-scaffold`
+
+Creates a new migration file in `apps/db/src/migrations` with a timestamp-based name and a ready-to-fill `defineMigration()` template.
+
+```bash
+ov db-scaffold add-users-package
+```
+
+### `ov db-up`
+
+Runs the migration pipeline in the `up` direction.
+
+What it does:
+
+1. Loads secrets such as `ODBVUE_ADB_SCHEMA_USERNAME`.
+2. Creates the project schema if it does not exist.
+3. Ensures the ODB-owned migration control tables exist.
+4. Compiles migration modules into SQL files.
+5. Reads applied migration names from `<schema>.odb_migrations`.
+6. Applies one pending migration by default, or moves to `base`, `latest`, or an exact tag.
+7. Inserts each successful migration name into `odb_migrations`.
+
+```bash
+ov du
+ov du latest
+ov du 1.0.0
+```
+
+### `ov db-latest` / `ov dl`
+
+Applies every pending migration. `ov dl` is the short alias for `ov db-latest`, equivalent to `ov db-up latest`.
+
+```bash
+ov db-latest
+ov dl
+```
+
+### `ov db-down`
+
+Rolls back one application migration by default, or moves down to `base` or an exact tag. It never drops the schema or ODB control tables; use `ov db-implode` for destructive schema removal.
+
+### `ov db-exec`
+
+Executes a single SQL statement or a SQL file.
+
+```bash
+ov db-exec "SELECT * FROM app_user.odb_migrations"
+ov db-exec apps/db/dist/sql/20260628161706_test_up.sql
+```
+
+The executor is Oracle-aware:
+
+- plain SQL DDL and DML are split on semicolons
+- PL/SQL blocks are kept intact and detected by `BEGIN` or `CREATE OR REPLACE ...`
+- SQL\*Plus style `/` block terminators are supported
+- `DBMS_OUTPUT` is enabled and printed when available
+
+That matters because generated package and ORDS scripts are PL/SQL-heavy, while table migrations are usually plain DDL.
+
+## Mental Model
+
+The most useful way to think about this stack is:
+
+- `packages/odb` is the authoring DSL
+- `apps/db` is the deployment source tree
+- Oracle SQL and PL/SQL are the compiled output
+- the CLI is the execution engine
+
+So "Oracle Database in TypeScript" here does not mean Oracle is replaced by TypeScript. It means TypeScript is used to define, version, and generate Oracle-native artifacts in a structured way.
+
+## When To Use Which Concept
+
+- Use `odbSchema()` in `apps/db/src/migrations/00000000000000-bootstrap.ts` for schema-user provisioning.
+- Use `odbTable()` and `alterTable()` for DDL.
+- Use `odbQuery()` for DML and read queries.
+- Use `odbPackage()` for business logic that belongs in PL/SQL.
+- Use the built-in wrappers (`odbUtlRaw`, `odbUtlEncode`, `odbDbmsLob`, `odbDbmsCrypto`) to call Oracle's own packages from a package body.
+- Use framework packages such as `odbLob` for odb-provided helpers that install into your schema under the `odb_*` naming convention.
+- Use `proc()` and `defineService()` with `odbOrdsSchema()` when package procedures should become REST endpoints.
+- Use `defineMigration()` to version all of the above.
+- Packages deploy blue/green automatically for lock-free redeploys and instant rollback.
+
+Together, these pieces form a TypeScript-authored, Oracle-native delivery workflow.

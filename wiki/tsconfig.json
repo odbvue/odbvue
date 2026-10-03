@@ -1,0 +1,7 @@
+{
+  "extends": "../tsconfig.json",
+  "include": [".vitepress/**/*.ts", ".vitepress/**/*.d.ts", ".vitepress/**/*.vue"],
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"]
+  }
+}

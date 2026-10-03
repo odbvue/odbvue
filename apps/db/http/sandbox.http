@@ -1,0 +1,76 @@
+@baseUrl = https://localhost:8443/ords/odbvue
+@username = admin
+@password = change-me
+@settingId = SANDBOX_DEMO
+
+### Login (Set-Cookie holds the refresh token; REST Client keeps it for refresh/logout)
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "{{username}}",
+  "password": "{{password}}"
+}
+
+###
+@accessToken = {{login.response.body.accessToken}}
+
+### Login with invalid credentials (expects 4xx with { "code": "..." })
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "{{username}}",
+  "password": "wrong-password"
+}
+
+### Refresh (rotates refresh token via Cookie, returns new access token)
+# @name refresh
+POST {{baseUrl}}/auth/refresh
+
+### Current user
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{accessToken}}
+
+### Current user without token (expects 401)
+GET {{baseUrl}}/auth/me
+
+### List settings (first page, 50 per page)
+GET {{baseUrl}}/sandbox/settings
+Authorization: Bearer {{accessToken}}
+
+### List settings (next page, from a previous nextCursor)
+GET {{baseUrl}}/sandbox/settings?limit=50&cursor={{settingId}}
+Authorization: Bearer {{accessToken}}
+
+### Read setting
+GET {{baseUrl}}/sandbox/settings/{{settingId}}
+Authorization: Bearer {{accessToken}}
+
+### Read missing setting (expects 404)
+GET {{baseUrl}}/sandbox/settings/DOES_NOT_EXIST
+Authorization: Bearer {{accessToken}}
+
+### Create or update setting
+PUT {{baseUrl}}/sandbox/settings/SANDBOX_TEST
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "value": "Hello from test.http"
+}
+
+### Read created setting
+GET {{baseUrl}}/sandbox/settings/SANDBOX_TEST
+Authorization: Bearer {{accessToken}}
+
+### Delete setting
+DELETE {{baseUrl}}/sandbox/settings/SANDBOX_TEST
+Authorization: Bearer {{accessToken}}
+
+### Settings without token (expects 401)
+GET {{baseUrl}}/sandbox/settings
+
+### Logout (revokes session via Cookie)
+POST {{baseUrl}}/auth/logout

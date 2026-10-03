@@ -1,0 +1,680 @@
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+import { oracleParameterName, toKebabCase, type OdbOrdsType, type OdbType } from './model.js'
+import type { ColumnType } from './schema/column.js'
+import { ODB_ERROR_NUMBER, ODB_ERROR_STATUS } from './schema/errors.js'
+import { odbHttp } from './helpers/http/http.js'
+
+export type OrdsHttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
+
+export type ServiceAuthorization =
+  | 'anonymous'
+  | 'authenticated'
+  | ({ match?: 'all' | 'any' } & (
+      | { roles: readonly [string, ...string[]]; permissions?: readonly [string, ...string[]] }
+      | { roles?: readonly [string, ...string[]]; permissions: readonly [string, ...string[]] }
+    ))
+
+export function validateServiceAuthorization(auth: ServiceAuthorization): void {
+  if (auth === 'anonymous' || auth === 'authenticated') return
+  if (!auth || typeof auth !== 'object' || (!auth.roles?.length && !auth.permissions?.length)) {
+    throw new Error(
+      'Service auth requires anonymous, authenticated, or non-empty roles/permissions.',
+    )
+  }
+  if (auth.match !== undefined && auth.match !== 'all' && auth.match !== 'any') {
+    throw new Error('Service auth match must be all or any.')
+  }
+  for (const names of [auth.roles, auth.permissions]) {
+    if (names !== undefined && (!Array.isArray(names) || !names.length)) {
+      throw new Error('Service auth roles/permissions must be non-empty arrays.')
+    }
+    for (const name of names ?? []) {
+      if (typeof name !== 'string' || !name.trim() || name.length > 200) {
+        throw new Error('Service auth names must contain 1 to 200 characters.')
+      }
+    }
+  }
+}
+
+/**
+ * Native ORDS parameter type.
+ * https://docs.oracle.com/en/database/oracle/oracle-rest-data-services/18.3/aelig/ords-database-type-mappings.html
+ */
+export type OrdsParamType = OdbOrdsType
+
+export type OrdsParamDirection = 'IN' | 'OUT' | 'IN OUT'
+
+export type OrdsResultColumnNode = {
+  name: string
+  type: ColumnType
+  nullable: boolean
+}
+
+// ── AST node types ────────────────────────────────────────────────────────────
+
+export type OrdsParamNode = {
+  kind: 'ords_param'
+  plsqlArg: string
+  name: string
+  bindVariable: string
+  direction: OrdsParamDirection
+  paramType: OrdsParamType
+  odbType?: OdbType
+  sourceType: 'BODY' | 'HEADER' | 'RESPONSE' | 'URI'
+  comment?: string
+  resultColumns?: OrdsResultColumnNode[]
+}
+
+export type OrdsEndpointNode = {
+  kind: 'ords_endpoint'
+  module: string
+  basePath: string
+  packageName: string
+  procedureName: string
+  method: OrdsHttpMethod
+  pattern: string
+  source: string
+  params: OrdsParamNode[]
+  auth?: ServiceAuthorization
+  responseMediaType?: string
+  comment?: string
+}
+
+export type OrdsSchemaNode = {
+  kind: 'ords_schema'
+  schema: string
+  urlMappingType: 'BASE_PATH' | 'BASE_URL'
+  urlMappingPattern: string
+  autoRestAuth: boolean
+}
+
+export type OrdsEndpointSqlOptions = {
+  /**
+   * Target schema. When provided, ORDS registration runs inside a temporary
+   * definer-rights procedure created in that schema so the resulting module,
+   * templates, and handlers are owned by the intended parsing schema instead
+   * of the ADMIN session used by the CLI.
+   */
+  schema?: string
+  /** Define the owning module before its template. Defaults to true. */
+  defineModule?: boolean
+  /** Define the template before its handler. Defaults to true. */
+  defineTemplate?: boolean
+}
+
+// ── OrdsParam ─────────────────────────────────────────────────────────────────
+
+export class OrdsParam {
+  constructor(
+    readonly plsqlArg: string,
+    readonly direction: OrdsParamDirection,
+    readonly paramType: OrdsParamType,
+    readonly comment?: string,
+    readonly resultColumns?: OrdsResultColumnNode[],
+    readonly odbType?: OdbType,
+    private readonly nameOverride?: string,
+    private readonly sourceTypeOverride?: 'BODY' | 'HEADER' | 'RESPONSE' | 'URI',
+  ) {}
+
+  /**
+   * User-facing name and bind variable: strips leading P_/R_ prefix,
+   * lowercases, and replaces _ with - (matches prc_ordsify convention).
+   * e.g. P_USER_NAME → user-name
+   */
+  get name(): string {
+    return this.nameOverride ?? oracleParameterName(this.plsqlArg, { style: 'kebab' })
+  }
+
+  get bindVariable(): string {
+    return oracleParameterName(this.plsqlArg)
+  }
+
+  get sourceType(): 'BODY' | 'HEADER' | 'RESPONSE' | 'URI' {
+    return this.sourceTypeOverride ?? (this.direction === 'OUT' ? 'RESPONSE' : 'HEADER')
+  }
+
+  get hasSourceTypeOverride(): boolean {
+    return this.sourceTypeOverride !== undefined
+  }
+
+  toNode(sourceType: OrdsParamNode['sourceType'] = this.sourceType): OrdsParamNode {
+    return {
+      kind: 'ords_param',
+      plsqlArg: this.plsqlArg,
+      name: this.name,
+      bindVariable: this.bindVariable,
+      direction: this.direction,
+      paramType: this.paramType,
+      odbType: this.odbType,
+      sourceType,
+      comment: this.comment,
+      resultColumns: this.resultColumns?.map((column) => ({ ...column })),
+    }
+  }
+}
+
+// ── OrdsEndpoint ──────────────────────────────────────────────────────────────
+
+export class OrdsEndpoint {
+  private _method?: OrdsHttpMethod
+  private _pattern?: string
+  private _basePath?: string
+  private _params: OrdsParam[] = []
+  private _comment?: string
+  private _auth?: ServiceAuthorization
+  private _responseMediaType?: string
+  private _contextUserId?: string
+
+  contextUserId(parameter: string): this {
+    this._contextUserId = parameter.toUpperCase()
+    return this
+  }
+
+  auth(policy: ServiceAuthorization): this {
+    validateServiceAuthorization(policy)
+    this._auth = structuredClone(policy)
+    return this
+  }
+
+  responseMediaType(value: string): this {
+    this._responseMediaType = value
+    return this
+  }
+
+  constructor(
+    /** ORDS module name (typically derived from the package name). */
+    readonly module: string,
+    /** PL/SQL package name. */
+    readonly packageName: string,
+    /** PL/SQL procedure name. */
+    readonly procedureName: string,
+  ) {}
+
+  /**
+   * Override the HTTP method. If omitted it is inferred from the procedure
+   * name prefix (GET_ → GET, POST_ → POST, PUT_ → PUT, DELETE_ → DELETE).
+   */
+  method(m: OrdsHttpMethod): this {
+    this._method = m
+    return this
+  }
+
+  /**
+   * Override the module base path. Defaults to `<module>/`.
+   */
+  basePath(path: string): this {
+    this._basePath = path
+    return this
+  }
+
+  /**
+   * Override the URL pattern. If omitted it is derived from the procedure
+   * name: the HTTP method prefix is stripped, underscores become dashes, and
+   * for GET endpoints required IN params are appended as path segments.
+   *
+   * @example 'users/:id'
+   */
+  pattern(p: string): this {
+    this._pattern = p
+    return this
+  }
+
+  /**
+   * Add a PL/SQL parameter binding.
+   *
+   * @param plsqlArg  Exact argument name as declared in PL/SQL (e.g. `P_USER_ID`).
+   * @param direction `IN`, `OUT`, or `IN OUT`.
+   * @param type      ORDS type — use `RESULTSET` for SYS_REFCURSOR, `INT` for PLS_INTEGER.
+   * @param comment   Optional description surfaced in the ORDS catalogue.
+   */
+  param(
+    plsqlArg: string,
+    direction: OrdsParamDirection,
+    type: OrdsParamType,
+    comment?: string,
+    resultColumns?: OrdsResultColumnNode[],
+    odbType?: OdbType,
+    nameOverride?: string,
+    sourceTypeOverride?: 'BODY' | 'HEADER' | 'RESPONSE' | 'URI',
+  ): this {
+    this._params.push(
+      new OrdsParam(
+        plsqlArg,
+        direction,
+        type,
+        comment,
+        resultColumns,
+        odbType,
+        nameOverride,
+        sourceTypeOverride,
+      ),
+    )
+    return this
+  }
+
+  comment(c: string): this {
+    this._comment = c
+    return this
+  }
+
+  get effectiveMethod(): OrdsHttpMethod {
+    if (this._method) return this._method
+    const name = this.procedureName.toUpperCase()
+    if (name.startsWith('GET_')) return 'GET'
+    if (name.startsWith('POST_')) return 'POST'
+    if (name.startsWith('PUT_')) return 'PUT'
+    if (name.startsWith('DELETE_')) return 'DELETE'
+    return 'GET'
+  }
+
+  get effectivePattern(): string {
+    if (this._pattern !== undefined) return this._pattern
+
+    // Strip HTTP method prefix
+    let name = this.procedureName.toUpperCase()
+    for (const prefix of ['GET_', 'POST_', 'PUT_', 'DELETE_']) {
+      if (name.startsWith(prefix)) {
+        name = name.slice(prefix.length)
+        break
+      }
+    }
+    const base = toKebabCase(name)
+
+    // For GET, append IN params as path segments (prc_ordsify convention)
+    if (this.effectiveMethod === 'GET') {
+      const pathParts = this._params
+        .filter((p) => p.direction === 'IN')
+        .map((p) => `:${p.bindVariable}`)
+      return pathParts.length > 0 ? `${base}/${pathParts.join('/')}` : base
+    }
+
+    return base
+  }
+
+  get effectiveBasePath(): string {
+    return this._basePath ?? `${this.module}/`
+  }
+
+  private get handlerSource(): string {
+    const binaryBody = this._params.some(
+      (param) => this.paramSourceType(param) === 'BODY' && param.odbType === 'blob',
+    )
+    const args = this._params
+      .map((p) =>
+        p.plsqlArg.toUpperCase() === this._contextUserId
+          ? `${p.plsqlArg.toLowerCase()} => v_auth_user_id`
+          : this.paramSourceType(p) === 'BODY' && p.odbType === 'blob'
+            ? `${p.plsqlArg.toLowerCase()} => v_binary_body`
+            : p.plsqlArg.toUpperCase() === 'P_BODY'
+              ? `${p.plsqlArg.toLowerCase()} => :body`
+              : this.paramSourceType(p) === 'BODY'
+                ? `${p.plsqlArg.toLowerCase()} => ${jsonValueExpression(p)}`
+                : `${p.plsqlArg.toLowerCase()} => :${p.bindVariable}`,
+      )
+      .join(', ')
+    const protectedEndpoint = this._auth !== undefined && this._auth !== 'anonymous'
+    const declarations = [
+      ...(binaryBody ? ['v_binary_body BLOB := :body;'] : []),
+      ...(this._params.some(
+        (param) => this.paramSourceType(param) === 'BODY' && param.odbType !== 'blob',
+      )
+        ? ['v_body CLOB := :body_text;']
+        : []),
+      ...(this._params.some(
+        (param) => this.paramSourceType(param) === 'BODY' && param.odbType === 'clob',
+      )
+        ? ['v_body_json JSON_OBJECT_T := JSON_OBJECT_T.parse(v_body);']
+        : []),
+      ...(protectedEndpoint ? ['v_auth_user_id VARCHAR2(32);'] : []),
+    ]
+    const declaration = declarations.length ? `DECLARE ${declarations.join(' ')} ` : ''
+    const authorization = protectedEndpoint
+      ? `v_auth_user_id := odb_auth.require_user(${odbHttp.bearerToken(':odb_authorization').toSQL()}); `
+      : ''
+    const policy = this._auth
+    const checks =
+      typeof policy === 'object'
+        ? [
+            ...(policy.roles ?? []).map(
+              (role) => `odb_auth.has_role(v_auth_user_id, ${sqlStr(role)})`,
+            ),
+            ...(policy.permissions ?? []).map(
+              (permission) => `odb_auth.has_permission(v_auth_user_id, ${sqlStr(permission)})`,
+            ),
+          ]
+        : []
+    const enforcement = checks.length
+      ? `IF NOT (${checks.join(policy && typeof policy === 'object' && policy.match === 'any' ? ' OR ' : ' AND ')}) THEN raise_application_error(${ODB_ERROR_NUMBER}, 'ODB_ERROR|FORBIDDEN|FORBIDDEN'); END IF; `
+      : ''
+    const normalizeBody = binaryBody
+      ? 'IF v_binary_body IS NULL THEN DBMS_LOB.CREATETEMPORARY(v_binary_body, TRUE, DBMS_LOB.CALL); END IF; '
+      : ''
+    const call = `${normalizeBody}${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args});`
+    const envelope = "'ODB_HTTP\\|([4-5][0-9]{2})\\|([A-Z][A-Z0-9_]{0,99})'"
+    const status = `REGEXP_SUBSTR(SQLERRM, ${envelope}, 1, 1, NULL, 1)`
+    const code = `REGEXP_SUBSTR(SQLERRM, ${envelope}, 1, 1, NULL, 2)`
+    const explicitResponse = [
+      `:status_code := TO_NUMBER(${status});`,
+      "owa_util.mime_header('application/json', FALSE);",
+      'owa_util.http_header_close;',
+      `htp.p(JSON_OBJECT('code' VALUE ${code}));`,
+    ].join(' ')
+    const odbEnvelope = "'ODB_ERROR\\|([A-Z][A-Z0-9_]{0,99})\\|([A-Z][A-Z0-9_]{0,99})'"
+    const odbKind = `REGEXP_SUBSTR(SQLERRM, ${odbEnvelope}, 1, 1, NULL, 1)`
+    const odbCode = `REGEXP_SUBSTR(SQLERRM, ${odbEnvelope}, 1, 1, NULL, 2)`
+    const odbStatus = Object.entries(ODB_ERROR_STATUS)
+      .map(([kind, httpStatus]) => `WHEN '${kind}' THEN ${httpStatus}`)
+      .join(' ')
+    const odbErrorResponse = [
+      `:status_code := CASE ${odbKind} ${odbStatus} ELSE 500 END;`,
+      "owa_util.mime_header('application/json', FALSE);",
+      'owa_util.http_header_close;',
+      `htp.p(JSON_OBJECT('code' VALUE ${odbCode}));`,
+    ].join(' ')
+    const fallbackResponse = [
+      ':status_code := 500;',
+      "owa_util.mime_header('application/json', FALSE);",
+      'owa_util.http_header_close;',
+      `htp.p('{"code":"INTERNAL_SERVER_ERROR"}');`,
+    ].join(' ')
+    return `${declaration}BEGIN ${authorization}${enforcement}${call} EXCEPTION WHEN OTHERS THEN IF SQLCODE = -20999 THEN ${explicitResponse} ELSIF SQLCODE = ${ODB_ERROR_NUMBER} THEN ${odbErrorResponse} ELSE ${fallbackResponse} END IF; END;`
+  }
+
+  private paramSourceType(param: OrdsParam): OrdsParamNode['sourceType'] {
+    if (param.hasSourceTypeOverride) {
+      return param.sourceType
+    }
+    if (param.direction === 'OUT') return 'RESPONSE'
+    const pathParams = new Set(
+      [...this.effectivePattern.matchAll(/:([a-zA-Z0-9_-]+)\??/g)].map((match) => match[1]),
+    )
+    if (pathParams.has(param.name)) return 'URI'
+    return this.effectiveMethod === 'POST' || this.effectiveMethod === 'PUT' ? 'BODY' : 'HEADER'
+  }
+
+  toNode(): OrdsEndpointNode {
+    return {
+      kind: 'ords_endpoint',
+      module: this.module,
+      basePath: this.effectiveBasePath,
+      packageName: this.packageName,
+      procedureName: this.procedureName,
+      method: this.effectiveMethod,
+      pattern: this.effectivePattern,
+      source: this.handlerSource,
+      params: this._params
+        .filter((p) => p.plsqlArg.toUpperCase() !== this._contextUserId)
+        .map((p) => p.toNode(this.paramSourceType(p))),
+      auth: this._auth,
+      responseMediaType: this._responseMediaType,
+      comment: this._comment,
+    }
+  }
+
+  toSQLUp(options: OrdsEndpointSqlOptions = {}): string {
+    const pattern = this.effectivePattern
+    const method = this.effectiveMethod
+    const comment = sqlStr(this._comment)
+    const source = `'${this.handlerSource.replace(/'/g, "''")}'`
+    const moduleSql =
+      options.defineModule === false
+        ? []
+        : [
+            `  ords.define_module(`,
+            `    p_module_name    => '${this.module}',`,
+            `    p_base_path      => '${this.effectiveBasePath}',`,
+            `    p_items_per_page => 0,`,
+            `    p_comments       => ${comment}`,
+            `  );`,
+            `  COMMIT;`,
+            '',
+          ]
+    const templateSql =
+      options.defineTemplate === false
+        ? []
+        : [
+            `  ords.define_template(`,
+            `    p_module_name => '${this.module}',`,
+            `    p_pattern     => '${pattern}',`,
+            `    p_comments    => ${comment}`,
+            `  );`,
+            `  COMMIT;`,
+            '',
+          ]
+    const body = [
+      ...moduleSql,
+      ...templateSql,
+      `  ords.define_handler(`,
+      `    p_module_name    => '${this.module}',`,
+      `    p_pattern        => '${pattern}',`,
+      `    p_method         => '${method}',`,
+      `    p_source_type    => ords.source_type_plsql,`,
+      `    p_source         => ${source},`,
+      `    p_items_per_page => 0,`,
+      `    p_comments       => ${comment}`,
+      `  );`,
+      `  COMMIT;`,
+      ...(this._auth !== undefined && this._auth !== 'anonymous'
+        ? [
+            `  ords.define_parameter(p_module_name => '${this.module}', p_pattern => '${pattern}', p_method => '${method}', p_name => 'Authorization', p_bind_variable_name => 'odb_authorization', p_source_type => 'HEADER', p_param_type => 'STRING', p_access_method => 'IN');`,
+          ]
+        : []),
+      ...this._params.flatMap((p) => {
+        if (p.plsqlArg.toUpperCase() === this._contextUserId) return []
+        if (p.plsqlArg.toUpperCase() === 'P_BODY' || this.paramSourceType(p) === 'BODY') return []
+        return [
+          '',
+          `  ords.define_parameter(`,
+          `    p_module_name        => '${this.module}',`,
+          `    p_pattern            => '${pattern}',`,
+          `    p_method             => '${method}',`,
+          `    p_name               => '${p.name}',`,
+          `    p_bind_variable_name => '${p.bindVariable}',`,
+          `    p_source_type        => '${this.paramSourceType(p)}',`,
+          `    p_param_type         => '${p.paramType}',`,
+          `    p_access_method      => '${p.direction}',`,
+          `    p_comments           => ${sqlStr(p.comment)}`,
+          `  );`,
+          `  COMMIT;`,
+        ]
+      }),
+    ]
+
+    if (!options.schema) {
+      return plsqlBlock(body)
+    }
+
+    return wrapInSchemaProcedure(
+      options.schema,
+      tempOrdsProcedureName(this.module, this.procedureName, 'up'),
+      body,
+    )
+  }
+
+  /**
+   * Drops the ORDS module for this endpoint (which removes all templates,
+   * handlers and parameters within it). Oracle ORDS only exposes
+   * ORDS.DELETE_MODULE — there is no DELETE_TEMPLATE API.
+   */
+  toSQLDown(options: OrdsEndpointSqlOptions = {}): string {
+    const body = [
+      `  ords.delete_module(`,
+      `    p_module_name => '${this.module}'`,
+      `  );`,
+      `  COMMIT;`,
+    ]
+
+    if (!options.schema) {
+      return plsqlBlock(body)
+    }
+
+    return wrapInSchemaProcedure(
+      options.schema,
+      tempOrdsProcedureName(this.module, this.procedureName, 'down'),
+      body,
+    )
+  }
+}
+
+function jsonValueExpression(param: OrdsParam): string {
+  const path = `$.${param.name}`
+  if (param.odbType === 'json') {
+    return `JSON_QUERY(v_body, '${path}' RETURNING CLOB)`
+  }
+  if (param.odbType === 'clob') {
+    return `v_body_json.get_clob(${sqlStr(param.name)})`
+  }
+  if (param.paramType === 'BOOLEAN') {
+    return `CASE JSON_VALUE(v_body, '${path}' RETURNING VARCHAR2(5)) WHEN 'true' THEN TRUE WHEN 'false' THEN FALSE END`
+  }
+  return `JSON_VALUE(v_body, '${path}' RETURNING ${jsonValueType(param.paramType)})`
+}
+
+function jsonValueType(paramType: OrdsParamType): string {
+  switch (paramType) {
+    case 'INT':
+    case 'LONG':
+    case 'DOUBLE':
+      return 'NUMBER'
+    case 'TIMESTAMP':
+      return 'TIMESTAMP'
+    default:
+      return 'VARCHAR2(32767)'
+  }
+}
+
+// ── OrdsSchema ────────────────────────────────────────────────────────────────
+
+export class OrdsSchema {
+  private _urlMappingType: 'BASE_PATH' | 'BASE_URL' = 'BASE_PATH'
+  private _urlMappingPattern?: string
+  private _autoRestAuth = false
+
+  constructor(readonly schema: string) {}
+
+  urlMappingType(type: 'BASE_PATH' | 'BASE_URL'): this {
+    this._urlMappingType = type
+    return this
+  }
+
+  urlMappingPattern(pattern: string): this {
+    this._urlMappingPattern = pattern
+    return this
+  }
+
+  autoRestAuth(enabled = true): this {
+    this._autoRestAuth = enabled
+    return this
+  }
+
+  toNode(): OrdsSchemaNode {
+    const schema = this.schema.toLowerCase()
+    return {
+      kind: 'ords_schema',
+      schema,
+      urlMappingType: this._urlMappingType,
+      urlMappingPattern: this._urlMappingPattern ?? schema,
+      autoRestAuth: this._autoRestAuth,
+    }
+  }
+
+  toSQLUp(): string {
+    const schema = this.schema.toLowerCase()
+    const pattern = this._urlMappingPattern ?? schema
+    return plsqlBlock([
+      `  ords.enable_schema(`,
+      `    p_enabled             => TRUE,`,
+      `    p_schema              => '${schema}',`,
+      `    p_url_mapping_type    => '${this._urlMappingType}',`,
+      `    p_url_mapping_pattern => '${pattern}',`,
+      `    p_auto_rest_auth      => ${this._autoRestAuth ? 'TRUE' : 'FALSE'}`,
+      `  );`,
+      `  COMMIT;`,
+    ])
+  }
+
+  toSQLDown(): string {
+    const schema = this.schema.toLowerCase()
+    return plsqlBlock([
+      `  ords.enable_schema(`,
+      `    p_enabled => FALSE,`,
+      `    p_schema  => '${schema}'`,
+      `  );`,
+      `  COMMIT;`,
+    ])
+  }
+}
+
+// ── Factories ─────────────────────────────────────────────────────────────────
+
+export function odbOrdsSchema(schema: string, build?: (o: OrdsSchema) => void): OrdsSchema {
+  const o = new OrdsSchema(schema)
+  build?.(o)
+  return o
+}
+
+export function odbOrdsEndpoint(
+  module: string,
+  packageName: string,
+  procedureName: string,
+  build?: (e: OrdsEndpoint) => void,
+): OrdsEndpoint {
+  const e = new OrdsEndpoint(module, packageName, procedureName)
+  build?.(e)
+  return e
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function sqlStr(value: string | undefined): string {
+  return value !== undefined ? `'${value.replace(/'/g, "''")}'` : 'NULL'
+}
+
+function plsqlBlock(body: string[]): string {
+  return ['BEGIN', ...body, 'END;', '/'].join('\n')
+}
+
+function qualifyName(name: string, schema?: string): string {
+  return schema ? `${schema}.${name}` : name
+}
+
+function tempOrdsProcedureName(
+  module: string,
+  procedureName: string,
+  direction: 'up' | 'down',
+): string {
+  const base = `OV_ORDS_${direction}_${module}_${procedureName}`
+    .toUpperCase()
+    .replace(/[^A-Z0-9_]/g, '_')
+  const hash = shortHash(base)
+  const prefix = base.slice(0, Math.max(1, 30 - hash.length - 1))
+  return `${prefix}_${hash}`
+}
+
+function shortHash(value: string): string {
+  let hash = 0
+
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0
+  }
+
+  return hash.toString(36).toUpperCase().slice(0, 6)
+}
+
+function wrapInSchemaProcedure(schema: string, procedureName: string, body: string[]): string {
+  const qualifiedProcedure = qualifyName(procedureName, schema)
+
+  return [
+    `CREATE OR REPLACE PROCEDURE ${qualifiedProcedure} AS`,
+    'BEGIN',
+    ...body,
+    `END ${procedureName};`,
+    '/',
+    'BEGIN',
+    `  ${qualifiedProcedure};`,
+    'END;',
+    '/',
+    `DROP PROCEDURE ${qualifiedProcedure};`,
+  ].join('\n')
+}

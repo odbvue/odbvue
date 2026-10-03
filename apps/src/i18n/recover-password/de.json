@@ -1,7 +1,0 @@
-{
-  "recover.password": "Passwort wiederherstellen",
-  "send": "Senden",
-  "username.must.be.a.valid.e-mail.address": "Benutzername muss eine gültige E-Mail-Adresse sein",
-  "wrong.username": "Falscher Benutzername",
-  "password.recovery.email.sent": "Passwort-Wiederherstellungs-E-Mail wurde gesendet"
-}
