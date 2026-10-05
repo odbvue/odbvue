@@ -179,6 +179,20 @@ export const runSetupOracleAdb = async () => {
       initial: INITIAL_PASSWORD,
       validate: passwordValidation,
     },
+    {
+      type: 'text',
+      name: 'appUsername',
+      message: 'Application admin username',
+      initial: 'admin@odbvue.com',
+      validate: (value) => (value.trim() ? true : 'This field is required'),
+    },
+    {
+      type: 'password',
+      name: 'appPassword',
+      message: 'Application admin password',
+      initial: 'MySecurePass123!',
+      validate: passwordValidation,
+    },
   ])
 
   const secretsStore = new SecretsStore()
@@ -186,6 +200,8 @@ export const runSetupOracleAdb = async () => {
   secretsStore.set('ODBVUE_ADB_WALLET_PASSWORD', credentials.walletPassword)
   secretsStore.set('ODBVUE_ADB_SCHEMA_USERNAME', credentials.schemaUsername)
   secretsStore.set('ODBVUE_ADB_SCHEMA_PASSWORD', credentials.schemaPassword)
+  secretsStore.set('ODBVUE_APP_ADMIN_USERNAME', credentials.appUsername)
+  secretsStore.set('ODBVUE_APP_ADMIN_PASSWORD', credentials.appPassword)
 
   logger.lf()
 }

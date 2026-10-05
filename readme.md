@@ -47,7 +47,7 @@ const greetings = odbPackage('pck_greetings', (pkg) => {
 })
 
 export const migration = defineMigration('00000000000002_greetings', {
-	schema: odbEnv.adb.schemaUsername,
+	schema: odbEnv.schemaUsername,
 }).install(greetings)
 ```
 

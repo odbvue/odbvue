@@ -11,8 +11,8 @@ import {
   odbStorage,
 } from '@odbvue/odb'
 
-const schemaName = odbEnv.adb.schemaUsername
-const schemaPassword = odbEnv.adb.schemaPassword
+const schemaName = odbEnv.schemaUsername
+const schemaPassword = odbEnv.schemaPassword
 
 export const schema = odbSchema(schemaName, schemaPassword, (definition) => {
   definition.grant('EXECUTE ON DBMS_CRYPTO')
@@ -41,24 +41,10 @@ export const migration = defineMigration('00000000000000_bootstrap', {
   )
   .install(
     odbAuth.seedUser({
-      username: 'admin@odbvue.com',
-      password: odbEnv.read('ODBVUE_AUTH_INITIAL_PASSWORD', 'MySecurePass123!'),
+      username: odbEnv.appUsername,
+      password: odbEnv.appPassword,
       displayName: 'Administrator',
     }),
   )
-  .install(
-    odbAuth.seedUser({
-      username: 'test@odbvue.com',
-      password: 'MySecurePass123!',
-      displayName: 'Test user',
-    }),
-  )
-  .install(
-    odbSettings.seed({
-      id: 'SANDBOX_DEMO',
-      value: 'Hello from the sandbox',
-      meta: { label: 'Sandbox demo setting' },
-    }),
-  )
   .install(odbAuth.role.seed({ name: 'admin', description: 'Application administrator' }))
-  .install(odbAuth.role.seedGrant({ username: 'admin@odbvue.com', role: 'admin' }))
+  .install(odbAuth.role.seedGrant({ username: odbEnv.appUsername, role: 'admin' }))

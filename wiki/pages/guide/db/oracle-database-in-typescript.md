@@ -37,7 +37,7 @@ Example migration shape:
 ```ts
 import { defineMigration, defineService, odbEnv, odbPackage, odbType } from '@odbvue/odb'
 
-const schemaName = odbEnv.adb.schemaUsername
+const schemaName = odbEnv.schemaUsername
 
 const appPackage = odbPackage('pck_app', (p) => {
   const version = p.proc('version', { out: { version: odbType.string() } }, ({ params, body }) => {
@@ -71,13 +71,9 @@ That single migration can emit package DDL, ORDS registration PL/SQL, and the ma
 ```ts
 import { odbEnv, odbSchema } from '@odbvue/odb'
 
-export const schema = odbSchema(
-  odbEnv.adb.schemaUsername,
-  odbEnv.adb.schemaPassword,
-  (definition) => {
-    definition.grant('EXECUTE ON DBMS_CRYPTO')
-  },
-)
+export const schema = odbSchema(odbEnv.schemaUsername, odbEnv.schemaPassword, (definition) => {
+  definition.grant('EXECUTE ON DBMS_CRYPTO')
+})
 ```
 
 This compiles to statements such as:
@@ -147,11 +143,13 @@ This is useful for additive migrations where a full `CREATE TABLE` is no longer 
 ```ts
 import { odbEnv } from '@odbvue/odb'
 
-const schemaName = odbEnv.adb.schemaUsername
+const schemaName = odbEnv.schemaUsername
 const tablespaceName = odbEnv.read('ODBVUE_ADB_TABLESPACE', 'DATA')
 ```
 
-`odbEnv.adb.schemaUsername` and `odbEnv.adb.schemaPassword` are shortcuts for `ODBVUE_ADB_SCHEMA_USERNAME` and `ODBVUE_ADB_SCHEMA_PASSWORD`.
+`odbEnv.schemaUsername` and `odbEnv.schemaPassword` are shortcuts for `ODBVUE_ADB_SCHEMA_USERNAME` and `ODBVUE_ADB_SCHEMA_PASSWORD`.
+
+`odbEnv.appUsername` and `odbEnv.appPassword` read the required `ODBVUE_APP_ADMIN_USERNAME` and `ODBVUE_APP_ADMIN_PASSWORD` values used to seed the application administrator and grant its admin role. Database setup in `ov setup` prompts for both values, defaulting to `admin@odbvue.com` and `MySecurePass123!`, and saves them alongside the schema credentials in the selected environment's `.env`. Choose a unique password for deployed environments. For environments configured before these prompts were added, supply both variables before loading the bootstrap migration.
 
 Pass a second argument to provide a default value. The default is used only when the environment variable is missing or empty; if no default is provided, the error identifies the missing variable by name.
 

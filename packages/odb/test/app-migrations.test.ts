@@ -4,6 +4,8 @@ import { generateApplicationOpenApi } from '../src/application.js'
 beforeAll(() => {
   process.env.ODBVUE_ADB_SCHEMA_USERNAME = 'ODBVUE'
   process.env.ODBVUE_ADB_SCHEMA_PASSWORD = 'test-password'
+  process.env.ODBVUE_APP_ADMIN_USERNAME = 'owner@example.com'
+  process.env.ODBVUE_APP_ADMIN_PASSWORD = 'CustomSecure123!'
 })
 
 const migrations = {
@@ -16,6 +18,16 @@ const migrations = {
 const load = async (file: keyof typeof migrations) => (await migrations[file]()).migration
 
 describe('app-owned ORDS migrations', () => {
+  it('seeds the configured application admin credentials and role grant', async () => {
+    const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
+    expect(sql).toContain("ODBVUE.odb_auth_crypto.hash_password('CustomSecure123!')")
+    const grants = sql.match(/DECLARE v_user_id[\s\S]*?END;\n\//g)
+    expect(grants).toHaveLength(1)
+    expect(grants?.[0]).toContain("'owner@example.com'")
+    expect(grants?.[0]).toContain("ODBVUE.odb_auth.grant_role(v_user_id, 'admin')")
+    expect(sql).not.toContain("'admin@odbvue.com'")
+  })
+
   it('installs storage and exposes owner-scoped upload, download, list and delete', async () => {
     const bootstrap = (await load('00000000000000-bootstrap')).compile().up().join('\n')
     expect(bootstrap).toContain('CREATE TABLE ODBVUE.odb_storage_files')
@@ -92,7 +104,7 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain('CREATE TABLE ODBVUE.odb_settings_store')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE ODBVUE.odb_settings AS')
     expect(sql).toContain("ODBVUE.odb_settings.write('APP_VERSION', '1.0.0'")
-    expect(sql).toContain("ODBVUE.odb_settings.write('SANDBOX_DEMO'")
+    expect(sql).not.toContain("ODBVUE.odb_settings.write('SANDBOX_DEMO'")
   })
 
   it('installs the transport-independent odb_auth package in bootstrap', async () => {
@@ -205,17 +217,17 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain('list_settings(p_after => :after')
   })
 
-  it('seeds an admin grant and an unprivileged test user in bootstrap', async () => {
+  it('seeds an admin grant without an unprivileged test user in bootstrap', async () => {
     const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
     expect(sql).toContain('CREATE TABLE ODBVUE.odb_auth_user_roles')
     expect(sql).toContain("ODBVUE.odb_auth.define_role('admin'")
     expect(sql).toContain("ODBVUE.odb_auth.grant_role(v_user_id, 'admin')")
-    expect(sql).toContain("'test@odbvue.com'")
-    expect(sql).toContain("ODBVUE.odb_auth_crypto.hash_password('MySecurePass123!')")
+    expect(sql).not.toContain("'test@odbvue.com'")
+    expect(sql).toContain("ODBVUE.odb_auth_crypto.hash_password('CustomSecure123!')")
     expect(sql.match(/ODBVUE\.odb_auth\.grant_role\(/g)).toHaveLength(1)
     const grants = sql.match(/DECLARE v_user_id[\s\S]*?END;\n\//g)
     expect(grants).toHaveLength(1)
-    expect(grants?.[0]).toContain("'admin@odbvue.com'")
+    expect(grants?.[0]).toContain("'owner@example.com'")
     expect(grants?.[0]).not.toContain("'test@odbvue.com'")
   })
 })
