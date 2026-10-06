@@ -27,13 +27,7 @@
           :text="capability.description"
           class="h-100"
           hover
-        >
-          <template #append>
-            <v-chip :color="isEnabled(capability) ? 'success' : 'default'" size="small">
-              {{ isEnabled(capability) ? 'Enabled' : 'Unavailable' }}
-            </v-chip>
-          </template>
-        </v-card>
+        />
       </v-col>
     </v-row>
     <v-row class="mt-4">
@@ -64,8 +58,4 @@ definePage({
 
 const config = useOdbVueConfig()
 const capabilities = odbVueCapabilities
-
-function isEnabled(capability: (typeof odbVueCapabilities)[number]) {
-  return capability.required || (capability.configKey && config[capability.configKey] !== false)
-}
 </script>

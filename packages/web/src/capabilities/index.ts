@@ -1,5 +1,3 @@
-import type { OdbVueCapabilityName } from '../runtime/config.js'
-
 export type CapabilityKind = 'core' | 'ui' | 'feature' | 'integration' | 'infrastructure'
 export interface CapabilityDefinition {
   name: string
@@ -10,7 +8,6 @@ export interface CapabilityDefinition {
   title: string
   description: string
   icon: string
-  configKey?: OdbVueCapabilityName
 }
 
 function defineCapabilityMetadata<const Definition extends CapabilityDefinition>(
@@ -83,7 +80,6 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     title: 'Authentication',
     description: 'Authentication and identity support.',
     icon: '$mdiShieldAccount',
-    configKey: 'auth',
   }),
   defineCapabilityMetadata({
     name: 'audit',
@@ -91,7 +87,6 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     title: 'Audit',
     description: 'Audit event recording.',
     icon: '$mdiClipboardTextClock',
-    configKey: 'audit',
   }),
   defineCapabilityMetadata({
     name: 'settings',
@@ -99,7 +94,6 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     title: 'Settings',
     description: 'Application settings management.',
     icon: '$mdiCog',
-    configKey: 'settings',
   }),
   defineCapabilityMetadata({
     name: 'rate-limit',
@@ -115,7 +109,6 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     title: 'Storage',
     description: 'External storage provider integration.',
     icon: '$mdiFolder',
-    configKey: 'storage',
   }),
   defineCapabilityMetadata({
     name: 'ai',
@@ -123,7 +116,6 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     title: 'AI',
     description: 'AI provider integration.',
     icon: '$mdiCreation',
-    configKey: 'ai',
   }),
   defineCapabilityMetadata({
     name: 'email',
@@ -131,6 +123,5 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     title: 'Email',
     description: 'Email provider integration.',
     icon: '$mdiEmail',
-    configKey: 'email',
   }),
 ] as const

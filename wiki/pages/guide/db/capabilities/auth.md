@@ -134,15 +134,9 @@ The application uses only bootstrap and sandbox migrations and is reinstalled fo
 
 ## Browser Runtime
 
-Enable the web capability in `apps/web/odbvue.config.ts`:
+Authentication is provided by `@odbvue/web`. `apps/web/odbvue.config.ts` configures web runtime options only and does not install database objects. Use `auth: { endpoints: { ... } }` to override endpoint URLs.
 
-```ts
-import { defineOdbVueApp } from '@odbvue/web'
-
-export default defineOdbVueApp({ auth: true })
-```
-
-Use `useAuth()` in components and composables. `restore()` runs automatically when the capability starts; it restores the access token from the refresh cookie and then loads the current user.
+Use `useAuth()` in components and composables. `restore()` runs automatically when the runtime starts; it restores the access token from the refresh cookie and then loads the current user.
 
 ```ts
 import { useAuth } from '@odbvue/web'

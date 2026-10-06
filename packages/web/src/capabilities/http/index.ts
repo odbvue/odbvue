@@ -82,19 +82,11 @@ export const httpCapability = defineCapability({
   requires: ['auth'],
   setup(context) {
     const auth = context.get(authContract)
-    const authEnabled = context.config.auth === true || typeof context.config.auth === 'object'
     const http = createOdbVueHttp(
       {
         ...context.config.http,
-        ...(authEnabled
-          ? {
-              getAccessToken: () => auth.accessToken.value,
-              refreshAccessToken: () => auth.refresh(),
-              onRefreshFailure: (refreshContext: HttpRefreshFailureContext) => {
-                context.config.http?.onRefreshFailure?.(refreshContext)
-              },
-            }
-          : {}),
+        getAccessToken: () => auth.accessToken.value,
+        refreshAccessToken: () => auth.refresh(),
       },
       context.hooks,
     )

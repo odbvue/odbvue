@@ -2,11 +2,9 @@ export { defineOdbVueApp } from './runtime/config.js'
 export type {
   OdbVueAppConfig,
   OdbVueAuthConfig,
-  OdbVueCapabilityName,
   OdbVueErrorsConfig,
   OdbVueHook,
   OdbVueI18nConfig,
-  OdbVueProviderConfig,
   OdbVueUiConfig,
 } from './runtime/config.js'
 export {
@@ -45,7 +43,7 @@ export { defineContract } from './runtime/contract.js'
 export type { OdbVueContract } from './runtime/contract.js'
 export { createOdbVueHooks } from './runtime/hooks.js'
 export type { OdbVueHookHandlers, OdbVueHookMap, OdbVueHooks } from './runtime/hooks.js'
-export { useCapability, useOdbVueConfig } from './runtime/config.js'
+export { useOdbVueConfig } from './runtime/config.js'
 export { installOdbVue } from './runtime/install.js'
 export { defineCapability, resolveOdbVueCapabilities } from './runtime/capability.js'
 export type { OdbVueCapability, OdbVueSetupContext } from './runtime/capability.js'

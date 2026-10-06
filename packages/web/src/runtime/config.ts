@@ -4,12 +4,9 @@ import type { HttpConfiguration } from '../capabilities/http/index.js'
 import { useOdbVue } from './context.js'
 import type { OdbVueHookHandlers } from './hooks.js'
 
-export type OdbVueAuthConfig =
-  | boolean
-  | {
-      endpoints?: Partial<import('../capabilities/auth/index.js').OdbVueAuthEndpoints>
-    }
-export type OdbVueProviderConfig = boolean | { provider: string; [key: string]: unknown }
+export type OdbVueAuthConfig = {
+  endpoints?: Partial<import('../capabilities/auth/index.js').OdbVueAuthEndpoints>
+}
 export type OdbVueHook = (...args: unknown[]) => unknown | Promise<unknown>
 
 export type OdbVueUiConfig = {
@@ -42,11 +39,6 @@ export type OdbVueAppConfig = {
   title?: string
   version?: string
   auth?: OdbVueAuthConfig
-  audit?: boolean
-  settings?: boolean
-  storage?: OdbVueProviderConfig
-  ai?: OdbVueProviderConfig
-  email?: OdbVueProviderConfig
   ui?: OdbVueUiConfig
   i18n?: OdbVueI18nConfig
   errors?: OdbVueErrorsConfig
@@ -57,8 +49,6 @@ export type OdbVueAppConfig = {
   preset?: string
 }
 
-export type OdbVueCapabilityName = 'auth' | 'audit' | 'settings' | 'storage' | 'ai' | 'email'
-
 /** Defines an OdbVue application configuration with inferred literal types. */
 export function defineOdbVueApp<const Config extends OdbVueAppConfig>(config: Config): Config {
   return config
@@ -67,12 +57,4 @@ export function defineOdbVueApp<const Config extends OdbVueAppConfig>(config: Co
 /** Returns the configuration installed when the OdbVue application was created. */
 export function useOdbVueConfig(): OdbVueAppConfig {
   return useOdbVue().config
-}
-
-/** Returns an enabled capability's configuration, or undefined when it is disabled. */
-export function useCapability<Name extends OdbVueCapabilityName>(
-  name: Name,
-): OdbVueAppConfig[Name] | undefined {
-  const capability = useOdbVueConfig()[name]
-  return capability === false || capability === undefined ? undefined : capability
 }

@@ -7,7 +7,8 @@ import {
   createOdbVueErrors,
   resolveOdbVueLocale,
   useAppStore,
-  useCapability,
+  authContract,
+  authCapability,
   useOdbVue,
   useOdbVueConfig,
   errorsContract,
@@ -36,35 +37,29 @@ describe('OdbVue application config', () => {
   })
 
   it('preserves the declared configuration', () => {
-    const config = defineOdbVueApp({ auth: { local: true }, audit: true })
+    const config = defineOdbVueApp({ auth: { endpoints: { login: '/session/login' } } })
 
-    expect(config).toEqual({ auth: { local: true }, audit: true })
+    expect(config).toEqual({ auth: { endpoints: { login: '/session/login' } } })
   })
 
-  it('provides config and enabled capabilities to composables', () => {
+  it('provides config and services without capability flags', () => {
     const config = defineOdbVueApp({
-      auth: { local: true },
-      audit: false,
       ui: { theme: { default: 'dark' } },
     })
     let providedConfig: unknown
     let providedRuntime: unknown
-    let auth: unknown
-    let audit: unknown
 
     const app = createApp({})
     const runtime = installOdbVue(app, config)
     app.runWithContext(() => {
       providedRuntime = useOdbVue()
       providedConfig = useOdbVueConfig()
-      auth = useCapability('auth')
-      audit = useCapability('audit')
     })
 
     expect(providedRuntime).toBe(runtime)
     expect(providedConfig).toBe(config)
-    expect(auth).toEqual({ local: true })
-    expect(audit).toBeUndefined()
+    expect(runtime.get(authContract)).toBeDefined()
+    expect(runtime.get(httpContract)).toBeDefined()
     expect(runtime.get(uiContract).theme.name.value).toBe('dark')
     expect(runtime.get(errorsContract)).toBeDefined()
   })
@@ -81,6 +76,17 @@ describe('OdbVue application config', () => {
     expect(runtime1.get(httpContract)).not.toBe(runtime2.get(httpContract))
     expect(runtime1.config).toBe(config1)
     expect(runtime2.config).toBe(config2)
+  })
+
+  it('restores auth at startup without an enablement flag', async () => {
+    const runtime = installOdbVue(createApp({}), defineOdbVueApp({}))
+    const auth = runtime.get(authContract)
+    const restore = vi.spyOn(auth, 'restore').mockResolvedValue(false)
+
+    await authCapability.start?.(runtime)
+
+    expect(restore).toHaveBeenCalledOnce()
+    restore.mockRestore()
   })
 
   it('throws when OdbVue has not been installed on the application', () => {

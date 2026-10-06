@@ -1,17 +1,11 @@
 # Web Configuration
 
-`apps/web/odbvue.config.ts` is the registration point for application-level choices. It is installed before the web app mounts, and `@odbvue/web` makes it available to framework code and composables.
+`apps/web/odbvue.config.ts` configures the **web application runtime**, not the database installation. It is installed before the web app mounts, and `@odbvue/web` makes it available to framework code and composables. Use the components and composables your application needs from `@odbvue/web`.
 
 ```ts
 import { defineOdbVueApp } from '@odbvue/web'
 
 export default defineOdbVueApp({
-  auth: true,
-  audit: false,
-  settings: false,
-  storage: false,
-  ai: false,
-  email: false,
   ui: {},
   integrations: {},
   hooks: {},
@@ -21,30 +15,33 @@ export default defineOdbVueApp({
 
 ## Configuration areas
 
-| Area           | Purpose                                                                                                                                                 |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Capabilities   | `auth`, `audit`, `settings`, `storage`, `ai`, and `email` declare framework capabilities. Their complete web APIs will be documented as they stabilize. |
-| `ui`           | Application theme, component defaults, icon aliases, and advanced Vuetify options.                                                                      |
-| `integrations` | Application choices for external providers.                                                                                                             |
-| `hooks`        | Reserved extension points for application-specific behavior.                                                                                            |
-| `modules`      | Reserved registration point for business modules.                                                                                                       |
+| Area           | Purpose                                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------- |
+| `auth`         | Optional overrides for authentication endpoint URLs; authentication is available by default.      |
+| `http`         | HTTP defaults and the generated OpenAPI document used for request security and response decoding. |
+| `i18n`         | Supported locales, browser-language detection, and translation options.                           |
+| `errors`       | Error buffering and application reporters.                                                        |
+| `ui`           | Application theme, component defaults, icon aliases, and advanced Vuetify options.                |
+| `integrations` | Application choices for external providers.                                                       |
+| `hooks`        | Reserved extension points for application-specific behavior.                                      |
+| `modules`      | Reserved registration point for business modules.                                                 |
 
 `title`, `version`, and `preset` are also available for application metadata and future composition. Use only documented, stable fields; configuration is intentionally the boundary between an application and the framework implementation.
 
 ## Runtime access
 
-Components and composables can read the installed configuration with `useOdbVueConfig()`. `useCapability(name)` returns a configured capability or `undefined` when it is disabled.
+Components and composables can read the installed configuration with `useOdbVueConfig()` and access services through their composables.
 
 ```ts
 const config = useOdbVueConfig()
-const audit = useCapability('audit')
+const auth = useAuth()
 ```
 
 Application-specific behavior should remain in application source files. Do not put business rules into the configuration object.
 
 ## Authentication
 
-Set `auth: true` after installing the database-side `odbAuth` migration. At startup, the capability sends the refresh cookie to `/auth/refresh`; when that succeeds it fetches `/auth/me`. The HTTP capability adds the access token to protected requests and refreshes it when needed.
+At startup, the authentication service sends the refresh cookie to `/auth/refresh`; when that succeeds it fetches `/auth/me`. The HTTP service adds the access token to protected requests and refreshes it when needed. Set `http.openapi` to the generated database OpenAPI document to distinguish protected operations from anonymous ones.
 
 ```ts
 import { useAuth } from '@odbvue/web'
@@ -57,3 +54,20 @@ await auth.logout()
 ```
 
 `login()` and `refresh()` receive only an access token in the response body. The refresh token is an `HttpOnly`, `Secure`, `SameSite=Lax` cookie, so browser requests must remain on a compatible HTTPS origin. Override the default `/auth/login`, `/auth/refresh`, `/auth/logout`, and `/auth/me` routes with `auth: { endpoints: { ... } }` when necessary.
+
+## Database Installation
+
+The database bootstrap installs all shipped database capabilities explicitly through migrations, including `odbHttp`, `odbRateLimit`, `odbAuth`, `odbSettings`, `odbLob`, `odbAudit`, and `odbStorage`.
+
+```ts
+defineMigration('00000000000000_bootstrap', { schema })
+  .install(odbHttp)
+  .install(odbRateLimit)
+  .install(odbAuth)
+  .install(odbSettings)
+  .install(odbLob)
+  .install(odbAudit)
+  .install(odbStorage)
+```
+
+Web configuration never generates or installs Oracle objects. Installing database packages does not automatically expose application endpoints or configure external providers; those remain explicit application concerns.

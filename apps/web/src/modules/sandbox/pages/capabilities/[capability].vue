@@ -10,13 +10,6 @@
         >
           <v-card-text>
             <p>{{ capability.description }}</p>
-            <v-chip :color="enabled ? 'success' : 'default'">
-              {{ enabled ? 'Enabled' : 'Unavailable' }}
-            </v-chip>
-            <p v-if="!enabled" class="mt-4 text-medium-emphasis">
-              Enable this capability in <code>odbvue.config.ts</code> to configure it for this
-              application.
-            </p>
           </v-card-text>
         </v-card>
       </v-col>
@@ -56,14 +49,8 @@ const config = useOdbVueConfig()
 const capability = computed(() =>
   odbVueCapabilities.find((item) => item.name === route.params.capability),
 )
-const enabled = computed(
-  () =>
-    !!capability.value &&
-    (capability.value.required ||
-      (capability.value.configKey && config[capability.value.configKey] !== false)),
-)
 const configuration = computed(() => {
-  if (!capability.value?.configKey) return 'Built in capability'
-  return JSON.stringify(config[capability.value.configKey], null, 2)
+  const options = Object.entries(config).find(([name]) => name === capability.value?.name)?.[1]
+  return options === undefined ? 'Default configuration' : JSON.stringify(options, null, 2)
 })
 </script>

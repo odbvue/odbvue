@@ -43,7 +43,6 @@ export interface OdbVueAuthEndpoints {
 
 export interface OdbVueAuthOptions {
   endpoints?: Partial<OdbVueAuthEndpoints>
-  enabled?: boolean
   http?: HttpClient
 }
 
@@ -214,12 +213,11 @@ export const authCapability = defineCapability({
     context.provide(
       authContract,
       createOdbVueAuth({
-        endpoints: typeof config === 'object' ? config.endpoints : undefined,
+        endpoints: config?.endpoints,
       }),
     )
   },
   async start(runtime) {
-    if (runtime.config.auth === true || typeof runtime.config.auth === 'object')
-      await runtime.get(authContract).restore()
+    await runtime.get(authContract).restore()
   },
 })
