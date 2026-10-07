@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
-import VOvTable from '../../src/components/data/VOvTable.vue'
-import { globalPlugins } from './setup'
+import VOvTable from '@/components/data/VOvTable.vue'
+import { globalPlugins } from '../../support/components.setup'
 import type { OvTableOptions, OvTableData } from '@/components'
 
 function mountTable(options: OvTableOptions, items: OvTableData[] = []) {

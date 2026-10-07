@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { nextTick } from 'vue'
-import VOvMap from '../../src/components/content/VOvMap.vue'
-import { globalPlugins } from './setup'
+import VOvMap from '@/components/content/VOvMap.vue'
+import { globalPlugins } from '../../support/components.setup'
 import type { OvMapOptions, OvGeoJson } from '@/components'
 
 const { mockFitBounds, mockInvalidateSize, mockGetBounds, mockGetLayers, mockMarker, mockIcon } =

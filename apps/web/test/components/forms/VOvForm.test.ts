@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import VOvForm from '../../src/components/forms/VOvForm.vue'
-import { globalPlugins } from './setup'
+import VOvForm from '@/components/forms/VOvForm.vue'
+import { globalPlugins } from '../../support/components.setup'
 import type { OvFormOptions } from '@/components'
 
 function mountForm(options: OvFormOptions, data = {}) {

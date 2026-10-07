@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
-import VOvView from '../../src/components/data/VOvView.vue'
-import { globalPlugins } from './setup'
+import VOvView from '@/components/data/VOvView.vue'
+import { globalPlugins } from '../../support/components.setup'
 import type { OvViewOptions } from '@/components'
 
 function mountView(options: OvViewOptions, data = {}) {

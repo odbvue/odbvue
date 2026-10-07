@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createAuth } from '../src/app/auth/core.js'
-import { createHttpClient, type HttpClient } from '../src/app/http/core.js'
+import { createAuth } from '@/app/auth/core.js'
+import { createHttpClient, type HttpClient } from '@/app/http/core.js'
 
 type HttpPostMock = (url: string, body?: unknown) => Promise<unknown>
 type HttpGetMock = (url: string) => Promise<unknown>

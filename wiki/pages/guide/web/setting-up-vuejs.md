@@ -11,7 +11,13 @@ main-application and module boundaries:
 apps/web/
   odbvue.config.ts           # Application choices
   plugins/                  # Node-only Vite plugins
-  test/                     # Infrastructure and shared component tests
+  test/                     # Vitest suites (*.test.ts), aligned with source
+    app/                    # Main application behavior and services
+    components/             # Shared components, mirroring source subfolders
+    modules/                # Module-specific behavior
+    plugins/                # Node-only Vite plugins
+    support/                # Shared setup, stubs, and fixtures
+    main.test.ts            # Bootstrap and mount
   e2e/                      # Browser tests
   src/
     main.ts                 # Bootstrap and mount

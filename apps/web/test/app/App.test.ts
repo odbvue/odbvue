@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import App from '../app/App.vue'
+import App from '@/app/App.vue'
 
 vi.mock('@/app/layouts/DefaultLayout.vue', () => ({
   default: { template: '<main data-layout="default"><slot /></main>' },

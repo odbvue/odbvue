@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { mount, flushPromises, VueWrapper } from '@vue/test-utils'
-import VOvEditor from '../../src/components/forms/VOvEditor.vue'
-import { globalPlugins } from './setup'
+import VOvEditor from '@/components/forms/VOvEditor.vue'
+import { globalPlugins } from '../../support/components.setup'
 
 let wrapper: VueWrapper
 

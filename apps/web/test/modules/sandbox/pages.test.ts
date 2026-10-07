@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-const pages = import.meta.glob<string>('../modules/sandbox/pages/**/*.vue', {
+const pages = import.meta.glob<string>('@/modules/sandbox/pages/**/*.vue', {
   eager: true,
   query: '?raw',
   import: 'default',

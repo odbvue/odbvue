@@ -9,8 +9,8 @@ import {
   resolvePageTitle,
   toRoutePage,
   useRouting,
-} from '../src/app/router/api.js'
-import type { PageMeta } from '../src/app/router/api.js'
+} from '@/app/router/api.js'
+import type { PageMeta } from '@/app/router/api.js'
 
 function pageMeta(meta: Partial<PageMeta> = {}): PageMeta {
   return { access: 'public', navigation: true, ...meta }

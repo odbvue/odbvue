@@ -7,7 +7,7 @@ import { createState } from '@/app/state'
 import { i18n } from '@/app/i18n'
 import { useHttp } from '@/app/http'
 import { useUi } from '@/app/ui'
-import Login from '../app/pages/login.vue'
+import Login from '@/app/pages/login.vue'
 
 const session = vi.hoisted((): { auth?: Auth } => ({}))
 vi.mock('@/app/auth', async (importOriginal) => {

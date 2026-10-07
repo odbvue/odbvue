@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { useHttp } from '../src/app/http/index.js'
+import { useHttp } from '@/app/http/index.js'
 
 type FetchMock = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 type RefreshMock = () => Promise<boolean>

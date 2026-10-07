@@ -62,7 +62,7 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       '@intlify/unplugin-vue-i18n/messages': fileURLToPath(
-        new URL('./test/messages.stub.ts', import.meta.url),
+        new URL('./test/support/messages.stub.ts', import.meta.url),
       ),
     },
   },
@@ -77,15 +77,20 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'app',
-          include: ['src/**/*.spec.ts', 'test/*.test.ts'],
+          include: [
+            'test/app/**/*.test.ts',
+            'test/modules/**/*.test.ts',
+            'test/plugins/**/*.test.ts',
+            'test/*.test.ts',
+          ],
         },
       },
       {
         extends: true,
         test: {
           name: 'components',
-          include: ['test/components/*.test.ts'],
-          setupFiles: ['./test/components/setup.ts'],
+          include: ['test/components/**/*.test.ts'],
+          setupFiles: ['./test/support/components.setup.ts'],
         },
       },
     ],

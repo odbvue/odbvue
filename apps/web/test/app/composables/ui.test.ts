@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, ref } from 'vue'
 import { createI18n } from 'vue-i18n'
 import { enableAutoUnmount, mount } from '@vue/test-utils'
-import { useNotificationMessage } from '../app/composables/ui'
+import { useNotificationMessage } from '@/app/composables/ui'
 
 enableAutoUnmount(afterEach)
 

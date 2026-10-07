@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { discoverPageFolders, moduleFromComponent } from '../plugins/routing'
+import { discoverPageFolders, moduleFromComponent } from '../../plugins/routing'
 
 let fixture: string | undefined
 afterEach(() => {

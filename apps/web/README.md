@@ -10,8 +10,7 @@ The complete Vue experience lives here, with no separate web runtime package.
 - `src/components`: shared `VOv*` components, compiled directly with the app.
 - `src/modules/sandbox`: sandbox pages, translations, and diagnostics catalog.
 - `plugins`: Node-only Vite plugins for routes/manifest, messages, icons, and OpenAPI.
-- `test`: infrastructure and shared component suites; `src/__tests__`: app behavior;
-  `e2e`: browser regression tests.
+- `test`: all Vitest suites, organized by source boundary; `e2e`: browser regression tests.
 
 This retains release/v0's conventional Vue folders while distinguishing the main
 application from self-contained modules. Modules may add their own components,
@@ -126,8 +125,25 @@ pnpm build
 
 ### Run Unit Tests with [Vitest](https://vitest.dev/)
 
+All Vitest tests live under `test` and use the `.test.ts` suffix. Mirror meaningful
+source boundaries: `test/app`, `test/components`, and `test/modules/<module>`.
+Bootstrap tests live at `test/main.test.ts`; Node-only Vite plugin tests live
+under `test/plugins`. Name tests after the subject they exercise, for example
+`test/app/pages/login.test.ts` for the login page.
+
+Shared setup, stubs, and fixtures belong in `test/support`. Prefer `@/` imports
+for application source so moving tests does not break source imports. The `app`
+Vitest project runs application, module, bootstrap, and plugin tests; the
+`components` project runs shared component tests with its own Vuetify setup.
+Both projects discover nested `.test.ts` files recursively. Playwright tests
+remain separate in `e2e` and use `.spec.ts`.
+
 ```sh
 pnpm test:unit
+# Run all Vitest suites once
+pnpm test:run
+# Run one project
+pnpm test:run --project=components
 ```
 
 ### Run End-to-End Tests with [Playwright](https://playwright.dev)

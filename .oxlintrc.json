@@ -25,7 +25,7 @@
       "rules": {}
     },
     {
-      "files": ["**/src/**/__tests__/*"],
+      "files": ["**/src/**/__tests__/*", "apps/web/test/**/*.ts"],
       "plugins": ["vitest"],
       "env": {
         "vitest": true
