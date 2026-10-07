@@ -1,4 +1,13 @@
 {
   "home.title": "Accueil",
-  "home.description": "Bienvenue à OdbVue"
+  "home.description": "Bienvenue à OdbVue",
+  "auth.login": "Connexion",
+  "auth.logout": "Déconnexion",
+  "auth.username": "Nom d'utilisateur",
+  "auth.password": "Mot de passe",
+  "auth.username.required": "Le nom d'utilisateur est requis",
+  "auth.password.required": "Le mot de passe est requis",
+  "auth.invalid.credentials": "Nom d'utilisateur ou mot de passe incorrect.",
+  "auth.forbidden": "Vous n'avez pas la permission d'accéder à cette page.",
+  "auth.too.many.requests": "Trop de tentatives de connexion. Veuillez réessayer plus tard."
 }

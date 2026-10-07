@@ -113,7 +113,7 @@ type OvFormFieldBase = {
   value?: unknown
   label?: string
   placeholder?: string
-  autocomplete?: 'off' | 'on'
+  autocomplete?: string
   hint?: string
   prefix?: string
   suffix?: string

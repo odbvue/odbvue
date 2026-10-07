@@ -11,10 +11,41 @@
           <v-list-item-title>{{ page.title }}</v-list-item-title>
         </v-list-item>
       </v-list>
+      <v-divider />
+      <v-list v-if="app.auth.ready">
+        <template v-if="app.auth.isAuthenticated">
+          <v-list-item
+            prepend-icon="$mdiAccount"
+            :title="displayName"
+            :subtitle="app.user?.username"
+          />
+          <v-list-item
+            prepend-icon="$mdiLogout"
+            :title="t('auth.logout')"
+            :disabled="app.auth.loading"
+            @click="logout"
+          />
+        </template>
+        <v-list-item v-else to="/login" prepend-icon="$mdiAccount" :title="t('auth.login')" />
+      </v-list>
     </v-navigation-drawer>
     <v-app-bar>
       <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
       <v-toolbar-title>{{ app.title }}</v-toolbar-title>
+      <template v-if="app.auth.ready">
+        <v-btn v-if="!app.auth.isAuthenticated" to="/login" prepend-icon="$mdiAccount" class="mr-2">
+          {{ t('auth.login') }}
+        </v-btn>
+        <v-btn
+          v-else
+          prepend-icon="$mdiLogout"
+          :loading="app.auth.loading"
+          class="mr-2"
+          @click="logout"
+        >
+          {{ t('auth.logout') }}
+        </v-btn>
+      </template>
       <v-btn v-if="mobile">
         <v-icon :icon="'$mdiDotsVertical'"></v-icon>
         <v-menu activator="parent">
@@ -97,7 +128,7 @@
         data-cy="theme-toggle"
       ></v-btn>
       <v-progress-linear
-        :active="app.ui.loading"
+        :active="app.ui.loading || app.auth.loading"
         indeterminate
         absolute
         location="bottom"
@@ -113,14 +144,14 @@
     </v-app-bar>
 
     <v-app-bar class="pa-2" v-if="app.ui.notification && !app.ui.snackbar">
-      <v-alert :type="app.ui.notification.type" :text="t(app.ui.notification.message)"></v-alert>
+      <v-alert :type="app.ui.notification.type" :text="notificationMessage"></v-alert>
     </v-app-bar>
 
     <v-main class="ma-4">
       <slot />
 
       <v-snackbar :model-value="app.ui.snackbar" @update:model-value="!$event && app.ui.clear()">
-        {{ app.ui.notification?.message }}
+        {{ notificationMessage }}
         <template v-slot:actions>
           <v-btn color="pink" variant="text" @click="app.ui.clear()">
             {{ t('close') }}
@@ -154,12 +185,28 @@
 </template>
 
 <script setup lang="ts">
+import { useAppStore } from '@/stores'
+import { isPageAllowed } from '@/router/auth'
+import { useNotificationMessage } from '@/composables/ui'
+
 const drawer = ref(false)
 const app = useAppStore()
+const notificationMessage = useNotificationMessage(() => app.ui.notification?.message)
 const routing = useRouting()
 const navigationPages = computed(() =>
-  routing.pages.value.filter((page) => page.module === undefined),
+  routing.pages.value.filter(
+    (page) => page.module === undefined && isPageAllowed(page.meta.visibility, page.meta, app.auth),
+  ),
 )
+const displayName = computed(() =>
+  typeof app.user?.displayName === 'string' ? app.user.displayName : app.user?.username,
+)
+const router = useRouter()
+async function logout() {
+  drawer.value = false
+  await app.auth.logout()
+  await router.replace('/')
+}
 const { mobile } = useDisplay()
 const { t } = useI18n()
 </script>

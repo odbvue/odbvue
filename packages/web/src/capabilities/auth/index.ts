@@ -160,6 +160,9 @@ export function createOdbVueAuth<User extends AuthUser = AuthUser>(
         if (!response.data) throw toError(response.error, 'Authentication failed.')
         applyTokens(response.data)
         await this.me()
+      } catch (error) {
+        clear()
+        throw error
       } finally {
         loading.value = false
       }
@@ -167,7 +170,10 @@ export function createOdbVueAuth<User extends AuthUser = AuthUser>(
     async logout() {
       loading.value = true
       try {
-        await requireHttp().post(endpoints.logout, undefined, { credentials: 'include' })
+        const response = await requireHttp().post(endpoints.logout, undefined, {
+          credentials: 'include',
+        })
+        if (response.error) throw response.error
       } finally {
         clear()
         loading.value = false

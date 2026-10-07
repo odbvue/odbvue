@@ -61,8 +61,9 @@ declare global {
   const triggerRef: typeof import('vue').triggerRef
   const undefined: typeof import('vuetify').undefined
   const unref: typeof import('vue').unref
-  const useAppStore: typeof import('@odbvue/web').useAppStore
+  const useAppStore: typeof import('./src/stores/index').useAppStore
   const useAttrs: typeof import('vue').useAttrs
+  const useAuthStore: typeof import('./src/stores/auth').useAuthStore
   const useCardBackground: typeof import('./src/composables/ui').useCardBackground
   const useCssModule: typeof import('vue').useCssModule
   const useCssVars: typeof import('vue').useCssVars
@@ -80,6 +81,7 @@ declare global {
   const useLink: typeof import('vue-router').useLink
   const useLocale: typeof import('vuetify').useLocale
   const useModel: typeof import('vue').useModel
+  const useNotificationMessage: typeof import('./src/composables/ui').useNotificationMessage
   const usePageMeta: typeof import('@odbvue/web').usePageMeta
   const usePreferencesStore: typeof import('@odbvue/web').usePreferencesStore
   const useRoute: typeof import('vue-router').useRoute

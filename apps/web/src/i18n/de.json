@@ -1,4 +1,13 @@
 {
   "home.title": "Startseite",
-  "home.description": "Willkommen bei OdbVue"
+  "home.description": "Willkommen bei OdbVue",
+  "auth.login": "Anmelden",
+  "auth.logout": "Abmelden",
+  "auth.username": "Benutzername",
+  "auth.password": "Passwort",
+  "auth.username.required": "Benutzername ist erforderlich",
+  "auth.password.required": "Passwort ist erforderlich",
+  "auth.invalid.credentials": "Benutzername oder Passwort ist falsch.",
+  "auth.forbidden": "Sie haben keine Berechtigung, auf diese Seite zuzugreifen.",
+  "auth.too.many.requests": "Zu viele Anmeldeversuche. Bitte versuchen Sie es später erneut."
 }

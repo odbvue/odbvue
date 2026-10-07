@@ -4,6 +4,7 @@ import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { unheadVueComposablesImports } from '@unhead/vue'
+import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 
 const cssStubPlugin = {
   enforce: 'pre' as const,
@@ -21,6 +22,7 @@ const cssStubPlugin = {
 export default defineConfig({
   plugins: [
     vue(),
+    VueI18nPlugin({ include: ['src/i18n/**'] }),
     cssStubPlugin,
     AutoImport({
       imports: [

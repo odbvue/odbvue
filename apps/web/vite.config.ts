@@ -93,7 +93,6 @@ export default defineConfig(({ mode }) => {
               'computedRouteParams',
               'computedRouteQuery',
               'configureHttp',
-              'useAppStore',
               'useHttp',
               'usePageMeta',
               'useRouteParams',
@@ -118,7 +117,7 @@ export default defineConfig(({ mode }) => {
           },
           unheadVueComposablesImports,
         ],
-        dirs: ['./src/composables/**', './src/modules/*/composables/**'],
+        dirs: ['./src/composables/**', './src/stores/**', './src/modules/*/composables/**'],
       }),
       Components({
         resolvers: [odbVueComponentsResolver],

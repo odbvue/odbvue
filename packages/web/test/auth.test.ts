@@ -10,6 +10,42 @@ function response<T>(data: T | null, status = 200) {
 }
 
 describe('authentication capability', () => {
+  it('clears issued tokens if identity hydration fails during login', async () => {
+    const auth = createOdbVueAuth({
+      http: {
+        post: vi.fn<HttpPostMock>().mockResolvedValue(response({ accessToken: 'access-token' })),
+        get: vi.fn<HttpGetMock>().mockResolvedValue({
+          ...response(null, 403),
+          error: new Error('Forbidden'),
+        }),
+      } as unknown as HttpClient,
+    })
+
+    await expect(auth.login({ username: 'ada', password: 'password' })).rejects.toThrow('Forbidden')
+    expect(auth.accessToken.value).toBeNull()
+    expect(auth.user.value).toBeNull()
+    expect(auth.loading.value).toBe(false)
+  })
+
+  it('surfaces logout errors and clears the local session', async () => {
+    const post = vi.fn<HttpPostMock>()
+    post
+      .mockResolvedValueOnce(response({ accessToken: 'access-token' }))
+      .mockResolvedValueOnce({ ...response(null, 500), error: new Error('Logout failed') })
+    const auth = createOdbVueAuth({
+      http: {
+        post,
+        get: vi.fn<HttpGetMock>().mockResolvedValue(response({ userId: 7, username: 'ada' })),
+      } as unknown as HttpClient,
+    })
+    await auth.login({ username: 'ada', password: 'password' })
+
+    await expect(auth.logout()).rejects.toThrow('Logout failed')
+    expect(auth.accessToken.value).toBeNull()
+    expect(auth.user.value).toBeNull()
+    expect(auth.loading.value).toBe(false)
+  })
+
   it('hydrates roles and permissions from JSON text or decoded arrays', async () => {
     const auth = createOdbVueAuth({
       http: {

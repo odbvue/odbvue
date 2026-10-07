@@ -1,4 +1,13 @@
 {
   "home.title": "Home",
-  "home.description": "Welcome to OdbVue"
+  "home.description": "Welcome to OdbVue",
+  "auth.login": "Login",
+  "auth.logout": "Logout",
+  "auth.username": "Username",
+  "auth.password": "Password",
+  "auth.username.required": "Username is required",
+  "auth.password.required": "Password is required",
+  "auth.invalid.credentials": "Invalid username or password.",
+  "auth.forbidden": "You do not have permission to access this page.",
+  "auth.too.many.requests": "Too many login attempts. Please try again later."
 }
