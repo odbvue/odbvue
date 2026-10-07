@@ -12,6 +12,55 @@ function response(status: number, data: unknown = {}): Response {
 }
 
 describe('HTTP capability', () => {
+  it('reports final HTTP and refresh errors through explicit callbacks', async () => {
+    const onError = vi.fn<NonNullable<import('@/app/http').HttpConfiguration['onError']>>()
+    const onRefreshFailure =
+      vi.fn<NonNullable<import('@/app/http').HttpConfiguration['onRefreshFailure']>>()
+    const fetch = vi.fn<FetchMock>(() => Promise.resolve(response(401)))
+    const http = useHttp({
+      fetch,
+      configuration: {
+        refreshAccessToken: async () => false,
+        onError,
+        onRefreshFailure,
+      },
+    })
+    const result = await http.get('/private')
+    expect(result.status).toBe(401)
+    expect(fetch).toHaveBeenCalledOnce()
+    expect(onError).toHaveBeenCalledExactlyOnceWith(result.error)
+    expect(onRefreshFailure).toHaveBeenCalledExactlyOnceWith({
+      request: '/private',
+      error: expect.any(Error),
+      options: { method: 'GET' },
+    })
+  })
+
+  it.each([
+    [99, false],
+    [100, true],
+  ])('reports slow requests at the configured threshold (%sms)', async (duration, slow) => {
+    const now = vi.spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValueOnce(duration)
+    const onSlowRequest =
+      vi.fn<NonNullable<import('@/app/http').HttpConfiguration['onSlowRequest']>>()
+    try {
+      const http = useHttp({
+        fetch: vi.fn<FetchMock>(() => Promise.resolve(response(200))),
+        configuration: { slowRequestThresholdMs: 100, onSlowRequest },
+      })
+      await http.get('/public')
+      expect(onSlowRequest).toHaveBeenCalledTimes(slow ? 1 : 0)
+      if (slow)
+        expect(onSlowRequest).toHaveBeenCalledWith({
+          request: '/public',
+          duration,
+          options: { method: 'GET' },
+        })
+    } finally {
+      now.mockRestore()
+    }
+  })
+
   it('uploads raw bytes with encoded metadata and replays the File after refresh', async () => {
     let token = 'expired'
     const file = new File(['binary content'], 'caf\u00e9 & report.txt', { type: 'text/plain' })

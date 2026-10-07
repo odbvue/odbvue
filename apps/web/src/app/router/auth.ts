@@ -1,14 +1,42 @@
-import type { Router } from 'vue-router'
-import type { OdbVueAuth } from '../auth/index.js'
-import type { OdbVuePageAccess, OdbVuePageMeta } from './types.js'
+import type { Router, NavigationGuard } from 'vue-router'
+import { auth as applicationAuth, type Auth } from '../auth/index.js'
+import { appConfig, type AppConfig } from '../config'
+import { useUi } from '../ui/store'
+import type { PageAccess, PageMeta } from './types.js'
 
-export type OdbVuePageAuth = Pick<OdbVueAuth, 'authenticated' | 'hasRole' | 'can'>
+export type PageAuth = Pick<Auth, 'authenticated' | 'hasRole' | 'can'>
 
-function isPageAllowed(
-  access: OdbVuePageAccess | undefined,
-  meta: OdbVuePageMeta,
-  auth: OdbVuePageAuth,
-): boolean {
+export function createAuthGuard(
+  router: Router,
+  session: Auth = applicationAuth,
+  config: AppConfig = appConfig,
+  onForbidden: () => void = () => useUi().error('auth.forbidden'),
+): NavigationGuard {
+  return async (to) => {
+    const login = config.auth?.routes?.login ?? '/login'
+    const authenticated = config.auth?.routes?.authenticated ?? '/'
+    const forbidden = config.auth?.routes?.forbidden ?? '/'
+    await session.restore()
+
+    if (to.path === login && session.authenticated.value) {
+      const redirect = resolveAuthRedirect(router, to.query.redirect, authenticated, login)
+      return redirect === to.fullPath ? false : redirect
+    }
+    const denied = to.matched.find((record) => !canAccessPage(record.meta, session))
+    if (!denied) return true
+    if (
+      !session.authenticated.value &&
+      (denied.meta.access === 'when-authenticated' || denied.meta.access === 'with-role') &&
+      to.path !== login
+    ) {
+      return { path: login, query: { redirect: to.fullPath } }
+    }
+    onForbidden()
+    return to.path === forbidden ? false : forbidden
+  }
+}
+
+function isPageAllowed(access: PageAccess | undefined, meta: PageMeta, auth: PageAuth): boolean {
   switch (access) {
     case 'never':
       return false
@@ -28,11 +56,11 @@ function isPageAllowed(
   }
 }
 
-export function canAccessPage(meta: OdbVuePageMeta, auth: OdbVuePageAuth): boolean {
+export function canAccessPage(meta: PageMeta, auth: PageAuth): boolean {
   return isPageAllowed(meta.access, meta, auth)
 }
 
-export function canShowPage(meta: OdbVuePageMeta, auth: OdbVuePageAuth): boolean {
+export function canShowPage(meta: PageMeta, auth: PageAuth): boolean {
   return canAccessPage(meta, auth) && isPageAllowed(meta.visibility, meta, auth)
 }
 

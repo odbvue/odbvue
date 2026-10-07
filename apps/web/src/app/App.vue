@@ -5,42 +5,13 @@
 </template>
 
 <script setup lang="ts">
-const layoutModules = import.meta.glob('./layouts/*.vue')
+import DefaultLayout from './layouts/DefaultLayout.vue'
+import FullscreenLayout from './layouts/FullscreenLayout.vue'
 
-function extractName(path: string) {
-  return path
-    .split('/')
-    .pop()
-    ?.replace(/\.\w+$/, '')
-    .replace(/Layout$/i, '')
-    .toLowerCase()
-}
-
-const availableLayouts: Record<string, () => Promise<Record<string, unknown>>> = {}
-for (const path in layoutModules) {
-  const name = extractName(path)
-  if (name) {
-    availableLayouts[name] = layoutModules[path] as () => Promise<Record<string, unknown>>
-  }
-}
-
-const route = (() => {
-  try {
-    return useRoute()
-  } catch {
-    return undefined
-  }
-})()
+const layouts = { default: DefaultLayout, fullscreen: FullscreenLayout }
+const route = useRoute()
 
 const LayoutComponent = computed(() => {
-  const name = (route?.meta?.layout as string) || 'default'
-  const key = name.toLowerCase()
-
-  const loader = availableLayouts[key]
-  if (!loader) {
-    throw new Error(`[Layout] Missing layout: ${name}`)
-  }
-
-  return defineAsyncComponent(loader)
+  return layouts[route.meta.layout ?? 'default']
 })
 </script>

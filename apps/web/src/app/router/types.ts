@@ -6,22 +6,22 @@ import type {
   Router,
 } from 'vue-router'
 
-export type OdbVuePageVisibility =
+export type PageVisibility =
   | 'always'
   | 'when-authenticated'
   | 'when-unauthenticated'
   | 'with-role'
   | 'never'
 
-export type OdbVuePageAccess = OdbVuePageVisibility
+export type PageAccess = PageVisibility
 
-export interface OdbVueNavigationMeta {
+export interface NavigationMeta {
   label?: string
   icon?: string
   order?: number
 }
 
-export interface OdbVuePageMeta {
+export interface PageMeta {
   module?: string
   title?: string
   description?: string
@@ -29,15 +29,15 @@ export interface OdbVuePageMeta {
   color?: string
   hidden?: boolean
   order?: number
-  layout?: string
-  visibility?: OdbVuePageVisibility
-  access?: OdbVuePageAccess
+  layout?: 'default' | 'fullscreen'
+  visibility?: PageVisibility
+  access?: PageAccess
   roles?: string[]
   permissions?: string[]
-  navigation?: false | OdbVueNavigationMeta
+  navigation?: false | NavigationMeta
 }
 
-export interface OdbVueRoutePage {
+export interface RoutePage {
   name?: RouteRecordNormalized['name'] | RouteRecordRaw['name']
   path: string
   module?: string
@@ -45,19 +45,19 @@ export interface OdbVueRoutePage {
   level: number
   children: string[]
   route: RouteRecordNormalized | RouteRecordRaw
-  meta: OdbVuePageMeta
+  meta: PageMeta
   title: string
-  navigation: false | OdbVueNavigationMeta
+  navigation: false | NavigationMeta
 }
 
-export interface OdbVueBreadcrumb {
+export interface Breadcrumb {
   title: string
   disabled: boolean
   href: string
   icon?: string
 }
 
-export interface OdbVueRouteParams {
+export interface RouteParams {
   pathParams: ComputedRef<Record<string, string>>
   queryParams: ComputedRef<Record<string, string>>
   routeParams: ComputedRef<Record<string, string>>
@@ -65,20 +65,20 @@ export interface OdbVueRouteParams {
   query: (name: string) => ComputedRef<string>
 }
 
-export interface OdbVueRouting {
-  currentPage: ComputedRef<OdbVueRoutePage | undefined>
+export interface Routing {
+  currentPage: ComputedRef<RoutePage | undefined>
   currentModule: ComputedRef<string | undefined>
-  breadcrumbs: ComputedRef<OdbVueBreadcrumb[]>
-  pages: ComputedRef<OdbVueRoutePage[]>
-  allPages: ComputedRef<OdbVueRoutePage[]>
+  breadcrumbs: ComputedRef<Breadcrumb[]>
+  pages: ComputedRef<RoutePage[]>
+  allPages: ComputedRef<RoutePage[]>
   title: ComputedRef<(path: string) => string>
-  params: OdbVueRouteParams
+  params: RouteParams
   navigate: Router['push']
   setBreadcrumb: (breadcrumbTitle: string, href?: string, icon?: string, disabled?: boolean) => void
 }
 
 declare module 'vue-router' {
-  interface RouteMeta extends OdbVuePageMeta {}
+  interface RouteMeta extends PageMeta {}
 }
 
-export type OdbVueRouteLocation = RouteLocationNormalizedLoaded
+export type RouteLocation = RouteLocationNormalizedLoaded

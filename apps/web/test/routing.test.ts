@@ -3,9 +3,9 @@ import { createApp } from 'vue'
 import type { RouteRecordNormalized } from 'vue-router'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import {
-  createOdbVuePageManifest,
+  createPageManifest,
   getNavigationMeta,
-  registerOdbVuePageManifest,
+  registerPageManifest,
   resolvePageTitle,
   toRoutePage,
   useRouting,
@@ -63,7 +63,7 @@ describe('routing metadata', () => {
       history: createMemoryHistory(),
       routes,
     })
-    registerOdbVuePageManifest(router, createOdbVuePageManifest(routes))
+    registerPageManifest(router, createPageManifest(routes))
     await router.push('/customers/42')
     const app = createApp({})
     app.use(router)
@@ -104,7 +104,7 @@ describe('routing metadata', () => {
       },
     ]
     const router = createRouter({ history: createMemoryHistory(), routes })
-    registerOdbVuePageManifest(router, createOdbVuePageManifest(routes))
+    registerPageManifest(router, createPageManifest(routes))
     await router.push('/sandbox/capabilities/routing')
     const app = createApp({})
     app.use(router)
@@ -144,7 +144,7 @@ describe('routing metadata', () => {
       },
     ]
     const router = createRouter({ history: createMemoryHistory(), routes })
-    registerOdbVuePageManifest(router, createOdbVuePageManifest(routes))
+    registerPageManifest(router, createPageManifest(routes))
     await router.push('/sandbox')
     const app = createApp({})
     app.use(router)
@@ -175,7 +175,7 @@ describe('routing metadata', () => {
       history: createMemoryHistory(),
       routes,
     })
-    registerOdbVuePageManifest(router, createOdbVuePageManifest(routes))
+    registerPageManifest(router, createPageManifest(routes))
     await router.push('/crm/customers/42')
     const app = createApp({})
     app.use(router)
@@ -199,7 +199,7 @@ describe('routing metadata', () => {
   })
 
   it('creates a flattened page registry from generated nested routes', () => {
-    const manifest = createOdbVuePageManifest([
+    const manifest = createPageManifest([
       {
         path: '/sandbox',
         name: 'sandbox',
@@ -254,7 +254,7 @@ describe('routing metadata', () => {
       },
     ]
     const router = createRouter({ history: createMemoryHistory(), routes })
-    registerOdbVuePageManifest(router, createOdbVuePageManifest(routes))
+    registerPageManifest(router, createPageManifest(routes))
     await router.push('/customers')
     const app = createApp({})
     app.use(router)

@@ -6,12 +6,12 @@ in `apps/web/index.html`.
 Set application metadata in `apps/web/odbvue.config.ts`:
 
 ```ts
-import { defineAppConfig } from './src/app/config'
+import type { AppConfig } from './src/app/config'
 
-export default defineAppConfig({
+export default {
   title: 'OdbVue',
   version: '1.0.0',
-})
+} satisfies AppConfig
 ```
 
 The default layout reads metadata directly with `useAppConfig()`:
@@ -28,9 +28,9 @@ const config = useAppConfig()
 </template>
 ```
 
-Application plugins already install Unhead. `installAppRouting()` in
-`src/app/router` maintains one head entry, updating it after successful navigation.
+The `afterEach` guard in `src/app/router/index.ts` updates `document.title` directly
+after successful navigation, without a head manager.
 Pages with a title produce `Application title - Page title`; pages without one use
 the application title alone. Denied or cancelled navigation does not update it.
 
-No metadata Pinia store, root-package import, or additional head plugin is needed.
+No metadata Pinia store, service container, or additional head plugin is needed.

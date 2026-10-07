@@ -17,10 +17,12 @@ This retains release/v0's conventional Vue folders while distinguishing the main
 application from self-contained modules. Modules may add their own components,
 composables, stores, and API calls. Infrastructure must not import sandbox.
 
-`src/app/plugins` explicitly installs the Vue libraries and provides typed,
-application-scoped services. There is no dynamic capability registry or contract
-system. Use focused composables, not an aggregator store. Pinia supplies UI and
-preferences; authentication already owns reactive state and needs no wrapper.
+`src/main.ts` explicitly installs Pinia, Vue I18n, Vuetify, and the router, then mounts
+the application immediately. Infrastructure exports application-scoped ES module
+instances; focused composables use these directly, without a service container,
+installer, event bus, or generic readiness lifecycle. Factories remain for isolated
+tests and dedicated HTTP clients. Pinia supplies UI and preferences; its store
+registry supports the sandbox state diagnostics and persistence plugin.
 
 Main pages generate `/...` routes from `src/app/pages`; module pages generate
 `/<module>/...` routes from `src/modules/<module>/pages`. Only page folders are
@@ -34,10 +36,12 @@ The [login page](./src/app/pages/login.vue) supports username/password authentic
 use `useAuth()` directly. Config supplies title/version, while preferences and UI
 use their own APIs.
 
-No auth state is persisted in localStorage or sessionStorage. Application setup restores the session
-once at startup with `POST /auth/refresh`, then `GET /auth/me`. The [entry point](./src/main.ts)
-waits for service readiness and router readiness before mounting. Guards await the same
-startup promise instead of issuing another refresh. Access tokens and user details remain in
+No auth state is persisted in localStorage or sessionStorage. The first router guard restores the session
+with `POST /auth/refresh`, then `GET /auth/me`. The [entry point](./src/main.ts)
+mounts the shell while initial navigation is pending. Auth restoration is lazy and idempotent:
+concurrent guards and later navigations share the same promise instead of issuing another refresh.
+The reactive auth `ready` flag remains available to login controls; it is not a bootstrap lifecycle.
+Access tokens and user details remain in
 memory; the server-managed refresh cookie is `HttpOnly`, `Secure`, and `SameSite=Lax`. Existing
 preference persistence is unchanged.
 
@@ -45,8 +49,9 @@ The default layout shows login/logout controls and the current identity. Applica
 enforce page `access` metadata; `with-role` requires any listed role and every listed permission.
 Unauthenticated visitors to protected pages return there after login, while authenticated users
 without access are sent home with an error. Login redirects must resolve to a local route.
-`installAppRouting()` in the [router](./src/app/router/index.ts) installs those guards and title
-updates. Application destinations can be configured with `auth.routes.login`,
+The [router](./src/app/router/index.ts) registers the manifest, auth guard, and successful-navigation
+title updates directly. Titles use `document.title` without a head manager.
+Application destinations can be configured with `auth.routes.login`,
 `auth.routes.authenticated`, and `auth.routes.forbidden`. Navigation applies the same access
 policy (including parents) and additionally checks `visibility`. These client-side checks complement,
 not replace, authorization on the API.
@@ -55,6 +60,9 @@ All sandbox module pages require the `admin` role for both access and navigation
 
 Notifications translate existing catalog keys and display other messages as plain text.
 Runtime errors are not sent to the missing-translation collector.
+Vue, router, and HTTP errors are captured by the error service. Capturing a framework
+error does not automatically display a notification; user-facing flows explicitly
+choose their feedback.
 
 Use HTTPS in production and a compatible API origin so the browser can send the refresh cookie.
 If developing through Vite's `/api` proxy, verify that the browser accepts the secure cookie

@@ -2,21 +2,25 @@
 
 Application routing adapts generated Vue Router records into pages with a predictable title, route metadata, and navigation metadata. The implementation lives in `apps/web/src/app/router`.
 
-Use it when an application shell, navigation component, breadcrumb trail, or page-aware component needs to understand the current route or all available pages. Routes are generated from `src/app/pages` and `src/modules/<module>/pages`. `installAppRouting()` registers the page manifest and installs authorization and document-title handling.
+Use it when an application shell, navigation component, breadcrumb trail, or page-aware component needs to understand the current route or all available pages. Routes are generated from `src/app/pages` and `src/modules/<module>/pages`. The router registers the page manifest, authorization guard, and document-title handling directly.
 
 ## Router installation
 
 ```ts
 import { createRouter, createWebHistory } from 'vue-router'
-import { installAppRouting } from '@/app/router/api'
+import { createAuthGuard, registerPageManifest, updatePageTitle } from '@/app/router/api'
 import { manifest, routes } from 'virtual:odbvue-pages'
 
 const router = createRouter({ history: createWebHistory(), routes })
-installAppRouting(router, manifest)
+registerPageManifest(router, manifest)
+router.beforeEach(createAuthGuard(router))
+router.afterEach((to, _from, failure) => {
+  if (!failure) updatePageTitle(to.meta)
+})
 export default router
 ```
 
-Pass this router to `installApp(app, config, router)` from `@/app/plugins`. The guard waits for the application's startup promise before evaluating every matched route, including parents. Successful navigation updates a single document-title entry. The installer returns a cleanup function that removes its guards and title entry.
+Install this router with `app.use(router)` in `main.ts`. The guard awaits lazy, idempotent auth restoration before evaluating every matched route, including parents. The application shell mounts immediately while navigation is pending. Successful navigation updates `document.title` directly; failed or cancelled navigation leaves it unchanged.
 
 Configure application destinations with `auth.routes`: `login` defaults to `/login`, while `authenticated` and `forbidden` default to `/`. An anonymous user requesting an authenticated or role-protected page is redirected to login with the original URL in `query.redirect`. Other denied requests show `auth.forbidden` and return to the forbidden destination.
 

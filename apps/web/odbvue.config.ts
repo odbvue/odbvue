@@ -1,11 +1,11 @@
-import { createLocalStorageErrorReporter } from '@/app/errors'
-import { defineAppConfig } from '@/app/config'
+import { createLocalStorageErrorReporter } from '@/app/errors/reporters'
+import type { AppConfig } from '@/app/config'
 
 import { light, dark } from './src/app/themes/themes.json'
 import icons from './src/app/themes/icons'
 import openapi from '../db/dist/openapi.json'
 
-export default defineAppConfig({
+export default {
   title: 'OdbVue',
   version: '1.0.0',
   http: { openapi },
@@ -30,7 +30,4 @@ export default defineAppConfig({
   errors: {
     reporters: [createLocalStorageErrorReporter()],
   },
-  integrations: {},
-  hooks: {},
-  modules: ['sandbox'],
-})
+} satisfies AppConfig

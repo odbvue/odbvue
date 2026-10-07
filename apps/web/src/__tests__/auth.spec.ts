@@ -2,12 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { defineAppConfig } from '@/app/config'
-import { installApp } from '@/app/plugins'
+import { createAuth, type Auth } from '@/app/auth'
+import { createState } from '@/app/state'
+import { i18n } from '@/app/i18n'
 import { useHttp } from '@/app/http'
 import { useUi } from '@/app/ui'
-import { type AppServices } from '@/app/context'
 import Login from '../app/pages/login.vue'
+
+const session = vi.hoisted((): { auth?: Auth } => ({}))
+vi.mock('@/app/auth', async (importOriginal) => {
+  const module = await importOriginal<typeof import('@/app/auth')>()
+  return { ...module, useAuth: () => session.auth }
+})
 
 const form = defineComponent({
   props: ['loading'],
@@ -33,22 +39,16 @@ async function setup() {
   })
   await router.push('/login?redirect=/sandbox')
   const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(json({}, 401))
-  let runtime!: AppServices
-  let ui!: ReturnType<typeof useUi>
+  const auth: Auth = createAuth({
+    http: () => useHttp({ fetch, configuration: { getAccessToken: () => auth.accessToken.value } }),
+  })
+  session.auth = auth
+  await auth.restore()
+  const ui = useUi()
+  ui.clear()
   const wrapper = mount(Login, {
     global: {
-      plugins: [
-        {
-          install(app) {
-            runtime = installApp(app, defineAppConfig({ errors: { reporters: [] } }), router)
-            const auth = runtime.auth
-            auth.setHttp(
-              useHttp({ fetch, configuration: { getAccessToken: () => auth.accessToken.value } }),
-            )
-            ui = app.runWithContext(() => useUi())
-          },
-        },
-      ],
+      plugins: [createState(), i18n, router],
       stubs: {
         VOvForm: form,
         VContainer: { template: '<div><slot /></div>' },
@@ -57,11 +57,10 @@ async function setup() {
       },
     },
   })
-  await runtime.ready
-  return { wrapper, router, fetch, ui, auth: runtime.auth }
+  return { wrapper, router, fetch, ui, auth }
 }
 
-describe('login page using framework auth', () => {
+describe('login page using application auth', () => {
   beforeEach(() => {
     vi.stubGlobal('definePage', vi.fn<() => void>())
     localStorage.clear()
@@ -72,7 +71,7 @@ describe('login page using framework auth', () => {
     vi.unstubAllGlobals()
   })
 
-  it('logs in through the capability, redirects, and keeps credentials out of storage', async () => {
+  it('logs in, redirects, and keeps credentials out of storage', async () => {
     const context = await setup()
     context.fetch
       .mockResolvedValueOnce(json({ accessToken: 'login-token' }))
@@ -118,7 +117,7 @@ describe('login page using framework auth', () => {
     context.wrapper.unmount()
   })
 
-  it('reflects capability loading and prevents duplicate submissions', async () => {
+  it('reflects auth loading and prevents duplicate submissions', async () => {
     const context = await setup()
     let finish!: (response: Response) => void
     context.fetch

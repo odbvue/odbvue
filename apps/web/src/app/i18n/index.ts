@@ -1,49 +1,45 @@
 import { createI18n } from 'vue-i18n'
 import messages from '@intlify/unplugin-vue-i18n/messages'
-import type { OdbVueI18nConfig } from '../config.js'
-
-type OdbVueI18n = ReturnType<typeof createI18n>
+import { appConfig } from '../config.js'
 
 const defaultLocales = ['en', 'fr', 'de'] as const
 
-/** Creates OdbVue's Vue I18n runtime from stable application i18n settings. */
-export function createOdbVueI18n(config: OdbVueI18nConfig = {}): OdbVueI18n {
-  const pendingKeys = new Set<string>()
-  const locales = config.locales ?? defaultLocales
-  const fallbackLocale = config.fallbackLocale ?? 'en'
+const config = appConfig.i18n ?? {}
+const pendingKeys = new Set<string>()
+const configuredLocales = config.locales ?? defaultLocales
+const configuredFallbackLocale = config.fallbackLocale ?? 'en'
 
-  return createI18n({
-    ...config.options,
-    legacy: false,
-    globalInjection: true,
-    locale:
-      config.locale ??
-      (config.detectBrowserLocale === false
-        ? fallbackLocale
-        : resolveOdbVueLocale(locales, fallbackLocale)),
-    fallbackLocale,
-    messages,
-    missing: (locale: string, key: string) => {
-      if (!import.meta.env.DEV || import.meta.env.MODE === 'test' || typeof window === 'undefined')
-        return
+export const i18n = createI18n({
+  ...config.options,
+  legacy: false,
+  globalInjection: true,
+  locale:
+    config.locale ??
+    (config.detectBrowserLocale === false
+      ? configuredFallbackLocale
+      : resolveLocale(configuredLocales, configuredFallbackLocale)),
+  fallbackLocale: configuredFallbackLocale,
+  messages,
+  missing: (locale: string, key: string) => {
+    if (!import.meta.env.DEV || import.meta.env.MODE === 'test' || typeof window === 'undefined')
+      return
 
-      const cacheKey = `${locale}:${key}`
-      if (pendingKeys.has(cacheKey)) return
-      pendingKeys.add(cacheKey)
+    const cacheKey = `${locale}:${key}`
+    if (pendingKeys.has(cacheKey)) return
+    pendingKeys.add(cacheKey)
 
-      fetch('/i18n-add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: { locale, key, value: key } }),
-      })
-        .catch((error: unknown) => console.warn('Unable to collect missing translation', error))
-        .finally(() => pendingKeys.delete(cacheKey))
-    },
-  })
-}
+    fetch('/i18n-add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: { locale, key, value: key } }),
+    })
+      .catch((error: unknown) => console.warn('Unable to collect missing translation', error))
+      .finally(() => pendingKeys.delete(cacheKey))
+  },
+})
 
 /** Selects the first configured locale matching the browser's language preferences. */
-export function resolveOdbVueLocale(
+export function resolveLocale(
   locales: readonly string[] = defaultLocales,
   fallbackLocale = 'en',
   browserLanguages: readonly string[] = typeof navigator === 'undefined' ? [] : navigator.languages,

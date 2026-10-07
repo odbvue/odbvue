@@ -2,28 +2,27 @@ import { createApp } from 'vue'
 
 import App from './app/App.vue'
 import router from './app/router'
-import { installApp } from '@/app/plugins'
-import { useUi } from '@/app/ui'
-import odbvueConfig from '../odbvue.config'
+import { pinia } from '@/app/state'
+import { i18n } from '@/app/i18n'
+import { vuetify } from '@/app/ui'
+import { captureError } from '@/app/errors'
 
 const app = createApp(App)
 
-const services = installApp(app, odbvueConfig, router)
+app.config.errorHandler = (error, instance, info) => {
+  captureError(error, { source: 'vue', context: { component: instance?.$options.name, info } })
+}
+
+app.use(pinia)
+app.use(i18n)
+app.use(vuetify)
+app.use(router)
 
 router.onError((error, to) => {
-  services.errors.capture(error, {
+  captureError(error, {
     source: 'router',
     context: { path: to.fullPath },
   })
-  app.runWithContext(() => useUi().error(error))
 })
 
-void services.ready
-  .then(async () => {
-    await router.isReady()
-    app.mount('#app')
-  })
-  .catch((error: unknown) => {
-    console.error('Unable to start OdbVue', error)
-    app.runWithContext(() => useUi().error(error))
-  })
+app.mount('#app')

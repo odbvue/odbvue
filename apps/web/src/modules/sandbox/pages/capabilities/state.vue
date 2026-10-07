@@ -48,8 +48,7 @@
 </template>
 
 <script setup lang="ts">
-import { getOdbVueStores, getPersistOptions, type PersistOptions } from '@/app/state'
-import { useAppServices } from '@/app/context'
+import { pinia, getStores, getPersistOptions, type PersistOptions } from '@/app/state'
 import { onMounted, ref } from 'vue'
 
 definePage({
@@ -67,11 +66,10 @@ type StoreSnapshot = {
   persist?: PersistOptions
 }
 
-const pinia = useAppServices().pinia
 const stores = ref<StoreSnapshot[]>([])
 
 async function refresh() {
-  stores.value = getOdbVueStores(pinia).map((store) => ({
+  stores.value = getStores(pinia).map((store) => ({
     id: store.$id,
     currentState: store.$state,
     persist: getPersistOptions(store),

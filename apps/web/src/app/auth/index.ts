@@ -1,6 +1,6 @@
 import { computed, readonly, ref, shallowRef, type ComputedRef, type Ref } from 'vue'
-import { useAppServices } from '../context'
-import type { HttpClient, HttpError } from '../http/index.js'
+import { appConfig } from '../config'
+import { http, type HttpClient, type HttpError } from '../http/index.js'
 
 export interface AuthUser {
   id: string | number
@@ -32,19 +32,19 @@ export interface AuthCredentials {
   password: string
 }
 
-export interface OdbVueAuthEndpoints {
+export interface AuthEndpoints {
   login: string
   refresh: string
   logout: string
   me: string
 }
 
-export interface OdbVueAuthOptions {
-  endpoints?: Partial<OdbVueAuthEndpoints>
-  http?: HttpClient
+export interface AuthOptions {
+  endpoints?: Partial<AuthEndpoints>
+  http: Pick<HttpClient, 'get' | 'post'> | (() => Pick<HttpClient, 'get' | 'post'>)
 }
 
-export interface OdbVueAuth<User extends AuthUser = AuthUser> {
+export interface Auth<User extends AuthUser = AuthUser> {
   user: Readonly<Ref<User | null>>
   accessToken: Readonly<Ref<string | null>>
   loading: Readonly<Ref<boolean>>
@@ -57,14 +57,13 @@ export interface OdbVueAuth<User extends AuthUser = AuthUser> {
   me(): Promise<User>
   hasRole(role: string): boolean
   can(permission: string): boolean
-  setHttp(http: HttpClient): void
 }
 
-export function useAuth(): OdbVueAuth {
-  return useAppServices().auth
+export function useAuth(): Auth {
+  return auth
 }
 
-const defaultEndpoints: OdbVueAuthEndpoints = {
+const defaultEndpoints: AuthEndpoints = {
   login: '/auth/login',
   refresh: '/auth/refresh',
   logout: '/auth/logout',
@@ -85,19 +84,16 @@ function authorizationNames(value: readonly string[] | string | undefined): read
 }
 
 /** Creates application-scoped authentication state backed by ORDS auth endpoints. */
-export function createOdbVueAuth<User extends AuthUser = AuthUser>(
-  options: OdbVueAuthOptions = {},
-): OdbVueAuth<User> {
+export function createAuth<User extends AuthUser = AuthUser>(options: AuthOptions): Auth<User> {
   const endpoints = { ...defaultEndpoints, ...options.endpoints }
   const user = shallowRef<User | null>(null)
   const accessToken = ref<string | null>(null)
   const loading = ref(false)
   const ready = ref(false)
-  let http = options.http
+  let restorePromise: Promise<boolean> | undefined
 
-  function requireHttp(): HttpClient {
-    if (!http) throw new Error('The HTTP capability is not available.')
-    return http
+  function requireHttp(): Pick<HttpClient, 'get' | 'post'> {
+    return 'get' in options.http ? options.http : options.http()
   }
 
   function clear(): void {
@@ -175,14 +171,17 @@ export function createOdbVueAuth<User extends AuthUser = AuthUser>(
       }
     },
     refresh,
-    async restore() {
-      try {
-        if (!(await refresh())) return false
-        await this.me()
-        return true
-      } finally {
-        ready.value = true
-      }
+    restore() {
+      restorePromise ??= (async () => {
+        try {
+          if (!(await refresh())) return false
+          await this.me()
+          return true
+        } finally {
+          ready.value = true
+        }
+      })()
+      return restorePromise
     },
     async me() {
       loading.value = true
@@ -201,8 +200,11 @@ export function createOdbVueAuth<User extends AuthUser = AuthUser>(
     can(permission) {
       return user.value?.permissions?.includes(permission) ?? false
     },
-    setHttp(client) {
-      http = client
-    },
   }
 }
+
+// The deferred client reference keeps token callbacks and auth requests mutually usable.
+export const auth = createAuth({
+  endpoints: appConfig.auth?.endpoints,
+  http: () => http,
+})

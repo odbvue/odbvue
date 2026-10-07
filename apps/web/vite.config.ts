@@ -17,7 +17,6 @@ import {
 import { openapiPlugin } from './plugins/openapi.ts'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
-import { unheadVueComposablesImports } from '@unhead/vue'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -97,7 +96,6 @@ export default defineConfig(({ mode }) => {
               'useTheme',
             ],
           },
-          unheadVueComposablesImports,
         ],
         dirs: ['./src/app/composables/**', './src/modules/*/composables/**'],
       }),

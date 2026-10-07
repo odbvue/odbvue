@@ -1,20 +1,17 @@
 export { usePageMeta, useRouting } from './helpers.js'
 export { canAccessPage, canShowPage, resolveAuthRedirect } from './auth.js'
-export type { OdbVuePageAuth } from './auth.js'
-export { installAppRouting } from './install.js'
+export type { PageAuth } from './auth.js'
+export { createAuthGuard } from './auth.js'
 export {
   getNavigationMeta,
   getPageMeta,
   resolveNavigationMeta,
   resolvePageTitle,
   toRoutePage,
+  updatePageTitle,
 } from './metadata.js'
-export { createOdbVuePageManifest, toManifestPage } from './manifest.js'
-export {
-  getOdbVueBreadcrumbOverride,
-  getOdbVuePageManifest,
-  registerOdbVuePageManifest,
-} from './registry.js'
+export { createPageManifest, toManifestPage } from './manifest.js'
+export { getBreadcrumbOverride, getPageManifest, registerPageManifest } from './registry.js'
 export {
   computedRouteParam,
   computedRouteParams,
@@ -22,13 +19,13 @@ export {
   useRouteParams,
 } from './navigation.js'
 export type {
-  OdbVueBreadcrumb,
-  OdbVueNavigationMeta,
-  OdbVuePageAccess,
-  OdbVuePageMeta,
-  OdbVuePageVisibility,
-  OdbVueRouteParams,
-  OdbVueRoutePage,
-  OdbVueRouting,
+  Breadcrumb,
+  NavigationMeta,
+  PageAccess,
+  PageMeta,
+  PageVisibility,
+  RouteParams,
+  RoutePage,
+  Routing,
 } from './types.js'
-export type { OdbVuePageManifest, OdbVuePageManifestEntry } from './manifest.js'
+export type { PageManifest, PageManifestEntry } from './manifest.js'

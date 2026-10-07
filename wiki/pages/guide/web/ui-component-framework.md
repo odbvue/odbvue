@@ -1,6 +1,6 @@
 # UI and Themes
 
-OdbVue uses [Vuetify](https://vuetifyjs.com/) as its UI implementation. `apps/web/src/app/ui` composes Vuetify styles, the Material Design 3 blueprint, and the MDI icon set. Application plugins install it, using choices under `ui` in `odbvue.config.ts`. Shared `VOv*` components live in `src/components` and compile directly with the application.
+OdbVue uses [Vuetify](https://vuetifyjs.com/) as its UI implementation. `apps/web/src/app/ui` exports Vuetify with its styles, the Material Design 3 blueprint, and the MDI icon set. `main.ts` installs it directly, using choices under `ui` in `odbvue.config.ts`. Shared `VOv*` components live in `src/components` and compile directly with the application.
 
 Use the [Vuetify documentation](https://vuetifyjs.com/components/all/) for component APIs. Extend the existing application setup rather than installing a second Vuetify instance.
 
@@ -9,14 +9,14 @@ Use the [Vuetify documentation](https://vuetifyjs.com/components/all/) for compo
 Keep substantial palettes in an application-owned file, then register them through configuration.
 
 ```ts
-import { defineAppConfig } from './src/app/config'
+import type { AppConfig } from './src/app/config'
 import { light, dark } from './src/app/themes/themes.json'
 
-export default defineAppConfig({
+export default {
   ui: {
     theme: { default: 'system', light, dark },
   },
-})
+} satisfies AppConfig
 ```
 
 `default` selects the initial theme. `system` follows the operating-system preference; use `light` or `dark` to select a fixed palette.

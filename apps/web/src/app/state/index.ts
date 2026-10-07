@@ -4,7 +4,7 @@ import piniaPersistPlugin from './pinia-persist.js'
 const storeRegistries = new WeakMap<Pinia, Map<string, StoreGeneric>>()
 
 /** Creates OdbVue's Pinia runtime with persistence support. */
-export function createOdbVuePinia(): Pinia {
+export function createState(): Pinia {
   const instance = createPinia()
   const stores = new Map<string, StoreGeneric>()
   storeRegistries.set(instance, stores)
@@ -16,9 +16,11 @@ export function createOdbVuePinia(): Pinia {
 }
 
 /** Returns the stores currently registered with an OdbVue Pinia runtime. */
-export function getOdbVueStores(pinia: Pinia): StoreGeneric[] {
+export function getStores(pinia: Pinia): StoreGeneric[] {
   return [...(storeRegistries.get(pinia)?.values() ?? [])]
 }
+
+export const pinia = createState()
 
 export { getPersistOptions } from './pinia-persist.js'
 export type { PersistCookieOptions, PersistOptions, PersistStorage } from './pinia-persist.js'

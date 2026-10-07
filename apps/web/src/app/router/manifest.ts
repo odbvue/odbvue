@@ -1,21 +1,21 @@
 import type { RouteRecordRaw } from 'vue-router'
-import type { OdbVuePageMeta, OdbVueRoutePage } from './types.js'
+import type { PageMeta, RoutePage } from './types.js'
 import { resolveNavigationMeta, resolvePageTitle } from './metadata.js'
 
-export interface OdbVuePageManifestEntry {
+export interface PageManifestEntry {
   name?: string | symbol
   path: string
   module?: string
   parent?: string
   level: number
   children: string[]
-  meta: OdbVuePageMeta
+  meta: PageMeta
   route: RouteRecordRaw
 }
 
-export interface OdbVuePageManifest {
+export interface PageManifest {
   routes: RouteRecordRaw[]
-  pages: OdbVuePageManifestEntry[]
+  pages: PageManifestEntry[]
 }
 
 function joinRoutePath(parentPath: string, path: string): string {
@@ -29,12 +29,12 @@ function collectPages(
   parentPath = '',
   parent?: string,
   level = 0,
-): OdbVuePageManifestEntry[] {
+): PageManifestEntry[] {
   return routes.flatMap((route) => {
     const path = joinRoutePath(parentPath, route.path)
-    const meta = (route.meta ?? {}) as OdbVuePageMeta
+    const meta = (route.meta ?? {}) as PageMeta
     const pageLevel = route.path === '' ? Math.max(0, level - 1) : level
-    const page: OdbVuePageManifestEntry = {
+    const page: PageManifestEntry = {
       name: route.name,
       path,
       module: meta.module,
@@ -49,12 +49,12 @@ function collectPages(
 }
 
 /** Creates the canonical OdbVue page registry from generated route records. */
-export function createOdbVuePageManifest(routes: RouteRecordRaw[]): OdbVuePageManifest {
+export function createPageManifest(routes: RouteRecordRaw[]): PageManifest {
   return { routes, pages: collectPages(routes) }
 }
 
 /** Converts a manifest entry into the runtime page representation. */
-export function toManifestPage(page: OdbVuePageManifestEntry): OdbVueRoutePage {
+export function toManifestPage(page: PageManifestEntry): RoutePage {
   return {
     name: page.name,
     path: page.path,

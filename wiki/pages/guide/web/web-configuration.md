@@ -1,36 +1,32 @@
 # Web Configuration
 
-`apps/web/odbvue.config.ts` configures the **web application**, not the database installation. Application plugins install Vue I18n, Pinia, Vuetify, and typed Vue-injected services before mounting. All web code belongs to `apps/web`; there is no separate web framework package or capability registry.
+`apps/web/odbvue.config.ts` configures the **web application**, not the database installation. `src/main.ts` explicitly installs Vue I18n, Pinia, Vuetify, and the router, then mounts immediately. All web code belongs to `apps/web`; there is no separate web framework package, service container, event bus, or capability registry.
 
 ```ts
-import { defineAppConfig } from './src/app/config'
+import type { AppConfig } from './src/app/config'
 
-export default defineAppConfig({
+export default {
+  title: 'OdbVue',
+  version: '1.0.0',
   ui: {},
-  integrations: {},
-  hooks: {},
-  modules: ['sandbox'],
-})
+} satisfies AppConfig
 ```
 
 ## Configuration areas
 
-| Area           | Purpose                                                                                           |
-| -------------- | ------------------------------------------------------------------------------------------------- |
-| `auth`         | Authentication endpoint overrides and application login, authenticated, and forbidden routes.     |
-| `http`         | HTTP defaults and the generated OpenAPI document used for request security and response decoding. |
-| `i18n`         | Supported locales, browser-language detection, and translation options.                           |
-| `errors`       | Error buffering and application reporters.                                                        |
-| `ui`           | Application theme, component defaults, icon aliases, and advanced Vuetify options.                |
-| `integrations` | Application choices for external providers.                                                       |
-| `hooks`        | Typed application startup, error, and HTTP events.                                                |
-| `modules`      | Module names displayed in application diagnostics; routing is discovered from source folders.     |
+| Area     | Purpose                                                                                           |
+| -------- | ------------------------------------------------------------------------------------------------- |
+| `auth`   | Authentication endpoint overrides and application login, authenticated, and forbidden routes.     |
+| `http`   | HTTP defaults and the generated OpenAPI document used for request security and response decoding. |
+| `i18n`   | Supported locales, browser-language detection, and translation options.                           |
+| `errors` | Error buffering and application reporters.                                                        |
+| `ui`     | Application theme, component defaults, icon aliases, and advanced Vuetify options.                |
 
 `title` and `version` supply application metadata. Configuration describes application choices; it does not enable database features or dynamically register web capabilities.
 
 ## Runtime access
 
-Components and composables can read the installed configuration with `useAppConfig()` and access services through their composables.
+Components and composables can read application configuration with `useAppConfig()` and access services through focused composables. These return ordinary application-scoped ES module instances and do not require an injection context. Module diagnostics derive module names from discovered page metadata rather than configuration.
 
 ```ts
 import { useAppConfig } from '@/app/config'
@@ -42,14 +38,21 @@ const auth = useAuth()
 
 Application-specific behavior should remain in application source files. Do not put business rules into the configuration object.
 
-`installApp()` in `src/app/plugins` returns explicit typed services with a single `ready: Promise<void>`. It resolves after session restoration and asynchronous `app:started` handlers complete. Startup failures are captured by the error service and reject readiness. Await readiness before mounting; routing guards installed with `installAppRouting()` await the same promise.
+Bootstrap installs the application instances directly. There is no generic readiness promise or startup hook. The router guard lazily restores authentication; mounting does not wait for auth or router readiness.
 
 ```ts
-import { installApp } from '@/app/plugins'
+import { createApp } from 'vue'
+import App from '@/app/App.vue'
+import { pinia } from '@/app/state'
+import { i18n } from '@/app/i18n'
+import { vuetify } from '@/app/ui'
+import router from '@/app/router'
 
-const services = installApp(app, config, router)
-await services.ready
-await router.isReady()
+const app = createApp(App)
+app.use(pinia)
+app.use(i18n)
+app.use(vuetify)
+app.use(router)
 app.mount('#app')
 ```
 
@@ -57,7 +60,9 @@ Use `useAuth()` directly rather than wrapping it in an application store or addi
 
 ## Authentication
 
-At startup, the authentication service sends the refresh cookie to `/auth/refresh`; when that succeeds it fetches `/auth/me`. The HTTP service adds the access token to protected requests and refreshes it when needed. Set `http.openapi` to the generated database OpenAPI document to distinguish protected operations from anonymous ones.
+On initial navigation, the authentication guard sends the refresh cookie to `/auth/refresh`; when that succeeds it fetches `/auth/me`. Auth's idempotent `restore()` shares one promise across concurrent calls and subsequent navigations, including restoration failures. The reactive auth `ready` flag controls login UI, not bootstrap. The HTTP service adds the access token to protected requests and refreshes it when needed. Set `http.openapi` to the generated database OpenAPI document to distinguish protected operations from anonymous ones.
+
+Vue and router errors are captured explicitly in `main.ts`, and HTTP errors use an `onError` callback. Error reporting is separate from user notifications: user-facing flows decide when to show localized feedback.
 
 ```ts
 import { useAuth } from '@/app/auth'

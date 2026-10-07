@@ -35,7 +35,7 @@
         <h3>Modules</h3>
       </v-col>
       <v-col cols="12">
-        <v-card :text="config.modules?.length ? config.modules.join(', ') : 'None'" />
+        <v-card :text="modules.length ? modules.join(', ') : 'None'" />
       </v-col>
     </v-row>
   </v-container>
@@ -59,4 +59,12 @@ definePage({
 
 const config = useAppConfig()
 const capabilities = odbVueCapabilities
+const routing = useRouting()
+const modules = computed(() =>
+  [
+    ...new Set(
+      routing.allPages.value.map((page) => page.module).filter((module) => module !== undefined),
+    ),
+  ].toSorted(),
+)
 </script>

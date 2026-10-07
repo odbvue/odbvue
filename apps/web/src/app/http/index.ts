@@ -1,6 +1,7 @@
 import { $fetch, type FetchContext, type FetchOptions } from 'ofetch'
-import { useAppServices } from '../context'
-import type { OdbVueHooks } from '../events.js'
+import { auth } from '../auth'
+import { appConfig } from '../config'
+import { captureError } from '../errors'
 import { decodeOdbJson, requiresBearerToken, type OdbOpenApiDocument } from './json.js'
 
 type HttpRequestOptions = FetchOptions<'json' | 'blob'>
@@ -34,6 +35,7 @@ export interface HttpRefreshFailureContext {
   options?: HttpRequestOptions
 }
 export interface HttpConfiguration {
+  onError?: (error: HttpError) => void
   getAccessToken?: () => string | null | undefined
   slowRequestThresholdMs?: number
   onSlowRequest?: (context: HttpSlowRequestContext) => void
@@ -48,8 +50,6 @@ export interface HttpClientOptions {
   fetch?: typeof globalThis.fetch
   /** Overrides runtime HTTP configuration for this client only. */
   configuration?: HttpConfiguration
-  /** Emits HTTP lifecycle events to this application's hook dispatcher. */
-  hooks?: OdbVueHooks
 }
 export interface HttpUploadMetadata {
   fileName?: string
@@ -84,10 +84,9 @@ const defaultHttpConfiguration: HttpConfiguration = {
 }
 
 /** Creates an application-scoped HTTP client with OdbVue defaults. */
-export function createOdbVueHttp(options: HttpConfiguration = {}, hooks?: OdbVueHooks): HttpClient {
+export function createHttp(options: HttpConfiguration = {}): HttpClient {
   const { onSlowRequest, slowRequestThresholdMs = 3000, ...configuration } = options
   return useHttp({
-    hooks,
     configuration: {
       ...configuration,
       slowRequestThresholdMs,
@@ -141,7 +140,6 @@ function requestRetryOptions(options?: HttpRequestOptions): HttpRequestOptions {
 async function executeRequest<T>(
   client: ReturnType<typeof $fetch.create>,
   configuration: HttpConfiguration,
-  hooks: OdbVueHooks | undefined,
   refresh: () => Promise<boolean>,
   request: string,
   options?: HttpRequestOptions,
@@ -168,7 +166,6 @@ async function executeRequest<T>(
     ) {
       const context = { request, duration, options }
       configuration.onSlowRequest?.(context)
-      void hooks?.emit('http:slow', context)
     }
     return {
       data:
@@ -197,24 +194,22 @@ async function executeRequest<T>(
       const expired = new Error('session.expired')
       try {
         if (await refresh())
-          return executeRequest<T>(client, configuration, hooks, refresh, request, options, true)
+          return executeRequest<T>(client, configuration, refresh, request, options, true)
         const context = { request, error: expired, options }
         configuration.onRefreshFailure?.(context)
-        void hooks?.emit('http:refreshFailed', context)
       } catch (refreshError) {
         const context = { request, error: refreshError, options }
         configuration.onRefreshFailure?.(context)
-        void hooks?.emit('http:refreshFailed', context)
       }
     }
     const httpError = createHttpError(error, request, status)
-    void hooks?.emit('http:error', { error: httpError })
+    configuration.onError?.(httpError)
     return { data: null, error: httpError, status, headers: null }
   }
 }
 
 export function useHttp(clientOptions?: HttpClientOptions): HttpClient {
-  if (!clientOptions) return useAppServices().http
+  if (!clientOptions) return http
   return createHttpClient(clientOptions)
 }
 
@@ -243,38 +238,31 @@ export function createHttpClient(clientOptions: HttpClientOptions = {}): HttpCli
     { fetch: clientOptions.fetch },
   )
   const http = (<T>(request: string, options?: HttpRequestOptions) =>
-    executeRequest<T>(
-      client,
-      configuration,
-      clientOptions.hooks,
-      refresh,
-      request,
-      options,
-    )) as HttpClient
+    executeRequest<T>(client, configuration, refresh, request, options)) as HttpClient
   http.get = (url, options) =>
-    executeRequest(client, configuration, clientOptions.hooks, refresh, url, {
+    executeRequest(client, configuration, refresh, url, {
       ...options,
       method: 'GET',
     })
   http.post = (url, body, options) =>
-    executeRequest(client, configuration, clientOptions.hooks, refresh, url, {
+    executeRequest(client, configuration, refresh, url, {
       ...options,
       method: 'POST',
       body: body as Record<string, unknown>,
     })
   http.put = (url, body, options) =>
-    executeRequest(client, configuration, clientOptions.hooks, refresh, url, {
+    executeRequest(client, configuration, refresh, url, {
       ...options,
       method: 'PUT',
       body: body as Record<string, unknown>,
     })
   http.delete = (url, options) =>
-    executeRequest(client, configuration, clientOptions.hooks, refresh, url, {
+    executeRequest(client, configuration, refresh, url, {
       ...options,
       method: 'DELETE',
     })
   http.patch = (url, body, options) =>
-    executeRequest(client, configuration, clientOptions.hooks, refresh, url, {
+    executeRequest(client, configuration, refresh, url, {
       ...options,
       method: 'PATCH',
       body: body as Record<string, unknown>,
@@ -320,3 +308,10 @@ export function createHttpClient(clientOptions: HttpClientOptions = {}): HttpCli
   }
   return http
 }
+
+export const http = createHttp({
+  ...appConfig.http,
+  getAccessToken: () => auth.accessToken.value,
+  refreshAccessToken: () => auth.refresh(),
+  onError: (error) => captureError(error, { source: 'http', context: { request: error.request } }),
+})

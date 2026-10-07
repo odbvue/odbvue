@@ -21,7 +21,6 @@ declare global {
   const getCurrentWatcher: typeof import('vue').getCurrentWatcher
   const h: typeof import('vue').h
   const inject: typeof import('vue').inject
-  const injectHead: typeof import('@unhead/vue').injectHead
   const isProxy: typeof import('vue').isProxy
   const isReactive: typeof import('vue').isReactive
   const isReadonly: typeof import('vue').isReadonly
@@ -67,8 +66,6 @@ declare global {
   const useDefaults: typeof import('vuetify').useDefaults
   const useDisplay: typeof import('vuetify').useDisplay
   const useGoTo: typeof import('vuetify').useGoTo
-  const useHead: typeof import('@unhead/vue').useHead
-  const useHeadSafe: typeof import('@unhead/vue').useHeadSafe
   const useHtml5DragDrop: typeof import('./src/app/composables/dnd').useHtml5DragDrop
   const useHttp: typeof import('@/app/http').useHttp
   const useI18n: typeof import('vue-i18n').useI18n
@@ -85,7 +82,6 @@ declare global {
   const useRouter: typeof import('vue-router').useRouter
   const useRouting: typeof import('@/app/router/api').useRouting
   const useRtl: typeof import('vuetify').useRtl
-  const useSeoMeta: typeof import('@unhead/vue').useSeoMeta
   const useSlots: typeof import('vue').useSlots
   const useTemplateRef: typeof import('vue').useTemplateRef
   const useTheme: typeof import('vuetify').useTheme

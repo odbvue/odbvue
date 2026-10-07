@@ -1,80 +1,90 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createApp } from 'vue'
-import { createOdbVueHooks } from '@/app/events'
-import { installApp } from '@/app/plugins'
-import { useAuth } from '@/app/auth'
-import { useHttp } from '@/app/http'
-import { useErrors } from '@/app/errors'
+import type { App } from 'vue'
+import { createMemoryHistory, createRouter, type Router } from 'vue-router'
+import { auth, useAuth } from '@/app/auth'
+import { http, useHttp } from '@/app/http'
+import { errors, useErrors } from '@/app/errors'
+import * as errorService from '@/app/errors'
+import { createAuthGuard } from '@/app/router/auth'
+import { useUi } from '@/app/ui'
 
-describe('application startup', () => {
-  afterEach(() => vi.restoreAllMocks())
+const bootstrap = vi.hoisted((): { router?: Router; app?: App } => ({}))
 
-  it('delivers typed configured and subscribed event handlers', async () => {
-    const configured = vi.fn<() => void>()
-    const subscribed = vi.fn<() => void>()
-    const hooks = createOdbVueHooks({ 'app:started': configured })
-    hooks.on('app:started', subscribed)
-    await hooks.emit('app:started', undefined)
-    expect(configured).toHaveBeenCalledOnce()
-    expect(subscribed).toHaveBeenCalledOnce()
+vi.mock('@/app/router', () => ({
+  get default() {
+    return bootstrap.router
+  },
+}))
+vi.mock('@/app/App.vue', () => ({
+  default: { template: '<div id="shell">Application shell</div>' },
+}))
+vi.mock('vue', async (importOriginal) => {
+  const vue = await importOriginal<typeof import('vue')>()
+  return {
+    ...vue,
+    createApp: (...args: Parameters<typeof vue.createApp>) => {
+      bootstrap.app = vue.createApp(...args)
+      return bootstrap.app
+    },
+  }
+})
+
+describe('application bootstrap', () => {
+  afterEach(() => {
+    bootstrap.app?.unmount()
+    bootstrap.app = undefined
+    document.body.innerHTML = ''
+    vi.restoreAllMocks()
   })
 
-  it('provides one auth, HTTP and error service per application', async () => {
-    const app = createApp({})
-    const services = installApp(app, {})
-    vi.spyOn(services.auth, 'restore').mockResolvedValue(false)
-    app.runWithContext(() => {
-      expect(useAuth()).toBe(services.auth)
-      expect(useHttp()).toBe(services.http)
-      expect(useErrors()).toBe(services.errors)
-    })
-    await services.ready
+  it('exposes single services without installing a container or restoring auth', () => {
+    const restore = vi.spyOn(auth, 'restore')
+    expect(useAuth()).toBe(auth)
+    expect(useHttp()).toBe(http)
+    expect(useErrors()).toBe(errors)
+    expect(useUi().error).toBeTypeOf('function')
+    expect(restore).not.toHaveBeenCalled()
   })
 
-  it('restores once before emitting app:started and becoming ready', async () => {
-    let finish!: () => void
-    const startup = new Promise<boolean>((resolve) => {
-      finish = () => resolve(false)
+  it('mounts the shell while initial auth restoration is pending and captures errors without notifications', async () => {
+    let finish!: (authenticated: boolean) => void
+    const restoration = new Promise<boolean>((resolve) => {
+      finish = resolve
     })
-    const started = vi.fn<() => void>()
-    const services = installApp(createApp({}), { hooks: { 'app:started': started } })
-    const restore = vi.spyOn(services.auth, 'restore').mockReturnValue(startup)
-    let ready = false
-    void services.ready.then(() => {
-      ready = true
+    const restore = vi.spyOn(auth, 'restore').mockReturnValue(restoration)
+    const capture = vi.spyOn(errorService, 'captureError')
+    const ui = useUi()
+    ui.clear()
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }],
     })
-    await vi.waitFor(() => expect(restore).toHaveBeenCalledOnce())
-    expect(started).not.toHaveBeenCalled()
-    expect(ready).toBe(false)
-    finish()
-    await services.ready
-    expect(started).toHaveBeenCalledOnce()
-    expect(ready).toBe(true)
-    expect(restore).toHaveBeenCalledOnce()
-  })
+    router.beforeEach(createAuthGuard(router))
+    bootstrap.router = router
+    document.body.innerHTML = '<div id="app"></div>'
 
-  it('rejects readiness and reports startup failure without emitting app:started', async () => {
-    const error = new Error('Restore failed')
-    const started = vi.fn<() => void>()
-    const services = installApp(createApp({}), { hooks: { 'app:started': started } })
-    vi.spyOn(services.auth, 'restore').mockRejectedValue(error)
-    await expect(services.ready).rejects.toBe(error)
-    expect(started).not.toHaveBeenCalled()
-    expect(services.errors.getEvents()).toEqual([
-      expect.objectContaining({ message: 'Restore failed', source: 'app', operation: 'startup' }),
-    ])
-  })
-
-  it('includes asynchronous startup events in readiness', async () => {
-    const error = new Error('Startup handler failed')
-    const services = installApp(createApp({}), {
-      hooks: {
-        'app:started': async () => {
-          throw error
-        },
-      },
+    try {
+      await import('@/main')
+      expect(document.querySelector('#shell')?.textContent).toBe('Application shell')
+      expect(router.currentRoute.value.matched).toHaveLength(0)
+      expect(restore).toHaveBeenCalledOnce()
+      const error = new Error('Render failed')
+      bootstrap.app?.config.errorHandler?.(error, null, 'render')
+      expect(capture).toHaveBeenCalledWith(error, expect.objectContaining({ source: 'vue' }))
+      expect(ui.notification.value).toBeUndefined()
+    } finally {
+      finish(false)
+      await router.isReady()
+    }
+    const failure = new Error('Navigation failed')
+    router.beforeEach(() => {
+      throw failure
     })
-    vi.spyOn(services.auth, 'restore').mockResolvedValue(false)
-    await expect(services.ready).rejects.toBe(error)
+    await expect(router.push('/?next=1')).rejects.toBe(failure)
+    expect(capture).toHaveBeenCalledWith(failure, {
+      source: 'router',
+      context: { path: '/?next=1' },
+    })
+    expect(ui.notification.value).toBeUndefined()
   })
 })

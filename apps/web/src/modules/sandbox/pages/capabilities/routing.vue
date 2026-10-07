@@ -48,7 +48,7 @@
 </template>
 
 <script setup lang="ts">
-import { useRouting, type OdbVuePageMeta } from '@/app/router/api'
+import { useRouting, type PageMeta } from '@/app/router/api'
 import { computed, ref } from 'vue'
 
 definePage({
@@ -72,7 +72,7 @@ const routingPages = computed(() => {
     .toSorted((first, second) => first.path.localeCompare(second.path))
 })
 
-function toYaml(meta: OdbVuePageMeta): string {
+function toYaml(meta: PageMeta): string {
   return Object.entries(meta)
     .map(([key, value]) => {
       if (Array.isArray(value)) return `${key}: [${value.map(yamlValue).join(', ')}]`
@@ -92,7 +92,7 @@ function yamlValue(value: unknown): string {
   return String(value)
 }
 
-async function copyMetadata(meta: OdbVuePageMeta) {
+async function copyMetadata(meta: PageMeta) {
   await navigator.clipboard.writeText(toYaml(meta))
 }
 </script>

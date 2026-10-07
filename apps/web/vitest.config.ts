@@ -3,7 +3,6 @@ import { defineConfig, configDefaults } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
-import { unheadVueComposablesImports } from '@unhead/vue'
 
 const cssStubPlugin = {
   enforce: 'pre' as const,
@@ -53,7 +52,6 @@ export default defineConfig({
             'useTheme',
           ],
         },
-        unheadVueComposablesImports,
       ],
       dirs: ['./src/app/composables/**', './src/modules/*/composables/**'],
       dts: false,

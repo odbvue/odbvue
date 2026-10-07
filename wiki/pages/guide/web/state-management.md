@@ -1,6 +1,6 @@
 # State Management
 
-OdbVue applications use [Pinia](https://pinia.vuejs.org/) for shared application state. Pinia is installed as part of the web runtime; application code defines only domain stores.
+OdbVue applications use [Pinia](https://pinia.vuejs.org/) for shared application state. `src/app/state` exports the application Pinia instance, which `main.ts` installs explicitly. Application code defines domain stores.
 
 ```ts
 export const useCustomerStore = defineStore('customers', () => {
@@ -29,4 +29,4 @@ export const useSettingsStore = defineStore(
 )
 ```
 
-The application persistence runtime supports `localStorage`, `sessionStorage`, `indexedDB`, and cookies. Do not add Pinia bootstrap code to `main.ts`.
+The application persistence plugin supports `localStorage`, `sessionStorage`, `indexedDB`, and cookies. Register persistence once in `src/app/state`; do not install another Pinia instance in domain modules. The store registry is retained for sandbox diagnostics.

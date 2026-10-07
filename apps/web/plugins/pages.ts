@@ -13,9 +13,9 @@ export function odbVuePagesPlugin(): Plugin {
     load(id) {
       if (id !== resolvedPagesVirtualModuleId) return undefined
       return [
-        "import { createOdbVuePageManifest } from '@/app/router/manifest'",
+        "import { createPageManifest } from '@/app/router/manifest'",
         "import { routes as generatedRoutes } from 'vue-router/auto-routes'",
-        'export const manifest = createOdbVuePageManifest(generatedRoutes)',
+        'export const manifest = createPageManifest(generatedRoutes)',
         'export const routes = manifest.routes',
         'export const pages = manifest.pages',
       ].join('\n')

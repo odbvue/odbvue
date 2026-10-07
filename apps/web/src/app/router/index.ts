@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { installAppRouting } from '@/app/router/api'
+import { createAuthGuard } from './auth'
+import { updatePageTitle } from './metadata'
+import { registerPageManifest } from './registry'
 import { manifest, routes } from 'virtual:odbvue-pages'
 import { handleHotUpdate } from 'vue-router/auto-routes'
 
@@ -8,7 +10,11 @@ const router = createRouter({
   routes,
 })
 
-installAppRouting(router, manifest)
+registerPageManifest(router, manifest)
+router.beforeEach(createAuthGuard(router))
+router.afterEach((to, _from, failure) => {
+  if (!failure) updatePageTitle(to.meta)
+})
 
 export default router
 

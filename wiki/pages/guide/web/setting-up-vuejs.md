@@ -25,7 +25,6 @@ apps/web/
       http/
       i18n/                 # Vue I18n setup and application messages
       network/
-      plugins/              # Explicit application plugin installation
       router/               # Router, guards, manifest and navigation
       state/                # Pinia and persistence
       ui/                   # Vuetify, feedback and preferences
@@ -45,9 +44,10 @@ module. Share UI through `src/components` and app services through focused
 composables such as `useAuth()`, `useHttp()`, and `useUi()`. Application
 infrastructure must not depend on sandbox.
 
-`src/app/plugins` explicitly composes the libraries and services. A typed Vue
-injection shares application-scoped dependencies; there are no dynamic contracts,
-capability ordering, module registries, or service-aggregation Pinia stores.
+`src/main.ts` explicitly installs the libraries and mounts the shell immediately.
+Services are ordinary application-scoped ES module instances; there are no dynamic
+contracts, service containers, generic startup hooks, capability ordering, or
+service-aggregation Pinia stores. The router restores auth on initial navigation.
 Pinia remains the implementation for preferences and UI state. Auth is already a
 reactive composable, so it needs no second store.
 

@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { createApp, nextTick, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import 'fake-indexeddb/auto'
-import { createOdbVuePinia, getOdbVueStores } from '@/app/state'
+import { createState, getStores } from '@/app/state'
 
 async function readIndexedDB(dbName: string, storeName: string, key: string): Promise<unknown> {
   const db = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -23,23 +23,23 @@ async function readIndexedDB(dbName: string, storeName: string, key: string): Pr
 
 describe('OdbVue Pinia state', () => {
   it('lists stores registered through its public plugin hook', () => {
-    const pinia = createOdbVuePinia()
+    const pinia = createState()
     createApp({}).use(pinia)
     const useCounterStore = defineStore('counter', { state: () => ({ count: 0 }) })
     const counter = useCounterStore(pinia)
 
-    expect(getOdbVueStores(pinia)).toEqual([counter])
+    expect(getStores(pinia)).toEqual([counter])
   })
 
   it('does not read stores from Pinia runtimes it does not create', () => {
-    const pinia = createOdbVuePinia()
+    const pinia = createState()
 
-    expect(getOdbVueStores(pinia)).toEqual([])
+    expect(getStores(pinia)).toEqual([])
   })
 
   it('hydrates JSON state persisted in a cookie', async () => {
     document.cookie = `counter-persist=${encodeURIComponent(JSON.stringify({ count: 42 }))}; Path=/`
-    const pinia = createOdbVuePinia()
+    const pinia = createState()
     createApp({}).use(pinia)
     const useCounterStore = defineStore('counter-persist', {
       state: () => ({ count: 0 }),
@@ -55,7 +55,7 @@ describe('OdbVue Pinia state', () => {
   })
 
   it('persists selected setup-store refs in localStorage', async () => {
-    const pinia = createOdbVuePinia()
+    const pinia = createState()
     createApp({}).use(pinia)
     const usePreferencesStore = defineStore(
       'preferences-persist',
@@ -85,7 +85,7 @@ describe('OdbVue Pinia state', () => {
       state: () => ({ count: 0 }),
       persist: { storage: 'indexedDB', dbName, storeName: 'second' },
     })
-    const pinia = createOdbVuePinia()
+    const pinia = createState()
     createApp({}).use(pinia)
     const first = useFirstStore(pinia)
     const second = useSecondStore(pinia)
@@ -98,7 +98,7 @@ describe('OdbVue Pinia state', () => {
       await expect(readIndexedDB(dbName, 'second', second.$id)).resolves.toEqual({ count: 2 })
     })
 
-    const hydratedPinia = createOdbVuePinia()
+    const hydratedPinia = createState()
     createApp({}).use(hydratedPinia)
     const hydratedFirst = useFirstStore(hydratedPinia)
     const hydratedSecond = useSecondStore(hydratedPinia)

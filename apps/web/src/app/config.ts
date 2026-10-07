@@ -1,20 +1,17 @@
 import type { IconAliases, ThemeDefinition, VuetifyOptions } from 'vuetify'
 import type { I18nOptions } from 'vue-i18n'
 import type { HttpConfiguration } from './http/index.js'
-import { useAppServices } from './context'
-import type { OdbVueHookHandlers } from './events.js'
+import config from '../../odbvue.config'
 
-export type OdbVueAuthConfig = {
-  endpoints?: Partial<import('./auth/index.js').OdbVueAuthEndpoints>
+export type AuthConfig = {
+  endpoints?: Partial<import('./auth/index.js').AuthEndpoints>
   routes?: {
     login?: string
     authenticated?: string
     forbidden?: string
   }
 }
-export type OdbVueHook = (...args: unknown[]) => unknown | Promise<unknown>
-
-export type OdbVueUiConfig = {
+export type UiConfig = {
   theme?: {
     default?: string
     light?: ThemeDefinition
@@ -25,7 +22,7 @@ export type OdbVueUiConfig = {
   vuetify?: Omit<VuetifyOptions, 'blueprint' | 'defaults' | 'icons' | 'theme'>
 }
 
-export type OdbVueI18nConfig = {
+export type I18nConfig = {
   /** Locales compiled into the application and eligible for browser-language matching. */
   locales?: readonly string[]
   /** Explicit initial locale. Takes precedence over browser-language detection. */
@@ -38,27 +35,20 @@ export type OdbVueI18nConfig = {
   >
 }
 
-export type OdbVueErrorsConfig = import('./errors/index.js').OdbVueErrorsConfig
+export type ErrorsConfig = import('./errors/index.js').ErrorsConfig
 
-export type OdbVueAppConfig = {
+export type AppConfig = {
   title?: string
   version?: string
-  auth?: OdbVueAuthConfig
-  ui?: OdbVueUiConfig
-  i18n?: OdbVueI18nConfig
-  errors?: OdbVueErrorsConfig
+  auth?: AuthConfig
+  ui?: UiConfig
+  i18n?: I18nConfig
+  errors?: ErrorsConfig
   http?: HttpConfiguration
-  integrations?: Record<string, unknown>
-  hooks?: OdbVueHookHandlers
-  modules?: string[]
 }
 
-/** Defines an OdbVue application configuration with inferred literal types. */
-export function defineAppConfig<const Config extends OdbVueAppConfig>(config: Config): Config {
-  return config
-}
+export const appConfig: AppConfig = config
 
-/** Returns the configuration installed when the OdbVue application was created. */
-export function useAppConfig(): OdbVueAppConfig {
-  return useAppServices().config
+export function useAppConfig(): AppConfig {
+  return appConfig
 }

@@ -1,13 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from 'vue'
-import { injectHead } from '@unhead/vue'
-import { renderDOMHead } from '@unhead/vue/client'
 import { createMemoryHistory, createRouter, type RouteRecordRaw } from 'vue-router'
-import { createOdbVuePageManifest, installAppRouting, useRouting } from '@/app/router/api'
-import { installApp } from '@/app/plugins'
+import {
+  createPageManifest,
+  createAuthGuard,
+  registerPageManifest,
+  updatePageTitle,
+  useRouting,
+} from '@/app/router/api'
+import { createAuth } from '@/app/auth'
 import { useHttp } from '@/app/http'
 import { useUi } from '@/app/ui'
-import { type OdbVueAppConfig } from '@/app/config'
+import { type AppConfig } from '@/app/config'
 
 const component = { template: '<div />' }
 const routes: RouteRecordRaw[] = [
@@ -36,28 +40,38 @@ function json(data: unknown, status = 200) {
   })
 }
 
-function setup(config: OdbVueAppConfig = {}, pageRoutes = routes) {
+function setup(config: AppConfig = {}, pageRoutes = routes) {
   const app = createApp({})
   const router = createRouter({ history: createMemoryHistory(), routes: pageRoutes })
-  const dispose = installAppRouting(router, createOdbVuePageManifest(pageRoutes))
-  const runtime = installApp(app, { title: 'OdbVue', ...config }, router)
-  const auth = runtime.auth
   const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(json({}, 401))
-  auth.setHttp(useHttp({ fetch }))
-  const ui = app.runWithContext(() => useUi())
-  const routing = app.runWithContext(() => useRouting())
-  return { app, router, runtime, auth, fetch, ui, routing, dispose }
+  const auth = createAuth({ http: useHttp({ fetch }) })
+  const ui = useUi()
+  ui.clear()
+  registerPageManifest(router, createPageManifest(pageRoutes))
+  const removeGuard = router.beforeEach(
+    createAuthGuard(router, auth, config, () => ui.error('auth.forbidden')),
+  )
+  const removeTitle = router.afterEach((to, _from, failure) => {
+    if (!failure) updatePageTitle(to.meta)
+  })
+  app.use(router)
+  const routing = app.runWithContext(() => useRouting(auth))
+  const dispose = () => {
+    removeGuard()
+    removeTitle()
+  }
+  return { app, router, auth, fetch, ui, routing, dispose }
 }
 
 async function login(context: ReturnType<typeof setup>, roles: string[] = []) {
-  await context.runtime.ready
+  await context.auth.restore()
   context.fetch
     .mockResolvedValueOnce(json({ accessToken: 'token' }))
     .mockResolvedValueOnce(json({ userId: 7, username: 'ada', roles }))
   await context.auth.login({ username: 'ada', password: 'password' })
 }
 
-describe('application routing installation', () => {
+describe('application router guards', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it('waits for restoration before deciding access and restores only once', async () => {
@@ -83,7 +97,7 @@ describe('application routing installation', () => {
 
   it('uses the same access policy for guards and reactive navigation', async () => {
     const context = setup()
-    await context.runtime.ready
+    await context.auth.restore()
     expect(context.routing.pages.value.map((page) => page.path)).toEqual(['/', '/anonymous'])
     await login(context)
     expect(context.routing.pages.value.map((page) => page.path)).toEqual(['/', '/private'])
@@ -156,26 +170,20 @@ describe('application routing installation', () => {
     context.dispose()
   })
 
-  it('updates one head entry only after successful navigation', async () => {
+  it('updates the document title only after successful navigation', async () => {
     const context = setup()
-    const head = context.app.runWithContext(() => injectHead())!
     await context.router.push('/login')
-    await renderDOMHead(head)
     expect(document.title).toBe('OdbVue - Login')
     await context.router.push('/')
-    await renderDOMHead(head)
     expect(document.title).toBe('OdbVue')
-    expect(head.entries.size).toBe(1)
     const remove = context.router.beforeEach((to) => to.path !== '/login')
     await context.router.push('/login')
-    await renderDOMHead(head)
     expect(document.title).toBe('OdbVue')
     remove()
     context.dispose()
-    expect(head.entries.size).toBe(0)
   })
 
-  it('propagates failed startup to navigation rather than hanging', async () => {
+  it('propagates failed restoration to navigation rather than hanging', async () => {
     const error = new Error('Restore failed')
     const context = setup()
     vi.spyOn(context.auth, 'restore').mockRejectedValue(error)

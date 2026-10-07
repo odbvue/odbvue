@@ -1,6 +1,6 @@
 import { useRoute, type RouteLocationNormalizedLoaded } from 'vue-router'
 import { computed, type ComputedRef } from 'vue'
-import type { OdbVueRouteParams } from './types.js'
+import type { RouteParams } from './types.js'
 
 const routeValueToString = (value: unknown): string => {
   if (Array.isArray(value)) return routeValueToString(value[0])
@@ -44,7 +44,7 @@ export const computedRouteParams = (
   })
 }
 
-export const useRouteParams = (): OdbVueRouteParams => {
+export const useRouteParams = (): RouteParams => {
   const route = useRoute()
 
   const pathParams = computed(() => {

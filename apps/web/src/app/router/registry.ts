@@ -1,22 +1,20 @@
 import { shallowRef, type ShallowRef } from 'vue'
 import type { Router } from 'vue-router'
-import type { OdbVuePageManifest } from './manifest.js'
-import type { OdbVueBreadcrumb } from './types.js'
+import type { PageManifest } from './manifest.js'
+import type { Breadcrumb } from './types.js'
 
-const manifests = new WeakMap<Router, OdbVuePageManifest>()
-const breadcrumbOverrides = new WeakMap<Router, ShallowRef<OdbVueBreadcrumb | undefined>>()
+const manifests = new WeakMap<Router, PageManifest>()
+const breadcrumbOverrides = new WeakMap<Router, ShallowRef<Breadcrumb | undefined>>()
 
-export function registerOdbVuePageManifest(router: Router, manifest: OdbVuePageManifest): void {
+export function registerPageManifest(router: Router, manifest: PageManifest): void {
   manifests.set(router, manifest)
 }
 
-export function getOdbVuePageManifest(router: Router): OdbVuePageManifest {
+export function getPageManifest(router: Router): PageManifest {
   return manifests.get(router) ?? { routes: [], pages: [] }
 }
 
-export function getOdbVueBreadcrumbOverride(
-  router: Router,
-): ShallowRef<OdbVueBreadcrumb | undefined> {
+export function getBreadcrumbOverride(router: Router): ShallowRef<Breadcrumb | undefined> {
   let breadcrumbOverride = breadcrumbOverrides.get(router)
   if (!breadcrumbOverride) {
     breadcrumbOverride = shallowRef()

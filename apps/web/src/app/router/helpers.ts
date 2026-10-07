@@ -1,13 +1,13 @@
-import { computed, inject } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { RouteParamsRaw } from 'vue-router'
-import { getOdbVueBreadcrumbOverride, getOdbVuePageManifest } from './registry.js'
+import { getBreadcrumbOverride, getPageManifest } from './registry.js'
 import { toRoutePage } from './metadata.js'
 import { toManifestPage } from './manifest.js'
 import { useRouteParams } from './navigation.js'
-import type { OdbVueBreadcrumb, OdbVuePageMeta, OdbVueRouting } from './types.js'
-import { appServicesKey } from '../context'
-import { canAccessPage, canShowPage } from './auth.js'
+import type { Breadcrumb, PageMeta, Routing } from './types.js'
+import { useAuth } from '../auth'
+import { canAccessPage, canShowPage, type PageAuth } from './auth.js'
 
 function routeParamsForPath(path: string, params: Record<string, unknown>): RouteParamsRaw {
   const parameterNames = [...path.matchAll(/:([A-Za-z0-9_]+)/g)].map((match) => match[1])
@@ -18,18 +18,16 @@ function routeParamsForPath(path: string, params: Record<string, unknown>): Rout
   )
 }
 
-export function useRouting(): OdbVueRouting {
+export function useRouting(auth: PageAuth = useAuth()): Routing {
   const router = useRouter()
   const route = useRoute()
-  const manifest = getOdbVuePageManifest(router)
-  const breadcrumbOverride = getOdbVueBreadcrumbOverride(router)
+  const manifest = getPageManifest(router)
+  const breadcrumbOverride = getBreadcrumbOverride(router)
   const params = useRouteParams()
-  const auth = inject(appServicesKey, undefined)?.auth
-  function isNavigable(page: { path: string; meta: OdbVuePageMeta }): boolean {
+  function isNavigable(page: { path: string; meta: PageMeta }): boolean {
     return (
-      !auth ||
-      (canShowPage(page.meta, auth) &&
-        router.resolve(page.path).matched.every((record) => canAccessPage(record.meta, auth)))
+      canShowPage(page.meta, auth) &&
+      router.resolve(page.path).matched.every((record) => canAccessPage(record.meta, auth))
     )
   }
   const pageEntries = computed(() => {
@@ -67,7 +65,7 @@ export function useRouting(): OdbVueRouting {
     return matched ? toRoutePage(matched) : undefined
   })
   const currentModule = computed(() => currentPage.value?.module)
-  const breadcrumbs = computed<OdbVueBreadcrumb[]>(() => {
+  const breadcrumbs = computed<Breadcrumb[]>(() => {
     const matchedNames = new Set(route.matched.map((matchedRoute) => matchedRoute.name))
     const matchedPages = pageEntries.value
       .filter((page) => {
@@ -82,7 +80,7 @@ export function useRouting(): OdbVueRouting {
       .toSorted((first, second) => first.path.length - second.path.length)
       .map(toManifestPage)
 
-    const items: OdbVueBreadcrumb[] = matchedPages
+    const items: Breadcrumb[] = matchedPages
       .filter((page) => page.meta.visibility !== 'never')
       .filter(isNavigable)
       .map((page, index, matched) => ({

@@ -1,5 +1,6 @@
 import { defineStore, acceptHMRUpdate, storeToRefs } from 'pinia'
 import { ref, computed, readonly } from 'vue'
+import { pinia } from '../state'
 
 export interface AlertOptions {
   timeout?: number
@@ -81,7 +82,7 @@ function messageFrom(error: unknown): string {
 
 /** Provides OdbVue's application-facing feedback API. */
 export function useUi() {
-  const store = useUiStore()
+  const store = useUiStore(pinia)
   const { loading, notification, snackbar } = storeToRefs(store)
 
   return {

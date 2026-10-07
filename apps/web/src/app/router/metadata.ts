@@ -1,7 +1,12 @@
 import type { RouteRecordNormalized } from 'vue-router'
-import type { OdbVueNavigationMeta, OdbVuePageMeta, OdbVueRoutePage } from './types.js'
+import type { NavigationMeta, PageMeta, RoutePage } from './types.js'
+import { appConfig } from '../config'
 
-export function resolvePageTitle(meta: OdbVuePageMeta, path: string): string {
+export function updatePageTitle(meta: PageMeta, appTitle = appConfig.title || 'OdbVue'): void {
+  document.title = meta.title ? `${appTitle} - ${meta.title}` : appTitle
+}
+
+export function resolvePageTitle(meta: PageMeta, path: string): string {
   if (meta.title) return meta.title
   return (
     path
@@ -14,20 +19,20 @@ export function resolvePageTitle(meta: OdbVuePageMeta, path: string): string {
   )
 }
 
-export function getPageMeta(route: RouteRecordNormalized): OdbVuePageMeta {
+export function getPageMeta(route: RouteRecordNormalized): PageMeta {
   return route.meta
 }
 
-export function getNavigationMeta(meta: OdbVuePageMeta): false | OdbVueNavigationMeta {
+export function getNavigationMeta(meta: PageMeta): false | NavigationMeta {
   return resolveNavigationMeta(meta)
 }
 
-export function resolveNavigationMeta(meta: OdbVuePageMeta): false | OdbVueNavigationMeta {
+export function resolveNavigationMeta(meta: PageMeta): false | NavigationMeta {
   if (meta.navigation === false || meta.hidden || meta.visibility === 'never') return false
   return meta.navigation || { icon: meta.icon, order: meta.order }
 }
 
-export function toRoutePage(route: RouteRecordNormalized): OdbVueRoutePage {
+export function toRoutePage(route: RouteRecordNormalized): RoutePage {
   const meta = getPageMeta(route)
   return {
     name: route.name,

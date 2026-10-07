@@ -1,6 +1,7 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
-import { computed, ref, type Ref, watch } from 'vue'
-import { useAppServices } from '../context'
+import { computed, ref, watch } from 'vue'
+import { i18n } from '../i18n'
+import { vuetify } from './index'
 
 const themes = ['system', 'light', 'dark'] as const
 
@@ -9,9 +10,6 @@ type ThemeName = (typeof themes)[number]
 export const usePreferencesStore = defineStore(
   'settings',
   () => {
-    const runtime = useAppServices()
-    const i18n = runtime.i18n
-    const vuetify = runtime.vuetify
     const theme = ref<ThemeName>('system')
 
     function setTheme(nextTheme: ThemeName) {
@@ -34,10 +32,7 @@ export const usePreferencesStore = defineStore(
       { immediate: true },
     )
 
-    const i18nManager = i18n.global as {
-      locale: Ref<string>
-      availableLocales: string[]
-    }
+    const i18nManager = i18n.global
     const locale = ref(i18nManager.locale.value)
     const locales = computed(() => i18nManager.availableLocales)
 

@@ -1,8 +1,11 @@
-import { useAppServices } from '../context'
+import { appConfig } from '../config'
+
+export { createConsoleErrorReporter, createLocalStorageErrorReporter } from './reporters'
+export type { LocalStorageErrorReporterOptions } from './reporters'
 
 export type ErrorSeverity = 'error' | 'warning'
 
-export interface OdbVueErrorEvent {
+export interface CapturedError {
   id: string
   message: string
   name?: string
@@ -22,29 +25,29 @@ export interface CaptureErrorOptions {
   context?: Record<string, unknown>
 }
 
-export type ErrorReporter = (event: OdbVueErrorEvent) => void | Promise<void>
+export type ErrorReporter = (event: CapturedError) => void | Promise<void>
 
-export interface OdbVueErrorsConfig {
+export interface ErrorsConfig {
   bufferSize?: number
   reporters?: readonly ErrorReporter[]
 }
 
-export interface OdbVueErrors {
-  capture(error: unknown, options?: CaptureErrorOptions): OdbVueErrorEvent
+export interface Errors {
+  capture(error: unknown, options?: CaptureErrorOptions): CapturedError
   addReporter(reporter: ErrorReporter): () => void
-  getEvents(): readonly OdbVueErrorEvent[]
+  getEvents(): readonly CapturedError[]
   clear(): void
 }
 
-export function useErrors(): OdbVueErrors {
-  return useAppServices().errors
+export function useErrors(): Errors {
+  return errors
 }
 
 function createErrorId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
-function normalizeError(error: unknown, options: CaptureErrorOptions = {}): OdbVueErrorEvent {
+function normalizeError(error: unknown, options: CaptureErrorOptions = {}): CapturedError {
   const isError = error instanceof Error
   const message = isError ? error.message : typeof error === 'string' ? error : String(error)
 
@@ -63,15 +66,12 @@ function normalizeError(error: unknown, options: CaptureErrorOptions = {}): OdbV
 }
 
 /** Creates an application-scoped error capture and reporting service. */
-export function createOdbVueErrors(
-  config: OdbVueErrorsConfig = {},
-  hooks?: import('../events.js').OdbVueHooks,
-): OdbVueErrors {
+export function createErrors(config: ErrorsConfig = {}): Errors {
   const reporters = new Set(config.reporters)
   const maxEntries = config.bufferSize ?? 50
-  const events: OdbVueErrorEvent[] = []
+  const events: CapturedError[] = []
 
-  function report(event: OdbVueErrorEvent): void {
+  function report(event: CapturedError): void {
     for (const reporter of reporters) {
       Promise.resolve()
         .then(() => reporter(event))
@@ -87,7 +87,6 @@ export function createOdbVueErrors(
       events.push(event)
       if (events.length > maxEntries) events.splice(0, events.length - maxEntries)
       report(event)
-      void hooks?.emit('error:captured', event)
       return event
     },
     addReporter(reporter) {
@@ -103,29 +102,5 @@ export function createOdbVueErrors(
   }
 }
 
-/** Reports captured errors to the browser console. */
-export function createConsoleErrorReporter(): ErrorReporter {
-  return (event) => {
-    console.error(event)
-  }
-}
-
-export interface LocalStorageErrorReporterOptions {
-  key?: string
-  maxEntries?: number
-}
-
-/** Persists a bounded history of captured errors in local storage. */
-export function createLocalStorageErrorReporter(
-  options: LocalStorageErrorReporterOptions = {},
-): ErrorReporter {
-  const key = options.key ?? 'odbvue:errors'
-  const maxEntries = options.maxEntries ?? 100
-
-  return (event) => {
-    const existing = JSON.parse(globalThis.localStorage.getItem(key) ?? '[]')
-    const events = Array.isArray(existing) ? existing : []
-    events.push(event)
-    globalThis.localStorage.setItem(key, JSON.stringify(events.slice(-maxEntries)))
-  }
-}
+export const errors = createErrors(appConfig.errors)
+export const captureError = errors.capture

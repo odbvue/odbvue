@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createOdbVueAuth } from '../src/app/auth/index.js'
+import { createAuth } from '../src/app/auth/index.js'
 import type { HttpClient } from '../src/app/http/index.js'
+import { useHttp } from '../src/app/http/index.js'
 
 type HttpPostMock = (url: string, body?: unknown) => Promise<unknown>
 type HttpGetMock = (url: string) => Promise<unknown>
@@ -11,7 +12,7 @@ function response<T>(data: T | null, status = 200) {
 
 describe('authentication capability', () => {
   it('clears issued tokens if identity hydration fails during login', async () => {
-    const auth = createOdbVueAuth({
+    const auth = createAuth({
       http: {
         post: vi.fn<HttpPostMock>().mockResolvedValue(response({ accessToken: 'access-token' })),
         get: vi.fn<HttpGetMock>().mockResolvedValue({
@@ -32,7 +33,7 @@ describe('authentication capability', () => {
     post
       .mockResolvedValueOnce(response({ accessToken: 'access-token' }))
       .mockResolvedValueOnce({ ...response(null, 500), error: new Error('Logout failed') })
-    const auth = createOdbVueAuth({
+    const auth = createAuth({
       http: {
         post,
         get: vi.fn<HttpGetMock>().mockResolvedValue(response({ userId: 7, username: 'ada' })),
@@ -47,7 +48,7 @@ describe('authentication capability', () => {
   })
 
   it('hydrates roles and permissions from JSON text or decoded arrays', async () => {
-    const auth = createOdbVueAuth({
+    const auth = createAuth({
       http: {
         get: vi.fn<HttpGetMock>().mockResolvedValue(
           response({
@@ -88,7 +89,7 @@ describe('authentication capability', () => {
       post,
       get,
     } as unknown as HttpClient
-    const auth = createOdbVueAuth({ http })
+    const auth = createAuth({ http })
 
     await auth.login({ username: 'ada', password: 'password' })
     expect(http.post).toHaveBeenNthCalledWith(
@@ -113,9 +114,10 @@ describe('authentication capability', () => {
   })
 
   it('becomes ready anonymously when the refresh cookie is invalid', async () => {
-    const auth = createOdbVueAuth({
+    const auth = createAuth({
       http: {
         post: vi.fn<HttpPostMock>().mockResolvedValue(response(null, 401)),
+        get: vi.fn<HttpGetMock>(),
       } as unknown as HttpClient,
     })
 
@@ -124,13 +126,67 @@ describe('authentication capability', () => {
     expect(auth.authenticated.value).toBe(false)
   })
 
+  it('shares one lazy restoration across concurrent calls and later navigations', async () => {
+    let finish!: (response: Response) => void
+    const fetch = vi.fn<typeof globalThis.fetch>()
+    fetch
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            finish = resolve
+          }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ userId: 7, username: 'ada' }), {
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+    const auth = createAuth({ http: useHttp({ fetch }) })
+    expect(fetch).not.toHaveBeenCalled()
+
+    const first = auth.restore()
+    const second = auth.restore()
+    expect(second).toBe(first)
+    expect(auth.ready.value).toBe(false)
+    finish(
+      new Response(JSON.stringify({ accessToken: 'restored-token' }), {
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    await expect(first).resolves.toBe(true)
+    expect(auth.restore()).toBe(first)
+    await expect(auth.restore()).resolves.toBe(true)
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(auth.ready.value).toBe(true)
+  })
+
+  it('shares restoration failures instead of silently retrying or hanging', async () => {
+    const error = new Error('Identity unavailable')
+    const fetch = vi.fn<typeof globalThis.fetch>()
+    fetch
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ accessToken: 'restored-token' }), {
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+      .mockResolvedValue(new Response(null, { status: 403 }))
+    const http = useHttp({ fetch })
+    const auth = createAuth({ http })
+    vi.spyOn(auth, 'me').mockRejectedValue(error)
+    const first = auth.restore()
+    await expect(first).rejects.toBe(error)
+    expect(auth.restore()).toBe(first)
+    await expect(auth.restore()).rejects.toBe(error)
+    expect(auth.ready.value).toBe(true)
+  })
+
   it('clears an existing session when refresh returns unauthorized', async () => {
     const post = vi.fn<HttpPostMock>()
     post
       .mockResolvedValueOnce(response({ accessToken: 'access-token' }))
       .mockResolvedValueOnce(response(null, 401))
     const get = vi.fn<HttpGetMock>().mockResolvedValue(response({ userId: 7, username: 'ada' }))
-    const auth = createOdbVueAuth({ http: { post, get } as unknown as HttpClient })
+    const auth = createAuth({ http: { post, get } as unknown as HttpClient })
 
     await auth.login({ username: 'ada', password: 'password' })
     await expect(auth.refresh()).resolves.toBe(false)
@@ -152,7 +208,7 @@ describe('authentication capability', () => {
         displayName: 'Ada Lovelace',
       }),
     )
-    const auth = createOdbVueAuth({ http: { post, get } as unknown as HttpClient })
+    const auth = createAuth({ http: { post, get } as unknown as HttpClient })
 
     await auth.login({ username: 'ada', password: 'password' })
 
@@ -165,7 +221,7 @@ describe('authentication capability', () => {
   it('restores an authenticated user using the browser refresh cookie', async () => {
     const post = vi.fn<HttpPostMock>().mockResolvedValue(response({ accessToken: 'access-token' }))
     const get = vi.fn<HttpGetMock>().mockResolvedValue(response({ userId: 7, username: 'ada' }))
-    const auth = createOdbVueAuth({ http: { post, get } as unknown as HttpClient })
+    const auth = createAuth({ http: { post, get } as unknown as HttpClient })
 
     await expect(auth.restore()).resolves.toBe(true)
 
@@ -193,7 +249,7 @@ describe('authentication capability', () => {
       post,
       get: vi.fn<HttpGetMock>().mockResolvedValue(response({ userId: 7, username: 'ada' })),
     } as unknown as HttpClient
-    const auth = createOdbVueAuth({ http })
+    const auth = createAuth({ http })
     await auth.login({ username: 'ada', password: 'password' })
 
     await expect(auth.refresh()).resolves.toBe(false)

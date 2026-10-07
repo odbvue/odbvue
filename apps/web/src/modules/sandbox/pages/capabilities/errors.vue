@@ -69,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { useErrors, type OdbVueErrorEvent } from '@/app/errors'
+import { useErrors, type CapturedError } from '@/app/errors'
 import { computed, ref } from 'vue'
 
 definePage({
@@ -82,8 +82,8 @@ definePage({
 })
 
 const errors = useErrors()
-const events = ref<OdbVueErrorEvent[]>([...errors.getEvents()])
-const selectedEvent = ref<OdbVueErrorEvent>()
+const events = ref<CapturedError[]>([...errors.getEvents()])
+const selectedEvent = ref<CapturedError>()
 const dialogOpen = computed({
   get: () => !!selectedEvent.value,
   set: (open: boolean) => {
@@ -117,7 +117,7 @@ function captureSampleWarning() {
   refresh()
 }
 
-function formatEvent(event: OdbVueErrorEvent): string {
+function formatEvent(event: CapturedError): string {
   return [event.severity, event.source, new Date(event.timestamp).toLocaleString()]
     .filter(Boolean)
     .join(' | ')
