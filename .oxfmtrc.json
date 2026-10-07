@@ -12,7 +12,7 @@
     "**/auto-imports.d.ts",
     "**/components.d.ts",
     "**/typed-router.d.ts",
-    "**/src/app/themes/icons.ts",
-    "**/src/app/services/openapi.generated.ts"
+    "**/src/capabilities/ui/themes/icons.ts",
+    "**/src/capabilities/api/openapi.generated.ts"
   ]
 }

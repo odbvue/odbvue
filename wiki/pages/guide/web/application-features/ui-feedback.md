@@ -1,10 +1,10 @@
 # UI Feedback
 
-Use `useUi()` from `@/app/ui`. It exposes a focused API backed by the application's
+Use `useUi()` from `@/capabilities/ui`. It exposes a focused API backed by the application's
 Pinia UI store; no application-store aggregation is required.
 
 ```ts
-import { useUi } from '@/app/ui'
+import { useUi } from '@/capabilities/ui'
 
 const ui = useUi()
 ui.info('Ready')
@@ -32,7 +32,7 @@ try {
 ```
 
 The default layout in `src/app/layouts` renders alerts, snackbars, and a loading
-indicator. `useNotificationMessage()` from `@/app/composables/ui` translates known
+indicator. `useNotificationMessage()` from `@/capabilities/ui` translates known
 catalog keys and displays arbitrary errors as plain text. Runtime error messages
 are not submitted to the missing-translation collector.
 

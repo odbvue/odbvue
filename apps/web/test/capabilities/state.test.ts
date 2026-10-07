@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { createApp, nextTick, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import 'fake-indexeddb/auto'
-import { createState } from '@/app/state'
+import { createState } from '@/capabilities/state'
 
 async function readIndexedDB(dbName: string, storeName: string, key: string): Promise<unknown> {
   const db = await new Promise<IDBDatabase>((resolve, reject) => {

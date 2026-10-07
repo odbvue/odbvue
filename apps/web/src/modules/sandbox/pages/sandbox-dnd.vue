@@ -28,7 +28,7 @@
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import { useHtml5DragDrop } from '../../../app/composables/dnd'
+import { useHtml5DragDrop } from '@/capabilities/dnd'
 
 type ColumnKey = 'todo' | 'doing' | 'done'
 type Card = { id: string; title: string; text: string }

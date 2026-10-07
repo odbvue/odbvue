@@ -5,8 +5,8 @@ render navigable root-level pages as cards, excluding the home page itself.
 
 ```ts
 import { computed } from 'vue'
-import { useRouting } from '@/app/router/api'
-import { useCardBackground } from '@/app/composables/ui'
+import { useRouting } from '@/capabilities/routing'
+import { useCardBackground } from '@/capabilities/ui'
 
 const routing = useRouting()
 const navigationPages = computed(() =>

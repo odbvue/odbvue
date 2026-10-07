@@ -38,8 +38,8 @@
 </template>
 
 <script setup lang="ts">
-import { useAppConfig } from '@/app/config'
-import { usePreferencesStore } from '@/app/ui'
+import { useAppConfig } from '@/capabilities/config'
+import { usePreferencesStore } from '@/capabilities/ui'
 import type { OvTableData, OvTableOptions } from '@/components'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'

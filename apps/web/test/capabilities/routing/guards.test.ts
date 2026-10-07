@@ -7,11 +7,11 @@ import {
   registerPageManifest,
   updatePageTitle,
   useRouting,
-} from '@/app/router/api'
-import { createAuth } from '@/app/auth'
-import { useHttp } from '@/app/http'
-import { useUi } from '@/app/ui'
-import { type AppConfig } from '@/app/config'
+} from '@/capabilities/routing'
+import { createAuth } from '@/capabilities/auth'
+import { useHttp } from '@/capabilities/http'
+import { useUi } from '@/capabilities/ui'
+import { type AppConfig } from '@/capabilities/config'
 
 const component = { template: '<div />' }
 const routes: RouteRecordRaw[] = [

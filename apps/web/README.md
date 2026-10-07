@@ -5,16 +5,26 @@ The complete Vue experience lives here, with no separate web runtime package.
 ## Source boundaries
 
 - `src/main.ts`: bootstrap, startup error handling, and mount.
-- `src/app`: main application shell, pages, layouts, composables, config access,
-  auth, HTTP, errors, router, i18n, Pinia/persistence, UI, themes, and generated API types.
+- `src/app`: application shell, pages, layouts, router assembly, and locale messages.
+- `src/capabilities`: shared auth, HTTP, errors, network status, routing APIs,
+  i18n initialization, Pinia/persistence, UI helpers/themes, drag-and-drop,
+  configuration access, runtime wiring, and generated API types.
 - `src/components`: shared `VOv*` components, compiled directly with the app.
 - `src/modules/sandbox`: sandbox pages, translations, and diagnostics catalog.
 - `plugins`: Node-only Vite plugins for routes/manifest, messages, icons, and OpenAPI.
 - `test`: all Vitest suites, organized by source boundary; `e2e`: browser regression tests.
 
-This retains release/v0's conventional Vue folders while distinguishing the main
-application from self-contained modules. Modules may add their own components,
-composables, stores, and API calls. Infrastructure must not import sandbox.
+Application pages and modules consume public capability entry points such as
+`@/capabilities/auth`, `@/capabilities/http`, and `@/capabilities/routing`.
+Capabilities must not import the application shell, pages, layouts, or modules.
+Modules may add their own components, composables, stores, and API calls.
+Keep shared helpers with their owning capability rather than in generic
+`composables` or `services` folders.
+
+`src/app/router.ts` assembles generated routes and connects shared routing guards
+and metadata handling. `src/capabilities/i18n` initializes localization, while
+application messages live in `src/app/i18n` and module/page messages remain
+in their own `i18n` folders.
 
 `src/main.ts` explicitly installs Pinia, Vue I18n, Vuetify, and the router, then mounts
 the application immediately. Infrastructure exports application-scoped ES module
@@ -26,9 +36,9 @@ the application uses the shared `pinia` instance.
 Sandbox state diagnostics read Pinia's public reactive state directly, without
 a separate store registry.
 
-Auth and HTTP factories live in [auth/core.ts](./src/app/auth/core.ts) and
-[http/core.ts](./src/app/http/core.ts), independently of application configuration
-and singleton initialization. [runtime.ts](./src/app/runtime.ts) wires the shared
+Auth and HTTP factories live in [auth/core.ts](./src/capabilities/auth/core.ts) and
+[http/core.ts](./src/capabilities/http/core.ts), independently of application configuration
+and singleton initialization. [runtime.ts](./src/capabilities/runtime.ts) wires the shared
 instances together through deferred client and token callbacks, without circular
 module imports. The public auth and HTTP entry points retain the factories,
 singletons, types, and `useAuth()` / `useHttp()` APIs.
@@ -61,7 +71,7 @@ Optional `permissions` require every listed permission and are supported only wi
 `authenticated` access or a role array when non-empty.
 Unauthenticated visitors to protected pages return there after login, while authenticated users
 without access are sent home with an error. Login redirects must resolve to a local route.
-The [router](./src/app/router/index.ts) registers the manifest, auth guard, and successful-navigation
+The [router](./src/app/router.ts) registers the manifest, auth guard, and successful-navigation
 title updates directly. Titles use `document.title` without a head manager.
 Application destinations can be configured with `auth.routes.login`,
 `auth.routes.authenticated`, and `auth.routes.forbidden`. Navigation applies the same access
@@ -126,14 +136,15 @@ pnpm build
 ### Run Unit Tests with [Vitest](https://vitest.dev/)
 
 All Vitest tests live under `test` and use the `.test.ts` suffix. Mirror meaningful
-source boundaries: `test/app`, `test/components`, and `test/modules/<module>`.
+source boundaries: `test/app`, `test/capabilities`, `test/components`, and
+`test/modules/<module>`.
 Bootstrap tests live at `test/main.test.ts`; Node-only Vite plugin tests live
 under `test/plugins`. Name tests after the subject they exercise, for example
 `test/app/pages/login.test.ts` for the login page.
 
 Shared setup, stubs, and fixtures belong in `test/support`. Prefer `@/` imports
 for application source so moving tests does not break source imports. The `app`
-Vitest project runs application, module, bootstrap, and plugin tests; the
+Vitest project runs application, capability, module, bootstrap, and plugin tests; the
 `components` project runs shared component tests with its own Vuetify setup.
 Both projects discover nested `.test.ts` files recursively. Playwright tests
 remain separate in `e2e` and use `.spec.ts`.

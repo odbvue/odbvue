@@ -26,7 +26,7 @@ definePage({
     navigation: true,
   },
 })
-import { useCardBackground } from '@/app/composables/ui'
+import { useCardBackground } from '@/capabilities/ui'
 const routing = useRouting()
 const navigationPages = computed(() =>
   routing.pages.value.filter((page) => page.level === 0 && page.path !== '/'),

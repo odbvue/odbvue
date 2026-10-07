@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-type CaptureError = typeof import('@/app/errors').captureError
+type CaptureError = typeof import('@/capabilities/errors').captureError
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -10,22 +10,22 @@ function json(data: unknown, status = 200): Response {
 }
 
 afterEach(() => {
-  vi.doUnmock('@/app/config')
-  vi.doUnmock('@/app/errors')
+  vi.doUnmock('@/capabilities/config')
+  vi.doUnmock('@/capabilities/errors')
   vi.unstubAllGlobals()
   vi.resetModules()
 })
 
 describe('auth and HTTP module boundaries', () => {
   it('imports and constructs core factories without application configuration or error services', async () => {
-    vi.doMock('@/app/config', () => {
+    vi.doMock('@/capabilities/config', () => {
       throw new Error('Core factories must not load application configuration.')
     })
-    vi.doMock('@/app/errors', () => {
+    vi.doMock('@/capabilities/errors', () => {
       throw new Error('Core factories must not load application error services.')
     })
-    const { createAuth } = await import('@/app/auth/core.js')
-    const { createHttp, createHttpClient } = await import('@/app/http/core.js')
+    const { createAuth } = await import('@/capabilities/auth/core.js')
+    const { createHttp, createHttpClient } = await import('@/capabilities/http/core.js')
     const fetch = vi.fn<typeof globalThis.fetch>()
     const http = createHttpClient({ fetch })
     const auth = createAuth({ http })
@@ -38,18 +38,18 @@ describe('auth and HTTP module boundaries', () => {
   it.each(['auth', 'http'] as const)(
     'initializes shared instances lazily when importing %s first',
     async (first) => {
-      vi.doMock('@/app/config', () => ({ appConfig: {} }))
-      vi.doMock('@/app/errors', () => ({ captureError: vi.fn<CaptureError>() }))
+      vi.doMock('@/capabilities/config', () => ({ appConfig: {} }))
+      vi.doMock('@/capabilities/errors', () => ({ captureError: vi.fn<CaptureError>() }))
       const fetch = vi.fn<typeof globalThis.fetch>()
       vi.stubGlobal('fetch', fetch)
 
-      if (first === 'auth') await import('@/app/auth/index.js')
-      else await import('@/app/http/index.js')
-      const authModule = await import('@/app/auth/index.js')
-      const httpModule = await import('@/app/http/index.js')
-      const runtime = await import('@/app/runtime.js')
-      const authCore = await import('@/app/auth/core.js')
-      const httpCore = await import('@/app/http/core.js')
+      if (first === 'auth') await import('@/capabilities/auth/index.js')
+      else await import('@/capabilities/http/index.js')
+      const authModule = await import('@/capabilities/auth/index.js')
+      const httpModule = await import('@/capabilities/http/index.js')
+      const runtime = await import('@/capabilities/runtime.js')
+      const authCore = await import('@/capabilities/auth/core.js')
+      const httpCore = await import('@/capabilities/http/core.js')
 
       expect(authModule.auth).toBe(runtime.auth)
       expect(authModule.useAuth()).toBe(runtime.auth)
@@ -64,9 +64,9 @@ describe('auth and HTTP module boundaries', () => {
   )
 
   it('wires login, shared refresh, logout, and error reporting through the same client', async () => {
-    vi.doMock('@/app/config', () => ({ appConfig: {} }))
+    vi.doMock('@/capabilities/config', () => ({ appConfig: {} }))
     const captureError = vi.fn<CaptureError>()
-    vi.doMock('@/app/errors', () => ({ captureError }))
+    vi.doMock('@/capabilities/errors', () => ({ captureError }))
     let requiredToken = 'login-token'
     const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
       const path = new URL(String(input), 'https://example.test').pathname
@@ -79,8 +79,8 @@ describe('auth and HTTP module boundaries', () => {
       return json({ ok: true })
     })
     vi.stubGlobal('fetch', fetch)
-    const { auth } = await import('@/app/auth/index.js')
-    const { http } = await import('@/app/http/index.js')
+    const { auth } = await import('@/capabilities/auth/index.js')
+    const { http } = await import('@/capabilities/http/index.js')
 
     await auth.login({ username: 'ada', password: 'password' })
     expect(auth.authenticated.value).toBe(true)

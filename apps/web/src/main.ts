@@ -2,10 +2,10 @@ import { createApp } from 'vue'
 
 import App from './app/App.vue'
 import router from './app/router'
-import { pinia } from '@/app/state'
-import { i18n } from '@/app/i18n'
-import { vuetify } from '@/app/ui'
-import { captureError } from '@/app/errors'
+import { pinia } from '@/capabilities/state'
+import { i18n } from '@/capabilities/i18n'
+import { vuetify } from '@/capabilities/ui'
+import { captureError } from '@/capabilities/errors'
 
 const app = createApp(App)
 

@@ -1,1 +1,1 @@
-export { odbVueComponentIcons } from '../app/ui/icons.js'
+export { odbVueComponentIcons } from '../capabilities/ui/icons.js'

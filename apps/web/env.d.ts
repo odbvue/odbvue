@@ -9,7 +9,7 @@ declare module 'virtual:odbvue-i18n-inventory' {
 }
 
 declare module 'virtual:odbvue-pages' {
-  import type { PageManifest } from '@/app/router/api'
+  import type { PageManifest } from '@/capabilities/routing'
   import type { RouteRecordRaw } from 'vue-router'
 
   export const manifest: PageManifest

@@ -99,8 +99,8 @@
 </template>
 
 <script setup lang="ts">
-import { useAppConfig } from '@/app/config'
-import { usePreferencesStore, useUi } from '@/app/ui'
+import { useAppConfig } from '@/capabilities/config'
+import { usePreferencesStore, useUi } from '@/capabilities/ui'
 import { computed } from 'vue'
 
 definePage({

@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { App } from 'vue'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
-import { auth, useAuth } from '@/app/auth'
-import { http, useHttp } from '@/app/http'
-import { errors, useErrors } from '@/app/errors'
-import * as errorService from '@/app/errors'
-import { createAuthGuard } from '@/app/router/auth'
-import { useUi } from '@/app/ui'
+import { auth, useAuth } from '@/capabilities/auth'
+import { http, useHttp } from '@/capabilities/http'
+import { errors, useErrors } from '@/capabilities/errors'
+import * as errorService from '@/capabilities/errors'
+import { createAuthGuard } from '@/capabilities/routing/auth'
+import { useUi } from '@/capabilities/ui'
 
 const bootstrap = vi.hoisted((): { router?: Router; app?: App } => ({}))
 

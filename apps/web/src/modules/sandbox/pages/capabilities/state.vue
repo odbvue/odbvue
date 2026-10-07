@@ -45,7 +45,7 @@
 </template>
 
 <script setup lang="ts">
-import { pinia } from '@/app/state'
+import { pinia } from '@/capabilities/state'
 import { computed } from 'vue'
 
 definePage({

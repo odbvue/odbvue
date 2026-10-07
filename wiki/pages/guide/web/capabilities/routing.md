@@ -1,6 +1,6 @@
 # Routing
 
-Application routing adapts generated Vue Router records into pages with a predictable title, route metadata, and navigation metadata. The implementation lives in `apps/web/src/app/router`.
+Application routing adapts generated Vue Router records into pages with a predictable title, route metadata, and navigation metadata. Shared APIs live in `apps/web/src/capabilities/routing`; application router assembly lives in `apps/web/src/app/router.ts`.
 
 Use it when an application shell, navigation component, breadcrumb trail, or page-aware component needs to understand the current route or all available pages. Routes are generated from `src/app/pages` and `src/modules/<module>/pages`. The router registers the page manifest, authorization guard, and document-title handling directly.
 
@@ -8,7 +8,7 @@ Use it when an application shell, navigation component, breadcrumb trail, or pag
 
 ```ts
 import { createRouter, createWebHistory } from 'vue-router'
-import { createAuthGuard, registerPageManifest, updatePageTitle } from '@/app/router/api'
+import { createAuthGuard, registerPageManifest, updatePageTitle } from '@/capabilities/routing'
 import { manifest, routes } from 'virtual:odbvue-pages'
 
 const router = createRouter({ history: createWebHistory(), routes })
@@ -42,7 +42,7 @@ Configure application destinations with `auth.routes`: `login` defaults to `/log
 Each page exposes its route path, the original normalized Vue Router record, `meta`, a derived `title`, and a resolved `navigation` boolean. A title comes from `meta.title` when present; otherwise it is derived from the final path segment, so `/customer-orders` becomes `Customer Orders`.
 
 ```ts
-import { useRouting } from '@/app/router/api'
+import { useRouting } from '@/capabilities/routing'
 
 const { allPages, breadcrumbs, currentModule, currentPage, navigate, pages, params, title } =
   useRouting()
@@ -120,7 +120,7 @@ Login pages can use `resolveAuthRedirect(router, route.query.redirect, fallback,
 
 ```vue
 <script setup lang="ts">
-import { useRouting } from '@/app/router/api'
+import { useRouting } from '@/capabilities/routing'
 
 const { pages } = useRouting()
 </script>
@@ -158,7 +158,7 @@ Breadcrumbs are built from each URL prefix that has a registered, visible page. 
 
 ```vue
 <script setup lang="ts">
-import { useRouting } from '@/app/router/api'
+import { useRouting } from '@/capabilities/routing'
 
 const { breadcrumbs } = useRouting()
 </script>
@@ -174,7 +174,7 @@ Use `usePageMeta()` when a component only needs metadata from the current page. 
 
 ```vue
 <script setup lang="ts">
-import { usePageMeta } from '@/app/router/api'
+import { usePageMeta } from '@/capabilities/routing'
 
 const pageMeta = usePageMeta()
 </script>
@@ -190,7 +190,7 @@ const pageMeta = usePageMeta()
 
 ```ts
 import { computed } from 'vue'
-import { useRouting } from '@/app/router/api'
+import { useRouting } from '@/capabilities/routing'
 
 const { currentModule } = useRouting()
 const isCustomersModule = computed(() => currentModule.value === 'customers')

@@ -21,6 +21,7 @@ export type OdbVueI18nViteOptions = {
   dumpInterval?: number
   flushDelay?: number
   i18nDir?: string
+  appLocalesDir?: string
   include?: string[]
 }
 
@@ -57,27 +58,33 @@ function getScopeKey(scope: I18nScope): string {
     : path.relative(process.cwd(), scope.pageDir).replaceAll('\\', '/')
 }
 
-function getI18nPath(scope: I18nScope, locale: string, i18nDir: string): string {
+function getI18nPath(
+  scope: I18nScope,
+  locale: string,
+  i18nDir: string,
+  appLocalesDir: string,
+): string {
   return scope.type === 'page'
     ? path.resolve(scope.pageDir, i18nDir, `${locale}.json`)
-    : path.resolve(process.cwd(), 'src', 'app', i18nDir, `${locale}.json`)
+    : path.resolve(process.cwd(), 'src', 'app', appLocalesDir, `${locale}.json`)
 }
 
 /** Adds OdbVue's generated-message and missing-key development plugins. */
 export function odbVueI18nPlugin(options: OdbVueI18nViteOptions = {}): PluginOption[] {
   const {
+    appLocalesDir = 'i18n',
     include = [
-      'src/app/i18n/**/*.json',
+      `src/app/${appLocalesDir}/**/*.json`,
       'src/app/pages/**/i18n/**/*.json',
       'src/modules/*/i18n/**/*.json',
       'src/modules/*/pages/**/i18n/**/*.json',
     ],
   } = options
-  return [VueI18nPlugin({ include }), i18nDevPlugin(options), i18nInventoryPlugin()]
+  return [VueI18nPlugin({ include }), i18nDevPlugin(options), i18nInventoryPlugin(options)]
 }
 
 /** Publishes source-file translation counts for developer diagnostics. */
-function i18nInventoryPlugin(): Plugin {
+function i18nInventoryPlugin({ appLocalesDir = 'i18n' }: OdbVueI18nViteOptions): Plugin {
   return {
     name: 'odbvue:i18n-inventory',
     resolveId(id) {
@@ -89,7 +96,7 @@ function i18nInventoryPlugin(): Plugin {
       const sourceRoot = path.resolve(process.cwd(), 'src')
       const modulesRoot = path.join(sourceRoot, 'modules')
       const inventory: I18nInventory = {
-        app: await countLocaleFiles(path.join(sourceRoot, 'app', 'i18n')),
+        app: await countLocaleFiles(path.join(sourceRoot, 'app', appLocalesDir)),
         modules: {},
       }
 
@@ -144,6 +151,7 @@ export function i18nDevPlugin(options: OdbVueI18nViteOptions = {}): Plugin {
     dumpInterval = 300_000,
     flushDelay = 500,
     i18nDir = 'i18n',
+    appLocalesDir = 'i18n',
   } = options
   const supportedLocales = new Set(locales)
   const i18nCache: I18nCache = new Map()
@@ -163,7 +171,7 @@ export function i18nDevPlugin(options: OdbVueI18nViteOptions = {}): Plugin {
 
     const fileGroups = new Map<string, Record<string, string>>()
     for (const [, item] of i18nCache) {
-      const filePath = getI18nPath(item.scope, item.locale, i18nDir)
+      const filePath = getI18nPath(item.scope, item.locale, i18nDir, appLocalesDir)
       if (!fileGroups.has(filePath)) fileGroups.set(filePath, {})
       fileGroups.get(filePath)![item.key] = item.value
     }

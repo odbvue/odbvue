@@ -1,8 +1,8 @@
-import { createLocalStorageErrorReporter } from '@/app/errors/reporters'
-import type { AppConfig } from '@/app/config'
+import { createLocalStorageErrorReporter } from '@/capabilities/errors/reporters'
+import type { AppConfig } from '@/capabilities/config'
 
-import { light, dark } from './src/app/themes/themes.json'
-import icons from './src/app/themes/icons'
+import { light, dark } from './src/capabilities/ui/themes/themes.json'
+import icons from './src/capabilities/ui/themes/icons'
 import openapi from '../db/dist/openapi.json'
 
 export default {

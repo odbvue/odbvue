@@ -109,10 +109,10 @@
 </template>
 
 <script setup lang="ts">
-import { useAuth } from '@/app/auth'
-import { useHttp } from '@/app/http'
+import { useAuth } from '@/capabilities/auth'
+import { useHttp } from '@/capabilities/http'
 import { ref } from 'vue'
-import type { components } from '@/app/services/openapi.generated'
+import type { components } from '@/capabilities/api/openapi.generated'
 
 definePage({
   meta: {

@@ -24,17 +24,21 @@ Oracle tooling and the CLI provide reusable framework behavior. The web applicat
 owns its Vue plugin composition, authentication, HTTP client, routing, persistence,
 translations, UI, pages, and themes.
 
-The main application lives in `src/app`, domain modules in `src/modules`, and
-shared components in `src/components`. Modules use app composables and shared UI
-without registering runtime contracts or importing other modules' internals.
+The shell, built-in pages, layouts, router assembly, and locale messages live in
+`src/app`. Shared auth, HTTP, routing APIs, state, localization, and UI services
+live in `src/capabilities`; domain modules live in `src/modules`, and shared
+components in `src/components`. App pages and modules use capability APIs and
+shared UI without importing other modules' internals. Capabilities do not import
+the application shell or modules.
 
 ## Composition
 
 `odbvue.config.ts` describes application choices. Explicit setup in
-`src/app/plugins` installs Pinia, Vue I18n, Vuetify, and application-scoped services.
-It restores authentication once; both mounting and routing await the same startup
-promise. Database capabilities are installed explicitly through migrations and
-are not enabled by web configuration.
+`src/main.ts` installs Pinia, Vue I18n, Vuetify, and the application router, then
+mounts the shell immediately. `src/capabilities/runtime.ts` wires shared auth and
+HTTP instances. Router guards await lazy, idempotent authentication restoration.
+Database capabilities are installed explicitly through migrations and are not
+enabled by web configuration.
 
 ## Web features
 

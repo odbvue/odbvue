@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { appConfig, useAppConfig } from '@/app/config'
-import { createErrors } from '@/app/errors'
-import { resolveLocale } from '@/app/i18n'
+import { appConfig, useAppConfig } from '@/capabilities/config'
+import { createErrors } from '@/capabilities/errors'
+import { resolveLocale } from '@/capabilities/i18n'
 
 describe('application config and errors', () => {
   it('captures normalized errors and isolates reporter failures', async () => {

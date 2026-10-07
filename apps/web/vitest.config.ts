@@ -27,7 +27,7 @@ export default defineConfig({
         'vue-router',
         'vue-i18n',
         {
-          from: '@/app/router/api',
+          from: '@/capabilities/routing',
           imports: [
             'useRouting',
             'usePageMeta',
@@ -37,8 +37,12 @@ export default defineConfig({
             'computedRouteQuery',
           ],
         },
-        { from: '@/app/ui', imports: ['useUi', 'usePreferencesStore'] },
-        { from: '@/app/http', imports: ['useHttp'] },
+        {
+          from: '@/capabilities/ui',
+          imports: ['useUi', 'usePreferencesStore', 'useCardBackground', 'useNotificationMessage'],
+        },
+        { from: '@/capabilities/dnd', imports: ['useHtml5DragDrop'] },
+        { from: '@/capabilities/http', imports: ['useHttp'] },
         {
           from: 'vuetify',
           imports: [
@@ -53,7 +57,7 @@ export default defineConfig({
           ],
         },
       ],
-      dirs: ['./src/app/composables/**', './src/modules/*/composables/**'],
+      dirs: ['./src/modules/*/composables/**'],
       dts: false,
     }),
     Components({ dirs: ['src/components'], dts: false }),
@@ -79,6 +83,7 @@ export default defineConfig({
           name: 'app',
           include: [
             'test/app/**/*.test.ts',
+            'test/capabilities/**/*.test.ts',
             'test/modules/**/*.test.ts',
             'test/plugins/**/*.test.ts',
             'test/*.test.ts',

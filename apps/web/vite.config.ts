@@ -62,7 +62,7 @@ export default defineConfig(({ mode }) => {
       odbVueI18nPlugin(),
       openapiPlugin({
         source: '../db/dist/openapi.json',
-        dest: 'src/app/services/openapi.generated.ts',
+        dest: 'src/capabilities/api/openapi.generated.ts',
       }),
       AutoImport({
         imports: [
@@ -70,7 +70,7 @@ export default defineConfig(({ mode }) => {
           'vue-router',
           'vue-i18n',
           {
-            from: '@/app/router/api',
+            from: '@/capabilities/routing',
             imports: [
               'computedRouteParam',
               'computedRouteParams',
@@ -80,8 +80,17 @@ export default defineConfig(({ mode }) => {
               'useRouting',
             ],
           },
-          { from: '@/app/http', imports: ['useHttp'] },
-          { from: '@/app/ui', imports: ['usePreferencesStore', 'useUi'] },
+          { from: '@/capabilities/http', imports: ['useHttp'] },
+          {
+            from: '@/capabilities/ui',
+            imports: [
+              'usePreferencesStore',
+              'useUi',
+              'useCardBackground',
+              'useNotificationMessage',
+            ],
+          },
+          { from: '@/capabilities/dnd', imports: ['useHtml5DragDrop'] },
           {
             from: 'vuetify',
             imports: [
@@ -97,7 +106,7 @@ export default defineConfig(({ mode }) => {
             ],
           },
         ],
-        dirs: ['./src/app/composables/**', './src/modules/*/composables/**'],
+        dirs: ['./src/modules/*/composables/**'],
       }),
       Components({
         dirs: ['src/components', 'src/app/components', 'src/modules/*/components'],

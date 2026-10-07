@@ -15,6 +15,9 @@ describe('main application and module page boundaries', () => {
     fixture = mkdtempSync(join(tmpdir(), 'odbvue-pages-'))
     for (const directory of [
       'src/app/pages',
+      'src/app/i18n',
+      'src/capabilities/ui',
+      'src/capabilities/routing',
       'src/modules/sandbox/pages',
       'src/modules/sandbox/components',
       'src/modules/sandbox/i18n',
@@ -35,6 +38,7 @@ describe('main application and module page boundaries', () => {
     )
     expect(moduleFromComponent(resolve('src/modules/sandbox/components/Form.vue'))).toBeUndefined()
     expect(moduleFromComponent(resolve('src/app/pages/index.vue'))).toBeUndefined()
+    expect(moduleFromComponent(resolve('src/capabilities/routing/index.ts'))).toBeUndefined()
     expect(moduleFromComponent()).toBeUndefined()
   })
 })

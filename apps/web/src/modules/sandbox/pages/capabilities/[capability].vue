@@ -33,7 +33,7 @@
 
 <script setup lang="ts">
 import { odbVueCapabilities } from '@/modules/sandbox/catalog'
-import { useAppConfig } from '@/app/config'
+import { useAppConfig } from '@/capabilities/config'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 

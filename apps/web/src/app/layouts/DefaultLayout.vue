@@ -183,10 +183,10 @@
 </template>
 
 <script setup lang="ts">
-import { useAuth } from '@/app/auth'
-import { useAppConfig } from '@/app/config'
-import { usePreferencesStore, useUi } from '@/app/ui'
-import { useNotificationMessage } from '@/app/composables/ui'
+import { useAuth } from '@/capabilities/auth'
+import { useAppConfig } from '@/capabilities/config'
+import { usePreferencesStore, useUi } from '@/capabilities/ui'
+import { useNotificationMessage } from '@/capabilities/ui'
 
 const drawer = ref(false)
 const config = useAppConfig()

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { useHttp } from '@/app/http/index.js'
+import { useHttp } from '@/capabilities/http/index.js'
 
 type FetchMock = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 type RefreshMock = () => Promise<boolean>
@@ -43,9 +43,9 @@ describe('HTTP capability', () => {
   })
 
   it('reports final HTTP and refresh errors through explicit callbacks', async () => {
-    const onError = vi.fn<NonNullable<import('@/app/http').HttpConfiguration['onError']>>()
+    const onError = vi.fn<NonNullable<import('@/capabilities/http').HttpConfiguration['onError']>>()
     const onRefreshFailure =
-      vi.fn<NonNullable<import('@/app/http').HttpConfiguration['onRefreshFailure']>>()
+      vi.fn<NonNullable<import('@/capabilities/http').HttpConfiguration['onRefreshFailure']>>()
     const fetch = vi.fn<FetchMock>(() => Promise.resolve(response(401)))
     const http = useHttp({
       fetch,
@@ -72,7 +72,7 @@ describe('HTTP capability', () => {
   ])('reports slow requests at the configured threshold (%sms)', async (duration, slow) => {
     const now = vi.spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValueOnce(duration)
     const onSlowRequest =
-      vi.fn<NonNullable<import('@/app/http').HttpConfiguration['onSlowRequest']>>()
+      vi.fn<NonNullable<import('@/capabilities/http').HttpConfiguration['onSlowRequest']>>()
     try {
       const http = useHttp({
         fetch: vi.fn<FetchMock>(() => Promise.resolve(response(200))),

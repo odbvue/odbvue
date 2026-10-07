@@ -1,7 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { createAuthGuard } from './auth'
-import { updatePageTitle } from './metadata'
-import { registerPageManifest } from './registry'
+import { createAuthGuard, updatePageTitle, registerPageManifest } from '@/capabilities/routing'
 import { manifest, routes } from 'virtual:odbvue-pages'
 import { handleHotUpdate } from 'vue-router/auto-routes'
 

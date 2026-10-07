@@ -1,6 +1,6 @@
 # UI and Themes
 
-OdbVue uses [Vuetify](https://vuetifyjs.com/) as its UI implementation. `apps/web/src/app/ui` exports Vuetify with its styles, the Material Design 3 blueprint, and the MDI icon set. `main.ts` installs it directly, using choices under `ui` in `odbvue.config.ts`. Shared `VOv*` components live in `src/components` and compile directly with the application.
+OdbVue uses [Vuetify](https://vuetifyjs.com/) as its UI implementation. `apps/web/src/capabilities/ui` exports Vuetify with its styles, the Material Design 3 blueprint, and the MDI icon set. `main.ts` installs it directly, using choices under `ui` in `odbvue.config.ts`. Shared `VOv*` components live in `src/components` and compile directly with the application.
 
 Use the [Vuetify documentation](https://vuetifyjs.com/components/all/) for component APIs. Extend the existing application setup rather than installing a second Vuetify instance.
 
@@ -9,8 +9,8 @@ Use the [Vuetify documentation](https://vuetifyjs.com/components/all/) for compo
 Keep substantial palettes in an application-owned file, then register them through configuration.
 
 ```ts
-import type { AppConfig } from './src/app/config'
-import { light, dark } from './src/app/themes/themes.json'
+import type { AppConfig } from './src/capabilities/config'
+import { light, dark } from './src/capabilities/ui/themes/themes.json'
 
 export default {
   ui: {
@@ -38,4 +38,4 @@ ui: {
 
 ## Icons
 
-`ui.icons` adds application aliases to OdbVue's MDI aliases. The application MDI plugin generates `src/app/themes/icons.ts`; `mdiHome` then becomes `$mdiHome` in templates.
+`ui.icons` adds application aliases to OdbVue's MDI aliases. The application MDI plugin generates `src/capabilities/ui/themes/icons.ts`; `mdiHome` then becomes `$mdiHome` in templates.

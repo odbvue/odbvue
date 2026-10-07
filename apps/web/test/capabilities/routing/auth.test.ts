@@ -1,9 +1,9 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { computed } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { canAccessPage, canShowPage, resolveAuthRedirect } from '@/app/router/api'
-import type { PageAccess, PageMeta } from '@/app/router/api'
-import { validatePageMeta } from '@/app/router/policy'
+import { canAccessPage, canShowPage, resolveAuthRedirect } from '@/capabilities/routing'
+import type { PageAccess, PageMeta } from '@/capabilities/routing'
+import { validatePageMeta } from '@/capabilities/routing/policy'
 
 const component = { template: '<div />' }
 const router = createRouter({

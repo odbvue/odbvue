@@ -1,11 +1,11 @@
 # Preferences
 
 UI preferences are application state, not database settings. Use
-`usePreferencesStore()` from `@/app/ui`; its implementation lives in
-`src/app/ui/preferences.ts`.
+`usePreferencesStore()` from `@/capabilities/ui`; its implementation lives in
+`src/capabilities/ui/preferences.ts`.
 
 ```ts
-import { usePreferencesStore } from '@/app/ui'
+import { usePreferencesStore } from '@/capabilities/ui'
 
 const preferences = usePreferencesStore()
 preferences.setTheme('dark')

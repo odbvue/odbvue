@@ -16,10 +16,10 @@
 
 <script setup lang="ts">
 import type { OvFormData, OvFormOptions } from '@/components'
-import { resolveAuthRedirect } from '@/app/router/api'
-import { useAuth } from '@/app/auth'
-import { useAppConfig } from '@/app/config'
-import { useUi } from '@/app/ui'
+import { resolveAuthRedirect } from '@/capabilities/routing'
+import { useAuth } from '@/capabilities/auth'
+import { useAppConfig } from '@/capabilities/config'
+import { useUi } from '@/capabilities/ui'
 
 definePage({
   meta: {

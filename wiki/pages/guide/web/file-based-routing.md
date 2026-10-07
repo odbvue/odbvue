@@ -41,4 +41,4 @@ navigation: true
 # About
 ```
 
-The application owns router creation and route HMR under `src/app/router`. Module metadata is inferred from the page's source folder. Adding a new module's `pages` folder requires restarting Vite; edits within existing modules use route HMR. Running the app updates `typed-router.d.ts`, which should remain committed for typed route names and parameters.
+The application owns router creation and route HMR in `src/app/router.ts`. Shared routing APIs live in `src/capabilities/routing`. Module metadata is inferred from the page's source folder. Adding a new module's `pages` folder requires restarting Vite; edits within existing modules use route HMR. Running the app updates `typed-router.d.ts`, which should remain committed for typed route names and parameters.

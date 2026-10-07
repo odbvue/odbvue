@@ -6,7 +6,7 @@ in `apps/web/index.html`.
 Set application metadata in `apps/web/odbvue.config.ts`:
 
 ```ts
-import type { AppConfig } from './src/app/config'
+import type { AppConfig } from './src/capabilities/config'
 
 export default {
   title: 'OdbVue',
@@ -18,7 +18,7 @@ The default layout reads metadata directly with `useAppConfig()`:
 
 ```vue
 <script setup lang="ts">
-import { useAppConfig } from '@/app/config'
+import { useAppConfig } from '@/capabilities/config'
 const config = useAppConfig()
 </script>
 
@@ -28,7 +28,7 @@ const config = useAppConfig()
 </template>
 ```
 
-The `afterEach` guard in `src/app/router/index.ts` updates `document.title` directly
+The `afterEach` guard in `src/app/router.ts` updates `document.title` directly
 after successful navigation, without a head manager.
 Pages with a title produce `Application title - Page title`; pages without one use
 the application title alone. Denied or cancelled navigation does not update it.

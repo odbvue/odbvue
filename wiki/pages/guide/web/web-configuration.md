@@ -3,7 +3,7 @@
 `apps/web/odbvue.config.ts` configures the **web application**, not the database installation. `src/main.ts` explicitly installs Vue I18n, Pinia, Vuetify, and the router, then mounts immediately. All web code belongs to `apps/web`; there is no separate web framework package, service container, event bus, or capability registry.
 
 ```ts
-import type { AppConfig } from './src/app/config'
+import type { AppConfig } from './src/capabilities/config'
 
 export default {
   title: 'OdbVue',
@@ -29,8 +29,8 @@ export default {
 Components and composables can read application configuration with `useAppConfig()` and access services through focused composables. These return ordinary application-scoped ES module instances and do not require an injection context. Module diagnostics derive module names from discovered page metadata rather than configuration.
 
 ```ts
-import { useAppConfig } from '@/app/config'
-import { useAuth } from '@/app/auth'
+import { useAppConfig } from '@/capabilities/config'
+import { useAuth } from '@/capabilities/auth'
 
 const config = useAppConfig()
 const auth = useAuth()
@@ -43,9 +43,9 @@ Bootstrap installs the application instances directly. There is no generic readi
 ```ts
 import { createApp } from 'vue'
 import App from '@/app/App.vue'
-import { pinia } from '@/app/state'
-import { i18n } from '@/app/i18n'
-import { vuetify } from '@/app/ui'
+import { pinia } from '@/capabilities/state'
+import { i18n } from '@/capabilities/i18n'
+import { vuetify } from '@/capabilities/ui'
 import router from '@/app/router'
 
 const app = createApp(App)
@@ -65,7 +65,7 @@ On initial navigation, the authentication guard sends the refresh cookie to `/au
 Vue and router errors are captured explicitly in `main.ts`, and HTTP errors use an `onError` callback. Error reporting is separate from user notifications: user-facing flows decide when to show localized feedback.
 
 ```ts
-import { useAuth } from '@/app/auth'
+import { useAuth } from '@/capabilities/auth'
 
 const auth = useAuth()
 

@@ -107,8 +107,8 @@
 </template>
 
 <script setup lang="ts">
-import { useAuth } from '@/app/auth'
-import { useHttp } from '@/app/http'
+import { useAuth } from '@/capabilities/auth'
+import { useHttp } from '@/capabilities/http'
 import { computed, ref } from 'vue'
 
 definePage({

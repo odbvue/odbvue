@@ -48,7 +48,7 @@
 </template>
 
 <script setup lang="ts">
-import { useRouting } from '@/app/router/api'
+import { useRouting } from '@/capabilities/routing'
 import type { RouteMeta } from 'vue-router'
 import { computed, ref } from 'vue'
 

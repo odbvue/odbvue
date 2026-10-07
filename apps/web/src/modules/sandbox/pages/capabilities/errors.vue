@@ -69,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { useErrors, type CapturedError } from '@/app/errors'
+import { useErrors, type CapturedError } from '@/capabilities/errors'
 import { computed, ref } from 'vue'
 
 definePage({

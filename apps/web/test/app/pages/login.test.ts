@@ -2,16 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { createAuth, type Auth } from '@/app/auth'
-import { createState } from '@/app/state'
-import { i18n } from '@/app/i18n'
-import { useHttp } from '@/app/http'
-import { useUi } from '@/app/ui'
+import { createAuth, type Auth } from '@/capabilities/auth'
+import { createState } from '@/capabilities/state'
+import { i18n } from '@/capabilities/i18n'
+import { useHttp } from '@/capabilities/http'
+import { useUi } from '@/capabilities/ui'
 import Login from '@/app/pages/login.vue'
 
 const session = vi.hoisted((): { auth?: Auth } => ({}))
-vi.mock('@/app/auth', async (importOriginal) => {
-  const module = await importOriginal<typeof import('@/app/auth')>()
+vi.mock('@/capabilities/auth', async (importOriginal) => {
+  const module = await importOriginal<typeof import('@/capabilities/auth')>()
   return { ...module, useAuth: () => session.auth }
 })
 

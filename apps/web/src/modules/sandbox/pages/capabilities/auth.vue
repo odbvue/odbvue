@@ -61,7 +61,7 @@
 </template>
 
 <script setup lang="ts">
-import { useAuth } from '@/app/auth'
+import { useAuth } from '@/capabilities/auth'
 import type { OvFormData, OvFormOptions } from '@/components'
 import { ref } from 'vue'
 
