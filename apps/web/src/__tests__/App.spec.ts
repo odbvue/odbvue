@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 
 import { mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import App from '../App.vue'
+import App from '../app/App.vue'
 
 const router = createRouter({
   history: createMemoryHistory(),

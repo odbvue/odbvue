@@ -1,36 +1,47 @@
 # Framework Overview
 
-OdbVue is a framework for Oracle-backed business applications. It provides a coherent path from database schema to generated web client, while applications keep ownership of their domain and visual identity.
+OdbVue provides a coherent path from Oracle database schema to a Vue experience,
+while applications own their domain and visual identity.
 
 ```text
-Oracle Database -> ORDS/OpenAPI -> @odbvue/web -> application
+Oracle Database -> ORDS/OpenAPI -> Vue application
 ```
 
 ## Framework components
 
 - `@odbvue/odb` models, builds, migrates, and executes work against Oracle.
+- `@odbvue/odb-oracledb` supplies the Oracle execution adapter.
 - ORDS exposes the deployed database contract; ODB emits its OpenAPI manifest.
-- `@odbvue/web` provides the web runtime, OdbVue configuration, and Vuetify setup.
-- `ov` coordinates common database and generated-client workflows.
+- `ov` coordinates database and generated-client workflows.
+- `apps/web` contains the complete Vue/Vuetify application and its shared UI.
 
-The OdbVue release is the compatibility unit. Framework packages are developed and released together rather than as independently versioned application features.
+Framework packages are developed together. The Vue application is private
+workspace source, not another independently versioned SDK.
 
 ## Ownership boundary
 
-OdbVue owns reusable runtime behavior: Vue and Vuetify setup, configuration access, database tooling, generated-client workflow, and framework defaults.
+Oracle tooling and the CLI provide reusable framework behavior. The web application
+owns its Vue plugin composition, authentication, HTTP client, routing, persistence,
+translations, UI, pages, and themes.
 
-An application owns its business pages, domain components, database migrations, translations, themes, and the choices declared in `odbvue.config.ts`. A setting belongs in application code when it is specific to that application; it belongs in OdbVue when every application would otherwise need to assemble the same plumbing.
+The main application lives in `src/app`, domain modules in `src/modules`, and
+shared components in `src/components`. Modules use app composables and shared UI
+without registering runtime contracts or importing other modules' internals.
 
 ## Composition
 
-`odbvue.config.ts` is the application-level registration point. It selects capabilities and integrations, supplies UI customizations, and will compose business modules as the module API becomes stable. OdbVue then applies those choices to its runtime without generating framework files for the application to maintain.
+`odbvue.config.ts` describes application choices. Explicit setup in
+`src/app/plugins` installs Pinia, Vue I18n, Vuetify, and application-scoped services.
+It restores authentication once; both mounting and routing await the same startup
+promise. Database capabilities are installed explicitly through migrations and
+are not enabled by web configuration.
 
-## Framework capabilities
+## Web features
 
-Capabilities are reusable framework behavior exposed by OdbVue packages. They give applications a shared implementation and contract while leaving application pages, domain rules, and presentation in application code.
+The application retains file-based pages, rich route metadata, navigation,
+breadcrumbs, authentication guards, HTTP refresh/retry handling, persistence, and
+shared forms, tables, charts, maps, and other components.
 
-The web runtime includes capabilities for configuration, errors, HTTP, internationalization, state, UI, and routing. Some capabilities are enabled or configured in `odbvue.config.ts`; routing is always available when an application uses the OdbVue web runtime and Vue Router.
-
-- [Routing](/guide/web/capabilities/routing) turns generated Vue Router records into typed, metadata-rich pages that application shells can use for navigation, breadcrumbs, titles, and page-aware UI.
-
-Capabilities expose framework-level information and operations. They do not replace application-specific authorization or business logic.
+- [Web Overview](/guide/web/setting-up-vuejs) explains the source boundaries.
+- [Routing](/guide/web/capabilities/routing) describes metadata-driven pages,
+  navigation, breadcrumbs, titles, and authorization.

@@ -13,11 +13,11 @@
     "format": "oxfmt",
     "lint": "oxlint",
     "type-check": "vue-tsc -p tsconfig.json --noEmit",
-    "check": "pnpm format && pnpm lint && pnpm type-check"
+    "test:run": "vitest run",
+    "check": "pnpm format && pnpm lint && pnpm type-check && pnpm test:run"
   },
   "dependencies": {
     "@mdi/js": "^7.4.47",
-    "@odbvue/web": "workspace:*",
     "@tiptap/extension-image": "^3.14.0",
     "@tiptap/markdown": "^3.27.1",
     "@tiptap/pm": "^3.11.0",
@@ -48,6 +48,7 @@
     "@vue/devtools-api": "^8.1.5",
     "@vue/test-utils": "^2.4.11",
     "@vue/tsconfig": "^0.9.1",
+    "fake-indexeddb": "^6.2.5",
     "gray-matter": "^4.0.3",
     "jsdom": "^29.1.1",
     "npm-run-all2": "^9.0.2",

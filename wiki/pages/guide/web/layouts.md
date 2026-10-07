@@ -1,9 +1,9 @@
 # Layouts
 
-Layouts are reusable page shells. OdbVue resolves application layouts by name; applications create or customize layout components in `src/layouts` and select one through page metadata.
+Layouts are reusable page shells. The main app resolves layouts by name; create or customize layout components in `src/app/layouts` and select one through page metadata. Module pages can use the same layouts.
 
 ```text
-src/layouts/
+src/app/layouts/
   DefaultLayout.vue
   FullscreenLayout.vue
 ```
@@ -16,4 +16,4 @@ definePage({
 </script>
 ```
 
-`default` is used when a page does not choose a layout. Application developers own the layout markup and page metadata; layout discovery is framework behavior.
+`default` is used when a page does not choose a layout. Layout discovery lives in `src/app/App.vue`; layout markup and page metadata remain application-owned.

@@ -69,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { errorsContract, useOdbVue, type OdbVueErrorEvent } from '@odbvue/web'
+import { useErrors, type OdbVueErrorEvent } from '@/app/errors'
 import { computed, ref } from 'vue'
 
 definePage({
@@ -81,7 +81,7 @@ definePage({
   },
 })
 
-const errors = useOdbVue().get(errorsContract)
+const errors = useErrors()
 const events = ref<OdbVueErrorEvent[]>([...errors.getEvents()])
 const selectedEvent = ref<OdbVueErrorEvent>()
 const dialogOpen = computed({

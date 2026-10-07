@@ -2,15 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import {
-  authContract,
-  defineOdbVueApp,
-  installOdbVue,
-  useHttp,
-  useUi,
-  type OdbVueRuntime,
-} from '@odbvue/web'
-import Login from '../pages/login.vue'
+import { defineAppConfig } from '@/app/config'
+import { installApp } from '@/app/plugins'
+import { useHttp } from '@/app/http'
+import { useUi } from '@/app/ui'
+import { type AppServices } from '@/app/context'
+import Login from '../app/pages/login.vue'
 
 const form = defineComponent({
   props: ['loading'],
@@ -36,15 +33,15 @@ async function setup() {
   })
   await router.push('/login?redirect=/sandbox')
   const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(json({}, 401))
-  let runtime!: OdbVueRuntime
+  let runtime!: AppServices
   let ui!: ReturnType<typeof useUi>
   const wrapper = mount(Login, {
     global: {
       plugins: [
         {
           install(app) {
-            runtime = installOdbVue(app, defineOdbVueApp({ errors: { reporters: [] } }), router)
-            const auth = runtime.get(authContract)
+            runtime = installApp(app, defineAppConfig({ errors: { reporters: [] } }), router)
+            const auth = runtime.auth
             auth.setHttp(
               useHttp({ fetch, configuration: { getAccessToken: () => auth.accessToken.value } }),
             )
@@ -61,7 +58,7 @@ async function setup() {
     },
   })
   await runtime.ready
-  return { wrapper, router, fetch, ui, auth: runtime.get(authContract) }
+  return { wrapper, router, fetch, ui, auth: runtime.auth }
 }
 
 describe('login page using framework auth', () => {

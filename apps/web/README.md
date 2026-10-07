@@ -1,26 +1,51 @@
-# apps
+# OdbVue web application
 
-This template should help get you started developing with Vue 3 in Vite.
+The complete Vue experience lives here, with no separate web runtime package.
+
+## Source boundaries
+
+- `src/main.ts`: bootstrap, startup error handling, and mount.
+- `src/app`: main application shell, pages, layouts, composables, config access,
+  auth, HTTP, errors, router, i18n, Pinia/persistence, UI, themes, and generated API types.
+- `src/components`: shared `VOv*` components, compiled directly with the app.
+- `src/modules/sandbox`: sandbox pages, translations, and diagnostics catalog.
+- `plugins`: Node-only Vite plugins for routes/manifest, messages, icons, and OpenAPI.
+- `test`: infrastructure and shared component suites; `src/__tests__`: app behavior;
+  `e2e`: browser regression tests.
+
+This retains release/v0's conventional Vue folders while distinguishing the main
+application from self-contained modules. Modules may add their own components,
+composables, stores, and API calls. Infrastructure must not import sandbox.
+
+`src/app/plugins` explicitly installs the Vue libraries and provides typed,
+application-scoped services. There is no dynamic capability registry or contract
+system. Use focused composables, not an aggregator store. Pinia supplies UI and
+preferences; authentication already owns reactive state and needs no wrapper.
+
+Main pages generate `/...` routes from `src/app/pages`; module pages generate
+`/<module>/...` routes from `src/modules/<module>/pages`. Only page folders are
+scanned. Restart Vite after adding a new module's pages folder; existing page
+changes use route HMR. Modules share the same auth/navigation metadata rules.
 
 ## Authentication
 
-The [login page](./src/pages/login.vue) supports username/password authentication (no Google
-login). Pages and the [default layout](./src/layouts/DefaultLayout.vue) use the framework's
-`useAuth()` capability directly; there is no application auth store or capability aggregator.
-The existing framework `useAppStore()` supplies title, version, preferences, and UI feedback.
+The [login page](./src/app/pages/login.vue) supports username/password authentication
+(no Google login). Pages and the [default layout](./src/app/layouts/DefaultLayout.vue)
+use `useAuth()` directly. Config supplies title/version, while preferences and UI
+use their own APIs.
 
-No auth state is persisted in localStorage or sessionStorage. The runtime restores the session
+No auth state is persisted in localStorage or sessionStorage. Application setup restores the session
 once at startup with `POST /auth/refresh`, then `GET /auth/me`. The [entry point](./src/main.ts)
-waits for `runtime.ready` and router readiness before mounting. Framework guards await the same
-runtime promise instead of issuing another refresh. Access tokens and user details remain in
+waits for service readiness and router readiness before mounting. Guards await the same
+startup promise instead of issuing another refresh. Access tokens and user details remain in
 memory; the server-managed refresh cookie is `HttpOnly`, `Secure`, and `SameSite=Lax`. Existing
 preference persistence is unchanged.
 
-The default layout shows login/logout controls and the current identity. Framework guards
+The default layout shows login/logout controls and the current identity. Application guards
 enforce page `access` metadata; `with-role` requires any listed role and every listed permission.
 Unauthenticated visitors to protected pages return there after login, while authenticated users
 without access are sent home with an error. Login redirects must resolve to a local route.
-`installOdbVueRouting()` in the [router](./src/router/index.ts) installs those guards and title
+`installAppRouting()` in the [router](./src/app/router/index.ts) installs those guards and title
 updates. Application destinations can be configured with `auth.routes.login`,
 `auth.routes.authenticated`, and `auth.routes.forbidden`. Navigation applies the same access
 policy (including parents) and additionally checks `visibility`. These client-side checks complement,

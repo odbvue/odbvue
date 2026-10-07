@@ -38,9 +38,11 @@
 </template>
 
 <script setup lang="ts">
-import { i18nContract, useOdbVue, usePreferencesStore } from '@odbvue/web'
-import type { OvTableData, OvTableOptions } from '@odbvue/web/components'
+import { useAppConfig } from '@/app/config'
+import { usePreferencesStore } from '@/app/ui'
+import type { OvTableData, OvTableOptions } from '@/components'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import inventory from 'virtual:odbvue-i18n-inventory'
 
 definePage({
@@ -52,17 +54,9 @@ definePage({
   },
 })
 
-type I18nGlobal = {
-  messages: { value: Record<string, unknown> }
-  locale: { value: string }
-  fallbackLocale: { value: unknown }
-}
-
-const runtime = useOdbVue()
-const { config } = runtime
-const i18n = runtime.get(i18nContract)
+const config = useAppConfig()
 const preferences = usePreferencesStore()
-const global = i18n.global as I18nGlobal
+const global = useI18n({ useScope: 'global' })
 const locales = computed(() => config.i18n?.locales ?? Object.keys(global.messages.value))
 const currentLocale = computed(() => global.locale.value)
 const fallbackLocale = computed(() => String(global.fallbackLocale.value))

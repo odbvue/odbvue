@@ -99,7 +99,8 @@
 </template>
 
 <script setup lang="ts">
-import { useOdbVue, usePreferencesStore, useUi } from '@odbvue/web'
+import { useAppConfig } from '@/app/config'
+import { usePreferencesStore, useUi } from '@/app/ui'
 import { computed } from 'vue'
 
 definePage({
@@ -113,7 +114,7 @@ definePage({
 
 const preferences = usePreferencesStore()
 const ui = useUi()
-const { config } = useOdbVue()
+const config = useAppConfig()
 const iconAliases = computed(() => Object.keys(config.ui?.icons ?? {}))
 
 function formatConfiguration(value: unknown): string {

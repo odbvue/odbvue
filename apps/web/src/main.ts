@@ -1,24 +1,24 @@
 import { createApp } from 'vue'
 
-import App from './App.vue'
-import router from './router'
-import { errorsContract, installOdbVue, useUi } from '@odbvue/web'
-import '@odbvue/web/components.css'
+import App from './app/App.vue'
+import router from './app/router'
+import { installApp } from '@/app/plugins'
+import { useUi } from '@/app/ui'
 import odbvueConfig from '../odbvue.config'
 
 const app = createApp(App)
 
-const runtime = installOdbVue(app, odbvueConfig, router)
+const services = installApp(app, odbvueConfig, router)
 
 router.onError((error, to) => {
-  runtime.get(errorsContract).capture(error, {
+  services.errors.capture(error, {
     source: 'router',
     context: { path: to.fullPath },
   })
   app.runWithContext(() => useUi().error(error))
 })
 
-void runtime.ready
+void services.ready
   .then(async () => {
     await router.isReady()
     app.mount('#app')

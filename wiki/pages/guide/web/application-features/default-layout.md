@@ -2,7 +2,7 @@
 
 ## App
 
-Clean the main `apps\web\src\App.vue` to have just wrapper for layouts
+The main `apps\web\src\app\App.vue` wraps pages in the selected application layout.
 
 ```vue
 <template>
@@ -20,7 +20,7 @@ Clean the main `apps\web\src\App.vue` to have just wrapper for layouts
 
 Modify default layout to have app layout with navigation drawer, app bar and footer.
 
-::: details `apps\web\src\layouts\DefaultLayout.vue`
+::: details `apps\web\src\app\layouts\DefaultLayout.vue`
 
 ```vue
 <template>

@@ -37,7 +37,7 @@
       "rules": {}
     },
     {
-      "files": ["**/src/pages/**/*.vue"],
+      "files": ["**/src/app/pages/**/*.vue", "**/src/modules/*/pages/**/*.vue"],
       "rules": {}
     }
   ]

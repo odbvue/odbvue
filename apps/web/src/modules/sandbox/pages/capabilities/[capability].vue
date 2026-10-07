@@ -1,6 +1,6 @@
 <template>
   <v-container v-if="capability">
-    <v-btn to="/sandbox" prepend-icon="$mdiArrowLeft" variant="text">Runtime overview</v-btn>
+    <v-btn to="/sandbox" prepend-icon="$mdiArrowLeft" variant="text">Application overview</v-btn>
     <v-row class="mt-2">
       <v-col cols="12" md="8">
         <v-card
@@ -32,7 +32,8 @@
 </template>
 
 <script setup lang="ts">
-import { odbVueCapabilities, useOdbVueConfig } from '@odbvue/web'
+import { odbVueCapabilities } from '@/modules/sandbox/catalog'
+import { useAppConfig } from '@/app/config'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -45,7 +46,7 @@ definePage({
 })
 
 const route = useRoute()
-const config = useOdbVueConfig()
+const config = useAppConfig()
 const capability = computed(() =>
   odbVueCapabilities.find((item) => item.name === route.params.capability),
 )

@@ -1,15 +1,15 @@
 # Web Configuration
 
-`apps/web/odbvue.config.ts` configures the **web application runtime**, not the database installation. It is installed before the web app mounts, and `@odbvue/web` makes it available to framework code and composables. Use the components and composables your application needs from `@odbvue/web`.
+`apps/web/odbvue.config.ts` configures the **web application**, not the database installation. Application plugins install Vue I18n, Pinia, Vuetify, and typed Vue-injected services before mounting. All web code belongs to `apps/web`; there is no separate web framework package or capability registry.
 
 ```ts
-import { defineOdbVueApp } from '@odbvue/web'
+import { defineAppConfig } from './src/app/config'
 
-export default defineOdbVueApp({
+export default defineAppConfig({
   ui: {},
   integrations: {},
   hooks: {},
-  modules: [],
+  modules: ['sandbox'],
 })
 ```
 
@@ -23,27 +23,32 @@ export default defineOdbVueApp({
 | `errors`       | Error buffering and application reporters.                                                        |
 | `ui`           | Application theme, component defaults, icon aliases, and advanced Vuetify options.                |
 | `integrations` | Application choices for external providers.                                                       |
-| `hooks`        | Reserved extension points for application-specific behavior.                                      |
-| `modules`      | Reserved registration point for business modules.                                                 |
+| `hooks`        | Typed application startup, error, and HTTP events.                                                |
+| `modules`      | Module names displayed in application diagnostics; routing is discovered from source folders.     |
 
-`title`, `version`, and `preset` are also available for application metadata and future composition. Use only documented, stable fields; configuration is intentionally the boundary between an application and the framework implementation.
+`title` and `version` supply application metadata. Configuration describes application choices; it does not enable database features or dynamically register web capabilities.
 
 ## Runtime access
 
-Components and composables can read the installed configuration with `useOdbVueConfig()` and access services through their composables.
+Components and composables can read the installed configuration with `useAppConfig()` and access services through their composables.
 
 ```ts
-const config = useOdbVueConfig()
+import { useAppConfig } from '@/app/config'
+import { useAuth } from '@/app/auth'
+
+const config = useAppConfig()
 const auth = useAuth()
 ```
 
 Application-specific behavior should remain in application source files. Do not put business rules into the configuration object.
 
-`installOdbVue()` returns a runtime with a single `ready: Promise<void>`. It resolves after capability startup (including session restoration) and asynchronous `app:started` hooks complete. Startup failures are captured by the errors capability and reject readiness. Await readiness before mounting; routing guards installed with `installOdbVueRouting()` await the same promise.
+`installApp()` in `src/app/plugins` returns explicit typed services with a single `ready: Promise<void>`. It resolves after session restoration and asynchronous `app:started` handlers complete. Startup failures are captured by the error service and reject readiness. Await readiness before mounting; routing guards installed with `installAppRouting()` await the same promise.
 
 ```ts
-const runtime = installOdbVue(app, config, router)
-await runtime.ready
+import { installApp } from '@/app/plugins'
+
+const services = installApp(app, config, router)
+await services.ready
 await router.isReady()
 app.mount('#app')
 ```
@@ -55,7 +60,7 @@ Use `useAuth()` directly rather than wrapping it in an application store or addi
 At startup, the authentication service sends the refresh cookie to `/auth/refresh`; when that succeeds it fetches `/auth/me`. The HTTP service adds the access token to protected requests and refreshes it when needed. Set `http.openapi` to the generated database OpenAPI document to distinguish protected operations from anonymous ones.
 
 ```ts
-import { useAuth } from '@odbvue/web'
+import { useAuth } from '@/app/auth'
 
 const auth = useAuth()
 
@@ -66,7 +71,7 @@ await auth.logout()
 
 `login()` and `refresh()` receive only an access token in the response body. The refresh token is an `HttpOnly`, `Secure`, `SameSite=Lax` cookie, so browser requests must remain on a compatible HTTPS origin. Override the default `/auth/login`, `/auth/refresh`, `/auth/logout`, and `/auth/me` routes with `auth: { endpoints: { ... } }` when necessary.
 
-Framework router destinations are separate from HTTP endpoints:
+Application router destinations are separate from HTTP endpoints:
 
 ```ts
 auth: {

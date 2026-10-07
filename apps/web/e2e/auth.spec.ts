@@ -125,3 +125,34 @@ test('reports failed logout while clearing local identity and returning home', a
   await expect(page.getByRole('alert')).toBeVisible()
   expect(requests).toEqual(['refresh', 'me', 'logout'])
 })
+
+test('loads app infrastructure and local shared components inside sandbox', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await mockAuth(page, { restored: true })
+
+  await page.goto('/sandbox/capabilities/routing')
+  await expect(page.getByRole('heading', { name: 'Routing', exact: true })).toBeVisible()
+  await expect(page).toHaveTitle('OdbVue - Routing')
+
+  await page.goto('/sandbox/capabilities/i18n')
+  await expect(page.getByRole('heading', { name: 'Internationalization' })).toBeVisible()
+  await expect(page.getByRole('row', { name: /Main application/ })).toContainText(/[1-9]\d*/)
+  await expect(page.getByRole('row', { name: /sandbox/ })).toContainText(/[1-9]\d*/)
+
+  await page.goto('/sandbox/capabilities/state')
+  await expect(page.getByRole('heading', { name: 'Installed stores' })).toBeVisible()
+  await expect(page.getByText('settings', { exact: true })).toBeVisible()
+  await expect(page.getByText('ui', { exact: true })).toBeVisible()
+
+  await page.goto('/sandbox/capabilities/components/form')
+  await expect(page.getByLabel('Text 1', { exact: true })).toHaveValue('Hello World!')
+
+  await page.goto('/sandbox/capabilities/components/editor')
+  await expect(page.getByRole('heading', { name: 'HTML', exact: true })).toBeVisible()
+  await expect(page.locator('.tiptap')).toBeVisible()
+
+  await page.goto('/sandbox/capabilities/components/chart')
+  await expect(page.getByRole('main').locator('canvas')).toHaveCount(3)
+  expect(errors).toEqual([])
+})

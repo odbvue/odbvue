@@ -134,12 +134,12 @@ The application uses only bootstrap and sandbox migrations and is reinstalled fo
 
 ## Browser Runtime
 
-Authentication is provided by `@odbvue/web`. `apps/web/odbvue.config.ts` configures web runtime options only and does not install database objects. Use `auth: { endpoints: { ... } }` to override endpoint URLs.
+Browser authentication lives in `apps/web/src/app/auth`. `apps/web/odbvue.config.ts` configures application options only and does not install database objects. Use `auth: { endpoints: { ... } }` to override endpoint URLs.
 
 Use `useAuth()` in components and composables. `restore()` runs automatically when the runtime starts; it restores the access token from the refresh cookie and then loads the current user.
 
 ```ts
-import { useAuth } from '@odbvue/web'
+import { useAuth } from '@/app/auth'
 
 const auth = useAuth()
 

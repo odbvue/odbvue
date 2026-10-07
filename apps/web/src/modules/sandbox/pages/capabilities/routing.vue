@@ -48,7 +48,7 @@
 </template>
 
 <script setup lang="ts">
-import { useRouting, type OdbVuePageMeta } from '@odbvue/web'
+import { useRouting, type OdbVuePageMeta } from '@/app/router/api'
 import { computed, ref } from 'vue'
 
 definePage({

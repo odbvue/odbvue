@@ -2,13 +2,13 @@
   <v-container>
     <v-row>
       <v-col cols="12">
-        <h3>Runtime</h3>
+        <h3>Application</h3>
       </v-col>
       <v-col cols="12" md="4">
         <v-card
           prepend-icon="$mdiServer"
-          title="OdbVue runtime"
-          subtitle="Framework"
+          title="OdbVue web application"
+          subtitle="Vue + Pinia + Vue Router + Vuetify"
           :text="config.version ? `v${config.version}` : 'Version unspecified'"
           class="h-100"
         />
@@ -42,7 +42,8 @@
 </template>
 
 <script setup lang="ts">
-import { odbVueCapabilities, useOdbVueConfig } from '@odbvue/web'
+import { odbVueCapabilities } from '@/modules/sandbox/catalog'
+import { useAppConfig } from '@/app/config'
 
 definePage({
   meta: {
@@ -56,6 +57,6 @@ definePage({
   },
 })
 
-const config = useOdbVueConfig()
+const config = useAppConfig()
 const capabilities = odbVueCapabilities
 </script>

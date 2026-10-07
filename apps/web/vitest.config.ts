@@ -4,7 +4,6 @@ import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { unheadVueComposablesImports } from '@unhead/vue'
-import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 
 const cssStubPlugin = {
   enforce: 'pre' as const,
@@ -22,13 +21,25 @@ const cssStubPlugin = {
 export default defineConfig({
   plugins: [
     vue(),
-    VueI18nPlugin({ include: ['src/i18n/**'] }),
     cssStubPlugin,
     AutoImport({
       imports: [
         'vue',
         'vue-router',
         'vue-i18n',
+        {
+          from: '@/app/router/api',
+          imports: [
+            'useRouting',
+            'usePageMeta',
+            'useRouteParams',
+            'computedRouteParam',
+            'computedRouteParams',
+            'computedRouteQuery',
+          ],
+        },
+        { from: '@/app/ui', imports: ['useUi', 'usePreferencesStore'] },
+        { from: '@/app/http', imports: ['useHttp'] },
         {
           from: 'vuetify',
           imports: [
@@ -44,13 +55,17 @@ export default defineConfig({
         },
         unheadVueComposablesImports,
       ],
-      dirs: ['./src/composables/**', './src/stores/**'],
+      dirs: ['./src/app/composables/**', './src/modules/*/composables/**'],
+      dts: false,
     }),
-    Components({}),
+    Components({ dirs: ['src/components'], dts: false }),
   ],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@intlify/unplugin-vue-i18n/messages': fileURLToPath(
+        new URL('./test/messages.stub.ts', import.meta.url),
+      ),
     },
   },
   ssr: {
@@ -59,5 +74,22 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     exclude: [...configDefaults.exclude, 'e2e/**'],
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'app',
+          include: ['src/**/*.spec.ts', 'test/*.test.ts'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'components',
+          include: ['test/components/*.test.ts'],
+          setupFiles: ['./test/components/setup.ts'],
+        },
+      },
+    ],
   },
 })

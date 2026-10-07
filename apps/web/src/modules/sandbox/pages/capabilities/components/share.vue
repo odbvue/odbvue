@@ -13,7 +13,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ShareOptions } from '@odbvue/web/components'
+import type { ShareOptions } from '@/components'
 
 definePage({
   meta: {

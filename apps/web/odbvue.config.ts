@@ -1,10 +1,11 @@
-import { createLocalStorageErrorReporter, defineOdbVueApp } from '@odbvue/web'
+import { createLocalStorageErrorReporter } from '@/app/errors'
+import { defineAppConfig } from '@/app/config'
 
-import { light, dark } from './src/themes/themes.json'
-import icons from './src/themes/icons'
+import { light, dark } from './src/app/themes/themes.json'
+import icons from './src/app/themes/icons'
 import openapi from '../db/dist/openapi.json'
 
-export default defineOdbVueApp({
+export default defineAppConfig({
   title: 'OdbVue',
   version: '1.0.0',
   http: { openapi },
@@ -31,5 +32,5 @@ export default defineOdbVueApp({
   },
   integrations: {},
   hooks: {},
-  modules: [],
+  modules: ['sandbox'],
 })

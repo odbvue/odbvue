@@ -23,31 +23,38 @@ Built for simplicity, scalability, and security, OdbVue keeps moving parts few, 
 Define the logic and its API together. A basic service looks like this in a new database migration:
 
 ```typescript
-import { defineMigration, defineService, odbEnv, odbLiteral, odbPackage, odbType } from '@odbvue/odb'
+import {
+  defineMigration,
+  defineService,
+  odbEnv,
+  odbLiteral,
+  odbPackage,
+  odbType,
+} from '@odbvue/odb'
 
 const greetings = odbPackage('pck_greetings', (pkg) => {
-	const greet = pkg.proc(
-		'greet',
-		{ out: { message: odbType.string() } },
-		({ params: { message }, body }) => {
-			body.set(message, odbLiteral('Hello from Oracle'))
-		},
-	)
+  const greet = pkg.proc(
+    'greet',
+    { out: { message: odbType.string() } },
+    ({ params: { message }, body }) => {
+      body.set(message, odbLiteral('Hello from Oracle'))
+    },
+  )
 
-	defineService(greet, {
-		auth: 'anonymous',
-		method: 'GET',
-		path: '/greet',
-		module: 'greetings',
-		basePath: '/greetings',
-		response: { message: greet.parameters.message },
-	})
+  defineService(greet, {
+    auth: 'anonymous',
+    method: 'GET',
+    path: '/greet',
+    module: 'greetings',
+    basePath: '/greetings',
+    response: { message: greet.parameters.message },
+  })
 
-	return {}
+  return {}
 })
 
 export const migration = defineMigration('00000000000002_greetings', {
-	schema: odbEnv.schemaUsername,
+  schema: odbEnv.schemaUsername,
 }).install(greetings)
 ```
 
@@ -76,8 +83,10 @@ OdbVue brings the surrounding tools into the same workflow:
 ## Getting started
 
 ### Prerequisites
+
 - [Node.js 24.12+](https://nodejs.org/)
-- [pnpm](https://pnpm.io/installation) and [Git](https://git-scm.com/downloads)
+- [pnpm](https://pnpm.io/installation) 
+- [Git](https://git-scm.com/downloads)
 
 ### Setup
 
@@ -98,7 +107,7 @@ pnpm dev
 
 > For local development - to run Oracle Data Base locally, install [Podman](https://podman.io/docs/installation) and initialize a Podman machine where required. Allocate at least 4 CPUs and 8 GB of RAM to the Podman environment (recommended).
 
-> For test - we recommend to register for [Free Tier in Oracle Cloud Infrastructure](https://www.oracle.com/cloud/free/). 
+> For test - we recommend to register for [Free Tier in Oracle Cloud Infrastructure](https://www.oracle.com/cloud/free/).
 
 ## Documentation
 

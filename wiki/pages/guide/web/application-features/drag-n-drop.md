@@ -2,7 +2,7 @@
 
 1. Create composable for DnD
 
-::: details `apps\web\src\composables\dnd.ts`
+::: details `apps\web\src\app\composables\dnd.ts`
 
 ```ts
 import { computed, ref, type CSSProperties } from 'vue'
@@ -73,7 +73,7 @@ export function useHtml5DragDrop<Payload>(options: DragDropOptions<Payload> = {}
 
 2. Create example for DnD in Sandbox
 
-::: details `apps\web\src\pages\sandbox\sandbox-dnd.vue`
+::: details `apps\web\src\modules\sandbox\pages\sandbox-dnd.vue`
 
 ```vue
 <template>
@@ -106,7 +106,7 @@ export function useHtml5DragDrop<Payload>(options: DragDropOptions<Payload> = {}
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import { useHtml5DragDrop } from '../../composables/dnd'
+import { useHtml5DragDrop } from '@/app/composables/dnd'
 
 type ColumnKey = 'todo' | 'doing' | 'done'
 type Card = { id: string; title: string; text: string }

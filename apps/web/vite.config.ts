@@ -1,5 +1,4 @@
 import { fileURLToPath, URL } from 'node:url'
-import { relative, resolve } from 'node:path'
 
 import { defineConfig, loadEnv } from 'vite'
 import VueRouter from 'vue-router/vite'
@@ -9,13 +8,13 @@ import Markdown from 'unplugin-vue-markdown/vite'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import {
   autoImportMdiIcons,
+  discoverPageFolders,
   extractMetaFromMarkdown,
   moduleFromComponent,
-  odbVueComponentsResolver,
   odbVueI18nPlugin,
   odbVuePagesPlugin,
-} from '@odbvue/web/vite'
-import { openapiPlugin } from './vite-plugin-openapi.ts'
+} from './plugins/index.ts'
+import { openapiPlugin } from './plugins/openapi.ts'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { unheadVueComposablesImports } from '@unhead/vue'
@@ -36,25 +35,10 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-    optimizeDeps: {
-      exclude: ['@odbvue/web'],
-    },
     plugins: [
       VueRouter({
         extensions: ['.vue', '.md'],
-        routesFolder: [
-          'src/pages',
-          {
-            src: 'src/modules',
-            path: (filePath) => {
-              const [moduleName, pagesDirectory, ...pagePath] = relative(
-                resolve(process.cwd(), 'src/modules'),
-                filePath,
-              ).split(/[/\\]/)
-              return `${moduleName}/${pagesDirectory === 'pages' ? pagePath.join('/') : ''}`
-            },
-          },
-        ],
+        routesFolder: discoverPageFolders(),
         async extendRoute(route) {
           const moduleName = moduleFromComponent(route.component)
           if (route.component?.endsWith('.md')) {
@@ -79,7 +63,7 @@ export default defineConfig(({ mode }) => {
       odbVueI18nPlugin(),
       openapiPlugin({
         source: '../db/dist/openapi.json',
-        dest: 'src/services/openapi.generated.ts',
+        dest: 'src/app/services/openapi.generated.ts',
       }),
       AutoImport({
         imports: [
@@ -87,20 +71,18 @@ export default defineConfig(({ mode }) => {
           'vue-router',
           'vue-i18n',
           {
-            from: '@odbvue/web',
+            from: '@/app/router/api',
             imports: [
               'computedRouteParam',
               'computedRouteParams',
               'computedRouteQuery',
-              'configureHttp',
-              'useHttp',
               'usePageMeta',
               'useRouteParams',
               'useRouting',
-              'usePreferencesStore',
-              'useUi',
             ],
           },
+          { from: '@/app/http', imports: ['useHttp'] },
+          { from: '@/app/ui', imports: ['usePreferencesStore', 'useUi'] },
           {
             from: 'vuetify',
             imports: [
@@ -117,10 +99,10 @@ export default defineConfig(({ mode }) => {
           },
           unheadVueComposablesImports,
         ],
-        dirs: ['./src/composables/**', './src/stores/**', './src/modules/*/composables/**'],
+        dirs: ['./src/app/composables/**', './src/modules/*/composables/**'],
       }),
       Components({
-        resolvers: [odbVueComponentsResolver],
+        dirs: ['src/components', 'src/app/components', 'src/modules/*/components'],
       }),
       vueDevTools(),
     ],

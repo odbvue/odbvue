@@ -11,7 +11,7 @@
 </template>
 
 <script setup lang="ts">
-import type { OvFilterValue, OvTableData, OvTableOptions } from '@odbvue/web/components'
+import type { OvFilterValue, OvTableData, OvTableOptions } from '@/components'
 
 definePage({
   meta: {

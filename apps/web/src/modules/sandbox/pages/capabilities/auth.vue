@@ -61,8 +61,8 @@
 </template>
 
 <script setup lang="ts">
-import { useAuth } from '@odbvue/web'
-import type { OvFormData, OvFormOptions } from '@odbvue/web/components'
+import { useAuth } from '@/app/auth'
+import type { OvFormData, OvFormOptions } from '@/components'
 import { ref } from 'vue'
 
 definePage({

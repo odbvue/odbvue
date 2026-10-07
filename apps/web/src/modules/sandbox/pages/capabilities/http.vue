@@ -48,7 +48,8 @@
 </template>
 
 <script setup lang="ts">
-import { useHttp, useNetwork } from '@odbvue/web'
+import { useHttp } from '@/app/http'
+import { useNetwork } from '@/app/network'
 import { ref } from 'vue'
 
 definePage({

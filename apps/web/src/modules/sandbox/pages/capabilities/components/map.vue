@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import type { OvGeoJson, OvMapOptions } from '@odbvue/web/components'
+import type { OvGeoJson, OvMapOptions } from '@/components'
 
 definePage({
   meta: {

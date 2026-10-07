@@ -153,9 +153,10 @@
 </template>
 
 <script setup lang="ts">
-import { httpContract, useAuth, useOdbVue } from '@odbvue/web'
+import { useAuth } from '@/app/auth'
+import { useHttp } from '@/app/http'
 import { computed, ref, watch } from 'vue'
-import type { components } from '@/services/openapi.generated'
+import type { components } from '@/app/services/openapi.generated'
 
 definePage({
   meta: {
@@ -179,7 +180,7 @@ type StoredFileResponse = {
 const maxFileBytes = 10 * 1024 * 1024
 const pageSize = 50
 const auth = useAuth()
-const http = useOdbVue().get(httpContract)
+const http = useHttp()
 const file = ref<File>()
 const items = ref<Item[]>([])
 const nextCursor = ref<string>()

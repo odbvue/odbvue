@@ -1,9 +1,11 @@
 # Routing and Pages
 
-OdbVue applications use file-based pages. Create route components under `src/pages`; the OdbVue routing convention turns their location into a URL.
+OdbVue applications use file-based pages. Main-application routes live under `src/app/pages`; module routes live under `src/modules/<module>/pages`. The Vite configuration scans only those page folders, not module components or layouts.
 
-- `src/pages/index.vue` becomes `/`.
-- `src/pages/about.vue` becomes `/about`.
+- `src/app/pages/index.vue` becomes `/`.
+- `src/app/pages/about.vue` becomes `/about`.
+- `src/modules/sandbox/pages/index.vue` becomes `/sandbox`.
+- `src/modules/sandbox/pages/capabilities/auth.vue` becomes `/sandbox/capabilities/auth`.
 - Vue and Markdown page files are supported.
 
 ## Page metadata
@@ -31,4 +33,4 @@ title: About
 # About
 ```
 
-Application developers create pages and metadata; router creation and route HMR are framework behavior. Running the app updates `typed-router.d.ts`, which should remain committed for typed route names and parameters.
+The application owns router creation and route HMR under `src/app/router`. Module metadata is inferred from the page's source folder. Adding a new module's `pages` folder requires restarting Vite; edits within existing modules use route HMR. Running the app updates `typed-router.d.ts`, which should remain committed for typed route names and parameters.

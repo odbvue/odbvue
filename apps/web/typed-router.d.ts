@@ -256,7 +256,7 @@ declare module 'vue-router/auto-routes' {
    * @internal
    */
   export interface _RouteFileInfoMap {
-    'src/pages/index.vue': {
+    'src/app/pages/index.vue': {
       routes:
         | '/'
       views:
@@ -264,7 +264,7 @@ declare module 'vue-router/auto-routes' {
       pathParamNames:
         | never
     }
-    'src/pages/[...path].vue': {
+    'src/app/pages/[...path].vue': {
       routes:
         | '/[...path]'
       views:
@@ -272,7 +272,7 @@ declare module 'vue-router/auto-routes' {
       pathParamNames:
         | 'path'
     }
-    'src/pages/about.md': {
+    'src/app/pages/about.md': {
       routes:
         | '/about'
       views:
@@ -280,7 +280,7 @@ declare module 'vue-router/auto-routes' {
       pathParamNames:
         | never
     }
-    'src/pages/login.vue': {
+    'src/app/pages/login.vue': {
       routes:
         | '/login'
       views:

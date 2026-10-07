@@ -8,10 +8,9 @@ export {}
 declare global {
   const EffectScope: typeof import('vue').EffectScope
   const computed: typeof import('vue').computed
-  const computedRouteParam: typeof import('@odbvue/web').computedRouteParam
-  const computedRouteParams: typeof import('@odbvue/web').computedRouteParams
-  const computedRouteQuery: typeof import('@odbvue/web').computedRouteQuery
-  const configureHttp: typeof import('@odbvue/web').configureHttp
+  const computedRouteParam: typeof import('@/app/router/api').computedRouteParam
+  const computedRouteParams: typeof import('@/app/router/api').computedRouteParams
+  const computedRouteQuery: typeof import('@/app/router/api').computedRouteQuery
   const createApp: typeof import('vue').createApp
   const customRef: typeof import('vue').customRef
   const defineAsyncComponent: typeof import('vue').defineAsyncComponent
@@ -59,10 +58,9 @@ declare global {
   const toRefs: typeof import('vue').toRefs
   const toValue: typeof import('vue').toValue
   const triggerRef: typeof import('vue').triggerRef
-  const undefined: typeof import('vuetify').undefined
   const unref: typeof import('vue').unref
   const useAttrs: typeof import('vue').useAttrs
-  const useCardBackground: typeof import('./src/composables/ui').useCardBackground
+  const useCardBackground: typeof import('./src/app/composables/ui').useCardBackground
   const useCssModule: typeof import('vue').useCssModule
   const useCssVars: typeof import('vue').useCssVars
   const useDate: typeof import('vuetify').useDate
@@ -71,29 +69,27 @@ declare global {
   const useGoTo: typeof import('vuetify').useGoTo
   const useHead: typeof import('@unhead/vue').useHead
   const useHeadSafe: typeof import('@unhead/vue').useHeadSafe
-  const useHtml5DragDrop: typeof import('./src/composables/dnd').useHtml5DragDrop
-  const useHttp: typeof import('@odbvue/web').useHttp
+  const useHtml5DragDrop: typeof import('./src/app/composables/dnd').useHtml5DragDrop
+  const useHttp: typeof import('@/app/http').useHttp
   const useI18n: typeof import('vue-i18n').useI18n
   const useId: typeof import('vue').useId
   const useLayout: typeof import('vuetify').useLayout
   const useLink: typeof import('vue-router').useLink
   const useLocale: typeof import('vuetify').useLocale
   const useModel: typeof import('vue').useModel
-  const useNotificationMessage: typeof import('./src/composables/ui').useNotificationMessage
-  const usePageMeta: typeof import('@odbvue/web').usePageMeta
-  const usePreferencesStore: typeof import('@odbvue/web').usePreferencesStore
+  const useNotificationMessage: typeof import('./src/app/composables/ui').useNotificationMessage
+  const usePageMeta: typeof import('@/app/router/api').usePageMeta
+  const usePreferencesStore: typeof import('@/app/ui').usePreferencesStore
   const useRoute: typeof import('vue-router').useRoute
-  const useRouteParams: typeof import('@odbvue/web').useRouteParams
+  const useRouteParams: typeof import('@/app/router/api').useRouteParams
   const useRouter: typeof import('vue-router').useRouter
-  const useRouting: typeof import('@odbvue/web').useRouting
+  const useRouting: typeof import('@/app/router/api').useRouting
   const useRtl: typeof import('vuetify').useRtl
   const useSeoMeta: typeof import('@unhead/vue').useSeoMeta
-  const useSettingsStore: typeof import('@odbvue/web').useSettingsStore
   const useSlots: typeof import('vue').useSlots
   const useTemplateRef: typeof import('vue').useTemplateRef
   const useTheme: typeof import('vuetify').useTheme
-  const useUi: typeof import('@odbvue/web').useUi
-  const useUiStore: typeof import('@odbvue/web').useUiStore
+  const useUi: typeof import('@/app/ui').useUi
   const watch: typeof import('vue').watch
   const watchEffect: typeof import('vue').watchEffect
   const watchPostEffect: typeof import('vue').watchPostEffect
@@ -105,6 +101,6 @@ declare global {
   export type { Component, Slot, Slots, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, ShallowRef, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
   import('vue')
   // @ts-ignore
-  export type { DragDropOptions } from './src/composables/dnd'
-  import('./src/composables/dnd')
+  export type { DragDropOptions } from './src/app/composables/dnd'
+  import('./src/app/composables/dnd')
 }

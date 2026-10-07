@@ -1,11 +1,10 @@
 packages:
-  - "apps/web"
-  - "apps/db"
-  - "packages/odb"
-  - "packages/odb-oracledb"
-  - "packages/web"
-  - "packages/cli"
-  - "wiki"
+  - 'apps/web'
+  - 'apps/db'
+  - 'packages/odb'
+  - 'packages/odb-oracledb'
+  - 'packages/cli'
+  - 'wiki'
 allowBuilds:
   esbuild: true
   oracledb: true

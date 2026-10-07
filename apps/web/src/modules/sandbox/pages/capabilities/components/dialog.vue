@@ -33,8 +33,8 @@
             :actionFormat="{ variant: 'outlined' }"
             actionSubmit="agree"
             actionCancel="disagree"
-            @action="(action: string) => console.log('action', action)"
-            @submit="(action: string) => console.log('submitted', action)"
+            @action="(action: OvAction) => console.log('action', action)"
+            @submit="(action: OvAction) => console.log('submitted', action)"
             @cancel="() => console.log('cancelled')"
           />
         </v-btn>
@@ -98,7 +98,7 @@ definePage({
     roles: ['admin'],
   },
 })
-import { type OvAction, type OvFormOptions, type OvFormData } from '@odbvue/web/components'
+import { type OvAction, type OvFormOptions, type OvFormData } from '@/components'
 import { ref } from 'vue'
 
 const formOptions = ref<OvFormOptions>({

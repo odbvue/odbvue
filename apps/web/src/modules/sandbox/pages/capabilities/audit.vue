@@ -107,7 +107,8 @@
 </template>
 
 <script setup lang="ts">
-import { httpContract, useAuth, useOdbVue } from '@odbvue/web'
+import { useAuth } from '@/app/auth'
+import { useHttp } from '@/app/http'
 import { computed, ref } from 'vue'
 
 definePage({
@@ -131,7 +132,7 @@ type Item = {
 
 const pageSize = 50
 const auth = useAuth()
-const http = useOdbVue().get(httpContract)
+const http = useHttp()
 const message = ref('Sandbox audit sample')
 const items = ref<Item[]>([])
 const nextCursor = ref<string>()

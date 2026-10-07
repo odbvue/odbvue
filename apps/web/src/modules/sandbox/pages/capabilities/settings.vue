@@ -109,9 +109,10 @@
 </template>
 
 <script setup lang="ts">
-import { httpContract, useAuth, useOdbVue } from '@odbvue/web'
+import { useAuth } from '@/app/auth'
+import { useHttp } from '@/app/http'
 import { ref } from 'vue'
-import type { components } from '@/services/openapi.generated'
+import type { components } from '@/app/services/openapi.generated'
 
 definePage({
   meta: {
@@ -128,7 +129,7 @@ type Action = 'read' | 'write' | 'remove' | 'list'
 
 const pageSize = 50
 const auth = useAuth()
-const http = useOdbVue().get(httpContract)
+const http = useHttp()
 const id = ref('SANDBOX_DEMO')
 const value = ref('')
 const items = ref<Item[]>([])
