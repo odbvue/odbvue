@@ -1,4 +1,7 @@
 export { usePageMeta, useRouting } from './helpers.js'
+export { canAccessPage, canShowPage, resolveAuthRedirect } from './auth.js'
+export type { OdbVuePageAuth } from './auth.js'
+export { installOdbVueRouting } from './install.js'
 export {
   getNavigationMeta,
   getPageMeta,

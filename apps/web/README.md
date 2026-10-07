@@ -5,21 +5,25 @@ This template should help get you started developing with Vue 3 in Vite.
 ## Authentication
 
 The [login page](./src/pages/login.vue) supports username/password authentication (no Google
-login). The [main store](./src/stores/index.ts) exposes the runtime title, version, preferences,
-UI feedback, and the [auth store](./src/stores/auth.ts). The auth store wraps the same `useAuth()`
-capability used by the sandbox; it does not create a separate session.
+login). Pages and the [default layout](./src/layouts/DefaultLayout.vue) use the framework's
+`useAuth()` capability directly; there is no application auth store or capability aggregator.
+The existing framework `useAppStore()` supplies title, version, preferences, and UI feedback.
 
 No auth state is persisted in localStorage or sessionStorage. The runtime restores the session
-once at startup with `POST /auth/refresh`, then `GET /auth/me`. Stores and route guards wait for
-that restoration instead of issuing another refresh. Access tokens and user details remain in
+once at startup with `POST /auth/refresh`, then `GET /auth/me`. The [entry point](./src/main.ts)
+waits for `runtime.ready` and router readiness before mounting. Framework guards await the same
+runtime promise instead of issuing another refresh. Access tokens and user details remain in
 memory; the server-managed refresh cookie is `HttpOnly`, `Secure`, and `SameSite=Lax`. Existing
 preference persistence is unchanged.
 
-The default layout shows login/logout controls and the current identity. Application guards
+The default layout shows login/logout controls and the current identity. Framework guards
 enforce page `access` metadata; `with-role` requires any listed role and every listed permission.
 Unauthenticated visitors to protected pages return there after login, while authenticated users
 without access are sent home with an error. Login redirects must resolve to a local route.
-Navigation uses the same policy for `visibility` metadata. These client-side checks complement,
+`installOdbVueRouting()` in the [router](./src/router/index.ts) installs those guards and title
+updates. Application destinations can be configured with `auth.routes.login`,
+`auth.routes.authenticated`, and `auth.routes.forbidden`. Navigation applies the same access
+policy (including parents) and additionally checks `visibility`. These client-side checks complement,
 not replace, authorization on the API.
 
 All sandbox module pages require the `admin` role for both access and navigation visibility.

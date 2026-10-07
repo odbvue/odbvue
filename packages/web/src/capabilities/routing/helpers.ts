@@ -1,11 +1,14 @@
-import { computed } from 'vue'
+import { computed, inject } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { RouteParamsRaw } from 'vue-router'
 import { getOdbVueBreadcrumbOverride, getOdbVuePageManifest } from './registry.js'
 import { toRoutePage } from './metadata.js'
 import { toManifestPage } from './manifest.js'
 import { useRouteParams } from './navigation.js'
-import type { OdbVueBreadcrumb, OdbVueRouting } from './types.js'
+import type { OdbVueBreadcrumb, OdbVuePageMeta, OdbVueRouting } from './types.js'
+import { odbVueRuntimeKey } from '../../runtime/context.js'
+import { authContract } from '../auth/index.js'
+import { canAccessPage, canShowPage } from './auth.js'
 
 function routeParamsForPath(path: string, params: Record<string, unknown>): RouteParamsRaw {
   const parameterNames = [...path.matchAll(/:([A-Za-z0-9_]+)/g)].map((match) => match[1])
@@ -22,6 +25,14 @@ export function useRouting(): OdbVueRouting {
   const manifest = getOdbVuePageManifest(router)
   const breadcrumbOverride = getOdbVueBreadcrumbOverride(router)
   const params = useRouteParams()
+  const auth = inject(odbVueRuntimeKey, undefined)?.get(authContract)
+  function isNavigable(page: { path: string; meta: OdbVuePageMeta }): boolean {
+    return (
+      !auth ||
+      (canShowPage(page.meta, auth) &&
+        router.resolve(page.path).matched.every((record) => canAccessPage(record.meta, auth)))
+    )
+  }
   const pageEntries = computed(() => {
     return manifest.pages.reduce<(typeof manifest.pages)[number][]>((pages, page) => {
       if (page.route.component === undefined) return pages
@@ -39,6 +50,7 @@ export function useRouting(): OdbVueRouting {
       .filter((page) => page.navigation !== false)
       .filter((page) => page.level === 0)
       .filter((page) => page.path !== '/:path(.*)')
+      .filter(isNavigable)
       .toSorted(
         (first, second) =>
           (first.navigation === false ? 0 : first.navigation.order || 0) -
@@ -72,6 +84,7 @@ export function useRouting(): OdbVueRouting {
 
     const items: OdbVueBreadcrumb[] = matchedPages
       .filter((page) => page.meta.visibility !== 'never')
+      .filter(isNavigable)
       .map((page, index, matched) => ({
         title: page.title,
         disabled: index === matched.length - 1,

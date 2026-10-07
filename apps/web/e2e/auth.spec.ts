@@ -1,6 +1,9 @@
 import { expect, test, type Page } from '@playwright/test'
 
-async function mockAuth(page: Page, options: { restored?: boolean; roles?: string[] } = {}) {
+async function mockAuth(
+  page: Page,
+  options: { restored?: boolean; roles?: string[]; logoutFailure?: boolean } = {},
+) {
   let session = options.restored ?? false
   const requests: string[] = []
   await page.route('**/auth/*', async (route) => {
@@ -31,6 +34,10 @@ async function mockAuth(page: Page, options: { restored?: boolean; roles?: strin
         },
       })
     } else if (action === 'logout') {
+      if (options.logoutFailure) {
+        await route.fulfill({ status: 500, json: { message: 'Logout unavailable' } })
+        return
+      }
       session = false
       await route.fulfill({ status: 204 })
     } else {
@@ -106,4 +113,15 @@ test('denies role-protected pages and hides their home navigation', async ({ pag
     page.getByText('You do not have permission to access this page.', { exact: true }),
   ).toBeVisible()
   await expect(page.getByRole('link', { name: /Sandbox/ })).toHaveCount(0)
+})
+
+test('reports failed logout while clearing local identity and returning home', async ({ page }) => {
+  const requests = await mockAuth(page, { restored: true, logoutFailure: true })
+  await page.goto('/sandbox')
+  await page.getByRole('button', { name: 'Logout', exact: true }).click()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByRole('button', { name: 'Logout', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Login', exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('alert')).toBeVisible()
+  expect(requests).toEqual(['refresh', 'me', 'logout'])
 })

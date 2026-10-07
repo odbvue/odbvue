@@ -5,7 +5,7 @@
         <h1 class="mb-4">{{ t('auth.login') }}</h1>
         <v-ov-form
           :options="options"
-          :loading="app.auth.loading || !app.auth.ready"
+          :loading="auth.loading.value || !auth.ready.value"
           :t="t"
           @submit="submit"
         />
@@ -16,8 +16,7 @@
 
 <script setup lang="ts">
 import type { OvFormData, OvFormOptions } from '@odbvue/web/components'
-import { useAppStore } from '@/stores'
-import { loginRedirect } from '@/router/auth'
+import { resolveAuthRedirect, useAuth, useOdbVueConfig, useUi } from '@odbvue/web'
 
 definePage({
   meta: {
@@ -27,7 +26,9 @@ definePage({
   },
 })
 
-const app = useAppStore()
+const auth = useAuth()
+const ui = useUi()
+const config = useOdbVueConfig()
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
@@ -56,9 +57,25 @@ const options: OvFormOptions = {
 }
 
 async function submit(data: OvFormData) {
-  if (app.auth.loading || !app.auth.ready) return
-  if (await app.auth.login(String(data.username), String(data.password))) {
-    await router.replace(loginRedirect(router, route.query.redirect))
+  if (auth.loading.value || !auth.ready.value) return
+  ui.clear()
+  try {
+    await auth.login({ username: String(data.username), password: String(data.password) })
+  } catch (error) {
+    const status = error instanceof Error && 'status' in error ? error.status : undefined
+    if (status === 401) ui.error('auth.invalid.credentials')
+    else if (status === 403) ui.error('auth.forbidden')
+    else if (status === 429) ui.error('auth.too.many.requests')
+    else ui.error(error)
+    return
   }
+  await router.replace(
+    resolveAuthRedirect(
+      router,
+      route.query.redirect,
+      config.auth?.routes?.authenticated ?? '/',
+      config.auth?.routes?.login ?? '/login',
+    ),
+  )
 }
 </script>

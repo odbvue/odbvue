@@ -17,7 +17,7 @@ export default defineOdbVueApp({
 
 | Area           | Purpose                                                                                           |
 | -------------- | ------------------------------------------------------------------------------------------------- |
-| `auth`         | Optional overrides for authentication endpoint URLs; authentication is available by default.      |
+| `auth`         | Authentication endpoint overrides and application login, authenticated, and forbidden routes.     |
 | `http`         | HTTP defaults and the generated OpenAPI document used for request security and response decoding. |
 | `i18n`         | Supported locales, browser-language detection, and translation options.                           |
 | `errors`       | Error buffering and application reporters.                                                        |
@@ -39,6 +39,17 @@ const auth = useAuth()
 
 Application-specific behavior should remain in application source files. Do not put business rules into the configuration object.
 
+`installOdbVue()` returns a runtime with a single `ready: Promise<void>`. It resolves after capability startup (including session restoration) and asynchronous `app:started` hooks complete. Startup failures are captured by the errors capability and reject readiness. Await readiness before mounting; routing guards installed with `installOdbVueRouting()` await the same promise.
+
+```ts
+const runtime = installOdbVue(app, config, router)
+await runtime.ready
+await router.isReady()
+app.mount('#app')
+```
+
+Use `useAuth()` directly rather than wrapping it in an application store or adding another initialization watcher. Authentication refs use `.value` in scripts; when accessed as properties of the `auth` object, use `.value` in templates too. Login/logout errors are thrown to the caller so application UI can present localized feedback.
+
 ## Authentication
 
 At startup, the authentication service sends the refresh cookie to `/auth/refresh`; when that succeeds it fetches `/auth/me`. The HTTP service adds the access token to protected requests and refreshes it when needed. Set `http.openapi` to the generated database OpenAPI document to distinguish protected operations from anonymous ones.
@@ -54,6 +65,18 @@ await auth.logout()
 ```
 
 `login()` and `refresh()` receive only an access token in the response body. The refresh token is an `HttpOnly`, `Secure`, `SameSite=Lax` cookie, so browser requests must remain on a compatible HTTPS origin. Override the default `/auth/login`, `/auth/refresh`, `/auth/logout`, and `/auth/me` routes with `auth: { endpoints: { ... } }` when necessary.
+
+Framework router destinations are separate from HTTP endpoints:
+
+```ts
+auth: {
+  routes: {
+    login: '/login',
+    authenticated: '/',
+    forbidden: '/',
+  },
+}
+```
 
 ## Database Installation
 

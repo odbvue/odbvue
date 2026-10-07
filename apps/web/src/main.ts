@@ -2,10 +2,9 @@ import { createApp } from 'vue'
 
 import App from './App.vue'
 import router from './router'
-import { errorsContract, installOdbVue } from '@odbvue/web'
+import { errorsContract, installOdbVue, useUi } from '@odbvue/web'
 import '@odbvue/web/components.css'
 import odbvueConfig from '../odbvue.config'
-import { useAppStore } from './stores'
 
 const app = createApp(App)
 
@@ -16,7 +15,15 @@ router.onError((error, to) => {
     source: 'router',
     context: { path: to.fullPath },
   })
-  app.runWithContext(() => useAppStore().ui.error(error))
+  app.runWithContext(() => useUi().error(error))
 })
 
-app.mount('#app')
+void runtime.ready
+  .then(async () => {
+    await router.isReady()
+    app.mount('#app')
+  })
+  .catch((error: unknown) => {
+    console.error('Unable to start OdbVue', error)
+    app.runWithContext(() => useUi().error(error))
+  })

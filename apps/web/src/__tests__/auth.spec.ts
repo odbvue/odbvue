@@ -1,8 +1,22 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createApp, nextTick } from 'vue'
-import { authCapability, authContract, defineOdbVueApp, installOdbVue, useHttp } from '@odbvue/web'
-import { useAppStore } from '../stores'
-import { useAuthStore } from '../stores/auth'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent } from 'vue'
+import { flushPromises, mount } from '@vue/test-utils'
+import { createMemoryHistory, createRouter } from 'vue-router'
+import {
+  authContract,
+  defineOdbVueApp,
+  installOdbVue,
+  useHttp,
+  useUi,
+  type OdbVueRuntime,
+} from '@odbvue/web'
+import Login from '../pages/login.vue'
+
+const form = defineComponent({
+  props: ['loading'],
+  emits: ['submit'],
+  template: `<button @click="$emit('submit', { username: 'ada', password: 'password' })" />`,
+})
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -11,143 +25,136 @@ function json(data: unknown, status = 200) {
   })
 }
 
-function setup() {
-  vi.spyOn(authCapability, 'start').mockResolvedValue(undefined)
-  const app = createApp({})
-  const runtime = installOdbVue(
-    app,
-    defineOdbVueApp({ title: 'OdbVue', version: '1.0.0', errors: { reporters: [] } }),
-  )
-  const capability = runtime.get(authContract)
-  const fetch = vi.fn<typeof globalThis.fetch>()
-  capability.setHttp(
-    useHttp({ fetch, configuration: { getAccessToken: () => capability.accessToken.value } }),
-  )
-  const main = app.runWithContext(() => useAppStore())
-  const auth = app.runWithContext(() => useAuthStore())
-  return { main, auth, capability, fetch }
+async function setup() {
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', component: {} },
+      { path: '/login', component: {} },
+      { path: '/sandbox', component: {} },
+    ],
+  })
+  await router.push('/login?redirect=/sandbox')
+  const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(json({}, 401))
+  let runtime!: OdbVueRuntime
+  let ui!: ReturnType<typeof useUi>
+  const wrapper = mount(Login, {
+    global: {
+      plugins: [
+        {
+          install(app) {
+            runtime = installOdbVue(app, defineOdbVueApp({ errors: { reporters: [] } }), router)
+            const auth = runtime.get(authContract)
+            auth.setHttp(
+              useHttp({ fetch, configuration: { getAccessToken: () => auth.accessToken.value } }),
+            )
+            ui = app.runWithContext(() => useUi())
+          },
+        },
+      ],
+      stubs: {
+        VOvForm: form,
+        VContainer: { template: '<div><slot /></div>' },
+        VRow: { template: '<div><slot /></div>' },
+        VCol: { template: '<div><slot /></div>' },
+      },
+    },
+  })
+  await runtime.ready
+  return { wrapper, router, fetch, ui, auth: runtime.get(authContract) }
 }
 
-async function anonymous(context: ReturnType<typeof setup>) {
-  context.fetch.mockResolvedValueOnce(json({}, 401))
-  await context.capability.restore()
-  await context.auth.init()
-}
-
-describe('application auth stores', () => {
+describe('login page using framework auth', () => {
   beforeEach(() => {
-    vi.restoreAllMocks()
+    vi.stubGlobal('definePage', vi.fn<() => void>())
     localStorage.clear()
     sessionStorage.clear()
   })
-
-  it('waits for runtime restoration without refreshing twice', async () => {
-    const { auth, main, capability, fetch } = setup()
-    let settled = false
-    const first = auth.init()
-    const second = auth.init()
-    const initialized = main.init().then(() => {
-      settled = true
-    })
-    await nextTick()
-    expect(settled).toBe(false)
-    expect(fetch).not.toHaveBeenCalled()
-    fetch
-      .mockResolvedValueOnce(json({ accessToken: 'restored-token' }))
-      .mockResolvedValueOnce(
-        json({ userId: 7, username: 'ada', displayName: 'Ada', roles: ['developer'] }),
-      )
-
-    await capability.restore()
-    await Promise.all([first, second])
-    await initialized
-
-    expect(fetch).toHaveBeenCalledTimes(2)
-    expect(auth.ready).toBe(true)
-    expect(auth.isAuthenticated).toBe(true)
-    expect(main.auth).toBe(auth)
-    expect(main.user).toMatchObject({ username: 'ada', displayName: 'Ada' })
-    expect(auth.hasRole('developer')).toBe(true)
-    expect(main.title).toBe('OdbVue')
-    expect(main.version).toBe('1.0.0')
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
-  it('logs in through the shared capability and keeps auth data out of storage', async () => {
-    const context = setup()
-    await anonymous(context)
+  it('logs in through the capability, redirects, and keeps credentials out of storage', async () => {
+    const context = await setup()
     context.fetch
       .mockResolvedValueOnce(json({ accessToken: 'login-token' }))
       .mockResolvedValueOnce(json({ userId: 7, username: 'ada', permissions: ['settings.read'] }))
 
-    await expect(context.auth.login('ada', 'password')).resolves.toBe(true)
-
-    expect(context.capability.authenticated.value).toBe(true)
-    expect(context.main.user?.username).toBe('ada')
+    await context.wrapper.findComponent(form).trigger('click')
+    await flushPromises()
+    expect(context.auth.authenticated.value).toBe(true)
     expect(context.auth.can('settings.read')).toBe(true)
+    expect(context.router.currentRoute.value.path).toBe('/sandbox')
     const [, options] = context.fetch.mock.calls[1]!
     expect(options?.credentials).toBe('include')
     expect(JSON.parse(String(options?.body))).toEqual({ username: 'ada', password: 'password' })
     expect(JSON.stringify(localStorage)).not.toMatch(/login-token|password|ada/)
     expect(sessionStorage.length).toBe(0)
-
-    context.fetch.mockResolvedValueOnce(new Response(null, { status: 204 }))
-    await expect(context.auth.logout()).resolves.toBe(true)
-    expect(context.main.user).toBeNull()
-    expect(context.auth.accessToken).toBeNull()
-    expect(context.capability.authenticated.value).toBe(false)
+    context.wrapper.unmount()
   })
 
   it.each([
     [401, 'auth.invalid.credentials'],
     [403, 'auth.forbidden'],
     [429, 'auth.too.many.requests'],
-  ])('shows feedback for failed login (%s)', async (status, message) => {
-    const context = setup()
-    await anonymous(context)
+  ])('preserves login feedback for HTTP %s', async (status, message) => {
+    const context = await setup()
     context.fetch.mockResolvedValueOnce(json({}, status))
+    await context.wrapper.findComponent(form).trigger('click')
+    await flushPromises()
 
-    await expect(context.auth.login('ada', 'wrong')).resolves.toBe(false)
-
-    expect(context.main.ui.notification?.message).toBe(message)
-    expect(context.auth.isAuthenticated).toBe(false)
-    expect(context.auth.loading).toBe(false)
+    expect(context.ui.notification.value?.message).toBe(message)
+    expect(context.auth.authenticated.value).toBe(false)
+    expect(context.auth.loading.value).toBe(false)
+    expect(context.router.currentRoute.value.path).toBe('/login')
+    context.wrapper.unmount()
   })
 
-  it('reports an offline login and releases loading state', async () => {
-    const context = setup()
-    await anonymous(context)
+  it('reports offline login errors and releases loading state', async () => {
+    const context = await setup()
     context.fetch.mockRejectedValueOnce(new Error('Offline'))
-
-    await expect(context.auth.login('ada', 'password')).resolves.toBe(false)
-    expect(context.main.ui.notification?.message).toContain('Offline')
-    expect(context.auth.loading).toBe(false)
+    await context.wrapper.findComponent(form).trigger('click')
+    await flushPromises()
+    expect(context.ui.notification.value?.message).toContain('Offline')
+    expect(context.auth.loading.value).toBe(false)
+    context.wrapper.unmount()
   })
 
-  it('reports logout failure while clearing the local identity', async () => {
-    const context = setup()
-    await anonymous(context)
+  it('reflects capability loading and prevents duplicate submissions', async () => {
+    const context = await setup()
+    let finish!: (response: Response) => void
     context.fetch
-      .mockResolvedValueOnce(json({ accessToken: 'login-token' }))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            finish = resolve
+          }),
+      )
       .mockResolvedValueOnce(json({ userId: 7, username: 'ada' }))
-    await context.auth.login('ada', 'password')
-    context.fetch.mockResolvedValueOnce(json({}, 500))
-
-    await expect(context.auth.logout()).resolves.toBe(false)
-    expect(context.main.ui.notification?.type).toBe('error')
-    expect(context.main.user).toBeNull()
-    expect(context.auth.accessToken).toBeNull()
+    const loginForm = context.wrapper.findComponent(form)
+    expect(loginForm.props('loading')).toBe(false)
+    await loginForm.trigger('click')
+    expect(loginForm.props('loading')).toBe(true)
+    await loginForm.trigger('click')
+    expect(context.fetch).toHaveBeenCalledTimes(2)
+    finish(json({ accessToken: 'login-token' }))
+    await flushPromises()
+    expect(loginForm.props('loading')).toBe(false)
+    expect(context.auth.authenticated.value).toBe(true)
+    context.wrapper.unmount()
   })
 
-  it('does not keep an issued token when loading the identity fails', async () => {
-    const context = setup()
-    await anonymous(context)
+  it('clears an issued token when fetching the identity fails', async () => {
+    const context = await setup()
     context.fetch
       .mockResolvedValueOnce(json({ accessToken: 'login-token' }))
       .mockResolvedValue(json({}, 403))
-
-    await expect(context.auth.login('ada', 'password')).resolves.toBe(false)
-    expect(context.auth.accessToken).toBeNull()
-    expect(context.main.user).toBeNull()
-    expect(context.main.ui.notification?.type).toBe('error')
+    await context.wrapper.findComponent(form).trigger('click')
+    await flushPromises()
+    expect(context.auth.accessToken.value).toBeNull()
+    expect(context.auth.user.value).toBeNull()
+    expect(context.ui.notification.value?.type).toBe('error')
+    context.wrapper.unmount()
   })
 })

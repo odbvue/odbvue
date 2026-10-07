@@ -6,6 +6,11 @@ import type { OdbVueHookHandlers } from './hooks.js'
 
 export type OdbVueAuthConfig = {
   endpoints?: Partial<import('../capabilities/auth/index.js').OdbVueAuthEndpoints>
+  routes?: {
+    login?: string
+    authenticated?: string
+    forbidden?: string
+  }
 }
 export type OdbVueHook = (...args: unknown[]) => unknown | Promise<unknown>
 

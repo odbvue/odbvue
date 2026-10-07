@@ -12,17 +12,17 @@
         </v-list-item>
       </v-list>
       <v-divider />
-      <v-list v-if="app.auth.ready">
-        <template v-if="app.auth.isAuthenticated">
+      <v-list v-if="auth.ready.value">
+        <template v-if="auth.authenticated.value">
           <v-list-item
             prepend-icon="$mdiAccount"
             :title="displayName"
-            :subtitle="app.user?.username"
+            :subtitle="auth.user.value?.username"
           />
           <v-list-item
             prepend-icon="$mdiLogout"
             :title="t('auth.logout')"
-            :disabled="app.auth.loading"
+            :disabled="auth.loading.value"
             @click="logout"
           />
         </template>
@@ -32,14 +32,14 @@
     <v-app-bar>
       <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
       <v-toolbar-title>{{ app.title }}</v-toolbar-title>
-      <template v-if="app.auth.ready">
-        <v-btn v-if="!app.auth.isAuthenticated" to="/login" prepend-icon="$mdiAccount" class="mr-2">
+      <template v-if="auth.ready.value">
+        <v-btn v-if="!auth.authenticated.value" to="/login" prepend-icon="$mdiAccount" class="mr-2">
           {{ t('auth.login') }}
         </v-btn>
         <v-btn
           v-else
           prepend-icon="$mdiLogout"
-          :loading="app.auth.loading"
+          :loading="auth.loading.value"
           class="mr-2"
           @click="logout"
         >
@@ -128,7 +128,7 @@
         data-cy="theme-toggle"
       ></v-btn>
       <v-progress-linear
-        :active="app.ui.loading || app.auth.loading"
+        :active="app.ui.loading || auth.loading.value"
         indeterminate
         absolute
         location="bottom"
@@ -185,26 +185,31 @@
 </template>
 
 <script setup lang="ts">
-import { useAppStore } from '@/stores'
-import { isPageAllowed } from '@/router/auth'
+import { useAppStore, useAuth } from '@odbvue/web'
 import { useNotificationMessage } from '@/composables/ui'
 
 const drawer = ref(false)
 const app = useAppStore()
+const auth = useAuth()
 const notificationMessage = useNotificationMessage(() => app.ui.notification?.message)
 const routing = useRouting()
 const navigationPages = computed(() =>
-  routing.pages.value.filter(
-    (page) => page.module === undefined && isPageAllowed(page.meta.visibility, page.meta, app.auth),
-  ),
+  routing.pages.value.filter((page) => page.module === undefined),
 )
 const displayName = computed(() =>
-  typeof app.user?.displayName === 'string' ? app.user.displayName : app.user?.username,
+  typeof auth.user.value?.displayName === 'string'
+    ? auth.user.value.displayName
+    : auth.user.value?.username,
 )
 const router = useRouter()
 async function logout() {
   drawer.value = false
-  await app.auth.logout()
+  app.ui.clear()
+  try {
+    await auth.logout()
+  } catch (error) {
+    app.ui.error(error)
+  }
   await router.replace('/')
 }
 const { mobile } = useDisplay()

@@ -8,7 +8,6 @@ import {
   resolveOdbVueLocale,
   useAppStore,
   authContract,
-  authCapability,
   useOdbVue,
   useOdbVueConfig,
   errorsContract,
@@ -83,7 +82,7 @@ describe('OdbVue application config', () => {
     const auth = runtime.get(authContract)
     const restore = vi.spyOn(auth, 'restore').mockResolvedValue(false)
 
-    await authCapability.start?.(runtime)
+    await runtime.ready
 
     expect(restore).toHaveBeenCalledOnce()
     restore.mockRestore()

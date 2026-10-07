@@ -3,7 +3,7 @@ import type { App } from 'vue'
 import type { Router } from 'vue-router'
 import type { OdbVueAppConfig } from './config.js'
 import { authCapability } from '../capabilities/auth/index.js'
-import { errorsCapability } from '../capabilities/errors/index.js'
+import { errorsCapability, errorsContract } from '../capabilities/errors/index.js'
 import { httpCapability } from '../capabilities/http/index.js'
 import { i18nCapability } from '../capabilities/i18n/index.js'
 import { stateCapability } from '../capabilities/state/index.js'
@@ -28,6 +28,10 @@ export function installOdbVue(app: App, config: OdbVueAppConfig, router?: Router
   const runtime: OdbVueRuntime = {
     config,
     hooks: createOdbVueHooks(config.hooks),
+    ready: Promise.resolve().then(async () => {
+      for (const capability of capabilities) await capability.start?.(runtime)
+      await runtime.hooks.emit('app:started', undefined)
+    }),
     provide(contract, value) {
       if (services.has(contract.key))
         throw new Error('An OdbVue contract can only be provided once.')
@@ -47,10 +51,11 @@ export function installOdbVue(app: App, config: OdbVueAppConfig, router?: Router
   const capabilities = resolveOdbVueCapabilities(coreCapabilities)
   for (const capability of capabilities) capability.setup?.({ ...runtime, app })
   app.provide(odbVueRuntimeKey, runtime)
-  if (router) app.use(router)
   app.use(createHead())
-  for (const capability of capabilities) void capability.start?.(runtime)
-  void runtime.hooks.emit('app:started', undefined)
+  if (router) app.use(router)
+  void runtime.ready.catch((error: unknown) => {
+    runtime.get(errorsContract).capture(error, { source: 'runtime', operation: 'startup' })
+  })
 
   return runtime
 }

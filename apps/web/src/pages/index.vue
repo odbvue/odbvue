@@ -27,16 +27,8 @@ definePage({
   },
 })
 import { useCardBackground } from '@/composables/ui'
-import { useAppStore } from '@/stores'
-import { isPageAllowed } from '@/router/auth'
-const app = useAppStore()
 const routing = useRouting()
 const navigationPages = computed(() =>
-  routing.pages.value.filter(
-    (page) =>
-      page.level === 0 &&
-      page.path !== '/' &&
-      isPageAllowed(page.meta.visibility, page.meta, app.auth),
-  ),
+  routing.pages.value.filter((page) => page.level === 0 && page.path !== '/'),
 )
 </script>
