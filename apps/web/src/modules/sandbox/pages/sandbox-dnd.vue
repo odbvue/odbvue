@@ -40,9 +40,8 @@ definePage({
     description: 'A compact card drag and drop demo',
     icon: '$mdiDrag',
     color: '#E8F0FE',
-    visibility: 'with-role',
-    access: 'with-role',
-    roles: ['admin'],
+    access: ['admin'],
+    navigation: true,
   },
 })
 

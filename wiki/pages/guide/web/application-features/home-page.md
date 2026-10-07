@@ -22,7 +22,8 @@ Set Vue page metadata with `definePage()` or Markdown metadata with frontmatter.
 For example, `src/app/pages/about.md` supplies the About card.
 
 Modules can contribute root cards too. `src/modules/sandbox/pages/index.vue`
-produces `/sandbox` and requires the `admin` role for access and visibility.
+produces `/sandbox` and declares `access: ['admin']` and `navigation: true`, requiring
+authentication and the `admin` role for access and navigation.
 Navigation uses the same authorization predicate as the router, so unauthorized
 users cannot see that card and direct visits are denied.
 

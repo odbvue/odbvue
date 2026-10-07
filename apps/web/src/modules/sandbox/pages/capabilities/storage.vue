@@ -162,9 +162,8 @@ definePage({
   meta: {
     title: 'Storage',
     icon: '$mdiFolder',
-    visibility: 'with-role',
-    access: 'with-role',
-    roles: ['admin'],
+    access: ['admin'],
+    navigation: true,
   },
 })
 

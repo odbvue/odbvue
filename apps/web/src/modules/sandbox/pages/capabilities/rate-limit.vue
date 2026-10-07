@@ -73,9 +73,8 @@ definePage({
   meta: {
     title: 'Rate limit',
     icon: '$mdiSpeedometer',
-    visibility: 'with-role',
-    access: 'with-role',
-    roles: ['admin'],
+    access: ['admin'],
+    navigation: true,
   },
 })
 

@@ -22,7 +22,7 @@ export default router
 
 Install this router with `app.use(router)` in `main.ts`. The guard awaits lazy, idempotent auth restoration before evaluating every matched route, including parents. The application shell mounts immediately while navigation is pending. Successful navigation updates `document.title` directly; failed or cancelled navigation leaves it unchanged.
 
-Configure application destinations with `auth.routes`: `login` defaults to `/login`, while `authenticated` and `forbidden` default to `/`. An anonymous user requesting an authenticated or role-protected page is redirected to login with the original URL in `query.redirect`. Other denied requests show `auth.forbidden` and return to the forbidden destination.
+Configure application destinations with `auth.routes`: `login` defaults to `/login`, while `authenticated` and `forbidden` default to `/`. An anonymous user requesting an authenticated, role-protected, or permission-protected page is redirected to login with the original URL in `query.redirect`. Other denied requests show `auth.forbidden` and return to the forbidden destination.
 
 ## How it works
 
@@ -39,7 +39,7 @@ Configure application destinations with `auth.routes`: `login` defaults to `/log
 | `params`        | Normalized path and query parameters for the current route. |
 | `navigate`      | Vue Router's programmatic navigation function.              |
 
-Each page exposes its route path, the original normalized Vue Router record, `meta`, a derived `title`, and `navigation` metadata. A title comes from `meta.title` when present; otherwise it is derived from the final path segment, so `/customer-orders` becomes `Customer Orders`.
+Each page exposes its route path, the original normalized Vue Router record, `meta`, a derived `title`, and a resolved `navigation` boolean. A title comes from `meta.title` when present; otherwise it is derived from the final path segment, so `/customer-orders` becomes `Customer Orders`.
 
 ```ts
 import { useRouting } from '@/app/router/api'
@@ -52,7 +52,7 @@ The returned values are Vue computed refs. Read their values in script with `.va
 
 ## Page metadata
 
-Declare metadata with `definePage()` in a page component. Application routing reads this metadata from Vue Router and applies it consistently to guards and navigation.
+Declare metadata with `definePage()` in a page component. Every Vue or Markdown page must explicitly declare `access` and a boolean `navigation`; the completed route manifest validates these after page metadata is merged. Generated structural parent routes without a page component are exempt. Application routing reads this metadata from Vue Router and applies it consistently to guards and navigation.
 
 ```vue
 <script setup lang="ts">
@@ -63,9 +63,8 @@ definePage({
     icon: '$mdiAccountGroup',
     order: 20,
     layout: 'default',
-    visibility: 'with-role',
-    access: 'with-role',
-    roles: ['sales'],
+    access: ['sales'],
+    navigation: true,
   },
 })
 </script>
@@ -73,13 +72,43 @@ definePage({
 
 `canAccessPage(meta, auth)` interprets `access` consistently for guards and navigation:
 
-- Omitted or `always`: no access restriction.
-- `never`: deny access.
-- `when-authenticated`: require an authenticated identity.
-- `when-unauthenticated`: require an anonymous session.
-- `with-role`: require authentication, at least one declared role or permission, any listed role, and all listed permissions.
+- `public`: accessible to anyone.
+- `authenticated`: require an authenticated identity.
+- `anonymous`: require an anonymous session.
+- A non-empty role array, such as `['admin', 'editor']`: require authentication and **any** listed role. Empty arrays and blank role names are invalid.
 
-`canShowPage(meta, auth)` additionally applies `visibility` using the same rules. Visibility can hide an otherwise accessible page; it never grants route access. Roles and permissions remain conditional on `with-role` in this metadata model. Server endpoints must enforce their own authorization.
+The access type is:
+
+```ts
+type PageAccess = 'public' | 'authenticated' | 'anonymous' | [string, ...string[]]
+```
+
+`canShowPage(meta, auth)` additionally checks `navigation !== false`. Disabling navigation hides a page from menus and breadcrumbs without denying route access. There is no separate `roles`, `visibility`, or page-level `hidden` policy. Server endpoints must enforce their own authorization.
+
+Optional `permissions` add an **all-permissions** requirement to authenticated or role-protected access:
+
+```ts
+definePage({
+  meta: {
+    access: 'authenticated',
+    permissions: ['settings.read'],
+    navigation: true,
+  },
+})
+```
+
+Use `access: 'authenticated'` when a page needs a session without role or permission requirements. Login uses anonymous access and opts out of navigation:
+
+```ts
+definePage({
+  meta: {
+    access: 'anonymous',
+    navigation: false,
+  },
+})
+```
+
+When a role array and permissions are both present, access requires any listed role **and** every listed permission. Non-empty permissions with `public` or `anonymous` access are invalid rather than silently changing the session requirement.
 
 Login pages can use `resolveAuthRedirect(router, route.query.redirect, fallback, login)` after `useAuth().login()`. It preserves local query strings and fragments while rejecting external URLs, protocol-relative URLs, backslashes, control characters, unmatched paths, and the login page itself. Optional fallback and login destinations default to `/` and `/login`.
 
@@ -87,7 +116,7 @@ Login pages can use `resolveAuthRedirect(router, route.query.redirect, fallback,
 
 ### Build a navigation list
 
-`routing.pages` is already filtered and ordered for application navigation. Navigation and breadcrumbs react to authentication changes and enforce both visibility and route access, including parent access requirements. `allPages` remains the unfiltered registry. A page's `navigation` metadata is `false` when it sets `navigation: false`, `hidden: true`, or `visibility: 'never'`. Otherwise it contains the explicit navigation settings or inherits the page icon and order.
+`routing.pages` is already filtered and ordered for application navigation. Navigation and breadcrumbs react to authentication changes and enforce route access, including parent access requirements. `allPages` remains the unfiltered registry. A page's `navigation` boolean reflects its explicit declaration. Display metadata comes from page `title`, `icon`, and `order`.
 
 ```vue
 <script setup lang="ts">
@@ -103,19 +132,22 @@ const { pages } = useRouting()
       :key="page.path"
       :to="page.path"
       :prepend-icon="page.meta.icon || '$mdiMinus'"
-      :title="page.navigation === false ? page.title : page.navigation.label || page.title"
+      :title="page.title"
     />
   </v-list>
 </template>
 ```
 
-To customize a label without changing the page title, use nested navigation metadata:
+Set navigation display and ordering with top-level page metadata:
 
 ```ts
 definePage({
   meta: {
     title: 'Customer administration',
-    navigation: { label: 'Customers', icon: '$mdiAccountGroup', order: 20 },
+    access: ['admin'],
+    icon: '$mdiAccountGroup',
+    order: 20,
+    navigation: true,
   },
 })
 ```

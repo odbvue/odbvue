@@ -10,6 +10,11 @@ import {
   toRoutePage,
   useRouting,
 } from '../src/app/router/api.js'
+import type { PageMeta } from '../src/app/router/api.js'
+
+function pageMeta(meta: Partial<PageMeta> = {}): PageMeta {
+  return { access: 'public', navigation: true, ...meta }
+}
 
 function route(path: string, meta: Record<string, unknown> = {}): RouteRecordNormalized {
   return { path, meta } as RouteRecordNormalized
@@ -22,24 +27,43 @@ describe('routing metadata', () => {
         module: 'sandbox',
         title: 'Customers',
         icon: '$mdiAccountGroup',
-        navigation: { label: 'Customers', order: 20 },
+        order: 20,
+        navigation: true,
       }),
     )
 
     expect(page.module).toBe('sandbox')
     expect(page.title).toBe('Customers')
-    expect(page.navigation).toEqual({ label: 'Customers', order: 20 })
+    expect(page.navigation).toBe(true)
+    expect(page.meta.order).toBe(20)
   })
 
-  it('omits hidden and non-navigable pages from generated navigation', () => {
+  it('defaults to navigation unless explicitly disabled', () => {
     expect(getNavigationMeta({ navigation: false })).toBe(false)
-    expect(getNavigationMeta({ hidden: true })).toBe(false)
-    expect(getNavigationMeta({ visibility: 'never' })).toBe(false)
+    expect(getNavigationMeta({ navigation: true })).toBe(true)
+    expect(getNavigationMeta({})).toBe(true)
   })
 
   it('resolves page titles consistently from metadata and paths', () => {
     expect(resolvePageTitle({}, '/customer-orders')).toBe('Customer Orders')
     expect(resolvePageTitle({ title: 'Orders' }, '/customer-orders')).toBe('Orders')
+  })
+
+  it('validates completed page metadata without requiring it on structural parents', () => {
+    expect(() =>
+      createPageManifest([
+        {
+          path: '/parent',
+          children: [{ path: 'child', component: {}, meta: pageMeta() }],
+        },
+      ]),
+    ).not.toThrow()
+    expect(() => createPageManifest([{ path: '/missing', component: {} }])).toThrow(
+      'Invalid page metadata in /missing',
+    )
+    expect(() =>
+      createPageManifest([{ path: '/missing', component: {}, meta: { access: 'public' } }]),
+    ).toThrow('Invalid page metadata in /missing')
   })
 
   it('includes matched dynamic routes in breadcrumbs', async () => {
@@ -48,13 +72,13 @@ describe('routing metadata', () => {
         path: '/customers',
         name: 'customers',
         component: {},
-        meta: { title: 'Customers' },
+        meta: pageMeta({ title: 'Customers' }),
         children: [
           {
             path: ':id',
             name: 'customer',
             component: {},
-            meta: { title: 'Customer' },
+            meta: pageMeta({ title: 'Customer' }),
           },
         ],
       },
@@ -81,12 +105,12 @@ describe('routing metadata', () => {
 
   it('uses manifest pages for breadcrumbs instead of directory-only routes', async () => {
     const routes = [
-      { path: '/', name: 'home', component: {}, meta: { title: 'Home' } },
+      { path: '/', name: 'home', component: {}, meta: pageMeta({ title: 'Home' }) },
       {
         path: '/sandbox',
         name: 'sandbox',
         component: {},
-        meta: { title: 'Sandbox' },
+        meta: pageMeta({ title: 'Sandbox' }),
         children: [
           {
             path: 'capabilities',
@@ -96,7 +120,7 @@ describe('routing metadata', () => {
                 path: 'routing',
                 name: 'sandbox-routing',
                 component: {},
-                meta: { title: 'Routing' },
+                meta: pageMeta({ title: 'Routing' }),
               },
             ],
           },
@@ -121,13 +145,40 @@ describe('routing metadata', () => {
     ])
   })
 
+  it('excludes navigation-disabled pages from menus and breadcrumbs but not the registry', async () => {
+    const routes = [
+      { path: '/', component: {}, meta: pageMeta({ title: 'Home' }) },
+      {
+        path: '/hidden',
+        component: {},
+        meta: pageMeta({ title: 'Hidden', navigation: false }),
+        children: [{ path: 'child', component: {}, meta: pageMeta({ title: 'Child' }) }],
+      },
+    ]
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    registerPageManifest(router, createPageManifest(routes))
+    await router.push('/hidden/child')
+    const app = createApp({})
+    app.use(router)
+    const routing = app.runWithContext(() => useRouting())
+
+    expect(routing.pages.value.map((page) => page.path)).toEqual(['/'])
+    expect(routing.allPages.value.map((page) => page.path)).toEqual([
+      '/',
+      '/hidden',
+      '/hidden/child',
+    ])
+    expect(routing.breadcrumbs.value.map((item) => item.title)).toEqual(['Home', 'Child'])
+  })
+
   it('omits structural and duplicate routes from the page registry', async () => {
     const routes = [
       {
         path: '/sandbox',
         component: {},
+        meta: pageMeta(),
         children: [
-          { path: '', name: 'sandbox', component: {}, meta: { title: 'Sandbox' } },
+          { path: '', name: 'sandbox', component: {}, meta: pageMeta({ title: 'Sandbox' }) },
           {
             path: 'capabilities',
             component: undefined,
@@ -136,7 +187,7 @@ describe('routing metadata', () => {
                 path: 'routing',
                 name: 'sandbox-routing',
                 component: {},
-                meta: { title: 'Routing' },
+                meta: pageMeta({ title: 'Routing' }),
               },
             ],
           },
@@ -168,7 +219,7 @@ describe('routing metadata', () => {
         path: '/crm/customers/:id',
         name: 'customer',
         component: {},
-        meta: { module: 'sandbox' },
+        meta: pageMeta({ module: 'sandbox' }),
       },
     ]
     const router = createRouter({
@@ -204,13 +255,13 @@ describe('routing metadata', () => {
         path: '/sandbox',
         name: 'sandbox',
         component: {},
-        meta: { module: 'sandbox' },
+        meta: pageMeta({ module: 'sandbox' }),
         children: [
           {
             path: 'capabilities/routing',
             name: 'sandbox-routing',
             component: {},
-            meta: { module: 'sandbox', title: 'Routing' },
+            meta: pageMeta({ module: 'sandbox', title: 'Routing' }),
           },
         ],
       },
@@ -237,18 +288,18 @@ describe('routing metadata', () => {
 
   it('derives navigation and breadcrumb overrides from the routing runtime', async () => {
     const routes = [
-      { path: '/', name: 'home', component: {}, meta: { title: 'Home', order: 20 } },
+      { path: '/', name: 'home', component: {}, meta: pageMeta({ title: 'Home', order: 20 }) },
       {
         path: '/customers',
         name: 'customers',
         component: {},
-        meta: { title: 'Customers', order: 10 },
+        meta: pageMeta({ title: 'Customers', order: 10 }),
         children: [
           {
             path: ':id',
             name: 'customer',
             component: {},
-            meta: { title: 'Customer' },
+            meta: pageMeta({ title: 'Customer' }),
           },
         ],
       },

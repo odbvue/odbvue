@@ -10,5 +10,5 @@
 </template>
 
 <route>
-  { meta: { layout: 'fullscreen' } }
+  { meta: { layout: 'fullscreen', access: 'public', navigation: false } }
 </route>

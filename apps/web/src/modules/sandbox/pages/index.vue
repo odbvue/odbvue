@@ -51,9 +51,8 @@ definePage({
     description: 'A sandbox page to test various UI components and features',
     icon: '$mdiFlask',
     color: '#DDEEFF',
-    visibility: 'with-role',
-    access: 'with-role',
-    roles: ['admin'],
+    access: ['admin'],
+    navigation: true,
   },
 })
 

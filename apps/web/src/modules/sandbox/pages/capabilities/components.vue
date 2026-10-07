@@ -20,9 +20,8 @@ import { RouterView, useRoute } from 'vue-router'
 definePage({
   meta: {
     title: 'Components',
-    visibility: 'with-role',
-    access: 'with-role',
-    roles: ['admin'],
+    access: ['admin'],
+    navigation: true,
   },
 })
 

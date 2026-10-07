@@ -1,11 +1,11 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import type { RouteParamsRaw } from 'vue-router'
+import type { RouteMeta, RouteParamsRaw } from 'vue-router'
 import { getBreadcrumbOverride, getPageManifest } from './registry.js'
 import { toRoutePage } from './metadata.js'
 import { toManifestPage } from './manifest.js'
 import { useRouteParams } from './navigation.js'
-import type { Breadcrumb, PageMeta, Routing } from './types.js'
+import type { Breadcrumb, Routing } from './types.js'
 import { useAuth } from '../auth'
 import { canAccessPage, canShowPage, type PageAuth } from './auth.js'
 
@@ -24,7 +24,7 @@ export function useRouting(auth: PageAuth = useAuth()): Routing {
   const manifest = getPageManifest(router)
   const breadcrumbOverride = getBreadcrumbOverride(router)
   const params = useRouteParams()
-  function isNavigable(page: { path: string; meta: PageMeta }): boolean {
+  function isNavigable(page: { path: string; meta: RouteMeta }): boolean {
     return (
       canShowPage(page.meta, auth) &&
       router.resolve(page.path).matched.every((record) => canAccessPage(record.meta, auth))
@@ -51,8 +51,7 @@ export function useRouting(auth: PageAuth = useAuth()): Routing {
       .filter(isNavigable)
       .toSorted(
         (first, second) =>
-          (first.navigation === false ? 0 : first.navigation.order || 0) -
-            (second.navigation === false ? 0 : second.navigation.order || 0) ||
+          (first.meta.order || 0) - (second.meta.order || 0) ||
           first.path.localeCompare(second.path),
       )
   })
@@ -80,22 +79,19 @@ export function useRouting(auth: PageAuth = useAuth()): Routing {
       .toSorted((first, second) => first.path.length - second.path.length)
       .map(toManifestPage)
 
-    const items: Breadcrumb[] = matchedPages
-      .filter((page) => page.meta.visibility !== 'never')
-      .filter(isNavigable)
-      .map((page, index, matched) => ({
-        title: page.title,
-        disabled: index === matched.length - 1,
-        href: page.route.name
-          ? router.resolve({
-              name: page.route.name,
-              params: routeParamsForPath(page.route.path, route.params),
-            }).href
-          : page.route.path.includes(':')
-            ? route.path
-            : router.resolve(page.route.path).href,
-        icon: page.meta.icon,
-      }))
+    const items: Breadcrumb[] = matchedPages.filter(isNavigable).map((page, index, matched) => ({
+      title: page.title,
+      disabled: index === matched.length - 1,
+      href: page.route.name
+        ? router.resolve({
+            name: page.route.name,
+            params: routeParamsForPath(page.route.path, route.params),
+          }).href
+        : page.route.path.includes(':')
+          ? route.path
+          : router.resolve(page.route.path).href,
+      icon: page.meta.icon,
+    }))
     if (breadcrumbOverride.value) items.push(breadcrumbOverride.value)
     return items
   })

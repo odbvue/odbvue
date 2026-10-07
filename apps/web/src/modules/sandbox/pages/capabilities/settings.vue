@@ -118,9 +118,8 @@ definePage({
   meta: {
     title: 'Settings',
     icon: '$mdiCog',
-    visibility: 'with-role',
-    access: 'with-role',
-    roles: ['admin'],
+    access: ['admin'],
+    navigation: true,
   },
 })
 

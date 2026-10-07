@@ -23,9 +23,8 @@ import type { ChartData } from 'chart.js'
 
 definePage({
   meta: {
-    visibility: 'with-role',
-    access: 'with-role',
-    roles: ['admin'],
+    access: ['admin'],
+    navigation: true,
   },
 })
 

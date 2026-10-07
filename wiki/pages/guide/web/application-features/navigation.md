@@ -4,7 +4,7 @@ Navigation is derived from the routing capability. It is not a Pinia store: gene
 
 ## Navigation Drawer
 
-`routing.pages` contains navigable root-level pages, excludes catch-all routes, and is ordered by navigation order then path. Page display metadata remains under `page.meta`. An application shell can exclude module-owned pages with `page.module === undefined`.
+`routing.pages` contains navigable root-level pages, excludes catch-all routes, and is ordered by page `order` then path. Page display metadata remains under `page.meta`. An application shell can exclude module-owned pages with `page.module === undefined`.
 
 ```vue
 <template>
@@ -30,7 +30,7 @@ const routing = useRouting()
 
 ## Breadcrumbs
 
-`routing.breadcrumbs` follows the current matched route hierarchy and omits pages with `visibility: 'never'`.
+`routing.breadcrumbs` follows the current matched route hierarchy and omits pages with `navigation: false` or unmet access requirements, including parent requirements.
 
 ```vue
 <template>
@@ -55,15 +55,17 @@ routing.setBreadcrumb('Acme Corp')
 
 ## Page Metadata
 
-Declare page metadata with `definePage()`. `navigation: false`, `hidden: true`, and `visibility: 'never'` remove a page from `routing.pages`.
+Declare page metadata with `definePage()`. Both `access` and the boolean `navigation` are required on pages. `navigation: false` removes a page from menus and breadcrumbs without denying direct access. Both views apply `access`: `public`, `authenticated`, `anonymous`, or a non-empty role array requiring authentication and any listed role. Optional non-empty `permissions` require authenticated or role-array access and every listed permission.
 
 ```ts
 definePage({
   meta: {
     title: 'Customer administration',
+    access: ['admin'],
     description: 'Search and maintain customers.',
     icon: '$mdiAccountGroup',
-    navigation: { label: 'Customers', order: 20 },
+    order: 20,
+    navigation: true,
   },
 })
 ```

@@ -39,9 +39,8 @@ import { useRoute } from 'vue-router'
 
 definePage({
   meta: {
-    visibility: 'with-role',
-    access: 'with-role',
-    roles: ['admin'],
+    access: ['admin'],
+    navigation: true,
   },
 })
 

@@ -69,9 +69,8 @@ definePage({
   meta: {
     title: 'Authentication',
     icon: '$mdiShieldAccount',
-    visibility: 'with-role',
-    access: 'with-role',
-    roles: ['admin'],
+    access: ['admin'],
+    navigation: true,
   },
 })
 

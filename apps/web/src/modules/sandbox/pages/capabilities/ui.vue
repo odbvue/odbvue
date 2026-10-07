@@ -106,9 +106,8 @@ import { computed } from 'vue'
 definePage({
   meta: {
     title: 'UI',
-    visibility: 'with-role',
-    access: 'with-role',
-    roles: ['admin'],
+    access: ['admin'],
+    navigation: true,
   },
 })
 

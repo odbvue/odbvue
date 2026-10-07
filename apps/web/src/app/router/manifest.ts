@@ -1,6 +1,7 @@
-import type { RouteRecordRaw } from 'vue-router'
-import type { PageMeta, RoutePage } from './types.js'
+import type { RouteMeta, RouteRecordRaw } from 'vue-router'
+import type { RoutePage } from './types.js'
 import { resolveNavigationMeta, resolvePageTitle } from './metadata.js'
+import { validatePageMeta } from './policy.js'
 
 export interface PageManifestEntry {
   name?: string | symbol
@@ -9,7 +10,7 @@ export interface PageManifestEntry {
   parent?: string
   level: number
   children: string[]
-  meta: PageMeta
+  meta: RouteMeta
   route: RouteRecordRaw
 }
 
@@ -32,7 +33,10 @@ function collectPages(
 ): PageManifestEntry[] {
   return routes.flatMap((route) => {
     const path = joinRoutePath(parentPath, route.path)
-    const meta = (route.meta ?? {}) as PageMeta
+    const meta = route.meta ?? {}
+    if (route.component !== undefined && route.component !== null) {
+      validatePageMeta(meta, path)
+    }
     const pageLevel = route.path === '' ? Math.max(0, level - 1) : level
     const page: PageManifestEntry = {
       name: route.name,

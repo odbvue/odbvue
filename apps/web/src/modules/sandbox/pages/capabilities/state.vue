@@ -54,9 +54,8 @@ import { onMounted, ref } from 'vue'
 definePage({
   meta: {
     title: 'State',
-    visibility: 'with-role',
-    access: 'with-role',
-    roles: ['admin'],
+    access: ['admin'],
+    navigation: true,
   },
 })
 

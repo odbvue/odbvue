@@ -46,17 +46,24 @@ memory; the server-managed refresh cookie is `HttpOnly`, `Secure`, and `SameSite
 preference persistence is unchanged.
 
 The default layout shows login/logout controls and the current identity. Application guards
-enforce page `access` metadata; `with-role` requires any listed role and every listed permission.
+enforce required page `access` metadata: `public`, `authenticated`, `anonymous`, or a non-empty
+role array such as `['admin', 'editor']`. Role arrays require authentication and any listed role.
+Optional `permissions` require every listed permission and are supported only with
+`authenticated` access or a role array when non-empty.
 Unauthenticated visitors to protected pages return there after login, while authenticated users
 without access are sent home with an error. Login redirects must resolve to a local route.
 The [router](./src/app/router/index.ts) registers the manifest, auth guard, and successful-navigation
 title updates directly. Titles use `document.title` without a head manager.
 Application destinations can be configured with `auth.routes.login`,
 `auth.routes.authenticated`, and `auth.routes.forbidden`. Navigation applies the same access
-policy (including parents) and additionally checks `visibility`. These client-side checks complement,
+policy (including parents); `navigation: false` excludes a page from menus and breadcrumbs
+without denying route access. Every page must declare a boolean `navigation`; display uses page
+`icon` and `order`. Vue and Markdown metadata is validated when the completed route manifest is created.
+Generated structural routes do not need page metadata.
+These client-side checks complement,
 not replace, authorization on the API.
 
-All sandbox module pages require the `admin` role for both access and navigation visibility.
+All sandbox module pages declare `access: ['admin']` and `navigation: true`.
 
 Notifications translate existing catalog keys and display other messages as plain text.
 Runtime errors are not sent to the missing-translation collector.

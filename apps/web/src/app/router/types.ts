@@ -3,38 +3,23 @@ import type {
   RouteLocationNormalizedLoaded,
   RouteRecordNormalized,
   RouteRecordRaw,
+  RouteMeta,
   Router,
 } from 'vue-router'
 
-export type PageVisibility =
-  | 'always'
-  | 'when-authenticated'
-  | 'when-unauthenticated'
-  | 'with-role'
-  | 'never'
+export type PageAccess = 'public' | 'authenticated' | 'anonymous' | [string, ...string[]]
 
-export type PageAccess = PageVisibility
-
-export interface NavigationMeta {
-  label?: string
-  icon?: string
-  order?: number
-}
-
-export interface PageMeta {
+export interface PageMeta extends Record<PropertyKey, unknown> {
   module?: string
   title?: string
   description?: string
   icon?: string
   color?: string
-  hidden?: boolean
   order?: number
   layout?: 'default' | 'fullscreen'
-  visibility?: PageVisibility
-  access?: PageAccess
-  roles?: string[]
+  access: PageAccess
   permissions?: string[]
-  navigation?: false | NavigationMeta
+  navigation: boolean
 }
 
 export interface RoutePage {
@@ -45,9 +30,9 @@ export interface RoutePage {
   level: number
   children: string[]
   route: RouteRecordNormalized | RouteRecordRaw
-  meta: PageMeta
+  meta: RouteMeta
   title: string
-  navigation: false | NavigationMeta
+  navigation: boolean
 }
 
 export interface Breadcrumb {
@@ -78,7 +63,7 @@ export interface Routing {
 }
 
 declare module 'vue-router' {
-  interface RouteMeta extends PageMeta {}
+  interface RouteMeta extends Partial<PageMeta> {}
 }
 
 export type RouteLocation = RouteLocationNormalizedLoaded

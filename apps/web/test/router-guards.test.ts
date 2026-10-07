@@ -15,21 +15,27 @@ import { type AppConfig } from '@/app/config'
 
 const component = { template: '<div />' }
 const routes: RouteRecordRaw[] = [
-  { path: '/', component },
+  { path: '/', component, meta: { access: 'public', navigation: true } },
   {
     path: '/login',
     component,
-    meta: { title: 'Login', access: 'when-unauthenticated', navigation: false },
+    meta: { title: 'Login', access: 'anonymous', navigation: false },
   },
-  { path: '/private', component, meta: { title: 'Private', access: 'when-authenticated' } },
-  { path: '/admin', component, meta: { access: 'with-role', roles: ['admin'] } },
-  { path: '/blocked', component, meta: { access: 'never' } },
-  { path: '/anonymous', component, meta: { visibility: 'when-unauthenticated' } },
+  {
+    path: '/private',
+    component,
+    meta: { title: 'Private', access: 'authenticated', navigation: true },
+  },
+  { path: '/admin', component, meta: { access: ['admin'], navigation: true } },
+  { path: '/blocked', component, meta: { access: ['blocked'], navigation: true } },
+  { path: '/anonymous', component, meta: { access: 'anonymous', navigation: true } },
   {
     path: '/parent',
     component,
-    meta: { access: 'with-role', roles: ['admin'] },
-    children: [{ path: 'child', component, meta: { title: 'Child' } }],
+    meta: { access: ['admin'], navigation: true },
+    children: [
+      { path: 'child', component, meta: { title: 'Child', access: 'public', navigation: true } },
+    ],
   },
 ]
 
@@ -128,6 +134,69 @@ describe('application router guards', () => {
     context.dispose()
   })
 
+  it.each(['/admin', '/parent/child', '/settings?tab=1#permissions'])(
+    'redirects role and permission requirements at %s to login',
+    async (path) => {
+      const context = setup({}, [
+        ...routes,
+        {
+          path: '/settings',
+          component,
+          meta: { access: 'authenticated', permissions: ['settings.read'], navigation: true },
+        },
+      ])
+      await context.router.push(path)
+      expect(context.router.currentRoute.value.path).toBe('/login')
+      expect(context.router.currentRoute.value.query.redirect).toBe(path)
+      expect(context.ui.notification.value).toBeUndefined()
+      context.dispose()
+    },
+  )
+
+  it('applies permission requirements to guards, navigation, and breadcrumbs reactively', async () => {
+    const context = setup({}, [
+      ...routes,
+      {
+        path: '/settings',
+        component,
+        meta: {
+          title: 'Settings',
+          access: 'authenticated',
+          permissions: ['settings.read'],
+          navigation: true,
+        },
+        children: [
+          {
+            path: 'details',
+            component,
+            meta: { title: 'Details', access: 'public', navigation: true },
+          },
+        ],
+      },
+    ])
+    await login(context)
+    await context.router.push('/settings/details')
+    expect(context.router.currentRoute.value.path).toBe('/')
+    expect(context.routing.pages.value.some((page) => page.path === '/settings')).toBe(false)
+    context.fetch.mockResolvedValueOnce(
+      json({ userId: 7, username: 'ada', permissions: ['settings.read'] }),
+    )
+    await context.auth.me()
+    await context.router.push('/settings/details')
+    expect(context.router.currentRoute.value.path).toBe('/settings/details')
+    expect(context.routing.pages.value.some((page) => page.path === '/settings')).toBe(true)
+    expect(context.routing.breadcrumbs.value.map((item) => item.href)).toEqual([
+      '/',
+      '/settings',
+      '/settings/details',
+    ])
+    context.fetch.mockResolvedValueOnce(json({ userId: 7, username: 'ada', permissions: [] }))
+    await context.auth.me()
+    expect(context.routing.pages.value.some((page) => page.path === '/settings')).toBe(false)
+    expect(context.routing.breadcrumbs.value.map((item) => item.href)).toEqual(['/'])
+    context.dispose()
+  })
+
   it('redirects authenticated login requests safely', async () => {
     const context = setup()
     await login(context)
@@ -141,9 +210,9 @@ describe('application router guards', () => {
   it('honors configured login, authenticated, and forbidden destinations', async () => {
     const pageRoutes: RouteRecordRaw[] = [
       ...routes.filter((route) => route.path !== '/login'),
-      { path: '/sign-in', component, meta: { access: 'when-unauthenticated' } },
-      { path: '/home', component },
-      { path: '/denied', component },
+      { path: '/sign-in', component, meta: { access: 'anonymous', navigation: false } },
+      { path: '/home', component, meta: { access: 'public', navigation: true } },
+      { path: '/denied', component, meta: { access: 'public', navigation: false } },
     ]
     const context = setup(
       { auth: { routes: { login: '/sign-in', authenticated: '/home', forbidden: '/denied' } } },
@@ -162,8 +231,11 @@ describe('application router guards', () => {
   it('cancels denial at the fallback instead of looping', async () => {
     const context = setup(
       {},
-      routes.map((route) => (route.path === '/' ? { ...route, meta: { access: 'never' } } : route)),
+      routes.map((route) =>
+        route.path === '/' ? { ...route, meta: { access: ['blocked'], navigation: true } } : route,
+      ),
     )
+    await login(context)
     await context.router.push('/blocked')
     expect(context.router.currentRoute.value.matched).toHaveLength(0)
     expect(context.ui.notification.value?.message).toBe('auth.forbidden')

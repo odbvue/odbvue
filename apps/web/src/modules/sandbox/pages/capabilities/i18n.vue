@@ -48,9 +48,8 @@ import inventory from 'virtual:odbvue-i18n-inventory'
 definePage({
   meta: {
     title: 'Internationalization',
-    visibility: 'with-role',
-    access: 'with-role',
-    roles: ['admin'],
+    access: ['admin'],
+    navigation: true,
   },
 })
 

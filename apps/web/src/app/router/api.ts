@@ -18,14 +18,5 @@ export {
   computedRouteQuery,
   useRouteParams,
 } from './navigation.js'
-export type {
-  Breadcrumb,
-  NavigationMeta,
-  PageAccess,
-  PageMeta,
-  PageVisibility,
-  RouteParams,
-  RoutePage,
-  Routing,
-} from './types.js'
+export type { Breadcrumb, PageAccess, PageMeta, RouteParams, RoutePage, Routing } from './types.js'
 export type { PageManifest, PageManifestEntry } from './manifest.js'

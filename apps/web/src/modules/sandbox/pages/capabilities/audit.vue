@@ -115,9 +115,8 @@ definePage({
   meta: {
     title: 'Audit',
     icon: '$mdiClipboardText',
-    visibility: 'with-role',
-    access: 'with-role',
-    roles: ['admin'],
+    access: ['admin'],
+    navigation: true,
   },
 })
 

@@ -24,8 +24,8 @@ import { useUi } from '@/app/ui'
 definePage({
   meta: {
     title: 'Login',
-    visibility: 'never',
-    access: 'when-unauthenticated',
+    access: 'anonymous',
+    navigation: false,
   },
 })
 

@@ -48,7 +48,8 @@
 </template>
 
 <script setup lang="ts">
-import { useRouting, type PageMeta } from '@/app/router/api'
+import { useRouting } from '@/app/router/api'
+import type { RouteMeta } from 'vue-router'
 import { computed, ref } from 'vue'
 
 definePage({
@@ -56,9 +57,8 @@ definePage({
     title: 'Routing',
     description: 'Inspect generated pages, metadata, and navigation conventions.',
     icon: '$mdiRoutes',
-    visibility: 'with-role',
-    access: 'with-role',
-    roles: ['admin'],
+    access: ['admin'],
+    navigation: true,
   },
 })
 
@@ -72,7 +72,7 @@ const routingPages = computed(() => {
     .toSorted((first, second) => first.path.localeCompare(second.path))
 })
 
-function toYaml(meta: PageMeta): string {
+function toYaml(meta: RouteMeta): string {
   return Object.entries(meta)
     .map(([key, value]) => {
       if (Array.isArray(value)) return `${key}: [${value.map(yamlValue).join(', ')}]`
@@ -92,7 +92,7 @@ function yamlValue(value: unknown): string {
   return String(value)
 }
 
-async function copyMetadata(meta: PageMeta) {
+async function copyMetadata(meta: RouteMeta) {
   await navigator.clipboard.writeText(toYaml(meta))
 }
 </script>

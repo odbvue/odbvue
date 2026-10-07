@@ -1,8 +1,8 @@
-import type { Router, NavigationGuard } from 'vue-router'
+import type { Router, NavigationGuard, RouteMeta } from 'vue-router'
 import { auth as applicationAuth, type Auth } from '../auth/index.js'
 import { appConfig, type AppConfig } from '../config'
 import { useUi } from '../ui/store'
-import type { PageAccess, PageMeta } from './types.js'
+import { validateAccessPolicy } from './policy.js'
 
 export type PageAuth = Pick<Auth, 'authenticated' | 'hasRole' | 'can'>
 
@@ -24,11 +24,7 @@ export function createAuthGuard(
     }
     const denied = to.matched.find((record) => !canAccessPage(record.meta, session))
     if (!denied) return true
-    if (
-      !session.authenticated.value &&
-      (denied.meta.access === 'when-authenticated' || denied.meta.access === 'with-role') &&
-      to.path !== login
-    ) {
+    if (!session.authenticated.value && requiresAuthentication(denied.meta) && to.path !== login) {
       return { path: login, query: { redirect: to.fullPath } }
     }
     onForbidden()
@@ -36,32 +32,22 @@ export function createAuthGuard(
   }
 }
 
-function isPageAllowed(access: PageAccess | undefined, meta: PageMeta, auth: PageAuth): boolean {
-  switch (access) {
-    case 'never':
-      return false
-    case 'when-authenticated':
-      return auth.authenticated.value
-    case 'when-unauthenticated':
-      return !auth.authenticated.value
-    case 'with-role':
-      return (
-        auth.authenticated.value &&
-        (!!meta.roles?.length || !!meta.permissions?.length) &&
-        (!meta.roles?.length || meta.roles.some((role) => auth.hasRole(role))) &&
-        (meta.permissions?.every((permission) => auth.can(permission)) ?? true)
-      )
-    default:
-      return true
-  }
+function requiresAuthentication(meta: RouteMeta): boolean {
+  return meta.access === 'authenticated' || Array.isArray(meta.access)
 }
 
-export function canAccessPage(meta: PageMeta, auth: PageAuth): boolean {
-  return isPageAllowed(meta.access, meta, auth)
+export function canAccessPage(meta: RouteMeta, auth: PageAuth): boolean {
+  validateAccessPolicy(meta)
+  if (meta.access === 'anonymous' && auth.authenticated.value) return false
+  if (requiresAuthentication(meta) && !auth.authenticated.value) return false
+  return (
+    (!Array.isArray(meta.access) || meta.access.some((role) => auth.hasRole(role))) &&
+    (meta.permissions?.every((permission) => auth.can(permission)) ?? true)
+  )
 }
 
-export function canShowPage(meta: PageMeta, auth: PageAuth): boolean {
-  return canAccessPage(meta, auth) && isPageAllowed(meta.visibility, meta, auth)
+export function canShowPage(meta: RouteMeta, auth: PageAuth): boolean {
+  return meta.navigation !== false && canAccessPage(meta, auth)
 }
 
 export function resolveAuthRedirect(

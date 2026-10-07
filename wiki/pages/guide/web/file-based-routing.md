@@ -11,6 +11,10 @@ OdbVue applications use file-based pages. Main-application routes live under `sr
 ## Page metadata
 
 Use `definePage()` in Vue pages to provide route metadata used by the application shell.
+Every page must declare `access` and a boolean `navigation`; the completed route manifest validates
+Vue metadata and Markdown frontmatter. Generated structural routes are exempt.
+Access is `public`, `authenticated`, `anonymous`, or a non-empty role array such as
+`['admin']`, which requires authentication and any listed role.
 
 ```vue
 <script setup lang="ts">
@@ -18,6 +22,8 @@ definePage({
   meta: {
     title: 'Customers',
     layout: 'default',
+    access: 'authenticated',
+    navigation: true,
   },
 })
 </script>
@@ -28,6 +34,8 @@ For Markdown pages, frontmatter contributes the same metadata.
 ```md
 ---
 title: About
+access: public
+navigation: true
 ---
 
 # About

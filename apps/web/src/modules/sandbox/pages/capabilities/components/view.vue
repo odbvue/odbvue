@@ -23,9 +23,8 @@
 <script setup lang="ts">
 definePage({
   meta: {
-    visibility: 'with-role',
-    access: 'with-role',
-    roles: ['admin'],
+    access: ['admin'],
+    navigation: true,
   },
 })
 
