@@ -119,7 +119,7 @@ definePage({
     icon: '$mdiCog',
     visibility: 'with-role',
     access: 'with-role',
-    roles: ['developer'],
+    roles: ['admin'],
   },
 })
 

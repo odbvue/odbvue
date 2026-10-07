@@ -62,7 +62,7 @@ definePage({
     title: 'State',
     visibility: 'with-role',
     access: 'with-role',
-    roles: ['developer'],
+    roles: ['admin'],
   },
 })
 

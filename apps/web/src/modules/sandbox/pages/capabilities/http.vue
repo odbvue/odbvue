@@ -57,7 +57,7 @@ definePage({
     icon: '$mdiNetwork',
     visibility: 'with-role',
     access: 'with-role',
-    roles: ['developer'],
+    roles: ['admin'],
   },
 })
 

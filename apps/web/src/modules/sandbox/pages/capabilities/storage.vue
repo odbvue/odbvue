@@ -163,7 +163,7 @@ definePage({
     icon: '$mdiFolder',
     visibility: 'with-role',
     access: 'with-role',
-    roles: ['developer'],
+    roles: ['admin'],
   },
 })
 

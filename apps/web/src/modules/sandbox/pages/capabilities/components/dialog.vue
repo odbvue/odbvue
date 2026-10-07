@@ -95,7 +95,7 @@ definePage({
   meta: {
     visibility: 'with-role',
     access: 'with-role',
-    roles: ['developer'],
+    roles: ['admin'],
   },
 })
 import { type OvAction, type OvFormOptions, type OvFormData } from '@odbvue/web/components'

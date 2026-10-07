@@ -116,7 +116,7 @@ definePage({
     icon: '$mdiClipboardText',
     visibility: 'with-role',
     access: 'with-role',
-    roles: ['developer'],
+    roles: ['admin'],
   },
 })
 

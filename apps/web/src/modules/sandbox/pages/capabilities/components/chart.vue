@@ -25,7 +25,7 @@ definePage({
   meta: {
     visibility: 'with-role',
     access: 'with-role',
-    roles: ['developer'],
+    roles: ['admin'],
   },
 })
 
