@@ -24,6 +24,13 @@ installer, event bus, or generic readiness lifecycle. Factories remain for isola
 tests and dedicated HTTP clients. Pinia supplies UI and preferences; its store
 registry supports the sandbox state diagnostics and persistence plugin.
 
+Auth and HTTP factories live in [auth/core.ts](./src/app/auth/core.ts) and
+[http/core.ts](./src/app/http/core.ts), independently of application configuration
+and singleton initialization. [runtime.ts](./src/app/runtime.ts) wires the shared
+instances together through deferred client and token callbacks, without circular
+module imports. The public auth and HTTP entry points retain the factories,
+singletons, types, and `useAuth()` / `useHttp()` APIs.
+
 Main pages generate `/...` routes from `src/app/pages`; module pages generate
 `/<module>/...` routes from `src/modules/<module>/pages`. Only page folders are
 scanned. Restart Vite after adding a new module's pages folder; existing page

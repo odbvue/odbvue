@@ -12,6 +12,36 @@ function response(status: number, data: unknown = {}): Response {
 }
 
 describe('HTTP capability', () => {
+  it('forwards all verb helpers through the client while preserving options and bodies', async () => {
+    const fetch = vi.fn<FetchMock>(() => Promise.resolve(response(200, { ok: true })))
+    const http = useHttp({ fetch })
+    const options = { headers: { 'X-Test': 'preserved' }, query: { page: 2 } }
+    const body = { value: true }
+    const results = await Promise.all([
+      http.get('/resource', options),
+      http.post('/resource', body, options),
+      http.put('/resource', body, options),
+      http.delete('/resource', options),
+      http.patch('/resource', body, options),
+    ])
+
+    expect(results.map((result) => result.data)).toEqual(Array(5).fill({ ok: true }))
+    expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual([
+      'GET',
+      'POST',
+      'PUT',
+      'DELETE',
+      'PATCH',
+    ])
+    for (const [input, init] of fetch.mock.calls) {
+      expect(new URL(String(input), 'https://example.test').searchParams.get('page')).toBe('2')
+      expect(new Headers(init?.headers).get('X-Test')).toBe('preserved')
+      if (['POST', 'PUT', 'PATCH'].includes(init?.method ?? ''))
+        expect(JSON.parse(String(init?.body))).toEqual(body)
+      else expect(init?.body).toBeUndefined()
+    }
+  })
+
   it('reports final HTTP and refresh errors through explicit callbacks', async () => {
     const onError = vi.fn<NonNullable<import('@/app/http').HttpConfiguration['onError']>>()
     const onRefreshFailure =
@@ -303,17 +333,20 @@ describe('HTTP capability', () => {
     expect(result.status).toBe(401)
   })
 
-  it('does not refresh a failed refresh-token request', async () => {
-    const refreshAccessToken = vi.fn<RefreshMock>(async () => true)
-    const fetch = vi.fn<FetchMock>(() => Promise.resolve(response(401)))
-    const http = useHttp({ fetch, configuration: { refreshAccessToken } })
+  it.each(['/auth/login', '/auth/refresh', '/auth/logout'])(
+    'does not refresh a failed token request to %s',
+    async (endpoint) => {
+      const refreshAccessToken = vi.fn<RefreshMock>(async () => true)
+      const fetch = vi.fn<FetchMock>(() => Promise.resolve(response(401)))
+      const http = useHttp({ fetch, configuration: { refreshAccessToken } })
 
-    const result = await http.post('/auth/refresh')
+      const result = await http.post(endpoint)
 
-    expect(result.status).toBe(401)
-    expect(fetch).toHaveBeenCalledTimes(1)
-    expect(refreshAccessToken).not.toHaveBeenCalled()
-  })
+      expect(result.status).toBe(401)
+      expect(fetch).toHaveBeenCalledTimes(1)
+      expect(refreshAccessToken).not.toHaveBeenCalled()
+    },
+  )
 
   it('retries retryable GET responses', async () => {
     let attempts = 0

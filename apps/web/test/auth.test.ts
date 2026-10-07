@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createAuth } from '../src/app/auth/index.js'
-import type { HttpClient } from '../src/app/http/index.js'
-import { useHttp } from '../src/app/http/index.js'
+import { createAuth } from '../src/app/auth/core.js'
+import { createHttpClient, type HttpClient } from '../src/app/http/core.js'
 
 type HttpPostMock = (url: string, body?: unknown) => Promise<unknown>
 type HttpGetMock = (url: string) => Promise<unknown>
@@ -141,7 +140,7 @@ describe('authentication capability', () => {
           headers: { 'Content-Type': 'application/json' },
         }),
       )
-    const auth = createAuth({ http: useHttp({ fetch }) })
+    const auth = createAuth({ http: createHttpClient({ fetch }) })
     expect(fetch).not.toHaveBeenCalled()
 
     const first = auth.restore()
@@ -170,7 +169,7 @@ describe('authentication capability', () => {
         }),
       )
       .mockResolvedValue(new Response(null, { status: 403 }))
-    const http = useHttp({ fetch })
+    const http = createHttpClient({ fetch })
     const auth = createAuth({ http })
     vi.spyOn(auth, 'me').mockRejectedValue(error)
     const first = auth.restore()
