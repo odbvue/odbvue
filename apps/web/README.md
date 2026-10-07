@@ -21,8 +21,11 @@ composables, stores, and API calls. Infrastructure must not import sandbox.
 the application immediately. Infrastructure exports application-scoped ES module
 instances; focused composables use these directly, without a service container,
 installer, event bus, or generic readiness lifecycle. Factories remain for isolated
-tests and dedicated HTTP clients. Pinia supplies UI and preferences; its store
-registry supports the sandbox state diagnostics and persistence plugin.
+tests and dedicated HTTP clients. Pinia supplies UI and preferences with a
+persistence plugin. `createState()` creates isolated Pinia instances for tests;
+the application uses the shared `pinia` instance.
+Sandbox state diagnostics read Pinia's public reactive state directly, without
+a separate store registry.
 
 Auth and HTTP factories live in [auth/core.ts](./src/app/auth/core.ts) and
 [http/core.ts](./src/app/http/core.ts), independently of application configuration

@@ -19,9 +19,6 @@
           <v-card-item prepend-icon="$mdiDatabase">
             <v-card-title>{{ store.id }}</v-card-title>
             <template #append>
-              <v-chip :color="store.persist ? 'success' : 'default'" size="small">
-                {{ store.persist ? store.persist.storage : 'Not persisted' }}
-              </v-chip>
               <v-btn
                 icon="$mdiContentCopy"
                 variant="text"
@@ -48,8 +45,8 @@
 </template>
 
 <script setup lang="ts">
-import { pinia, getStores, getPersistOptions, type PersistOptions } from '@/app/state'
-import { onMounted, ref } from 'vue'
+import { pinia } from '@/app/state'
+import { computed } from 'vue'
 
 definePage({
   meta: {
@@ -59,21 +56,9 @@ definePage({
   },
 })
 
-type StoreSnapshot = {
-  id: string
-  currentState: Record<string, unknown>
-  persist?: PersistOptions
-}
-
-const stores = ref<StoreSnapshot[]>([])
-
-async function refresh() {
-  stores.value = getStores(pinia).map((store) => ({
-    id: store.$id,
-    currentState: store.$state,
-    persist: getPersistOptions(store),
-  }))
-}
+const stores = computed(() =>
+  Object.entries(pinia.state.value).map(([id, currentState]) => ({ id, currentState })),
+)
 
 function formatState(state: unknown): string {
   return state === undefined ? 'No saved state' : JSON.stringify(state, null, 2)
@@ -82,6 +67,4 @@ function formatState(state: unknown): string {
 async function copyState(state: unknown) {
   await navigator.clipboard.writeText(formatState(state))
 }
-
-onMounted(refresh)
 </script>

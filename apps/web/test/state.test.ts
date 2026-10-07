@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { createApp, nextTick, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import 'fake-indexeddb/auto'
-import { createState, getStores } from '@/app/state'
+import { createState } from '@/app/state'
 
 async function readIndexedDB(dbName: string, storeName: string, key: string): Promise<unknown> {
   const db = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -22,19 +22,20 @@ async function readIndexedDB(dbName: string, storeName: string, key: string): Pr
 }
 
 describe('OdbVue Pinia state', () => {
-  it('lists stores registered through its public plugin hook', () => {
-    const pinia = createState()
-    createApp({}).use(pinia)
+  it('creates isolated Pinia instances', () => {
+    const firstPinia = createState()
+    const secondPinia = createState()
+    createApp({}).use(firstPinia)
+    createApp({}).use(secondPinia)
     const useCounterStore = defineStore('counter', { state: () => ({ count: 0 }) })
-    const counter = useCounterStore(pinia)
+    const firstCounter = useCounterStore(firstPinia)
+    const secondCounter = useCounterStore(secondPinia)
 
-    expect(getStores(pinia)).toEqual([counter])
-  })
+    firstCounter.count = 1
 
-  it('does not read stores from Pinia runtimes it does not create', () => {
-    const pinia = createState()
-
-    expect(getStores(pinia)).toEqual([])
+    expect(firstPinia).not.toBe(secondPinia)
+    expect(firstCounter.count).toBe(1)
+    expect(secondCounter.count).toBe(0)
   })
 
   it('hydrates JSON state persisted in a cookie', async () => {

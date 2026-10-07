@@ -29,4 +29,6 @@ export const useSettingsStore = defineStore(
 )
 ```
 
-The application persistence plugin supports `localStorage`, `sessionStorage`, `indexedDB`, and cookies. Register persistence once in `src/app/state`; do not install another Pinia instance in domain modules. The store registry is retained for sandbox diagnostics.
+The application persistence plugin supports `localStorage`, `sessionStorage`, `indexedDB`, and cookies. Register persistence once in `src/app/state`; do not install another Pinia instance in domain modules. Use `createState()` from `src/app/state` for isolated Pinia instances in tests; the application uses the shared `pinia` instance.
+
+The sandbox State page displays active stores using Pinia's public reactive state, without a separate store registry.
