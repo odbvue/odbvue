@@ -38,7 +38,7 @@ a separate store registry.
 
 Auth and HTTP factories live in [auth/core.ts](./src/capabilities/auth/core.ts) and
 [http/core.ts](./src/capabilities/http/core.ts), independently of application configuration
-and singleton initialization. [runtime.ts](./src/capabilities/runtime.ts) wires the shared
+and singleton initialization. [client.ts](./src/capabilities/client.ts) wires the shared
 instances together through deferred client and token callbacks, without circular
 module imports. The public auth and HTTP entry points retain the factories,
 singletons, types, and `useAuth()` / `useHttp()` APIs.

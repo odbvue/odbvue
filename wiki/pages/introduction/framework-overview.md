@@ -35,7 +35,7 @@ the application shell or modules.
 
 `odbvue.config.ts` describes application choices. Explicit setup in
 `src/main.ts` installs Pinia, Vue I18n, Vuetify, and the application router, then
-mounts the shell immediately. `src/capabilities/runtime.ts` wires shared auth and
+mounts the shell immediately. `src/capabilities/client.ts` wires shared auth and
 HTTP instances. Router guards await lazy, idempotent authentication restoration.
 Database capabilities are installed explicitly through migrations and are not
 enabled by web configuration.
