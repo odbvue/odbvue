@@ -2,8 +2,6 @@ export { canAccessPage, canShowPage, resolveAuthRedirect } from './auth.js'
 export type { PageAuth } from './auth.js'
 export { createAuthGuard } from './auth.js'
 export {
-  getNavigationMeta,
-  getPageMeta,
   resolveNavigationMeta,
   resolvePageTitle,
   toRoutePage,

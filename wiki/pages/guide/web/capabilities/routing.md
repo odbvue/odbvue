@@ -43,6 +43,8 @@ The routing capability keeps metadata validation and adaptation in `metadata.ts`
 
 Each page exposes its route path, the original normalized Vue Router record, `meta`, a derived `title`, and a resolved `navigation` boolean. A title comes from `meta.title` when present; otherwise it is derived from the final path segment, so `/customer-orders` becomes `Customer Orders`.
 
+Read raw metadata directly from `route.meta`. Use `toRoutePage()` to adapt a route record, `resolvePageTitle()` for title fallback, `resolveNavigationMeta()` for the navigation default (`true` unless explicitly disabled), and `updatePageTitle()` to update the document title.
+
 ```ts
 import { useRouting } from '@/capabilities/routing'
 

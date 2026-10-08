@@ -4,8 +4,8 @@ import type { RouteRecordNormalized } from 'vue-router'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import {
   createPageManifest,
-  getNavigationMeta,
   registerPageManifest,
+  resolveNavigationMeta,
   resolvePageTitle,
   toRoutePage,
   useRouting,
@@ -36,12 +36,13 @@ describe('routing metadata', () => {
     expect(page.title).toBe('Customers')
     expect(page.navigation).toBe(true)
     expect(page.meta.order).toBe(20)
+    expect(page.meta).toBe(page.route.meta)
   })
 
   it('defaults to navigation unless explicitly disabled', () => {
-    expect(getNavigationMeta({ navigation: false })).toBe(false)
-    expect(getNavigationMeta({ navigation: true })).toBe(true)
-    expect(getNavigationMeta({})).toBe(true)
+    expect(resolveNavigationMeta({ navigation: false })).toBe(false)
+    expect(resolveNavigationMeta({ navigation: true })).toBe(true)
+    expect(resolveNavigationMeta({})).toBe(true)
   })
 
   it('resolves page titles consistently from metadata and paths', () => {

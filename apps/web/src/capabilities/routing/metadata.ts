@@ -73,20 +73,12 @@ export function resolvePageTitle(meta: RouteMeta, path: string): string {
   )
 }
 
-export function getPageMeta(route: RouteRecordNormalized): RouteMeta {
-  return route.meta
-}
-
-export function getNavigationMeta(meta: RouteMeta): boolean {
-  return resolveNavigationMeta(meta)
-}
-
 export function resolveNavigationMeta(meta: RouteMeta): boolean {
   return meta.navigation !== false
 }
 
 export function toRoutePage(route: RouteRecordNormalized): RoutePage {
-  const meta = getPageMeta(route)
+  const meta = route.meta
   return {
     name: route.name,
     path: route.path,
