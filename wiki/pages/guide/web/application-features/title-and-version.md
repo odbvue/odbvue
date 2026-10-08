@@ -14,17 +14,16 @@ export default {
 } satisfies AppConfig
 ```
 
-The default layout reads metadata directly with `useAppConfig()`:
+The default layout reads metadata directly from `appConfig`:
 
 ```vue
 <script setup lang="ts">
-import { useAppConfig } from '@/capabilities/config'
-const config = useAppConfig()
+import { appConfig } from '@/capabilities/config'
 </script>
 
 <template>
-  <v-toolbar-title>{{ config.title }}</v-toolbar-title>
-  <span class="text-caption">v{{ config.version }}</span>
+  <v-toolbar-title>{{ appConfig.title }}</v-toolbar-title>
+  <span class="text-caption">v{{ appConfig.version }}</span>
 </template>
 ```
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { appConfig, useAppConfig } from '@/capabilities/config'
+import { appConfig } from '@/capabilities/config'
 import { createErrors } from '@/capabilities/errors'
 import { resolveLocale } from '@/capabilities/i18n'
 
@@ -24,7 +24,6 @@ describe('application config and errors', () => {
   })
 
   it('exposes application metadata without an injection context', () => {
-    expect(useAppConfig()).toBe(appConfig)
     expect(appConfig).toMatchObject({ title: 'OdbVue', version: '1.0.0' })
   })
 

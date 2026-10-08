@@ -48,7 +48,3 @@ export type AppConfig = {
 }
 
 export const appConfig: AppConfig = config
-
-export function useAppConfig(): AppConfig {
-  return appConfig
-}

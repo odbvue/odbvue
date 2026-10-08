@@ -31,7 +31,7 @@
     </v-navigation-drawer>
     <v-app-bar>
       <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
-      <v-toolbar-title> {{ config.title }}</v-toolbar-title>
+      <v-toolbar-title> {{ appConfig.title }}</v-toolbar-title>
       <template v-if="auth.ready.value">
         <v-btn v-if="!auth.authenticated.value" to="/login" prepend-icon="$mdiAccount" class="mr-2">
           {{ t('auth.login') }}
@@ -161,7 +161,7 @@
     <v-footer app>
       <v-row>
         <v-col>
-          <span class="text-caption">v{{ config.version }}</span>
+          <span class="text-caption">v{{ appConfig.version }}</span>
         </v-col>
         <v-col class="text-right">
           <v-btn
@@ -184,12 +184,11 @@
 
 <script setup lang="ts">
 import { useAuth } from '@/capabilities/auth'
-import { useAppConfig } from '@/capabilities/config'
+import { appConfig } from '@/capabilities/config'
 import { usePreferencesStore, useUi } from '@/capabilities/ui'
 import { useNotificationMessage } from '@/capabilities/ui'
 
 const drawer = ref(false)
-const config = useAppConfig()
 const preferences = usePreferencesStore()
 const ui = useUi()
 const auth = useAuth()

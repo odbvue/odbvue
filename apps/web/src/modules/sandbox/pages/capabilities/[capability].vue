@@ -33,7 +33,7 @@
 
 <script setup lang="ts">
 import { odbVueCapabilities } from '@/modules/sandbox/catalog'
-import { useAppConfig } from '@/capabilities/config'
+import { appConfig } from '@/capabilities/config'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -45,12 +45,11 @@ definePage({
 })
 
 const route = useRoute()
-const config = useAppConfig()
 const capability = computed(() =>
   odbVueCapabilities.find((item) => item.name === route.params.capability),
 )
 const configuration = computed(() => {
-  const options = Object.entries(config).find(([name]) => name === capability.value?.name)?.[1]
+  const options = Object.entries(appConfig).find(([name]) => name === capability.value?.name)?.[1]
   return options === undefined ? 'Default configuration' : JSON.stringify(options, null, 2)
 })
 </script>

@@ -18,7 +18,7 @@
 import type { OvFormData, OvFormOptions } from '@/components'
 import { resolveAuthRedirect } from '@/capabilities/routing'
 import { useAuth } from '@/capabilities/auth'
-import { useAppConfig } from '@/capabilities/config'
+import { appConfig } from '@/capabilities/config'
 import { useUi } from '@/capabilities/ui'
 
 definePage({
@@ -31,7 +31,6 @@ definePage({
 
 const auth = useAuth()
 const ui = useUi()
-const config = useAppConfig()
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
@@ -76,8 +75,8 @@ async function submit(data: OvFormData) {
     resolveAuthRedirect(
       router,
       route.query.redirect,
-      config.auth?.routes?.authenticated ?? '/',
-      config.auth?.routes?.login ?? '/login',
+      appConfig.auth?.routes?.authenticated ?? '/',
+      appConfig.auth?.routes?.login ?? '/login',
     ),
   )
 }

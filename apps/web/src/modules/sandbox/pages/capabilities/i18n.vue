@@ -38,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { useAppConfig } from '@/capabilities/config'
+import { appConfig } from '@/capabilities/config'
 import { usePreferencesStore } from '@/capabilities/ui'
 import type { OvTableData, OvTableOptions } from '@/components'
 import { computed } from 'vue'
@@ -53,10 +53,9 @@ definePage({
   },
 })
 
-const config = useAppConfig()
 const preferences = usePreferencesStore()
 const global = useI18n({ useScope: 'global' })
-const locales = computed(() => config.i18n?.locales ?? Object.keys(global.messages.value))
+const locales = computed(() => appConfig.i18n?.locales ?? Object.keys(global.messages.value))
 const currentLocale = computed(() => global.locale.value)
 const fallbackLocale = computed(() => String(global.fallbackLocale.value))
 const appMessages = inventory.app

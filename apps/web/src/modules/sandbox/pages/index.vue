@@ -9,7 +9,7 @@
           prepend-icon="$mdiServer"
           title="OdbVue web application"
           subtitle="Vue + Pinia + Vue Router + Vuetify"
-          :text="config.version ? `v${config.version}` : 'Version unspecified'"
+          :text="appConfig.version ? `v${appConfig.version}` : 'Version unspecified'"
           class="h-100"
         />
       </v-col>
@@ -43,7 +43,7 @@
 
 <script setup lang="ts">
 import { odbVueCapabilities } from '@/modules/sandbox/catalog'
-import { useAppConfig } from '@/capabilities/config'
+import { appConfig } from '@/capabilities/config'
 
 definePage({
   meta: {
@@ -56,7 +56,6 @@ definePage({
   },
 })
 
-const config = useAppConfig()
 const capabilities = odbVueCapabilities
 const routing = useRouting()
 const modules = computed(() =>

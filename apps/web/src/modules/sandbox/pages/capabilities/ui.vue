@@ -36,7 +36,7 @@
               max-height="18em"
               min-height="18em"
             >
-              <pre class="ma-0"><code>{{ formatConfiguration(config.ui?.theme) }}</code></pre>
+              <pre class="ma-0"><code>{{ formatConfiguration(appConfig.ui?.theme) }}</code></pre>
             </v-sheet>
           </v-card-text>
         </v-card>
@@ -50,7 +50,7 @@
               max-height="18em"
               min-height="18em"
             >
-              <pre class="ma-0"><code>{{ formatConfiguration(config.ui?.defaults) }}</code></pre>
+              <pre class="ma-0"><code>{{ formatConfiguration(appConfig.ui?.defaults) }}</code></pre>
             </v-sheet>
           </v-card-text>
         </v-card>
@@ -99,7 +99,7 @@
 </template>
 
 <script setup lang="ts">
-import { useAppConfig } from '@/capabilities/config'
+import { appConfig } from '@/capabilities/config'
 import { usePreferencesStore, useUi } from '@/capabilities/ui'
 import { computed } from 'vue'
 
@@ -113,8 +113,7 @@ definePage({
 
 const preferences = usePreferencesStore()
 const ui = useUi()
-const config = useAppConfig()
-const iconAliases = computed(() => Object.keys(config.ui?.icons ?? {}))
+const iconAliases = computed(() => Object.keys(appConfig.ui?.icons ?? {}))
 
 function formatConfiguration(value: unknown): string {
   return value === undefined ? 'None configured' : JSON.stringify(value, null, 2)

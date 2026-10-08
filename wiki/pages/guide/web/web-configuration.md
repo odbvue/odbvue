@@ -26,13 +26,13 @@ export default {
 
 ## Runtime access
 
-Components and composables can read application configuration with `useAppConfig()` and access services through focused composables. These return ordinary application-scoped ES module instances and do not require an injection context. Module diagnostics derive module names from discovered page metadata rather than configuration.
+Components and composables read static application configuration by importing `appConfig` directly. Reactive services such as authentication are accessed through focused composables like `useAuth()`. Neither requires an injection context. Module diagnostics derive module names from discovered page metadata rather than configuration.
 
 ```ts
-import { useAppConfig } from '@/capabilities/config'
+import { appConfig } from '@/capabilities/config'
 import { useAuth } from '@/capabilities/auth'
 
-const config = useAppConfig()
+const title = appConfig.title
 const auth = useAuth()
 ```
 
