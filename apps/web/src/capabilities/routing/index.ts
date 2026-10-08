@@ -1,4 +1,3 @@
-export { usePageMeta, useRouting } from './helpers.js'
 export { canAccessPage, canShowPage, resolveAuthRedirect } from './auth.js'
 export type { PageAuth } from './auth.js'
 export { createAuthGuard } from './auth.js'
@@ -16,7 +15,9 @@ export {
   computedRouteParam,
   computedRouteParams,
   computedRouteQuery,
+  usePageMeta,
   useRouteParams,
+  useRouting,
 } from './navigation.js'
 export type { Breadcrumb, PageAccess, PageMeta, RouteParams, RoutePage, Routing } from './types.js'
 export type { PageManifest, PageManifestEntry } from './manifest.js'

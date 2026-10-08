@@ -26,6 +26,8 @@ Configure application destinations with `auth.routes`: `login` defaults to `/log
 
 ## How it works
 
+The routing capability keeps metadata validation and adaptation in `metadata.ts`, access decisions and guards in `auth.ts`, and reactive routing, breadcrumbs, and parameter composables in `navigation.ts`. `manifest.ts` builds the page manifest, `registry.ts` stores per-router state, `types.ts` defines shared contracts, and `index.ts` exposes the public API.
+
 `useRouting()` reads the active Vue Router instance and returns computed values:
 
 | Value           | Description                                                 |

@@ -1,7 +1,6 @@
 import type { RouteMeta, RouteRecordRaw } from 'vue-router'
 import type { RoutePage } from './types.js'
-import { resolveNavigationMeta, resolvePageTitle } from './metadata.js'
-import { validatePageMeta } from './policy.js'
+import { resolveNavigationMeta, resolvePageTitle, validatePageMeta } from './metadata.js'
 
 export interface PageManifestEntry {
   name?: string | symbol

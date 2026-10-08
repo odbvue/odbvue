@@ -2,7 +2,7 @@ import type { Router, NavigationGuard, RouteMeta } from 'vue-router'
 import { auth as applicationAuth, type Auth } from '../auth/index.js'
 import { appConfig, type AppConfig } from '../config'
 import { useUi } from '../ui/store'
-import { validateAccessPolicy } from './policy.js'
+import { validateAccessPolicy } from './metadata.js'
 
 export type PageAuth = Pick<Auth, 'authenticated' | 'hasRole' | 'can'>
 

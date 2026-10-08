@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { canAccessPage, canShowPage, resolveAuthRedirect } from '@/capabilities/routing'
 import type { PageAccess, PageMeta } from '@/capabilities/routing'
-import { validatePageMeta } from '@/capabilities/routing/policy'
+import { validatePageMeta } from '@/capabilities/routing/metadata'
 
 const component = { template: '<div />' }
 const router = createRouter({
