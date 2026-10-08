@@ -156,7 +156,7 @@
 import { useAuth } from '@/capabilities/auth'
 import { useHttp } from '@/capabilities/http'
 import { computed, ref, watch } from 'vue'
-import type { components } from '@/capabilities/api/openapi.generated'
+import type { components } from '@/api/openapi.generated'
 
 definePage({
   meta: {

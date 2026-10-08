@@ -6,10 +6,10 @@ OdbVue applications consume Oracle APIs through a generated OpenAPI client.
 Oracle database -> ORDS -> OpenAPI manifest -> generated web client
 ```
 
-ODB writes the deployed ORDS contract to `apps/db/dist/openapi.json`. The web build regenerates `apps/web/src/capabilities/api/openapi.generated.ts` from that contract. Import its types in application API code; never edit the generated file manually.
+ODB writes the deployed ORDS contract to `apps/db/dist/openapi.json`. The web build regenerates `apps/web/src/api/openapi.generated.ts` from that contract. Import its types in application API code; never edit the generated file manually.
 
 ```ts
-import type { components, paths } from '@/capabilities/api/openapi.generated'
+import type { components, paths } from '@/api/openapi.generated'
 
 type User = components['schemas']['UsersGetUserResultItem']
 type GetUser = paths['/users/users/{id}']['get']

@@ -5,10 +5,11 @@ The complete Vue experience lives here, with no separate web runtime package.
 ## Source boundaries
 
 - `src/main.ts`: bootstrap, startup error handling, and mount.
+- `src/api`: generated backend contract types from OpenAPI; never edit them manually.
 - `src/app`: application shell, pages, layouts, router assembly, and locale messages.
 - `src/capabilities`: shared auth, HTTP, errors, network status, routing APIs,
   i18n initialization, Pinia/persistence, UI helpers/themes, drag-and-drop,
-  configuration access, runtime wiring, and generated API types.
+  configuration access, and runtime wiring.
 - `src/components`: shared `VOv*` components, compiled directly with the app.
 - `src/modules/sandbox`: sandbox pages, translations, and diagnostics catalog.
 - `plugins`: Node-only Vite plugins for routes/manifest, messages, icons, and OpenAPI.

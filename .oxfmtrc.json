@@ -13,6 +13,6 @@
     "**/components.d.ts",
     "**/typed-router.d.ts",
     "**/src/capabilities/ui/themes/icons.ts",
-    "**/src/capabilities/api/openapi.generated.ts"
+    "**/src/api/openapi.generated.ts"
   ]
 }

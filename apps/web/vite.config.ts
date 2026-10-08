@@ -62,7 +62,7 @@ export default defineConfig(({ mode }) => {
       odbVueI18nPlugin(),
       openapiPlugin({
         source: '../db/dist/openapi.json',
-        dest: 'src/capabilities/api/openapi.generated.ts',
+        dest: 'src/api/openapi.generated.ts',
       }),
       AutoImport({
         imports: [

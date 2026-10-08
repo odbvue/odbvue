@@ -21,6 +21,7 @@ application consumes that contract using application-owned infrastructure.
 | `packages/cli/`              | The `ov` development workflow                                           |
 | `apps/db/`                   | Application-owned Oracle migrations and database artifacts              |
 | `apps/web/`                  | Complete Vue application, dependencies, build plugins, and tests        |
+| `apps/web/src/api/`          | Generated backend contract types from OpenAPI                           |
 | `apps/web/src/app/`          | Application shell, pages, layouts, router assembly, and locale messages |
 | `apps/web/src/capabilities/` | Shared auth, HTTP, routing, state, localization, UI, and configuration  |
 | `apps/web/src/modules/`      | Self-contained application modules, currently sandbox                   |
@@ -32,7 +33,8 @@ The reusable framework boundary is Oracle tooling and the CLI. Vue, Pinia, Vue
 Router, Vue I18n, and Vuetify supply their own lifecycle and composition mechanisms;
 the application composes them without a second capability runtime.
 
-Within the web source, `app` owns the application shell and built-in pages,
+Within the web source, `api` holds the generated backend contract types,
+`app` owns the application shell and built-in pages,
 `capabilities` provides shared functionality consumed by app and modules,
 `modules` describe application domains, and `components` provides shared UI.
 Capabilities must not import app pages, layouts, or modules. Build-time

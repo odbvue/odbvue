@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, extname, resolve, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -13,6 +13,11 @@ function sourceFiles(directory: string): string[] {
 }
 
 describe('application and capability source boundaries', () => {
+  it('keeps the generated backend contract separate from capabilities', () => {
+    expect(readdirSync(resolve(sourceRoot, 'api'))).toEqual(['openapi.generated.ts'])
+    expect(existsSync(resolve(sourceRoot, 'capabilities', 'api'))).toBe(false)
+  })
+
   it('keeps only shell responsibilities under app', () => {
     expect(readdirSync(resolve(sourceRoot, 'app')).toSorted()).toEqual([
       'App.vue',
