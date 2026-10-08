@@ -82,6 +82,7 @@ describe('login page using application auth', () => {
     expect(context.auth.authenticated.value).toBe(true)
     expect(context.auth.can('settings.read')).toBe(true)
     expect(context.router.currentRoute.value.path).toBe('/sandbox')
+    expect(context.ui.loading.value).toBe(false)
     const [, options] = context.fetch.mock.calls[1]!
     expect(options?.credentials).toBe('include')
     expect(JSON.parse(String(options?.body))).toEqual({ username: 'ada', password: 'password' })
@@ -103,6 +104,7 @@ describe('login page using application auth', () => {
     expect(context.ui.notification.value?.message).toBe(message)
     expect(context.auth.authenticated.value).toBe(false)
     expect(context.auth.loading.value).toBe(false)
+    expect(context.ui.loading.value).toBe(false)
     expect(context.router.currentRoute.value.path).toBe('/login')
     context.wrapper.unmount()
   })
@@ -114,10 +116,11 @@ describe('login page using application auth', () => {
     await flushPromises()
     expect(context.ui.notification.value?.message).toContain('Offline')
     expect(context.auth.loading.value).toBe(false)
+    expect(context.ui.loading.value).toBe(false)
     context.wrapper.unmount()
   })
 
-  it('reflects auth loading and prevents duplicate submissions', async () => {
+  it('uses main-content loading instead of form loading and prevents duplicate submissions', async () => {
     const context = await setup()
     let finish!: (response: Response) => void
     context.fetch
@@ -129,14 +132,18 @@ describe('login page using application auth', () => {
       )
       .mockResolvedValueOnce(json({ userId: 7, username: 'ada' }))
     const loginForm = context.wrapper.findComponent(form)
-    expect(loginForm.props('loading')).toBe(false)
+    expect(loginForm.props('loading')).toBeUndefined()
+    expect(context.ui.loading.value).toBe(false)
     await loginForm.trigger('click')
-    expect(loginForm.props('loading')).toBe(true)
+    expect(loginForm.props('loading')).toBeUndefined()
+    expect(context.auth.loading.value).toBe(true)
+    expect(context.ui.loading.value).toBe(true)
     await loginForm.trigger('click')
     expect(context.fetch).toHaveBeenCalledTimes(2)
     finish(json({ accessToken: 'login-token' }))
     await flushPromises()
-    expect(loginForm.props('loading')).toBe(false)
+    expect(loginForm.props('loading')).toBeUndefined()
+    expect(context.ui.loading.value).toBe(false)
     expect(context.auth.authenticated.value).toBe(true)
     context.wrapper.unmount()
   })
@@ -151,6 +158,7 @@ describe('login page using application auth', () => {
     expect(context.auth.accessToken.value).toBeNull()
     expect(context.auth.user.value).toBeNull()
     expect(context.ui.notification.value?.type).toBe('error')
+    expect(context.ui.loading.value).toBe(false)
     context.wrapper.unmount()
   })
 })

@@ -3,12 +3,7 @@
     <v-row justify="center">
       <v-col cols="12" sm="8" md="5" lg="4">
         <h1 class="mb-4">{{ t('auth.login') }}</h1>
-        <v-ov-form
-          :options="options"
-          :loading="auth.loading.value || !auth.ready.value"
-          :t="t"
-          @submit="submit"
-        />
+        <v-ov-form :options="options" :t="t" @submit="submit" />
       </v-col>
     </v-row>
   </v-container>
@@ -61,6 +56,7 @@ const options: OvFormOptions = {
 async function submit(data: OvFormData) {
   if (auth.loading.value || !auth.ready.value) return
   ui.clear()
+  ui.startLoading()
   try {
     await auth.login({ username: String(data.username), password: String(data.password) })
   } catch (error) {
@@ -70,6 +66,8 @@ async function submit(data: OvFormData) {
     else if (status === 429) ui.error('auth.too.many.requests')
     else ui.error(error)
     return
+  } finally {
+    ui.stopLoading()
   }
   await router.replace(
     resolveAuthRedirect(

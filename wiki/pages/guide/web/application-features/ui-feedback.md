@@ -38,3 +38,9 @@ are not submitted to the missing-translation collector.
 
 Use the sandbox UI page to exercise preferences and feedback. Authentication
 loading is independently supplied by `useAuth()`.
+
+The login page calls `ui.startLoading()` while authenticating and
+`ui.stopLoading()` in `finally`, showing the main-content overlay rather than
+the form's local overlay. The app-bar progress indicator responds to either UI
+or authentication loading; other authentication operations do not activate the
+main-content overlay automatically.
