@@ -21,7 +21,7 @@
           :disabled="options.disabled"
           :readonly="options.readonly"
           :fast-fail="options.fastFail"
-          @submit.prevent
+          @submit.prevent="handleSubmit"
         >
           <v-row>
             <v-col
@@ -45,22 +45,6 @@
                         rules: field.rules,
                         'error-messages': field.errors,
                       }
-                "
-                v-on="
-                  [
-                    'text',
-                    'textarea',
-                    'markdown',
-                    'number',
-                    'email',
-                    'password',
-                    'date',
-                    'time',
-                    'datetime-local',
-                    'duration',
-                  ].includes(field.type)
-                    ? { 'keyup.enter': () => handleFieldEnter(field.name) }
-                    : {}
                 "
               >
                 <template #label>
@@ -87,10 +71,17 @@
                 v-for="action in actions"
                 :key="action.name"
                 v-bind="action.props"
-                @click="handleAction(action.name)"
+                :type="action.name === options.actionSubmit ? 'submit' : 'button'"
+                @click="action.name !== options.actionSubmit && handleAction(action.name)"
               />
             </v-col>
           </v-row>
+          <button
+            v-if="hideActions && actions.some((action) => action.name === options.actionSubmit)"
+            type="submit"
+            hidden
+            tabindex="-1"
+          />
         </v-form>
         <v-overlay :model-value="loading" persistent contained class="align-center justify-center">
           <v-progress-circular indeterminate size="48" />
@@ -750,14 +741,8 @@ const handleAction = async (actionName: string) => {
   await emits('action', action.name, getTransformedValues())
 }
 
-async function handleFieldEnter(fieldName: string) {
-  if (!options.actions) return
-  const lastField = fields.value[fields.value.length - 1]
-  const isLastField = lastField?.name === fieldName
-  const hasSubmitAction = actions.value.find(
-    (actionItem) => actionItem.name === options.actionSubmit,
-  )
-  if (isLastField && hasSubmitAction) await handleAction(hasSubmitAction.name)
+async function handleSubmit() {
+  if (options.actionSubmit) await handleAction(options.actionSubmit)
 }
 
 function formFocus(elementId?: string) {

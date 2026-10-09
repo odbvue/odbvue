@@ -96,6 +96,18 @@ test('restores identity before handling an authenticated visit to login', async 
   expect(requests).toEqual(['refresh', 'me'])
 })
 
+for (const field of ['Username', 'Password']) {
+  test(`submits login once on Enter in ${field}`, async ({ page }) => {
+    const requests = await mockAuth(page)
+    await page.goto('/login?redirect=%2Fsandbox')
+    await page.getByLabel('Username').fill('ada')
+    await page.getByLabel('Password', { exact: true }).fill('valid-password')
+    await page.getByLabel(field, { exact: true }).press('Enter')
+    await expect(page).toHaveURL(/\/sandbox$/)
+    expect(requests).toEqual(['refresh', 'login', 'me'])
+  })
+}
+
 test('rejects external return URLs', async ({ page }) => {
   await mockAuth(page)
   await page.goto('/login?redirect=https%3A%2F%2Fexample.com')

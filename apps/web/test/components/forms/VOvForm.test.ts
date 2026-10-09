@@ -4,8 +4,9 @@ import VOvForm from '@/components/forms/VOvForm.vue'
 import { globalPlugins } from '../../support/components.setup'
 import type { OvFormOptions } from '@/components'
 
-function mountForm(options: OvFormOptions, data = {}) {
+function mountForm(options: OvFormOptions, data = {}, attachTo?: Element) {
   return mount(VOvForm, {
+    attachTo,
     props: { options, data },
     global: { plugins: globalPlugins },
   })
@@ -119,6 +120,82 @@ describe('VOvForm', () => {
     const btn = wrapper.findAll('button').find((b) => b.text().includes('cancel'))
     await btn?.trigger('click')
     expect(wrapper.emitted('cancel')).toBeTruthy()
+  })
+
+  describe('Submission', () => {
+    const options: OvFormOptions = {
+      fields: [
+        { type: 'text', name: 'username', label: 'Username' },
+        { type: 'password', name: 'password', label: 'Password' },
+      ],
+      actions: ['login', 'cancel'],
+      actionSubmit: 'login',
+      actionCancel: 'cancel',
+    }
+
+    it('renders the configured submit action as a native submit button', () => {
+      const wrapper = mountForm(options)
+      expect(wrapper.get('button[type="submit"]').text()).toContain('login')
+      expect(wrapper.get('button[type="button"]').text()).toContain('cancel')
+    })
+
+    it('emits transformed form data once on native submission', async () => {
+      const wrapper = mountForm(options, { username: 'user', password: 'secret' })
+      await flushPromises()
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+      expect(wrapper.emitted('submit')).toEqual([[{ username: 'user', password: 'secret' }]])
+      await wrapper.get('input[type="password"]').trigger('keyup', { key: 'Enter' })
+      await flushPromises()
+      expect(wrapper.emitted('submit')).toHaveLength(1)
+    })
+
+    it('validates before emitting submit', async () => {
+      const wrapper = mountForm({
+        ...options,
+        fields: [
+          {
+            type: 'text',
+            name: 'username',
+            rules: [{ type: 'required', params: true, message: 'Username is required' }],
+          },
+        ],
+      })
+      await flushPromises()
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+      expect(wrapper.emitted('submit')).toBeUndefined()
+      expect(wrapper.text()).toContain('Username is required')
+    })
+
+    it('supports native submission when actions are hidden', async () => {
+      const wrapper = mount(VOvForm, {
+        props: { options, hideActions: true, data: { username: 'user', password: 'secret' } },
+        global: { plugins: globalPlugins },
+      })
+      await flushPromises()
+      expect(wrapper.get('button[type="submit"]').attributes('hidden')).toBeDefined()
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+      expect(wrapper.emitted('submit')).toHaveLength(1)
+    })
+
+    it('does not submit on Enter in a textarea', async () => {
+      const wrapper = mountForm({
+        ...options,
+        fields: [{ type: 'textarea', name: 'notes' }],
+      })
+      await wrapper.get('textarea').trigger('keyup', { key: 'Enter' })
+      await flushPromises()
+      expect(wrapper.emitted('submit')).toBeUndefined()
+    })
+
+    it('does not emit submit without a configured submit action', async () => {
+      const wrapper = mountForm({ fields: options.fields, actions: ['cancel'] })
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+      expect(wrapper.emitted('submit')).toBeUndefined()
+    })
   })
 
   describe('Custom Fields', () => {
@@ -431,6 +508,7 @@ describe('VOvForm', () => {
           actionSubmit: 'submit',
         },
         { customField: 'submitted value' },
+        document.body,
       )
       await flushPromises()
 
@@ -442,10 +520,12 @@ describe('VOvForm', () => {
 
       const submitBtn = wrapper.findAll('button').find((b) => b.text().includes('submit'))
       await submitBtn?.trigger('click')
+      await flushPromises()
 
       const submitEmit = wrapper.emitted('submit')
       expect(submitEmit).toBeTruthy()
       expect(submitEmit?.[0]?.[0]).toHaveProperty('customField', 'submitted value')
+      wrapper.unmount()
     })
   })
 })

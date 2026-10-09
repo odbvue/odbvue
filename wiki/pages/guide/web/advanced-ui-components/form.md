@@ -115,6 +115,7 @@ Notable field-specific options:
 - Switch fields are normalized to booleans internally and converted back to the original format on submit.
 - Custom fields can be lazy-loaded components.
 - `actionSubmit`, `actionCancel`, `actionReset`, and `actionValidate` are matched by action name.
+- Pressing Enter in a single-line input submits through `actionSubmit`, validates the form, and emits `submit` with normalized values when valid. This also works with `hideActions`; Enter in a textarea or markdown editor retains its normal editing behavior.
   { title: 'USA', value: 'us' },
   { title: 'Canada', value: 'ca' },
   { title: 'Mexico', value: 'mx' }
