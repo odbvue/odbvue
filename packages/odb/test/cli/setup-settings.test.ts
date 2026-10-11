@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module'
 import { PassThrough } from 'node:stream'
+import { Command } from '../../../cli/node_modules/commander/esm.mjs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OdbExecutor, OracleExecuteResult } from '../../src/execution/executor.js'
 
@@ -26,6 +27,7 @@ const NumberPrompt: new (options: {
 } = require('../../../cli/node_modules/prompts/lib/elements/number.js')
 
 const state = vi.hoisted(() => ({
+  readFile: vi.fn<(path: string, encoding: string) => Promise<string>>(),
   prompts:
     vi.fn<
       (
@@ -45,8 +47,13 @@ const state = vi.hoisted(() => ({
   info: vi.fn<(message: string) => void>(),
   success: vi.fn<(message: string) => void>(),
   connected: vi.fn<(config: unknown) => void>(),
+  fatal: vi.fn<(error: unknown) => void>(),
 }))
 
+vi.mock('node:fs/promises', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:fs/promises')>()),
+  readFile: state.readFile,
+}))
 vi.mock('../../../cli/node_modules/prompts/index.js', () => ({ default: state.prompts }))
 vi.mock('../../../cli/src/app/db-exec.js', () => ({ buildConnectionConfig: state.config }))
 vi.mock('../../../cli/src/adapters/secrets-store.js', () => ({
@@ -57,7 +64,7 @@ vi.mock('../../../cli/src/adapters/secrets-store.js', () => ({
   },
 }))
 vi.mock('../../../cli/src/shared/logger.js', () => ({
-  logger: { info: state.info, success: state.success },
+  logger: { info: state.info, success: state.success, fatal: state.fatal },
 }))
 vi.mock('@odbvue/odb', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/index.js')>()
@@ -79,6 +86,7 @@ vi.mock('@odbvue/odb', async (importOriginal) => {
 })
 
 import { runSetupSettings } from '../../../cli/src/app/setup-settings.js'
+import { registerSetupSettingsCommand } from '../../../cli/src/commands/setup-settings.js'
 
 const settings = {
   host: 'smtp.example.com',
@@ -128,6 +136,98 @@ describe('CLI SMTP settings setup', () => {
     expect(
       questions.find((question: { name: string }) => question.name === 'host'),
     ).not.toHaveProperty('initial')
+  })
+
+  it('applies a complete file with mixed-case keys without prompting', async () => {
+    state.readFile.mockResolvedValue(
+      JSON.stringify({
+        smtp_host: settings.host,
+        SMTP_PORT: settings.port,
+        Smtp_Username: settings.username,
+        smtp_PASSWORD: settings.password,
+        SMTP_FROM_ADDR: settings.from_addr,
+        smtp_from_name: settings.from_name,
+      }),
+    )
+    await expect(runSetupSettings('settings.json')).resolves.toBe(true)
+    expect(state.readFile).toHaveBeenCalledWith('settings.json', 'utf-8')
+    expect(state.prompts).not.toHaveBeenCalled()
+    expect(state.connection.execute.mock.calls[0]![1]).toEqual({
+      ...settings,
+      port_value: '587',
+      schema: 'APP',
+    })
+    expect(state.connection.commit).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses supplied values and prompts only for missing values', async () => {
+    state.readFile.mockResolvedValue(
+      JSON.stringify({ smtp_host: 'mail.example.com', smtp_port: 2525 }),
+    )
+    const { host: _host, port: _port, ...missing } = settings
+    state.prompts.mockResolvedValue(missing)
+    await expect(runSetupSettings('settings.json')).resolves.toBe(true)
+    expect(state.prompts.mock.calls[0]![0].map((question) => question.name)).toEqual([
+      'username',
+      'password',
+      'from_addr',
+      'from_name',
+    ])
+    expect(state.connection.execute.mock.calls[0]![1]).toMatchObject({
+      ...missing,
+      host: 'mail.example.com',
+      port: 2525,
+      port_value: '2525',
+    })
+  })
+
+  it.each([
+    ['null', 'must contain a JSON object'],
+    ['[]', 'must contain a JSON object'],
+    ['"settings"', 'must contain a JSON object'],
+    ['{"smtp_port":"587"}', 'Invalid SMTP setting: smtp_port'],
+    ['{"smtp_host":null}', 'Invalid SMTP setting: smtp_host'],
+    ['{"smtp_password":""}', 'Invalid SMTP setting: smtp_password'],
+    ['{"smtp_port":0}', 'Invalid SMTP setting: smtp_port'],
+    ['{"smtp_hots":"mail.example.com"}', 'Unknown SMTP setting key'],
+    ['{"smtp_port":587,"SMTP_PORT":2525}', 'Duplicate SMTP setting key'],
+  ])('rejects an invalid file before prompting or connecting: %s', async (json, message) => {
+    state.readFile.mockResolvedValue(json)
+    await expect(runSetupSettings('settings.json')).rejects.toThrow(message)
+    expect(state.prompts).not.toHaveBeenCalled()
+    expect(state.connected).not.toHaveBeenCalled()
+    expect(state.success).not.toHaveBeenCalled()
+  })
+
+  it('surfaces malformed JSON and file read errors without connecting', async () => {
+    state.readFile.mockResolvedValue('{')
+    await expect(runSetupSettings('settings.json')).rejects.toBeInstanceOf(SyntaxError)
+    const error = new Error('File not found')
+    state.readFile.mockRejectedValue(error)
+    await expect(runSetupSettings('missing.json')).rejects.toBe(error)
+    expect(state.prompts).not.toHaveBeenCalled()
+    expect(state.connected).not.toHaveBeenCalled()
+  })
+
+  it('does not apply file values when a missing-value prompt is cancelled', async () => {
+    state.readFile.mockResolvedValue('{"smtp_port":2525}')
+    state.prompts.mockImplementation(async (_questions, options) => {
+      options.onCancel()
+      return {}
+    })
+    await expect(runSetupSettings('settings.json')).resolves.toBe(false)
+    expect(state.connected).not.toHaveBeenCalled()
+    expect(state.info).toHaveBeenCalledWith(expect.stringContaining('cancelled'))
+  })
+
+  it.each(['setup-settings', 'ss'])('accepts the optional file argument via %s', async (name) => {
+    state.readFile.mockResolvedValue('{"smtp_port":587}')
+    const program = new Command()
+    registerSetupSettingsCommand(program)
+    await program.parseAsync([name, 'settings.json'], { from: 'user' })
+    expect(state.readFile).toHaveBeenCalledWith('settings.json', 'utf-8')
+    expect(state.connection.commit).toHaveBeenCalledTimes(1)
+    expect(state.fatal).not.toHaveBeenCalled()
   })
 
   it('writes six bound values and updates the configured schema ACL in one transaction', async () => {

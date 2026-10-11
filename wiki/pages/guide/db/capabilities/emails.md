@@ -26,8 +26,14 @@ The capability installs:
 - `odb_emails`: PL/SQL API. The queue has a distinct name because Oracle tables
   and packages share an object namespace.
 
-The SMTP implementation uses PL/SQL source assets, like the LOB helper, to work
-with Oracle's SMTP connection records, MIME streaming, and cleanup.
+The package is defined in TypeScript using `odbPackage`, typed Oracle wrappers,
+and query builders, including SMTP connection records, MIME streaming, and cleanup.
+No separate PL/SQL source assets or raw SQL escape hatches are required.
+
+The public `odbEmails` calls and installation order are unchanged. Existing
+deployments need a package-only replacement migration; rebuilding the toolkit
+or editing bootstrap does not update an installed database package. Replace only
+the package, without reinstalling the queue, recipient, or attachment tables.
 
 ## SMTP configuration
 
@@ -48,9 +54,27 @@ After deploying the bootstrap migration, configure the current environment:
 ov setup-settings
 # Short alias:
 ov ss
+# Supply all or some values from a JSON file:
+ov setup-settings .config/dev/settings.json
 ```
 
-The command prompts for all six values and masks the password. It connects using
+JSON keys are case-insensitive (`smtp_host`, `SMTP_HOST`, and `Smtp_Host` are
+equivalent). The supported keys are the six setting IDs listed above. For example:
+
+```json
+{
+  "smtp_host": "smtp.email.eu-stockholm-1.oci.oraclecloud.com",
+  "smtp_port": 587
+}
+```
+
+The command applies file values and prompts only for missing settings, masking
+the password when prompted. A complete file needs no prompts. The port must be a
+JSON number; the other values must be strings. Invalid values, unknown keys, and
+duplicate keys differing only in case are rejected before any database changes.
+Keep files containing credentials out of source control.
+
+Without a file, the command prompts for all six values. It connects using
 the current environment's ADMIN wallet and credentials and uses
 `ODBVUE_ADB_SCHEMA_USERNAME` as the settings owner and ACL principal. It writes
 values through `odb_settings.write` using bind variables and grants only `smtp`
@@ -100,6 +124,8 @@ It rejects empty content, invalid priorities, and header injection. `addr` adds
 recipients or replaces Reply-To. `attc` attaches an already stored file; call it
 multiple times for multiple attachments. Content and attachment names support
 UTF-8; Bcc addresses are used in the envelope but omitted from message headers.
+Attachment names use percent-encoded UTF-8 continuation parameters, with at most
+20 bytes per parameter; short names and final partial chunks are supported.
 
 Composition uses the caller's transaction. **Commit the message and attachments
 before calling `send`.** Delivery runs in an autonomous transaction so status

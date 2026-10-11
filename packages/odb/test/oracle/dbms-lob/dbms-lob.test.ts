@@ -53,6 +53,40 @@ describe('odbDbmsLob', () => {
   })
 
   describe('procedures (statement strings)', () => {
+    it('emits conversion parameters in Oracle signature order', () => {
+      expect(
+        odbDbmsLob
+          .convertToBlob(
+            'dest',
+            'source',
+            'amount',
+            'dest_offset',
+            'source_offset',
+            'charset',
+            'context',
+            'warning',
+          )
+          .toSQL(),
+      ).toBe(
+        'DBMS_LOB.CONVERTTOBLOB(dest, source, amount, dest_offset, source_offset, charset, context, warning)',
+      )
+      expect(
+        odbDbmsLob
+          .convertToClob(
+            'dest',
+            'source',
+            'amount',
+            'dest_offset',
+            'source_offset',
+            'charset',
+            'context',
+            'warning',
+          )
+          .toSQL(),
+      ).toBe(
+        'DBMS_LOB.CONVERTTOCLOB(dest, source, amount, dest_offset, source_offset, charset, context, warning)',
+      )
+    })
     it('append', () => {
       expect(odbDbmsLob.append('v_dest', 'v_src').toSQL()).toBe('DBMS_LOB.APPEND(v_dest, v_src)')
     })

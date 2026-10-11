@@ -375,13 +375,138 @@ describe('ProcedureBody control flow and exceptions', () => {
     })
 
     expect(sql).toContain('FUNCTION NORMALIZE(p_value IN VARCHAR2) RETURN VARCHAR2 IS')
-    expect(sql).toContain('PROCEDURE RESET() IS')
+    expect(sql).toContain('PROCEDURE RESET IS')
     expect(sql).toContain('ELSIF l_count < 3 THEN')
     expect(sql).toContain('WHILE l_count < 10 LOOP')
     expect(sql).toContain('CASE')
     expect(sql).toContain('WHEN l_count = 10 THEN')
     expect(sql).toContain('END CASE;')
     expect(sql).toContain('RESET();')
+  })
+
+  describe('typed package declarations', () => {
+    it('emits inline constants, subtypes, literal defaults, and initialized record handles', () => {
+      const pkg = odbPackage('typed_declarations', (p) => {
+        const flag = p.subtype('flag', odbType.integer(), [0, 1])
+        const crlf = p.privateConstant('c_crlf', odbType.string(2), {
+          value: expr.concat(
+            expr.call('VARCHAR2', 'CHR', odbLiteral(13)),
+            expr.call('VARCHAR2', 'CHR', odbLiteral(10)),
+          ),
+        })
+        return {
+          run: p.proc(
+            'run',
+            {
+              in: {
+                enabled: { ...flag, default: odbLiteral(1) },
+                name: { ...odbType.string(), default: odbLiteral("a'b") },
+              },
+            },
+            ({ body }) => {
+              const { conn, ready, text } = body.variables({
+                conn: odbType.custom('UTL_SMTP.CONNECTION'),
+                ready: odbType.boolean(),
+                text: odbType.string(),
+              })
+              ready.initialize(false)
+              body.set(
+                conn.field('private_tcp_con', 'UTL_TCP.CONNECTION'),
+                conn.field('private_tcp_con', 'UTL_TCP.CONNECTION'),
+              )
+              body.set(text, crlf)
+            },
+          ),
+        }
+      })
+      const sql = pkg.toSQLUp()
+      expect(sql).toContain('SUBTYPE flag IS PLS_INTEGER RANGE 0..1;')
+      expect(sql).toContain("p_enabled IN flag DEFAULT 1, p_name IN VARCHAR2 DEFAULT 'a''b'")
+      expect(sql).toContain('l_ready BOOLEAN := FALSE;')
+      expect(sql).toContain('l_conn.private_tcp_con := l_conn.private_tcp_con;')
+      expect(pkg.application().privateConstants?.[0].value).toBe('CHR(13) || CHR(10)')
+      expect(JSON.stringify(pkg.application())).not.toContain('"kind":"raw"')
+    })
+
+    it('emits forward declarations before private and local procedures that call functions', () => {
+      const pkg = odbPackage('forward_declarations', (p) => {
+        const normalize = p.privateFunc('normalize', odbType.string(), (fn) =>
+          fn.body((body) => body.return(odbLiteral('ok'))),
+        )
+        const consume = p.privateProc('consume', (proc) =>
+          proc.body((body) => {
+            const { value } = body.variables({ value: odbType.string() })
+            body.set(value, normalize.invoke())
+          }),
+        )
+        return {
+          run: p.proc('run', {}, ({ body }) => {
+            const local = body.localFunc('local_value', odbType.string(), (fn) =>
+              fn.body((nested) => nested.return(odbLiteral('ok'))),
+            )
+            const write = body.localProc('write_value', (proc) =>
+              proc.body((nested) => {
+                const { value } = nested.variables({ value: odbType.string() })
+                nested.set(value, local.invoke())
+              }),
+            )
+            body.call(consume.invoke())
+            body.call(write.invoke())
+          }),
+        }
+      })
+      const sql = pkg.toSQLUp()
+      expect(sql.indexOf('FUNCTION normalize RETURN VARCHAR2;')).toBeLessThan(
+        sql.indexOf('PROCEDURE consume IS'),
+      )
+      expect(sql.indexOf('FUNCTION local_value RETURN VARCHAR2;')).toBeLessThan(
+        sql.indexOf('PROCEDURE write_value IS'),
+      )
+      expect(sql).not.toContain('PROCEDURE run()')
+    })
+
+    it('emits custom exception declarations, rollback, and rethrow without raw statements', () => {
+      const pkg = odbPackage('typed_exceptions', (p) => ({
+        run: p
+          .proc('run', {}, ({ body }) => {
+            const busy = body.exception('e_busy', -54)
+            body.block((lock) => {
+              lock.raise(busy)
+              lock.when(busy, (handler) => handler.conflict('BUSY'))
+            })
+            body.whenOthers((handler) => {
+              handler.rollback()
+              handler.raise()
+            })
+          })
+          .autonomous(),
+      }))
+      const sql = pkg.toSQLUp()
+      expect(sql).toContain('PRAGMA AUTONOMOUS_TRANSACTION;')
+      expect(sql).toContain('e_busy EXCEPTION;')
+      expect(sql).toContain('PRAGMA EXCEPTION_INIT(e_busy, -54);')
+      expect(sql).toContain('WHEN e_busy THEN')
+      expect(sql).toContain('RAISE e_busy;')
+      expect(sql).toContain("raise_application_error(-20998, 'ODB_ERROR|CONFLICT|BUSY');")
+      expect(sql).toMatch(/ROLLBACK;\s+RAISE;/)
+      expect(JSON.stringify(pkg.application())).not.toContain('"kind":"raw"')
+    })
+
+    it('rejects invalid declaration names, ranges, duplicate exceptions, and error numbers', () => {
+      const pkg = odbPackage('invalid_declarations')
+      const body = new ProcedureBody()
+      expect(() => pkg.subtype('flag;', odbType.integer())).toThrow('invalid subtype name')
+      expect(() => pkg.subtype('flag', odbType.integer(), [1, 0])).toThrow('ordered integer bounds')
+      expect(() => body.exception('e_busy;', -54)).toThrow('invalid exception name')
+      expect(() => body.exception('e_busy', 54)).toThrow('negative Oracle error number')
+      body.exception('e_busy', -54)
+      expect(() => body.exception('E_BUSY', -54)).toThrow('duplicate exception')
+      expect(() => body.raiseApplicationError(-54, odbLiteral('bad'))).toThrow(
+        'between -20999 and -20000',
+      )
+      const { conn } = body.variables({ conn: odbType.custom('UTL_SMTP.CONNECTION') })
+      expect(() => conn.field('bad.field', 'VARCHAR2')).toThrow('invalid record field')
+    })
   })
 
   it('derives named input parameter names and column anchored types', () => {
@@ -488,6 +613,26 @@ describe('ProcedureBody control flow and exceptions', () => {
     })
 
     expect(sql).toContain('pck_job.run(p_id);')
+  })
+
+  it('rejects range indices that shadow existing, hoisted, or subsequently declared locals', () => {
+    const existing = new ProcedureBody()
+    existing.variables({ chunk: odbType.string() })
+    expect(() => existing.forRange('chunk', 1, 2, () => {})).toThrow(
+      'loop index l_chunk conflicts with a local variable',
+    )
+
+    const hoisted = new ProcedureBody()
+    expect(() =>
+      hoisted.forRange('chunk', 1, 2, (_index, loop) =>
+        loop.variables({ chunk: odbType.string() }),
+      ),
+    ).toThrow('loop index l_chunk conflicts with a local variable')
+
+    const later = new ProcedureBody()
+    later.block((nested) => nested.forRange('chunk', 1, 2, (_index, loop) => loop.null()))
+    later.variables({ chunk: odbType.string() })
+    expect(() => later.toNode()).toThrow('loop index l_chunk conflicts with a local variable')
   })
 
   it('emits an EXCEPTION section with a WHEN OTHERS handler', () => {

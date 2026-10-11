@@ -249,6 +249,58 @@ export const odbDbmsLob = {
     ])
   },
 
+  /** Convert a CLOB to a BLOB; offsets/context are IN OUT and warning is OUT. */
+  convertToBlob(
+    destination: PlsqlRenderable,
+    source: PlsqlRenderable,
+    amount: PlsqlRenderable,
+    destinationOffset: PlsqlRenderable,
+    sourceOffset: PlsqlRenderable,
+    charsetId: PlsqlRenderable,
+    languageContext: PlsqlRenderable,
+    warning: PlsqlRenderable,
+  ): PlsqlStatement {
+    return proc(
+      'CONVERTTOBLOB',
+      [
+        destination,
+        source,
+        amount,
+        destinationOffset,
+        sourceOffset,
+        charsetId,
+        languageContext,
+        warning,
+      ].map(renderPlsql),
+    )
+  },
+
+  /** Convert a BLOB to a CLOB; offsets/context are IN OUT and warning is OUT. */
+  convertToClob(
+    destination: PlsqlRenderable,
+    source: PlsqlRenderable,
+    amount: PlsqlRenderable,
+    destinationOffset: PlsqlRenderable,
+    sourceOffset: PlsqlRenderable,
+    charsetId: PlsqlRenderable,
+    languageContext: PlsqlRenderable,
+    warning: PlsqlRenderable,
+  ): PlsqlStatement {
+    return proc(
+      'CONVERTTOCLOB',
+      [
+        destination,
+        source,
+        amount,
+        destinationOffset,
+        sourceOffset,
+        charsetId,
+        languageContext,
+        warning,
+      ].map(renderPlsql),
+    )
+  },
+
   /** `DBMS_LOB.FILEOPEN(<file_loc>[, <open_mode>])` */
   fileOpen(fileLoc: PlsqlRenderable, openMode?: PlsqlRenderable): PlsqlStatement {
     const args = [renderPlsql(fileLoc)]

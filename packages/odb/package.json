@@ -16,7 +16,7 @@
     }
   },
   "scripts": {
-    "build": "tsc && node ./scripts/build.mjs",
+    "build": "tsc",
     "dev": "tsc --watch",
     "format": "oxfmt",
     "lint": "oxlint",

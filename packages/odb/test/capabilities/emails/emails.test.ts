@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { odbEmails, emails, emailsAddr, emailsAttc, emailsTypes } from '../../../src/index.js'
+import {
+  odbEmails,
+  odbEmailsPackage,
+  emails,
+  emailsAddr,
+  emailsAttc,
+  emailsTypes,
+} from '../../../src/index.js'
 
 describe('Emails', () => {
   const sql = odbEmails.toSQLUp({ schema: 'APP' })
@@ -45,16 +52,16 @@ describe('Emails', () => {
   })
 
   it('uses the legacy two-argument connection, then STARTTLS before authentication', () => {
-    const start = sql.indexOf('utl_smtp.open_connection(l_host, l_port)')
-    const tls = sql.indexOf('utl_smtp.starttls(l_conn)', start)
+    const start = sql.indexOf('UTL_SMTP.OPEN_CONNECTION(l_host, l_port)')
+    const tls = sql.indexOf('UTL_SMTP.STARTTLS(l_conn)', start)
     const auth = sql.indexOf(
-      "utl_smtp.auth(l_conn, l_username, l_password, schemes => 'PLAIN')",
+      "UTL_SMTP.AUTH(l_conn, l_username, l_password, schemes => 'PLAIN')",
       tls,
     )
     expect(start).toBeGreaterThan(0)
     expect(tls).toBeGreaterThan(start)
     expect(auth).toBeGreaterThan(tls)
-    expect(sql).not.toContain('utl_smtp.ehlo(')
+    expect(sql).not.toMatch(/utl_smtp\.ehlo\(/i)
     expect(sql).not.toContain('secure_host =>')
     expect(sql).toContain('odb_settings.read(p_id, l_value, l_meta)')
     for (const id of [
@@ -68,9 +75,9 @@ describe('Emails', () => {
       expect(sql).toContain(`smtp_setting('${id}')`)
     }
     expect(sql).not.toContain('JSON_OBJECT_T')
-    expect(sql).toContain("regexp_like(l_port_value, '^[0-9]{1,5}$')")
-    expect(sql).toContain('l_port := to_number(l_port_value)')
-    expect(sql).toContain('l_port NOT BETWEEN 1 AND 65535')
+    expect(sql).toContain("REGEXP_LIKE(l_port_value, '^[0-9]{1,5}$')")
+    expect(sql).toContain('l_port := TO_NUMBER(l_port_value)')
+    expect(sql).toContain('l_port < 1 OR l_port > 65535')
     expect(sql).toContain('EMAILS_SMTP_NOT_CONFIGURED')
     expect(sql).not.toContain('tx_timeout =>')
     expect(sql).not.toContain('wallet_path =>')
@@ -80,13 +87,13 @@ describe('Emails', () => {
   })
 
   it('encodes UTF-8 HTML and attachments as MIME with bounded base64 lines', () => {
-    expect(sql).toContain("odb_lob.clob_to_blob(l_email.content, nls_charset_id('AL32UTF8'), 1)")
+    expect(sql).toContain("odb_lob.clob_to_blob(l_email_content, NLS_CHARSET_ID('AL32UTF8'), 1)")
     expect(sql).not.toContain(
-      "odb_lob.clob_to_blob(l_email.content, nls_charset_id('AL32UTF8'), TRUE)",
+      "odb_lob.clob_to_blob(l_email_content, NLS_CHARSET_ID('AL32UTF8'), TRUE)",
     )
-    expect(sql).toContain('dbms_lob.substr(p_blob, 57, l_offset)')
+    expect(sql).toContain('DBMS_LOB.SUBSTR(p_blob, 57, l_offset)')
     expect(sql).toContain('l_offset := l_offset + 57')
-    expect(sql).toContain('substr(p_value, l_offset, 9)')
+    expect(sql).toContain('SUBSTR(p_value, l_offset, 9)')
     expect(sql).toContain("'=?UTF-8?B?'")
     expect(sql).toContain('Content-Type: text/html; charset=UTF-8')
     expect(sql).toContain('Content-Transfer-Encoding: base64')
@@ -95,11 +102,11 @@ describe('Emails', () => {
     expect(sql).toContain('filename*')
     expect(sql).toContain("address_header('ReplyTo', 'Reply-To')")
     expect(sql).not.toContain("address_header('Bcc'")
-    expect(sql).toContain("addr_type IN ('To', 'Cc', 'Bcc')")
+    expect(sql).toContain("addr_type = 'To' OR addr_type = 'Cc' OR addr_type = 'Bcc'")
   })
 
   it('guards headers, file ownership, already-sent messages and queue edits', () => {
-    expect(sql).toContain("regexp_like(p_value, '[[:cntrl:]]')")
+    expect(sql).toContain("REGEXP_LIKE(p_value, '[[:cntrl:]]')")
     expect(sql).toContain('EMAILS_HEADER_INVALID')
     expect(sql).toContain('EMAILS_ADDRESS_INVALID')
     expect(sql).toContain('EMAILS_SUBJECT_INVALID')
@@ -113,23 +120,60 @@ describe('Emails', () => {
     expect(sql).toContain('EMAILS_NOT_FOUND')
   })
 
+  it('encodes partial filename chunks without requesting bytes beyond the RAW value', () => {
+    expect(sql).toContain(
+      "l_filename_hex VARCHAR2(2040) := RAWTOHEX(UTL_I18N.STRING_TO_RAW(p_name, 'AL32UTF8'));",
+    )
+    expect(sql).toContain('WHILE l_offset <= LENGTH(l_filename_hex) LOOP')
+    expect(sql).toContain('l_hex := SUBSTR(l_filename_hex, l_offset, 40);')
+    expect(sql).toContain("l_value := l_value || '%' || SUBSTR(l_hex, l_byte * 2 + 1, 2);")
+    expect(sql).toContain(
+      "CASE WHEN l_offset + 40 <= LENGTH(l_filename_hex) THEN ';' ELSE NULL END",
+    )
+    expect(sql).toContain('l_offset := l_offset + 40;')
+    expect(sql).not.toContain('UTL_RAW.SUBSTR(')
+  })
+
   it('persists failed attempts independently of the HTTP transaction and clears errors on success', () => {
     expect(sql).toContain('PRAGMA AUTONOMOUS_TRANSACTION')
     expect(sql).toContain('SET attempts = attempts + 1')
     expect(sql).toContain("SET status = 'E', error = l_error")
-    expect(sql).toContain("numtodsinterval(p_postpone, 'SECOND')")
+    expect(sql).toContain("NUMTODSINTERVAL(p_postpone, 'SECOND')")
     expect(sql).toContain(
-      "SET status = 'S', delivered = systimestamp, postponed = NULL, error = NULL",
+      "SET status = 'S', delivered = SYSTIMESTAMP, postponed = NULL, error = NULL",
     )
-    expect(sql).toContain('dbms_utility.format_error_backtrace')
-    expect(sql).toContain('dbms_lob.freetemporary(l_body)')
-    const accepted = sql.indexOf('utl_smtp.close_data(l_conn)')
+    expect(sql).toContain('DBMS_UTILITY.FORMAT_ERROR_BACKTRACE')
+    expect(sql).toContain('DBMS_LOB.FREETEMPORARY(l_content)')
+    const accepted = sql.indexOf('UTL_SMTP.CLOSE_DATA(l_conn)')
     const saved = sql.indexOf("SET status = 'S'", accepted)
     const committed = sql.indexOf('COMMIT;', saved)
-    const quit = sql.indexOf('utl_smtp.quit(l_conn)', committed)
+    const quit = sql.indexOf('UTL_SMTP.QUIT(l_conn)', committed)
     expect(saved).toBeGreaterThan(accepted)
     expect(committed).toBeGreaterThan(saved)
     expect(quit).toBeGreaterThan(committed)
+  })
+
+  it('defines every routine without raw statements and derives cursor metadata from its query', () => {
+    const node = odbEmailsPackage.application()
+    expect(JSON.stringify(node)).not.toContain('"kind":"raw"')
+    expect(node.procedures.map((proc) => proc.name)).toEqual([
+      'mail',
+      'addr',
+      'attc',
+      'list',
+      'send',
+    ])
+    expect(node.procedures.find((proc) => proc.name === 'send')?.autonomous).toBe(true)
+    expect(node.procedures.find((proc) => proc.name === 'list')?.body?.resultSets?.P_ITEMS).toEqual(
+      odbEmails.list('after', 'limit', 'items').cursors?.ITEMS,
+    )
+    expect(sql).toContain('PRAGMA EXCEPTION_INIT(e_busy, -54);')
+    expect(sql).toMatch(/WHEN OTHERS THEN\s+ROLLBACK;\s+RAISE;/)
+    expect(
+      sql.indexOf('FUNCTION address(p_addr IN VARCHAR2, p_name IN VARCHAR2) RETURN VARCHAR2;'),
+    ).toBeLessThan(
+      sql.indexOf('PROCEDURE address_header(p_type IN VARCHAR2, p_header IN VARCHAR2) IS'),
+    )
   })
 
   it('drops dependencies in reverse installation order', () => {

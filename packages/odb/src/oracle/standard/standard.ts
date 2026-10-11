@@ -125,6 +125,68 @@ export const odbOracle = {
     return call('NUMBER', 'MOD', [value, divisor])
   },
 
+  ceil(value: PlsqlRenderable): PlsqlExpression<'NUMBER'> {
+    return call('NUMBER', 'CEIL', [value])
+  },
+
+  replace(
+    value: PlsqlRenderable,
+    search: PlsqlRenderable,
+    replacement: PlsqlRenderable,
+  ): PlsqlExpression<'VARCHAR2'> {
+    return call('VARCHAR2', 'REPLACE', [value, search, replacement])
+  },
+
+  rtrim(value: PlsqlRenderable, characters: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
+    return call('VARCHAR2', 'RTRIM', [value, characters])
+  },
+
+  toClob(value: PlsqlRenderable): PlsqlExpression<'CLOB'> {
+    return call('CLOB', 'TO_CLOB', [value])
+  },
+
+  toBlob(value: PlsqlRenderable): PlsqlExpression<'BLOB'> {
+    return call('BLOB', 'TO_BLOB', [value])
+  },
+
+  emptyClob(): PlsqlExpression<'CLOB'> {
+    return call('CLOB', 'EMPTY_CLOB', [])
+  },
+
+  emptyBlob(): PlsqlExpression<'BLOB'> {
+    return call('BLOB', 'EMPTY_BLOB', [])
+  },
+
+  nlsCharsetId(value: PlsqlRenderable): PlsqlExpression<'INTEGER'> {
+    return call('INTEGER', 'NLS_CHARSET_ID', [value])
+  },
+
+  toChar(
+    value: PlsqlRenderable,
+    format?: PlsqlRenderable,
+    nls?: PlsqlRenderable,
+  ): PlsqlExpression<'VARCHAR2'> {
+    const args = [value]
+    if (format !== undefined) args.push(format)
+    if (nls !== undefined) args.push(nls)
+    return call('VARCHAR2', 'TO_CHAR', args)
+  },
+
+  atTimeZone(value: PlsqlRenderable, zone: PlsqlRenderable): PlsqlExpression<'TIMESTAMP'> {
+    return new PlsqlExpression(
+      'TIMESTAMP',
+      `(${renderPlsql(value)} AT TIME ZONE ${renderPlsql(zone)})`,
+    )
+  },
+
+  sqlerrm(): PlsqlExpression<'VARCHAR2'> {
+    return new PlsqlExpression('VARCHAR2', 'SQLERRM')
+  },
+
+  count(): PlsqlExpression<'NUMBER'> {
+    return new PlsqlExpression('NUMBER', 'COUNT(*)')
+  },
+
   /** `CHR(<code>)` -> VARCHAR2 */
   chr(code: PlsqlRenderable | number): PlsqlExpression<'VARCHAR2'> {
     return call('VARCHAR2', 'CHR', [code])

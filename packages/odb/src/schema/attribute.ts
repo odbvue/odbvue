@@ -354,6 +354,18 @@ export class LocalVar<
     return this.name
   }
 
+  initialize(value: PlsqlValue<T> | string | number | boolean | null): this {
+    this.options.value = renderExpressionValue(value)
+    return this
+  }
+
+  field<TField extends PlsqlType | string>(name: string, type: TField): LocalVar<TField> {
+    if (!/^[A-Za-z][A-Za-z0-9_$#]*$/.test(name)) {
+      throw new Error(`field: invalid record field ${name}.`)
+    }
+    return new LocalVar(`${this.name}.${name}`, type)
+  }
+
   toNode(): LocalVarNode {
     return {
       kind: 'localvar',

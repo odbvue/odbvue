@@ -103,6 +103,7 @@ export class SelectQueryBuilder<
   private _orderBy: OrderByClause[] = []
   private _limit?: number | { toSQL(): string }
   private _forUpdate = false
+  private _nowait = false
   private _into?: string
   private _schema?: string
 
@@ -235,8 +236,9 @@ export class SelectQueryBuilder<
   }
 
   /** Lock the selected rows for update. */
-  forUpdate(): this {
+  forUpdate(options: { nowait?: boolean } = {}): this {
     this._forUpdate = true
+    this._nowait = options.nowait === true
     return this
   }
 
@@ -276,7 +278,7 @@ export class SelectQueryBuilder<
     if (this._limit !== undefined) {
       sql += ` FETCH FIRST ${this.limitSql()} ROWS ONLY`
     }
-    if (this._forUpdate) sql += ' FOR UPDATE'
+    if (this._forUpdate) sql += this._nowait ? ' FOR UPDATE NOWAIT' : ' FOR UPDATE'
 
     return { sql, bindings }
   }
@@ -296,7 +298,7 @@ export class SelectQueryBuilder<
       sql += ` ORDER BY ${parts.join(', ')}`
     }
     if (this._limit !== undefined) sql += ` FETCH FIRST ${this.limitSql()} ROWS ONLY`
-    if (this._forUpdate) sql += ' FOR UPDATE'
+    if (this._forUpdate) sql += this._nowait ? ' FOR UPDATE NOWAIT' : ' FOR UPDATE'
     return sql
   }
 }

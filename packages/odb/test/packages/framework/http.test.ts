@@ -33,16 +33,16 @@ describe('odbHttp framework package', () => {
       .forbidden()
       .tooManyRequests()
 
-    expect(
-      body.toNode().statements.map((statement) => ('sql' in statement ? statement.sql : '')),
-    ).toEqual([
-      "raise_application_error(-20998, 'ODB_ERROR|NOT_FOUND|NOT_FOUND')",
-      "raise_application_error(-20998, 'ODB_ERROR|CONFLICT|CONFLICT')",
-      "raise_application_error(-20998, 'ODB_ERROR|VALIDATION_ERROR|VALIDATION_ERROR')",
-      "raise_application_error(-20998, 'ODB_ERROR|UNAUTHORIZED|INVALID_CREDENTIALS')",
-      "raise_application_error(-20998, 'ODB_ERROR|FORBIDDEN|FORBIDDEN')",
-      "raise_application_error(-20998, 'ODB_ERROR|TOO_MANY_REQUESTS|TOO_MANY_REQUESTS')",
-    ])
+    expect(body.toNode().statements).toEqual(
+      [
+        "'ODB_ERROR|NOT_FOUND|NOT_FOUND'",
+        "'ODB_ERROR|CONFLICT|CONFLICT'",
+        "'ODB_ERROR|VALIDATION_ERROR|VALIDATION_ERROR'",
+        "'ODB_ERROR|UNAUTHORIZED|INVALID_CREDENTIALS'",
+        "'ODB_ERROR|FORBIDDEN|FORBIDDEN'",
+        "'ODB_ERROR|TOO_MANY_REQUESTS|TOO_MANY_REQUESTS'",
+      ].map((message) => ({ kind: 'raise-application-error', number: -20998, message })),
+    )
     expect(() => body.notFound('not-found')).toThrow('code must be uppercase')
   })
 

@@ -12,6 +12,7 @@ import {
   type PlsqlRenderable,
   type PlsqlType,
   type PlsqlValue,
+  type PlsqlExpressionValue,
   PlsqlStatement,
   emitLocalVarDecl,
   emitParamDef,
@@ -52,7 +53,7 @@ export type OdbTypeDescriptor<TType extends PlsqlType | string> = {
   /** Logical ODB type when it is richer than the PL/SQL type (e.g. `json` stored as CLOB). */
   odbType?: OdbType
   /** Parameter default expression. Ignored when the descriptor is used as a local variable. */
-  default?: string
+  default?: PlsqlExpressionValue
 }
 
 type ParameterInput =
@@ -159,7 +160,18 @@ function inputParameterOdbType(input: ParameterInput): OdbType {
 
 function parameterOptions(input: ParameterInput): { length?: number; default?: string } {
   if (input instanceof Column) return {}
-  return { length: input.length, default: input.default }
+  const value = input.default
+  return {
+    length: input.length,
+    default:
+      value === undefined
+        ? undefined
+        : typeof value === 'string'
+          ? value
+          : isPlsqlValue(value)
+            ? value.toSQL()
+            : renderPlsqlLiteral(value),
+  }
 }
 
 /** ODB type descriptors for use with named parameters and local variables. */
@@ -251,7 +263,12 @@ export type StatementNode =
   | { kind: 'return'; value?: string }
   | { kind: 'null' }
   | { kind: 'commit' }
+  | { kind: 'rollback' }
+  | { kind: 'raise'; exception?: string }
+  | { kind: 'raise-application-error'; number: number; message: string }
   | { kind: 'call'; sql: string }
+  | { kind: 'query'; sql: string }
+  | { kind: 'open-for'; cursor: string; query: string }
   | { kind: 'raw'; sql: string }
   | { kind: 'if'; branches: IfBranchNode[]; elseStatements?: StatementNode[] }
   | ForRangeNode
@@ -284,14 +301,21 @@ export type OraclePredefinedException =
   | 'ZERO_DIVIDE'
 
 export type ExceptionHandlerNode = {
-  when: OraclePredefinedException | 'OTHERS'
+  when: string
   statements: StatementNode[]
+}
+
+export type ExceptionDeclarationNode = { name: string; number: number }
+
+export class PlsqlException {
+  constructor(readonly name: string) {}
 }
 
 // ── AST node types ───────────────────────────────────────────────────────────
 
 export type ProcedureBodyNode = {
   declarations: LocalVarNode[]
+  exceptions?: ExceptionDeclarationNode[]
   localProcedures?: ProcedureNode[]
   localFunctions?: FunctionNode[]
   statements: StatementNode[]
@@ -334,7 +358,14 @@ export type PrivateConstantNode = {
   name: string
   type: PlsqlType | string
   length?: number
-  substitution: string
+  substitution?: string
+  value?: string
+}
+
+export type SubtypeNode = {
+  name: string
+  type: string
+  range?: readonly [number, number]
 }
 
 export type OdbApplication = {
@@ -345,6 +376,7 @@ export type OdbApplication = {
   privateProcedures?: ProcedureNode[]
   privateFunctions?: FunctionNode[]
   privateConstants?: PrivateConstantNode[]
+  subtypes?: SubtypeNode[]
 }
 
 export type ApplicationLike = OdbApplication | { application(): OdbApplication }
@@ -424,6 +456,17 @@ export class ProcedureBody {
   private _returnCounter = 0
   private _cursorResultColumns = new Map<string, OrdsResultColumnNode[]>()
   private _exceptionHandlers: ExceptionHandlerNode[] = []
+  private _exceptions: ExceptionDeclarationNode[] = []
+  private _loopIndices = new Set<string>()
+
+  private validateLoopIndices(): void {
+    const shadowed = this._declarations.find((variable) =>
+      this._loopIndices.has(variable.name.toUpperCase()),
+    )
+    if (shadowed) {
+      throw new Error(`forRange: loop index ${shadowed.name} conflicts with a local variable.`)
+    }
+  }
 
   /**
    * @param _returnType   Return type of the enclosing function, if any. Enables
@@ -528,6 +571,38 @@ export class ProcedureBody {
     return this
   }
 
+  rollback(): this {
+    this._statements.push({ kind: 'rollback' })
+    return this
+  }
+
+  raise(exception?: PlsqlException): this {
+    this._statements.push({ kind: 'raise', exception: exception?.name })
+    return this
+  }
+
+  exception(name: string, number: number): PlsqlException {
+    if (!/^[A-Za-z][A-Za-z0-9_$#]*$/.test(name)) {
+      throw new Error(`exception: invalid exception name ${name}.`)
+    }
+    if (!Number.isInteger(number) || number >= 0 || number < -1000000) {
+      throw new Error('exception: number must be a negative Oracle error number.')
+    }
+    if (this._exceptions.some((exception) => exception.name.toUpperCase() === name.toUpperCase())) {
+      throw new Error(`exception: duplicate exception ${name}.`)
+    }
+    this._exceptions.push({ name, number })
+    return new PlsqlException(name)
+  }
+
+  raiseApplicationError(number: number, message: PlsqlValue<'VARCHAR2'>): this {
+    if (!Number.isInteger(number) || number < -20999 || number > -20000) {
+      throw new Error('raiseApplicationError: number must be between -20999 and -20000.')
+    }
+    this._statements.push({ kind: 'raise-application-error', number, message: message.toSQL() })
+    return this
+  }
+
   /** Emit a typed PL/SQL procedure-call statement. */
   call(statement: PlsqlStatement): this {
     for (const [cursor, columns] of Object.entries(statement.cursors ?? {})) {
@@ -568,7 +643,10 @@ export class ProcedureBody {
     if (!ODB_ERROR_CODE_PATTERN.test(code)) {
       throw new Error('raiseError: code must be uppercase alphanumeric with optional underscores.')
     }
-    return this.raw(`raise_application_error(${ODB_ERROR_NUMBER}, 'ODB_ERROR|${kind}|${code}')`)
+    return this.raiseApplicationError(
+      ODB_ERROR_NUMBER,
+      new PlsqlExpression('VARCHAR2', renderPlsqlLiteral(`ODB_ERROR|${kind}|${code}`)),
+    )
   }
 
   /** Raise a `VALIDATION_ERROR` ODB error. */
@@ -659,7 +737,7 @@ export class ProcedureBody {
    * body.query(from('employees').insert().values({ name: 'Alice' }))
    */
   query(qb: AnyQueryBuilder): this {
-    this._statements.push({ kind: 'raw', sql: qb.toSQL() })
+    this._statements.push({ kind: 'query', sql: qb.toSQL() })
     return this
   }
 
@@ -709,7 +787,7 @@ export class ProcedureBody {
         })),
       )
     }
-    this._statements.push({ kind: 'raw', sql: `OPEN ${cursorName} FOR ${qb.toSQL()}` })
+    this._statements.push({ kind: 'open-for', cursor: cursorName, query: qb.toSQL() })
     return this
   }
 
@@ -724,6 +802,8 @@ export class ProcedureBody {
     for (const declaration of child._declarations) {
       this._declarations.push(declaration)
     }
+    for (const exception of child._exceptions) this.exception(exception.name, exception.number)
+    for (const index of child._loopIndices) this._loopIndices.add(index)
     for (const [name, columns] of child._cursorResultColumns) {
       this._cursorResultColumns.set(name, columns)
     }
@@ -788,14 +868,18 @@ export class ProcedureBody {
     build: (index: LocalVar<'PLS_INTEGER'>, body: ProcedureBody) => void,
   ): this {
     const loopIndex = new LocalVar(localVariableName(index), 'PLS_INTEGER')
+    this._loopIndices.add(loopIndex.name.toUpperCase())
+    this.validateLoopIndices()
     const renderBound = (value: PlsqlRenderable | number) =>
       typeof value === 'number' ? String(value) : renderPlsql(value)
+    const statements = this.childStatements((body) => build(loopIndex, body))
+    this.validateLoopIndices()
     this._statements.push({
       kind: 'for-range',
       index: loopIndex.name,
       from: renderBound(from),
       to: renderBound(to),
-      statements: this.childStatements((body) => build(loopIndex, body)),
+      statements,
     })
     return this
   }
@@ -840,6 +924,8 @@ export class ProcedureBody {
     const child = new ProcedureBody(this._returnType, this._returnLength)
     build(child)
     for (const declaration of child._declarations) this._declarations.push(declaration)
+    for (const exception of child._exceptions) this.exception(exception.name, exception.number)
+    for (const index of child._loopIndices) this._loopIndices.add(index)
     for (const procedure of child._localProcedures) this._localProcedures.push(procedure)
     for (const fn of child._localFunctions) this._localFunctions.push(fn)
     for (const [name, columns] of child._cursorResultColumns) {
@@ -896,10 +982,13 @@ export class ProcedureBody {
    * body.when('NO_DATA_FOUND', (h) => h.set(rError, 'not found'))
    */
   when(
-    exceptionName: OraclePredefinedException | 'OTHERS',
+    exceptionName: OraclePredefinedException | 'OTHERS' | PlsqlException,
     build: (body: ProcedureBody) => void,
   ): this {
-    this._exceptionHandlers.push({ when: exceptionName, statements: this.childStatements(build) })
+    this._exceptionHandlers.push({
+      when: typeof exceptionName === 'string' ? exceptionName : exceptionName.name,
+      statements: this.childStatements(build),
+    })
     return this
   }
 
@@ -914,8 +1003,10 @@ export class ProcedureBody {
   }
 
   toNode(): ProcedureBodyNode {
+    this.validateLoopIndices()
     return {
       declarations: this._declarations.map((v) => v.toNode()),
+      exceptions: this._exceptions.length > 0 ? this._exceptions.map((e) => ({ ...e })) : undefined,
       localProcedures:
         this._localProcedures.length > 0
           ? this._localProcedures.map((procedure) => procedure.toNode())
@@ -1493,8 +1584,13 @@ export type Package<
   privateConstant<TType extends PlsqlType | string>(
     name: string,
     type: TType | OdbTypeDescriptor<TType>,
-    substitution: string,
+    source: string | { value: PlsqlExpressionValue },
   ): PlsqlExpression<TType>
+  subtype<TName extends string>(
+    name: TName,
+    type: OdbTypeDescriptor<PlsqlType | string>,
+    range?: readonly [number, number],
+  ): OdbTypeDescriptor<TName>
   call<TMemberName extends keyof TMembers>(
     member: TMemberName,
     ...args: PlsqlRenderable[]
@@ -1513,6 +1609,7 @@ export class PackageImpl<
   private _privateProcedures: Procedure[] = []
   private _privateFunctions: PlsqlFunction<any>[] = []
   private _privateConstants: PrivateConstantNode[] = []
+  private _subtypes: SubtypeNode[] = []
   private _memberLookup: Record<string, PackageMemberDefinition> = {}
 
   /**
@@ -1615,22 +1712,46 @@ export class PackageImpl<
   }
 
   /**
-   * Declare a body-private constant whose value is supplied when SQL is
-   * generated. The returned expression can be used by package members.
+   * Declare a body-private constant from a named SQL-generation substitution
+   * or an inline `{ value }` literal/expression.
    */
   privateConstant<TType extends PlsqlType | string>(
     name: string,
     type: TType | OdbTypeDescriptor<TType>,
-    substitution: string,
+    source: string | { value: PlsqlExpressionValue },
   ): PlsqlExpression<TType> {
     const definition = typeof type === 'object' ? type : { type }
     this._privateConstants.push({
       name,
       type: definition.type,
       length: definition.length,
-      substitution,
+      substitution: typeof source === 'string' ? source : undefined,
+      value:
+        typeof source === 'string'
+          ? undefined
+          : isPlsqlValue(source.value)
+            ? source.value.toSQL()
+            : renderPlsqlLiteral(source.value),
     })
     return new PlsqlExpression(definition.type, name)
+  }
+
+  subtype<TName extends string>(
+    name: TName,
+    type: OdbTypeDescriptor<PlsqlType | string>,
+    range?: readonly [number, number],
+  ): OdbTypeDescriptor<TName> {
+    if (!/^[A-Za-z][A-Za-z0-9_$#]*$/.test(name)) {
+      throw new Error(`subtype: invalid subtype name ${name}.`)
+    }
+    if (range && (!range.every(Number.isInteger) || range[0] > range[1])) {
+      throw new Error('subtype: range must contain ordered integer bounds.')
+    }
+    if (this._subtypes.some((subtype) => subtype.name.toUpperCase() === name.toUpperCase())) {
+      throw new Error(`subtype: duplicate subtype ${name}.`)
+    }
+    this._subtypes.push({ name, type: emitPlsqlType(type.type, type), range })
+    return { type: name }
   }
 
   /**
@@ -1663,6 +1784,7 @@ export class PackageImpl<
       privateProcedures: this._privateProcedures.map((p) => p.toNode()),
       privateFunctions: this._privateFunctions.map((f) => f.toNode()),
       privateConstants: this._privateConstants.map((constant) => ({ ...constant })),
+      subtypes: this._subtypes.map((subtype) => ({ ...subtype })),
     }
   }
 
@@ -1704,15 +1826,17 @@ function emitPackageSpec(pkg: OdbApplication, options: PackageSqlOptions = {}): 
   const orReplace = options.orReplace !== false ? 'OR REPLACE ' : ''
   const lines: string[] = [`CREATE ${orReplace}PACKAGE ${name} AS`]
 
+  for (const subtype of pkg.subtypes ?? []) {
+    const range = subtype.range ? ` RANGE ${subtype.range[0]}..${subtype.range[1]}` : ''
+    lines.push(`  SUBTYPE ${subtype.name} IS ${subtype.type}${range};`)
+  }
+
   for (const proc of pkg.procedures) {
-    const params = proc.params.map(emitParamDef).join(', ')
-    lines.push(`  PROCEDURE ${proc.name}(${params});`)
+    lines.push(`  ${routineSignature(proc)};`)
   }
 
   for (const fn of pkg.functions) {
-    const params = fn.params.map(emitParamDef).join(', ')
-    const ret = emitParamType(fn.returnType)
-    lines.push(`  FUNCTION ${fn.name}(${params}) RETURN ${ret};`)
+    lines.push(`  ${routineSignature(fn)};`)
   }
 
   lines.push(`END ${identifier};`)
@@ -1726,14 +1850,21 @@ function emitPackageBody(pkg: OdbApplication, options: PackageSqlOptions = {}): 
   const lines: string[] = [`CREATE ${orReplace}PACKAGE BODY ${name} AS`]
 
   for (const constant of pkg.privateConstants ?? []) {
-    const value = options.substitutions?.[constant.substitution]
-    if (value === undefined) {
+    const value =
+      constant.substitution !== undefined
+        ? options.substitutions?.[constant.substitution]
+        : undefined
+    const renderedValue =
+      constant.value ?? (value === undefined ? undefined : renderPlsqlLiteral(value))
+    if (renderedValue === undefined) {
       throw new Error(`Package ${pkg.name}: missing substitution ${constant.substitution}.`)
     }
     lines.push(
-      `  ${constant.name} CONSTANT ${emitPlsqlType(constant.type, { length: constant.length })} := ${renderPlsqlLiteral(value)};`,
+      `  ${constant.name} CONSTANT ${emitPlsqlType(constant.type, { length: constant.length })} := ${renderedValue};`,
     )
   }
+
+  emitRoutineDeclarations(lines, pkg.privateProcedures, pkg.privateFunctions, '  ')
 
   for (const proc of pkg.privateProcedures ?? []) {
     lines.push(emitProcedureImpl(proc))
@@ -1759,9 +1890,38 @@ function emitProcedureImpl(proc: ProcedureNode): string {
   return emitProcedureImplAt(proc, '  ')
 }
 
+function routineSignature(routine: ProcedureNode | FunctionNode): string {
+  const params = routine.params.map(emitParamDef).join(', ')
+  const name = `${routine.name}${params ? `(${params})` : ''}`
+  return routine.kind === 'procedure'
+    ? `PROCEDURE ${name}`
+    : `FUNCTION ${name} RETURN ${emitParamType(routine.returnType)}`
+}
+
+function emitRoutineDeclarations(
+  lines: string[],
+  procedures: ProcedureNode[] | undefined,
+  functions: FunctionNode[] | undefined,
+  indent: string,
+): void {
+  for (const routine of [...(procedures ?? []), ...(functions ?? [])]) {
+    lines.push(`${indent}${routineSignature(routine)};`)
+  }
+}
+
+function emitBodyDeclarations(lines: string[], body: ProcedureBodyNode, indent: string): void {
+  for (const decl of body.declarations) lines.push(`${indent}${emitLocalVarDecl(decl)}`)
+  for (const exception of body.exceptions ?? []) {
+    lines.push(`${indent}${exception.name} EXCEPTION;`)
+    lines.push(`${indent}PRAGMA EXCEPTION_INIT(${exception.name}, ${exception.number});`)
+  }
+  emitRoutineDeclarations(lines, body.localProcedures, body.localFunctions, indent)
+  for (const proc of body.localProcedures ?? []) lines.push(emitProcedureImplAt(proc, indent))
+  for (const fn of body.localFunctions ?? []) lines.push(emitFunctionImplAt(fn, indent))
+}
+
 function emitProcedureImplAt(proc: ProcedureNode, indent: string): string {
-  const params = proc.params.map(emitParamDef).join(', ')
-  const sig = `${indent}PROCEDURE ${proc.name}(${params}) IS`
+  const sig = `${indent}${routineSignature(proc)} IS`
 
   if (!proc.body) {
     return [sig, `${indent}BEGIN`, `${indent}  NULL;`, `${indent}END ${proc.name};`].join('\n')
@@ -1771,15 +1931,7 @@ function emitProcedureImplAt(proc: ProcedureNode, indent: string): string {
 
   if (proc.autonomous) lines.push(`${indent}  PRAGMA AUTONOMOUS_TRANSACTION;`)
 
-  for (const decl of proc.body.declarations) {
-    lines.push(`${indent}  ${emitLocalVarDecl(decl)}`)
-  }
-  for (const localProcedure of proc.body.localProcedures ?? []) {
-    lines.push(emitProcedureImplAt(localProcedure, `${indent}  `))
-  }
-  for (const localFunction of proc.body.localFunctions ?? []) {
-    lines.push(emitFunctionImplAt(localFunction, `${indent}  `))
-  }
+  emitBodyDeclarations(lines, proc.body, `${indent}  `)
 
   lines.push(`${indent}BEGIN`)
   lines.push(...emitStatementBlock(proc.body.statements, `${indent}  `))
@@ -1793,9 +1945,7 @@ function emitFunctionImpl(fn: FunctionNode): string {
 }
 
 function emitFunctionImplAt(fn: FunctionNode, indent: string): string {
-  const params = fn.params.map(emitParamDef).join(', ')
-  const ret = emitParamType(fn.returnType)
-  const sig = `${indent}FUNCTION ${fn.name}(${params}) RETURN ${ret} IS`
+  const sig = `${indent}${routineSignature(fn)} IS`
 
   if (!fn.body) {
     return [sig, `${indent}BEGIN`, `${indent}  RETURN NULL;`, `${indent}END ${fn.name};`].join('\n')
@@ -1803,15 +1953,7 @@ function emitFunctionImplAt(fn: FunctionNode, indent: string): string {
 
   const lines: string[] = [sig]
 
-  for (const decl of fn.body.declarations) {
-    lines.push(`${indent}  ${emitLocalVarDecl(decl)}`)
-  }
-  for (const localProcedure of fn.body.localProcedures ?? []) {
-    lines.push(emitProcedureImplAt(localProcedure, `${indent}  `))
-  }
-  for (const localFunction of fn.body.localFunctions ?? []) {
-    lines.push(emitFunctionImplAt(localFunction, `${indent}  `))
-  }
+  emitBodyDeclarations(lines, fn.body, `${indent}  `)
 
   lines.push(`${indent}BEGIN`)
 
@@ -1856,8 +1998,17 @@ function emitStatement(stmt: StatementNode, indent: string): string[] {
       return [`${indent}NULL;`]
     case 'commit':
       return [`${indent}COMMIT;`]
+    case 'rollback':
+      return [`${indent}ROLLBACK;`]
+    case 'raise':
+      return [`${indent}RAISE${stmt.exception ? ` ${stmt.exception}` : ''};`]
+    case 'raise-application-error':
+      return [`${indent}raise_application_error(${stmt.number}, ${stmt.message});`]
     case 'call':
+    case 'query':
       return [`${indent}${stmt.sql};`]
+    case 'open-for':
+      return [`${indent}OPEN ${stmt.cursor} FOR ${stmt.query};`]
     case 'raw':
       return [`${indent}${stmt.sql.trimEnd().endsWith(';') ? stmt.sql : `${stmt.sql};`}`]
     case 'if': {

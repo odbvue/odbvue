@@ -10,6 +10,21 @@ import {
 } from '../../src/schema/table.js'
 
 describe('odbQuery', () => {
+  it('emits NOWAIT consistently for inline and bound queries without changing default locks', () => {
+    const queue = odbTable('queue', (t) => ({ id: t.guid().primaryKey() }))
+    const query = odbQuery()
+      .selectFrom(queue)
+      .select(queue.id)
+      .where(queue.id, '=', 'message')
+      .forUpdate({ nowait: true })
+    expect(query.toSQL()).toBe("SELECT id FROM queue WHERE id = 'message' FOR UPDATE NOWAIT")
+    expect(query.compile()).toEqual({
+      sql: 'SELECT id FROM queue WHERE id = :w0 FOR UPDATE NOWAIT',
+      bindings: { w0: 'message' },
+    })
+    query.forUpdate()
+    expect(query.toSQL()).toBe("SELECT id FROM queue WHERE id = 'message' FOR UPDATE")
+  })
   it('supports typed table schemas and column references', () => {
     const users = odbTable('APP_USERS', (t) => ({
       id: t.number('id').notNull(),

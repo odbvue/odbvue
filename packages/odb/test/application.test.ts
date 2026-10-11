@@ -104,8 +104,9 @@ describe('ODB application contract', () => {
       params: { uri: { id: { name: 'p_id' } }, response: { result: { name: 'p_result' } } },
     })
     expect(procedure.body?.statements[0]).toEqual({
-      kind: 'raw',
-      sql: 'OPEN p_result FOR SELECT ID, UUID, CREATED_AT, EMAIL FROM APP_USERS',
+      kind: 'open-for',
+      cursor: 'p_result',
+      query: 'SELECT ID, UUID, CREATED_AT, EMAIL FROM APP_USERS',
     })
     expect(procedure.body?.resultSets?.P_RESULT).toEqual([
       { name: 'ID', type: 'number', nullable: false },

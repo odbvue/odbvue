@@ -2,6 +2,23 @@
 
 `odbLob` exposes an odb framework package, `odb_lob`, for common LOB and Base64 conversions. It is installed into your schema by a migration (it is not a native Oracle built-in).
 
+Its implementation is defined in TypeScript with `odbPackage` and typed Oracle
+wrappers, without separate PL/SQL source assets or raw SQL escape hatches.
+The public package retains its integer-backed `boolean` subtype (`0`/`1`),
+charset defaults, conversion warnings, and NULL-versus-empty LOB behavior.
+The chunked algorithm is adapted from [Paulzip's Base64](https://github.com/paulzip-dev/Base64).
+
+The conversion call helpers accept optional charset/warning arguments, and the
+encoding helpers accept an optional newline flag. Existing one-argument calls
+still use the database package's defaults:
+
+```ts
+import { odbLiteral, odbLob, odbOracle } from '@odbvue/odb'
+
+odbLob.clobToBlob('p_content', odbOracle.nlsCharsetId(odbLiteral('AL32UTF8')), odbLiteral(1))
+odbLob.blobToBase64('p_content', odbLiteral(0)) // No line breaks
+```
+
 Use it in migrations for two things:
 
 - install or drop the database package with `toSQLUp()` and `toSQLDown()`
@@ -22,7 +39,7 @@ export const migration = defineMigration('20260628161706_test', {
 ## Use In A Procedure Body
 
 ```ts
-import { odbPackage, odbType } from '@odbvue/odb'
+import { odbOracle, odbPackage, odbType } from '@odbvue/odb'
 
 const appPackage = odbPackage('pck_app', (p) => {
   const version = p.proc('version', { out: { test: odbType.clob() } }, ({ params, body }) => {
@@ -48,15 +65,13 @@ const convert = pkg.proc(
       vClob: odbType.clob(),
     })
     body.set(vText, 'hello')
-    body.raw(`${vClob.name} := empty_clob()`)
+    body.set(vClob, odbOracle.emptyClob())
 
     body.set(params.textResult, vText.toBase64())
     body.set(params.clobResult, vClob.toBase64())
   },
 )
 ```
-
-Use `body.raw()` only as an escape hatch for raw PL/SQL statements.
 
 Supported typed helpers:
 
