@@ -8,9 +8,10 @@ export const registerSetupSettingsCommand = (program: Command) => {
     .command('setup-settings')
     .alias('ss')
     .description('Configure SMTP settings and update the database network ACL')
-    .action(async () => {
+    .argument('[file]', 'JSON file with SMTP settings (case-insensitive keys)')
+    .action(async (file?: string) => {
       try {
-        await runSetupSettings()
+        await runSetupSettings(file)
       } catch (error) {
         logger.fatal(error)
       }

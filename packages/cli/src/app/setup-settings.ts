@@ -1,4 +1,5 @@
-import prompts from 'prompts'
+import { readFile } from 'node:fs/promises'
+import prompts, { type PromptObject } from 'prompts'
 
 import { odbDbmsNetworkAclAdmin, odbSettings, withConnection } from '@odbvue/odb'
 
@@ -15,91 +16,122 @@ type SmtpSettings = {
   from_name: string
 }
 
-const hostValid = (value: string) =>
+const hostValid = (value: unknown) =>
   typeof value === 'string' &&
   value.length <= 255 &&
   /^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$/.test(value)
-const portValid = (value: number) => Number.isInteger(value) && value >= 1 && value <= 65535
-const credentialValid = (value: string) =>
+const portValid = (value: unknown) =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 65535
+const credentialValid = (value: unknown) =>
   typeof value === 'string' && value.trim().length > 0 && value.length <= 2000
-const addressValid = (value: string) =>
+const addressValid = (value: unknown) =>
   typeof value === 'string' &&
   value.length <= 240 &&
   /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$/.test(value)
-const nameValid = (value: string) =>
+const nameValid = (value: unknown) =>
   typeof value === 'string' &&
   value.trim().length > 0 &&
   value.length <= 240 &&
   [...value].every((character) => character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127)
 
-export const runSetupSettings = async (): Promise<boolean> => {
+const validators: Record<string, (value: unknown) => boolean> = {
+  host: hostValid,
+  port: portValid,
+  username: credentialValid,
+  password: credentialValid,
+  from_addr: addressValid,
+  from_name: nameValid,
+}
+
+const settingsValid = (settings: Record<string, unknown>): settings is SmtpSettings =>
+  Object.entries(validators).every(([name, validate]) => validate(settings[name]))
+
+export const runSetupSettings = async (file?: string): Promise<boolean> => {
+  const fileSettings: Record<string, unknown> = {}
+  if (file !== undefined) {
+    const values: unknown = JSON.parse(await readFile(file, 'utf-8'))
+    if (values === null || typeof values !== 'object' || Array.isArray(values)) {
+      throw new Error('SMTP settings file must contain a JSON object')
+    }
+    for (const [key, value] of Object.entries(values)) {
+      const normalized = key.toLowerCase()
+      const name = normalized.slice('smtp_'.length)
+      if (!normalized.startsWith('smtp_') || !Object.hasOwn(validators, name)) {
+        throw new Error(`Unknown SMTP setting key: ${key}`)
+      }
+      if (Object.hasOwn(fileSettings, name)) {
+        throw new Error(`Duplicate SMTP setting key (case-insensitive): ${key}`)
+      }
+      if (!validators[name]!(value)) {
+        throw new Error(`Invalid SMTP setting: ${key}; no settings or ACLs were changed`)
+      }
+      fileSettings[name] = value
+    }
+  }
+
   let cancelled = false
-  const settings: SmtpSettings = await prompts(
-    [
-      {
-        type: 'text',
-        name: 'host',
-        message: 'SMTP host',
-        validate: (value) => hostValid(value) || 'Enter an SMTP hostname (no URL or wildcard)',
-      },
-      {
-        type: 'number',
-        name: 'port',
-        message: 'SMTP port',
-        initial: 587,
-        validate: (value) =>
-          portValid(value === '' ? 587 : value) || 'Enter an integer port from 1 to 65535',
-      },
-      {
-        type: 'text',
-        name: 'username',
-        message: 'SMTP username',
-        validate: (value) =>
-          credentialValid(value) || 'Enter an SMTP username (up to 2000 characters)',
-      },
-      {
-        type: 'password',
-        name: 'password',
-        message: 'SMTP password',
-        validate: (value) =>
-          credentialValid(value) || 'Enter an SMTP password (up to 2000 characters)',
-      },
-      {
-        type: 'text',
-        name: 'from_addr',
-        message: 'SMTP from address',
-        initial: 'admin@odbvue.com',
-        validate: (value) => addressValid(value) || 'Enter a valid sender email address',
-      },
-      {
-        type: 'text',
-        name: 'from_name',
-        message: 'SMTP from name',
-        initial: 'Odbvue Admin',
-        validate: (value) =>
-          nameValid(value) ||
-          'Enter a sender name without control characters (up to 240 characters)',
-      },
-    ],
+  const questions: PromptObject[] = [
     {
-      onCancel: () => {
-        cancelled = true
-      },
+      type: 'text',
+      name: 'host',
+      message: 'SMTP host',
+      validate: (value) => hostValid(value) || 'Enter an SMTP hostname (no URL or wildcard)',
     },
+    {
+      type: 'number',
+      name: 'port',
+      message: 'SMTP port',
+      initial: 587,
+      validate: (value) =>
+        portValid(value === '' ? 587 : value) || 'Enter an integer port from 1 to 65535',
+    },
+    {
+      type: 'text',
+      name: 'username',
+      message: 'SMTP username',
+      validate: (value) =>
+        credentialValid(value) || 'Enter an SMTP username (up to 2000 characters)',
+    },
+    {
+      type: 'password',
+      name: 'password',
+      message: 'SMTP password',
+      validate: (value) =>
+        credentialValid(value) || 'Enter an SMTP password (up to 2000 characters)',
+    },
+    {
+      type: 'text',
+      name: 'from_addr',
+      message: 'SMTP from address',
+      initial: 'admin@odbvue.com',
+      validate: (value) => addressValid(value) || 'Enter a valid sender email address',
+    },
+    {
+      type: 'text',
+      name: 'from_name',
+      message: 'SMTP from name',
+      initial: 'Odbvue Admin',
+      validate: (value) =>
+        nameValid(value) || 'Enter a sender name without control characters (up to 240 characters)',
+    },
+  ]
+  const missingQuestions = questions.filter(
+    (question) => !Object.hasOwn(fileSettings, String(question.name)),
   )
+  const answers: Record<string, unknown> = missingQuestions.length
+    ? await prompts(missingQuestions, {
+        onCancel: () => {
+          cancelled = true
+        },
+      })
+    : {}
+  const settings = { ...fileSettings, ...answers }
 
   if (cancelled) {
     logger.info('Settings setup cancelled. No settings or ACLs were changed.')
     return false
   }
-  if (
-    !hostValid(settings.host) ||
-    !portValid(settings.port) ||
-    !credentialValid(settings.username) ||
-    !credentialValid(settings.password) ||
-    !addressValid(settings.from_addr) ||
-    !nameValid(settings.from_name)
-  ) {
+  if (!settingsValid(settings)) {
     throw new Error('Invalid SMTP settings; no settings or ACLs were changed')
   }
 
