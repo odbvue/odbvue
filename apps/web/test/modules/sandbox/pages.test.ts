@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { odbVueCapabilities } from '@/modules/sandbox/catalog'
 
 const pages = import.meta.glob<string>('@/modules/sandbox/pages/**/*.vue', {
   eager: true,
@@ -9,6 +10,15 @@ const pages = import.meta.glob<string>('@/modules/sandbox/pages/**/*.vue', {
 describe('sandbox page metadata', () => {
   it('discovers sandbox pages', () => {
     expect(Object.keys(pages).length).toBeGreaterThan(0)
+  })
+
+  it('registers Network ACL in the catalog with its dedicated page', () => {
+    expect(odbVueCapabilities.find((capability) => capability.name === 'acl')).toMatchObject({
+      kind: 'infrastructure',
+      title: 'Network ACL',
+      icon: '$mdiShieldLock',
+    })
+    expect(Object.keys(pages).some((path) => path.endsWith('/capabilities/acl.vue'))).toBe(true)
   })
 
   it.each(Object.entries(pages))('restricts %s to administrators', (_path, source) => {

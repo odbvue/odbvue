@@ -10,6 +10,7 @@ import {
   odbSettings,
   odbStorage,
   odbEmails,
+  odbAcl,
   odbType,
   PlsqlStatement,
   type Package,
@@ -423,6 +424,45 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
     summary: 'Send or retry a queued email (never resend a delivered message)',
     uri: { id: retryEmail.parameters.id },
   })
+  const listAcl = pkg.proc(
+    'list_acl',
+    { out: { items: odbType.resultset() } },
+    ({ params: { items }, body }) => body.call(odbAcl.list(items)),
+  )
+  defineService(listAcl, {
+    auth: { roles: ['admin'] },
+    method: 'GET',
+    path: '/acl',
+    summary: 'List application HTTP and SMTP host grants',
+    response: { items: listAcl.parameters.items },
+  })
+  for (const protocol of ['http', 'smtp'] as const) {
+    for (const action of ['add', 'remove'] as const) {
+      const operation = pkg.proc(
+        `${action}_${protocol}_acl`,
+        { in: { host: odbAcl.types.host, port: odbAcl.types.port } },
+        ({ params: { host, port }, body }) => {
+          const call =
+            protocol === 'http'
+              ? action === 'add'
+                ? odbAcl.addHttp
+                : odbAcl.removeHttp
+              : action === 'add'
+                ? odbAcl.addSmtp
+                : odbAcl.removeSmtp
+          body.call(call(host, port))
+        },
+      )
+      defineService(operation, {
+        auth: { roles: ['admin'] },
+        method: action === 'add' ? 'PUT' : 'DELETE',
+        path: `/acl/${protocol}/:host`,
+        summary: `${action === 'add' ? 'Grant' : 'Remove'} application ${protocol.toUpperCase()} host access`,
+        uri: { host: operation.parameters.host },
+        query: { port: operation.parameters.port },
+      })
+    }
+  }
   return {}
 })
 

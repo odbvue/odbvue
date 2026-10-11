@@ -10,6 +10,7 @@ import {
   odbAudit,
   odbStorage,
   odbEmails,
+  odbAcl,
 } from '@odbvue/odb'
 
 const schemaName = odbEnv.schemaUsername
@@ -31,6 +32,7 @@ export const migration = defineMigration('00000000000000_bootstrap', {
   .install(odbRateLimit)
   .install(odbAuth)
   .install(odbSettings)
+  .install(odbAcl)
   .install(odbLob)
   .install(odbAudit)
   .install(odbStorage)

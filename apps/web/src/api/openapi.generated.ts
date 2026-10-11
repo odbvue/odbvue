@@ -247,6 +247,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sandbox/acl": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List application HTTP and SMTP host grants */
+        get: operations["sandbox_list_acl"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sandbox/acl/http/{host}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Grant application HTTP host access */
+        put: operations["sandbox_add_http_acl"];
+        post?: never;
+        /** Remove application HTTP host access */
+        delete: operations["sandbox_remove_http_acl"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sandbox/acl/smtp/{host}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Grant application SMTP host access */
+        put: operations["sandbox_add_smtp_acl"];
+        post?: never;
+        /** Remove application SMTP host access */
+        delete: operations["sandbox_remove_smtp_acl"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -333,6 +386,19 @@ export interface components {
             items: components["schemas"]["SandboxListEmailsItemsItem"][];
         };
         SandboxRetryEmailResponse: Record<string, never>;
+        SandboxListAclItemsItem: {
+            host: string;
+            lowerPort?: number | null;
+            upperPort?: number | null;
+            privilege: string;
+        };
+        SandboxListAclResponse: {
+            items: components["schemas"]["SandboxListAclItemsItem"][];
+        };
+        SandboxAddHttpAclResponse: Record<string, never>;
+        SandboxRemoveHttpAclResponse: Record<string, never>;
+        SandboxAddSmtpAclResponse: Record<string, never>;
+        SandboxRemoveSmtpAclResponse: Record<string, never>;
     };
     responses: never;
     parameters: never;
@@ -971,6 +1037,192 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SandboxRetryEmailResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient authorization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    sandbox_list_acl: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxListAclResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient authorization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    sandbox_add_http_acl: {
+        parameters: {
+            query?: {
+                port?: number;
+            };
+            header?: never;
+            path: {
+                host: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxAddHttpAclResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient authorization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    sandbox_remove_http_acl: {
+        parameters: {
+            query?: {
+                port?: number;
+            };
+            header?: never;
+            path: {
+                host: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxRemoveHttpAclResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient authorization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    sandbox_add_smtp_acl: {
+        parameters: {
+            query?: {
+                port?: number;
+            };
+            header?: never;
+            path: {
+                host: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxAddSmtpAclResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient authorization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    sandbox_remove_smtp_acl: {
+        parameters: {
+            query?: {
+                port?: number;
+            };
+            header?: never;
+            path: {
+                host: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxRemoveSmtpAclResponse"];
                 };
             };
             /** @description Authentication required */

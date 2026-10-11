@@ -155,7 +155,6 @@ describe('CLI SMTP settings setup', () => {
     expect(state.connection.execute.mock.calls[0]![1]).toEqual({
       ...settings,
       port_value: '587',
-      schema: 'APP',
     })
     expect(state.connection.commit).toHaveBeenCalledTimes(1)
   })
@@ -234,7 +233,7 @@ describe('CLI SMTP settings setup', () => {
     state.schema = ' app '
     await expect(runSetupSettings()).resolves.toBe(true)
     const [sql, bindings] = state.connection.execute.mock.calls[0]!
-    expect(bindings).toEqual({ ...settings, port_value: '587', schema: 'APP' })
+    expect(bindings).toEqual({ ...settings, port_value: '587' })
     for (const [id, bind] of [
       ['SMTP_HOST', 'host'],
       ['SMTP_PORT', 'port_value'],
@@ -245,19 +244,13 @@ describe('CLI SMTP settings setup', () => {
     ]) {
       expect(sql).toContain(`APP.odb_settings.write('${id}', :${bind}, NULL)`)
     }
-    expect(sql).toContain(
-      'DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE(host => :host, lower_port => :port, upper_port => :port',
-    )
-    expect(sql).toContain("privilege_list => XS$NAME_LIST('smtp'), principal_name => :schema")
+    expect(sql).toContain('APP.odb_acl.add_smtp(:host, :port)')
     expect(sql).toContain('IF l_old_host <> :host OR l_old_port <> :port THEN')
-    expect(sql).toContain('FROM dba_host_aces')
-    expect(sql).toContain(
-      "AND principal = :schema AND lower(privilege) = 'smtp' AND grant_type = 'GRANT'",
-    )
-    expect(sql).toContain('IF l_count > 0 THEN')
-    expect(sql).toContain(
-      'DBMS_NETWORK_ACL_ADMIN.REMOVE_HOST_ACE(host => l_old_host, lower_port => l_old_port, upper_port => l_old_port',
-    )
+    expect(sql).toContain('length(l_old_host) <= 255')
+    expect(sql).toContain('IF l_old_port BETWEEN 1 AND 65535 THEN')
+    expect(sql).toContain('APP.odb_acl.remove_smtp(l_old_host, l_old_port)')
+    expect(sql).not.toContain('DBMS_NETWORK_ACL_ADMIN')
+    expect(sql).not.toContain('dba_host_aces')
     expect(sql).not.toContain(settings.password)
     expect(sql).not.toContain(settings.username)
     expect(state.connection.execute).toHaveBeenCalledTimes(1)

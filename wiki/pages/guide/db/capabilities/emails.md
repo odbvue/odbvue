@@ -77,7 +77,8 @@ Keep files containing credentials out of source control.
 Without a file, the command prompts for all six values. It connects using
 the current environment's ADMIN wallet and credentials and uses
 `ODBVUE_ADB_SCHEMA_USERNAME` as the settings owner and ACL principal. It writes
-values through `odb_settings.write` using bind variables and grants only `smtp`
+values through `odb_settings.write` using bind variables. It calls
+[`odbAcl`](./acl) to remove and add host grants, granting only `smtp`
 on the chosen host and port. On reconfiguration it removes the prior configured
 host/port's SMTP grant for that schema, if present; other privileges are untouched.
 Settings and ACL changes commit together or roll back on failure. Cancelling a
@@ -90,7 +91,8 @@ Do not reset an existing database just to configure SMTP.
 
 Individual values can also be edited with the admin Settings page or, for example,
 `PUT /sandbox/settings/SMTP_HOST`. Those edits do not update ACLs; use the CLI
-when changing the host or port. Do not place real credentials in migrations or
+when changing the host or port. The Network ACL sandbox page can manage grants
+independently, but does not change SMTP settings. Do not place real credentials in migrations or
 source control. Settings are admin-only, but are not encrypted at rest by this
 capability.
 

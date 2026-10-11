@@ -96,6 +96,13 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     icon: '$mdiCog',
   }),
   defineCapabilityMetadata({
+    name: 'acl',
+    kind: 'infrastructure',
+    title: 'Network ACL',
+    description: 'Application-schema HTTP and SMTP host grants with exact-port access control.',
+    icon: '$mdiShieldLock',
+  }),
+  defineCapabilityMetadata({
     name: 'rate-limit',
     kind: 'infrastructure',
     required: true,

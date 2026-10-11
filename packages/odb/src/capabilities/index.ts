@@ -1,4 +1,5 @@
 export * from './contracts.js'
+export * from './acl/index.js'
 export * from './audit/index.js'
 export * from './settings/index.js'
 export * from './auth/index.js'

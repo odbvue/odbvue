@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { generateApplicationOpenApi } from '../src/application.js'
+import { odbAclPackage } from '../src/capabilities/acl/index.js'
 
 beforeAll(() => {
   process.env.ODBVUE_ADB_SCHEMA_USERNAME = 'ODBVUE'
@@ -35,7 +36,11 @@ describe('app-owned ORDS migrations', () => {
       expect(sql).toContain(`ODBVUE.odb_settings.write('${id}', ''`)
     }
     expect(sql).not.toContain("ODBVUE.odb_settings.write('smtp'")
-    expect(sql).not.toContain('DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE')
+    const aclPackageSql = odbAclPackage.toSQLUp({ schema: 'ODBVUE' })
+    expect(sql).toContain(aclPackageSql)
+    const bootstrapSql = sql.replace(aclPackageSql, '')
+    expect(bootstrapSql).not.toContain('DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE')
+    expect(bootstrapSql).not.toMatch(/odb_acl\.add_(?:http|smtp)\s*\(/i)
     const schemaSql = (await migrations['00000000000000-bootstrap']()).schema.toSQLUp()
     expect(schemaSql).toContain('GRANT EXECUTE ON UTL_SMTP TO ODBVUE')
     const down = (await load('00000000000000-bootstrap')).compile().down().join('\n')

@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import prompts, { type PromptObject } from 'prompts'
 
-import { odbDbmsNetworkAclAdmin, odbSettings, withConnection } from '@odbvue/odb'
+import { odbAcl, odbSettings, withConnection } from '@odbvue/odb'
 
 import { SecretsStore } from '../adapters/secrets-store.js'
 import { logger } from '../shared/logger.js'
@@ -140,20 +140,8 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
     throw new Error('A valid schema username is required in ODBVUE_ADB_SCHEMA_USERNAME')
   }
 
-  const ace =
-    "XS$ACE_TYPE(privilege_list => XS$NAME_LIST('smtp'), principal_name => :schema, principal_type => XS_ACL.PTYPE_DB)"
-  const append = odbDbmsNetworkAclAdmin
-    .appendHostAce(':host', ace, {
-      lowerPort: ':port',
-      upperPort: ':port',
-    })
-    .toSQL()
-  const remove = odbDbmsNetworkAclAdmin
-    .removeHostAce('l_old_host', ace, {
-      lowerPort: 'l_old_port',
-      upperPort: 'l_old_port',
-    })
-    .toSQL()
+  const append = odbAcl.addSmtp(':host', ':port').toSQL()
+  const remove = odbAcl.removeSmtp('l_old_host', 'l_old_port').toSQL()
   const writes = [
     ['SMTP_HOST', 'host'],
     ['SMTP_PORT', 'port_value'],
@@ -170,28 +158,26 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
   l_old_port_value VARCHAR2(2000);
   l_old_port PLS_INTEGER;
   l_meta CLOB;
-  l_count PLS_INTEGER;
 BEGIN
   ${schema}.${odbSettings.read("'SMTP_HOST'", 'l_old_host', 'l_meta').toSQL()};
   ${schema}.${odbSettings.read("'SMTP_PORT'", 'l_old_port_value', 'l_meta').toSQL()};
-  IF l_old_host IS NOT NULL AND regexp_like(l_old_port_value, '^[0-9]{1,5}$') THEN
+  IF l_old_host IS NOT NULL AND length(l_old_host) <= 255
+    AND regexp_like(l_old_host, '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$')
+    AND regexp_like(l_old_port_value, '^[0-9]{1,5}$') THEN
     l_old_port := to_number(l_old_port_value);
-    IF l_old_host <> :host OR l_old_port <> :port THEN
-      SELECT count(*) INTO l_count FROM dba_host_aces
-      WHERE host = l_old_host AND lower_port = l_old_port AND upper_port = l_old_port
-        AND principal = :schema AND lower(privilege) = 'smtp' AND grant_type = 'GRANT';
-      IF l_count > 0 THEN
-        ${remove};
+    IF l_old_port BETWEEN 1 AND 65535 THEN
+      IF l_old_host <> :host OR l_old_port <> :port THEN
+        ${schema}.${remove};
       END IF;
     END IF;
   END IF;
-  ${append};
+  ${schema}.${append};
 ${writes}
 END;`
 
   await withConnection(buildConnectionConfig(false), async (_connection, executor) => {
     await executor.transaction(async (tx) => {
-      await tx.run(sql, { ...settings, port_value: String(settings.port), schema })
+      await tx.run(sql, { ...settings, port_value: String(settings.port) })
     })
   })
   logger.success(`SMTP settings saved and host ACL updated for ${schema}.`)
