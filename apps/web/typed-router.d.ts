@@ -173,6 +173,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/sandbox/capabilities/emails': RouteRecordInfo<
+      '/sandbox/capabilities/emails',
+      '/sandbox/capabilities/emails',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/sandbox/capabilities/errors': RouteRecordInfo<
       '/sandbox/capabilities/errors',
       '/sandbox/capabilities/errors',
@@ -413,6 +420,14 @@ declare module 'vue-router/auto-routes' {
     'src/modules/sandbox/pages/capabilities/components/view.vue': {
       routes:
         | '/sandbox/capabilities/components/view'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/modules/sandbox/pages/capabilities/emails.vue': {
+      routes:
+        | '/sandbox/capabilities/emails'
       views:
         | never
       pathParamNames:

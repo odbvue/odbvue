@@ -2,6 +2,30 @@
 @username = admin
 @password = change-me
 @settingId = SANDBOX_DEMO
+@emailAddress = recipient@example.com
+@emailId = replace-with-queued-email-id
+
+### Send HTML email (configure smtp settings first; admin role required)
+POST {{baseUrl}}/sandbox/emails
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "address": "{{emailAddress}}",
+  "name": "Sandbox recipient",
+  "subject": "OdbVue sandbox email",
+  "content": "<p>Hello from OdbVue.</p>",
+  "priority": 3,
+  "attachmentId": null
+}
+
+### Email delivery history
+GET {{baseUrl}}/sandbox/emails?limit=51
+Authorization: Bearer {{accessToken}}
+
+### Retry a queued email
+POST {{baseUrl}}/sandbox/emails/{{emailId}}/send
+Authorization: Bearer {{accessToken}}
 
 ### Login (Set-Cookie holds the refresh token; REST Client keeps it for refresh/logout)
 # @name login

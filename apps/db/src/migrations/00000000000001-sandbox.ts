@@ -9,6 +9,7 @@ import {
   odbPackage,
   odbSettings,
   odbStorage,
+  odbEmails,
   odbType,
   PlsqlStatement,
   type Package,
@@ -348,6 +349,79 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
     summary: 'Delete your file',
     context: { userId: removeStorage.parameters.ownerId },
     uri: { id: removeStorage.parameters.id },
+  })
+
+  const sendEmail = pkg.proc(
+    'send_email',
+    {
+      in: {
+        ownerId: odbStorage.types.ownerId,
+        address: odbEmails.types.address,
+        name: odbEmails.types.name,
+        subject: odbEmails.types.subject,
+        content: odbEmails.types.content,
+        priority: odbEmails.types.priority,
+        attachmentId: odbStorage.types.id,
+      },
+      out: { id: odbEmails.types.id },
+    },
+    ({
+      params: { ownerId, address, name, subject, content, priority, attachmentId, id },
+      body,
+    }) => {
+      body.call(odbEmails.mail(address, name, subject, content, priority, id))
+      body.ifThen(cond.isNotNull(attachmentId), (then) =>
+        then.call(odbEmails.attc(id, ownerId, attachmentId)),
+      )
+      body.commit()
+      body.call(odbEmails.send(id))
+    },
+  )
+  defineService(sendEmail, {
+    auth: { roles: ['admin'] },
+    method: 'POST',
+    path: '/emails',
+    summary: 'Queue and send an HTML email with an optional stored attachment',
+    context: { userId: sendEmail.parameters.ownerId },
+    body: {
+      address: sendEmail.parameters.address,
+      name: sendEmail.parameters.name,
+      subject: sendEmail.parameters.subject,
+      content: sendEmail.parameters.content,
+      priority: sendEmail.parameters.priority,
+      attachmentId: sendEmail.parameters.attachmentId,
+    },
+    response: { id: sendEmail.parameters.id },
+  })
+
+  const listEmails = pkg.proc(
+    'list_emails',
+    {
+      in: { after: odbEmails.types.id, limit: odbType.integer() },
+      out: { items: odbType.resultset() },
+    },
+    ({ params: { after, limit, items }, body }) => body.call(odbEmails.list(after, limit, items)),
+  )
+  defineService(listEmails, {
+    auth: { roles: ['admin'] },
+    method: 'GET',
+    path: '/emails',
+    summary: 'List email delivery status and errors',
+    query: { cursor: listEmails.parameters.after, limit: listEmails.parameters.limit },
+    response: { items: listEmails.parameters.items },
+  })
+
+  const retryEmail = pkg.proc(
+    'retry_email',
+    { in: { id: odbEmails.types.id } },
+    ({ params: { id }, body }) => body.call(odbEmails.send(id)),
+  )
+  defineService(retryEmail, {
+    auth: { roles: ['admin'] },
+    method: 'POST',
+    path: '/emails/:id/send',
+    summary: 'Send or retry a queued email (never resend a delivered message)',
+    uri: { id: retryEmail.parameters.id },
   })
   return {}
 })

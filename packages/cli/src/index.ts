@@ -7,6 +7,7 @@ import { version } from './shared/version.js'
 import { EnvironmentStore } from './adapters/environment-store.js'
 
 import { registerSetupCommand } from './commands/setup.js'
+import { registerSetupSettingsCommand } from './commands/setup-settings.js'
 import { registerImplodeCommand } from './commands/implode.js'
 
 import { registerEnvironmentSetCommand } from './commands/environment-set.js'
@@ -36,6 +37,7 @@ if (currentEnv) logger.msg(`Environment: ${currentEnv}`)
 logger.lf()
 
 registerSetupCommand(program)
+registerSetupSettingsCommand(program)
 registerImplodeCommand(program)
 
 registerEnvironmentSetCommand(program)

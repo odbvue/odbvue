@@ -9,6 +9,7 @@ import {
   odbSettings,
   odbAudit,
   odbStorage,
+  odbEmails,
 } from '@odbvue/odb'
 
 const schemaName = odbEnv.schemaUsername
@@ -20,6 +21,7 @@ export const schema = odbSchema(schemaName, schemaPassword, (definition) => {
   definition.grant('EXECUTE ON UTL_I18N')
   definition.grant('EXECUTE ON UTL_INADDR')
   definition.grant('EXECUTE ON UTL_TCP')
+  definition.grant('EXECUTE ON UTL_SMTP')
 })
 
 export const migration = defineMigration('00000000000000_bootstrap', {
@@ -32,6 +34,17 @@ export const migration = defineMigration('00000000000000_bootstrap', {
   .install(odbLob)
   .install(odbAudit)
   .install(odbStorage)
+  .install(odbEmails)
+  .install(
+    odbSettings.seed(
+      { id: 'SMTP_HOST', value: '', meta: { label: 'SMTP host', type: 'string' } },
+      { id: 'SMTP_PORT', value: '', meta: { label: 'SMTP port', type: 'number' } },
+      { id: 'SMTP_USERNAME', value: '', meta: { label: 'SMTP username', type: 'string' } },
+      { id: 'SMTP_PASSWORD', value: '', meta: { label: 'SMTP password', type: 'string' } },
+      { id: 'SMTP_FROM_ADDR', value: '', meta: { label: 'SMTP sender address', type: 'string' } },
+      { id: 'SMTP_FROM_NAME', value: '', meta: { label: 'SMTP sender name', type: 'string' } },
+    ),
+  )
   .install(
     odbSettings.seed({
       id: 'APP_VERSION',

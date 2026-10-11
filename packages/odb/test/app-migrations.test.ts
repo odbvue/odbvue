@@ -18,6 +18,70 @@ const migrations = {
 const load = async (file: keyof typeof migrations) => (await migrations[file]()).migration
 
 describe('app-owned ORDS migrations', () => {
+  it('installs emails and seeds six empty SMTP settings without a host ACL', async () => {
+    const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
+    expect(sql).toContain('CREATE TABLE ODBVUE.odb_emails_queue')
+    expect(sql).toContain('CREATE TABLE ODBVUE.odb_emails_addr')
+    expect(sql).toContain('CREATE TABLE ODBVUE.odb_emails_attc')
+    expect(sql).toContain('CREATE OR REPLACE PACKAGE ODBVUE.odb_emails AS')
+    for (const id of [
+      'SMTP_HOST',
+      'SMTP_PORT',
+      'SMTP_USERNAME',
+      'SMTP_PASSWORD',
+      'SMTP_FROM_ADDR',
+      'SMTP_FROM_NAME',
+    ]) {
+      expect(sql).toContain(`ODBVUE.odb_settings.write('${id}', ''`)
+    }
+    expect(sql).not.toContain("ODBVUE.odb_settings.write('smtp'")
+    expect(sql).not.toContain('DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE')
+    const schemaSql = (await migrations['00000000000000-bootstrap']()).schema.toSQLUp()
+    expect(schemaSql).toContain('GRANT EXECUTE ON UTL_SMTP TO ODBVUE')
+    const down = (await load('00000000000000-bootstrap')).compile().down().join('\n')
+    expect(down).not.toContain('DBMS_NETWORK_ACL_ADMIN.REMOVE_HOST_ACE')
+    expect(down).toContain("ODBVUE.odb_settings.remove('SMTP_HOST')")
+  })
+
+  it('exposes admin-only email send, history and retry services with owner-scoped attachments', async () => {
+    const migration = await load('00000000000001-sandbox')
+    const sql = migration.compile().up().join('\n')
+    expect(sql).toContain(
+      'odb_emails.mail(p_address, p_name, p_subject, p_content, p_priority, p_id)',
+    )
+    expect(sql).toContain('odb_emails.attc(p_id, p_owner_id, p_attachment_id)')
+    expect(sql).toMatch(/COMMIT;\s+odb_emails.send\(p_id, 300\)/)
+    expect(sql).toContain('odb_emails.list(p_after, p_limit, p_items)')
+    expect(sql).toContain("v_body_json.get_clob(''content'')")
+    expect(sql).not.toContain('odb_emails_queue')
+    const openapi = generateApplicationOpenApi(migration.applications()[0]) as {
+      paths: Record<string, Record<string, { security: unknown; parameters?: { name: string }[] }>>
+    }
+    for (const [path, method] of [
+      ['/sandbox/emails', 'post'],
+      ['/sandbox/emails', 'get'],
+      ['/sandbox/emails/{id}/send', 'post'],
+    ]) {
+      const operation = openapi.paths[path!]?.[method!]
+      expect(operation?.security).toEqual([{ bearerAuth: [] }])
+      expect(operation?.parameters).not.toContainEqual(expect.objectContaining({ name: 'ownerId' }))
+    }
+    expect(sql).toContain("odb_auth.has_role(v_auth_user_id, ''admin'')")
+    expect(openapi).toMatchObject({
+      components: {
+        schemas: {
+          SandboxListEmailsItemsItem: {
+            properties: {
+              id: { type: 'string' },
+              attempts: { type: 'number' },
+              error: { type: ['string', 'null'] },
+            },
+          },
+        },
+      },
+    })
+  })
+
   it('seeds the configured application admin credentials and role grant', async () => {
     const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
     expect(sql).toContain("ODBVUE.odb_auth_crypto.hash_password('CustomSecure123!')")

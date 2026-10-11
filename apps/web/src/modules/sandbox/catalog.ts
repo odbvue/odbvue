@@ -118,10 +118,11 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     icon: '$mdiCreation',
   }),
   defineCapabilityMetadata({
-    name: 'email',
+    name: 'emails',
     kind: 'integration',
-    title: 'Email',
-    description: 'Email provider integration.',
+    requires: ['settings', 'storage'],
+    title: 'Emails',
+    description: 'SMTP delivery, attachments, and delivery history.',
     icon: '$mdiEmail',
   }),
 ] as const
