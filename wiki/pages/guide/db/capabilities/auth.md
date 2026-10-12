@@ -118,13 +118,13 @@ migration
 
 body.call(odbAuth.role.grant(userId, odbLiteral('admin')))
 body.call(odbAuth.role.revoke(userId, odbLiteral('admin')))
-body.call(odbAuth.perm.grant(odbLiteral('admin'), odbLiteral('settings.read')))
-body.call(odbAuth.perm.revoke(odbLiteral('admin'), odbLiteral('settings.read')))
+body.call(odbAuth.permission.grant(odbLiteral('admin'), odbLiteral('settings.read')))
+body.call(odbAuth.permission.revoke(odbLiteral('admin'), odbLiteral('settings.read')))
 body.call(odbAuth.role.require(userId, odbLiteral('admin')))
-body.call(odbAuth.perm.require(userId, odbLiteral('settings.read')))
+body.call(odbAuth.permission.require(userId, odbLiteral('settings.read')))
 ```
 
-`role.has` and `perm.has` return typed BOOLEAN expressions. `role.define` upserts role descriptions. `role.grant` accepts optional `validFrom` and `validTo` expressions and replaces an existing assignment's validity window. Grant-management calls do not commit and do not authorize their caller; expose administrative operations only through protected application services. Seeds upsert or add records; omitting a permission from a seed does not revoke it.
+`role.has` and `permission.has` return typed BOOLEAN expressions. `role.define` upserts role descriptions. `role.grant` accepts optional `validFrom` and `validTo` expressions and replaces an existing assignment's validity window. Grant-management calls do not commit and do not authorize their caller; expose administrative operations only through protected application services. Seeds upsert or add records; omitting a permission from a seed does not revoke it.
 
 For a procedure that needs the verified caller, declare an ordinary IN string parameter and bind it with `context: { userId: procedure.parameters.userId }`. This binding is available only to protected services and is never exposed as a request parameter. Internal package callers still pass the identity explicitly; framework business capabilities such as settings do not enforce application policy.
 

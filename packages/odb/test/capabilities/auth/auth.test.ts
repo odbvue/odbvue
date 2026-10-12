@@ -144,7 +144,7 @@ describe('odbAuth framework package', () => {
     expect(sql).toContain('SELECT DISTINCT rp.permission')
     expect(sql).toContain('l_permission_array.append(permission_row.permission)')
     expect(odbAuth.role.has('l_id', 'p_role').toSQL()).toBe('odb_auth.has_role(l_id, p_role)')
-    expect(odbAuth.perm.require('l_id', 'p_permission').toSQL()).toBe(
+    expect(odbAuth.permission.require('l_id', 'p_permission').toSQL()).toBe(
       'odb_auth.require_permission(l_id, p_permission)',
     )
     expect(
@@ -156,6 +156,22 @@ describe('odbAuth framework package', () => {
       odbAuth.role.seedGrant({ username: 'admin', role: 'admin' }).toSQLUp({ schema: 'APP' }),
     ).toContain("APP.odb_auth.grant_role(v_user_id, 'admin')")
   })
+  it('exposes permission helpers with unchanged SQL calls', () => {
+    expect(odbAuth.permission.has('l_id', 'p_permission').toSQL()).toBe(
+      'odb_auth.has_permission(l_id, p_permission)',
+    )
+    expect(odbAuth.permission.require('l_id', 'p_permission').toSQL()).toBe(
+      'odb_auth.require_permission(l_id, p_permission)',
+    )
+    expect(odbAuth.permission.grant('p_role', 'p_permission').toSQL()).toBe(
+      'odb_auth.grant_permission(p_role, p_permission)',
+    )
+    expect(odbAuth.permission.revoke('p_role', 'p_permission').toSQL()).toBe(
+      'odb_auth.revoke_permission(p_role, p_permission)',
+    )
+    expect(odbAuth).not.toHaveProperty('perm')
+  })
+
   it('emits tables and auth primitives without ORDS endpoints', () => {
     const sql = odbAuth.toSQLUp({ schema: 'APP', jwtSecret: 'x'.repeat(32) })
     expect(sql).toContain('CREATE TABLE APP.odb_auth_users')
