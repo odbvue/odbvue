@@ -17,18 +17,15 @@ describe('Network ACL capability', () => {
     expect(sql).not.toContain('odb_http')
   })
 
-  it('installs direct privileges before compiling the definer-rights package', () => {
-    expect(sql.indexOf('GRANT EXECUTE ON SYS.DBMS_NETWORK_ACL_ADMIN TO APP;')).toBeLessThan(
-      sql.indexOf('CREATE OR REPLACE PACKAGE'),
-    )
-    expect(sql.indexOf('GRANT SELECT ON SYS.DBA_HOST_ACES TO APP;')).toBeLessThan(
-      sql.indexOf('CREATE OR REPLACE PACKAGE'),
-    )
+  it('installs only the definer-rights package without provisioning privileges', () => {
+    expect(sql).toBe(odbAclPackage.toSQLUp({ schema: 'APP' }))
+    expect(sql).not.toMatch(/^\s*GRANT\s/im)
     expect(sql).not.toContain('AUTHID CURRENT_USER')
     expect(() => odbAcl.toSQLUp({ schema: 'APP; DROP USER OTHER' })).toThrow(
       'Invalid Oracle schema',
     )
-    expect(odbAcl.toSQLUp()).not.toContain('GRANT EXECUTE')
+    expect(odbAcl.toSQLUp()).toBe(odbAclPackage.toSQLUp())
+    expect(odbAcl.toSQLUp()).not.toMatch(/^\s*GRANT\s/im)
   })
 
   it('defaults helper calls to exact ports 443 and 587 and supports numeric or expression ports', () => {

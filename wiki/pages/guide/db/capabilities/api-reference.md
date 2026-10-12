@@ -5,7 +5,7 @@
 `odbAcl` provides `addHttp(host, port?)`, `removeHttp(host, port?)`,
 `addSmtp(host, port?)`, `removeSmtp(host, port?)`, and `list(items)` for the
 application schema. Default exact ports are 443 and 587; only `http` or `smtp`
-is granted. See the [Network ACL guide](./acl) for installation privileges,
+is granted. See the [Network ACL guide](./acl) for schema provisioning prerequisites,
 typed calls, and sandbox services.
 
 ## Emails

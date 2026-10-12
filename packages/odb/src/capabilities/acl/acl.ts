@@ -13,10 +13,7 @@ export const odbAcl = {
     if (options.schema && !/^[A-Za-z][A-Za-z0-9_$#]{0,127}$/.test(options.schema)) {
       throw new Error(`Invalid Oracle schema name: ${options.schema}`)
     }
-    const grants = options.schema
-      ? `GRANT EXECUTE ON SYS.DBMS_NETWORK_ACL_ADMIN TO ${options.schema};\nGRANT SELECT ON SYS.DBA_HOST_ACES TO ${options.schema};\n`
-      : ''
-    return grants + odbAclPackage.toSQLUp(options)
+    return odbAclPackage.toSQLUp(options)
   },
   toSQLDown(options: { schema?: string } = {}): string {
     return odbAclPackage.toSQLDown(options)

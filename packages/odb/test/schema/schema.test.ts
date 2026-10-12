@@ -4,6 +4,20 @@ import { odbSchema } from '../../src/schema/schema.js'
 import { splitSqlStatements } from '../../src/execution/sql.js'
 
 describe('odbSchema', () => {
+  it('provisions direct execute and select object grants', () => {
+    const schema = odbSchema('APP', 'secret', (definition) => {
+      definition.grant('EXECUTE ON SYS.DBMS_NETWORK_ACL_ADMIN')
+      definition.grant('SELECT ON SYS.DBA_HOST_ACES')
+    })
+
+    expect(schema.toNode().grants).toEqual([
+      'EXECUTE ON SYS.DBMS_NETWORK_ACL_ADMIN',
+      'SELECT ON SYS.DBA_HOST_ACES',
+    ])
+    expect(schema.toSQLUp()).toContain('GRANT EXECUTE ON SYS.DBMS_NETWORK_ACL_ADMIN TO APP;')
+    expect(schema.toSQLUp()).toContain('GRANT SELECT ON SYS.DBA_HOST_ACES TO APP;')
+  })
+
   it('enables OCI resource principals only when requested', () => {
     const schema = odbSchema('ODB', 'secret', (definition) => definition.enableResourcePrincipal())
 

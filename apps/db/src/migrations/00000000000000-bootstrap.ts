@@ -23,6 +23,8 @@ export const schema = odbSchema(schemaName, schemaPassword, (definition) => {
   definition.grant('EXECUTE ON UTL_INADDR')
   definition.grant('EXECUTE ON UTL_TCP')
   definition.grant('EXECUTE ON UTL_SMTP')
+  definition.grant('EXECUTE ON SYS.DBMS_NETWORK_ACL_ADMIN')
+  definition.grant('SELECT ON SYS.DBA_HOST_ACES')
 })
 
 export const migration = defineMigration('00000000000000_bootstrap', {

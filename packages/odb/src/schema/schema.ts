@@ -1,4 +1,10 @@
-export type Grant = 'SELECT' | 'INSERT' | 'UPDATE' | 'DELETE' | `EXECUTE ON ${string}`
+export type Grant =
+  | 'SELECT'
+  | 'INSERT'
+  | 'UPDATE'
+  | 'DELETE'
+  | `EXECUTE ON ${string}`
+  | `SELECT ON ${string}`
 
 export type SchemaNode = {
   kind: 'schema'

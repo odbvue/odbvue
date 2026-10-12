@@ -7,15 +7,22 @@ administrator connection. It does not accept an arbitrary principal.
 ## Install
 
 ```ts
-import { defineMigration, odbAcl } from '@odbvue/odb'
+import { defineMigration, odbAcl, odbSchema } from '@odbvue/odb'
+
+export const schema = odbSchema('APP', schemaPassword, (definition) => {
+  definition.grant('EXECUTE ON SYS.DBMS_NETWORK_ACL_ADMIN')
+  definition.grant('SELECT ON SYS.DBA_HOST_ACES')
+})
 
 export const migration = defineMigration('20261011140000_acl', { schema: 'APP' }).install(odbAcl)
 ```
 
-With a target schema, installation grants `EXECUTE ON SYS.DBMS_NETWORK_ACL_ADMIN`
-and `SELECT ON SYS.DBA_HOST_ACES` directly to that schema before compiling the
-package. Run installation as an administrator permitted to grant these privileges.
-Without a target schema, provision these direct grants before installation.
+Supply `schemaPassword` from your environment. Schema/environment provisioning
+must grant `EXECUTE ON SYS.DBMS_NETWORK_ACL_ADMIN` and
+`SELECT ON SYS.DBA_HOST_ACES` directly to the application schema before compiling
+the package. Run provisioning as an administrator permitted to grant these
+privileges. Capability installation creates only database objects and does not
+grant privileges, with or without a target schema.
 Role-based grants are insufficient for definer-rights PL/SQL.
 
 This is a privileged capability: the schema can administer network ACLs and read
@@ -71,11 +78,12 @@ not embedded Oracle ACL administration SQL.
 The sandbox Network ACL page lists grants and adds/removes exact-port HTTP or
 SMTP grants through admin-only `/sandbox/acl` services.
 
-Bootstrap installs `odbAcl`; the existing `pck_sandbox` package exposes its
+Bootstrap provisions the direct prerequisite privileges through `definition.grant`
+and installs `odbAcl`; the existing `pck_sandbox` package exposes its
 admin-only services. These changes target a fresh database redeployment.
 Editing already-applied migrations does not upgrade an existing database.
 Regenerate the deployed OpenAPI manifest and web types after redeployment.
 
 Uninstalling `odbAcl` drops the package, not existing host grants or the direct
-installation privileges. Removing grants and privileges is an explicit
+schema privileges. Removing grants and privileges is an explicit
 administrator operation.
