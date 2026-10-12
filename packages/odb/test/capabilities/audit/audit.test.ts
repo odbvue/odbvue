@@ -1,9 +1,35 @@
 import { describe, expect, it } from 'vitest'
 import { odbAudit } from '../../../src/capabilities/audit/audit.js'
+import { odbLiteral } from '../../../src/schema/attribute.js'
+import { odbOracle } from '../../../src/oracle/index.js'
 import { ProcedureBody } from '../../../src/schema/package.js'
 
 describe('odbAudit (framework package odb_audit)', () => {
   describe('install / drop SQL', () => {
+    it('maps every severity case-insensitively and defaults unknown or NULL values to INFO', () => {
+      const sql = odbAudit.toSQLUp()
+      const start = sql.indexOf('FUNCTION severity_number', sql.indexOf('PACKAGE BODY'))
+      const end = sql.indexOf('END severity_number;', start)
+      expect(start).toBeGreaterThan(-1)
+      expect(end).toBeGreaterThan(start)
+      const implementation = sql.slice(start, end)
+      for (const [name, number] of [
+        ['TRACE', 1],
+        ['DEBUG', 5],
+        ['INFO', 9],
+        ['WARN', 13],
+        ['ERROR', 17],
+        ['FATAL', 21],
+      ] as const) {
+        expect(implementation).toMatch(
+          new RegExp(
+            `IF UPPER\\(p_severity_text\\) = '${name}' THEN\\s+RETURN ${number};\\s+END IF;`,
+          ),
+        )
+      }
+      expect(implementation.trimEnd()).toMatch(/RETURN 9;$/)
+    })
+
     it('lists newest first with a timestamp and id keyset', () => {
       const sql = odbAudit.toSQLUp()
       expect(sql).toContain(
@@ -75,6 +101,19 @@ describe('odbAudit (framework package odb_audit)', () => {
       expect(odbAudit.warn("'msg'").toSQL()).toBe("odb_audit.warn('msg')")
       expect(odbAudit.error("'msg'", 'v_attr').toSQL()).toBe("odb_audit.error('msg', v_attr)")
       expect(odbAudit.fatal("'msg'").toSQL()).toBe("odb_audit.fatal('msg')")
+    })
+
+    it('preserves optional arguments and typed literal escaping for every severity helper', () => {
+      for (const name of ['debug', 'info', 'warn', 'error', 'fatal'] as const) {
+        const message = odbLiteral("O'Brien")
+        expect(odbAudit[name](message).toSQL()).toBe(`odb_audit.${name}('O''Brien')`)
+        expect(odbAudit[name](message, odbOracle.null()).toSQL()).toBe(
+          `odb_audit.${name}('O''Brien', NULL)`,
+        )
+      }
+      const severity = odbAudit.severityNumber(odbLiteral('WARN'))
+      expect(severity.type).toBe('PLS_INTEGER')
+      expect(severity.toSQL()).toBe("odb_audit.severity_number('WARN')")
     })
 
     it('renders log() with optional arguments', () => {

@@ -2,6 +2,12 @@
 
 Beyond authoring SQL and PL/SQL, `@odbvue/odb` is a typed toolkit that turns a single Oracle model into queries, contracts, types, and a REST client. Highlights:
 
+## Runtime capabilities and SQL escape hatches
+
+Database capabilities are implemented through ODB rather than maintained as handwritten PL/SQL packages. Their runtime control flow, queries, and package calls use the TypeScript builders. A procedure returned by `pkg.proc()` exposes `invoke(...)` for unqualified calls from another member of the same package; external callers use the package's qualified member helpers.
+
+This does not mean ODB contains no SQL/PLSQL string construction. Migration DDL, idempotent upgrade blocks, and seed scripts can still assemble SQL or anonymous PL/SQL blocks. Oracle-specific expressions and query sources, such as `JSON_TABLE`, also remain escape hatches where no dedicated builder exists. The distinction is DSL-authored business/runtime implementations, not the elimination of every SQL string.
+
 ## Typed schema and query builder
 
 Return an object from `odbTable()` to expose typed columns. The same definition infers selected rows, required inserts, nullable values, defaults, and updates.

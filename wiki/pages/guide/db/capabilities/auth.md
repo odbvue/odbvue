@@ -43,6 +43,8 @@ export const migration = defineMigration('20260913120000_auth', { schema })
 
 `seedUser()` is idempotent. Use a real secret manager for the initial password in deployed environments.
 
+The runtime packages are defined through ODB's package and query builders. Installation and seeding are a separate concern: `odbAuth.upgrade()` renders idempotent DDL blocks, and seed helpers may render anonymous PL/SQL blocks. These are intentional SQL-string escape hatches, not handwritten runtime package implementations.
+
 ## HTTP Contract
 
 The sandbox migration (`apps/db/src/migrations/00000000000001-sandbox.ts`) exposes these endpoints beneath `/auth`. `odbAuth` does not register them; the application package does:

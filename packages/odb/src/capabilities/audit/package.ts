@@ -30,21 +30,7 @@ function jsonPut(
 }
 
 function jsonToClob(target: { toSQL(): string }): PlsqlExpression<'CLOB'> {
-  return new PlsqlExpression('CLOB', `${target.toSQL()}.to_clob()`)
-}
-
-function callLog(...args: PlsqlRenderable[]): PlsqlStatement {
-  return new PlsqlStatement(`log(${args.map(renderPlsql).join(', ')})`)
-}
-
-function severityNumberOf(severityText: PlsqlRenderable): PlsqlExpression<'PLS_INTEGER'> {
-  const branches = Object.entries(SEVERITY_NUMBERS)
-    .map(([name, number]) => `WHEN '${name}' THEN ${number}`)
-    .join(' ')
-  return new PlsqlExpression(
-    'PLS_INTEGER',
-    `CASE ${odbOracle.upper(severityText).toSQL()} ${branches} ELSE ${SEVERITY_NUMBERS.INFO} END`,
-  )
+  return plsqlExpr.call('CLOB', `${target.toSQL()}.to_clob`)
 }
 
 function putWhenPresent(
@@ -115,7 +101,14 @@ export const odbAuditPackage = odbPackage('odb_audit', (pkg) => {
 
   const severityNumber = pkg.func('severity_number', auditTypes.severityNumber, (fn) => {
     const { severityText } = fn.parameters({ in: { severityText: auditTypes.severityText } })
-    fn.body((body) => body.return(severityNumberOf(severityText)))
+    fn.body((body) => {
+      for (const [name, number] of Object.entries(SEVERITY_NUMBERS)) {
+        body.ifThen(cond.eq(odbOracle.upper(severityText), name), (then) =>
+          then.return(odbLiteral(number)),
+        )
+      }
+      body.return(odbLiteral(SEVERITY_NUMBERS.INFO))
+    })
   })
 
   const attributes = pkg.func('attributes', odbType.clob(), (fn) => {
@@ -138,7 +131,7 @@ export const odbAuditPackage = odbPackage('odb_audit', (pkg) => {
       })
     fn.body((body) => {
       const { json } = body.variables({ json: odbType.custom(JSON_OBJECT) })
-      body.set(json, new PlsqlExpression(JSON_OBJECT, 'json_object_t()'))
+      body.set(json, plsqlExpr.call(JSON_OBJECT, 'json_object_t'))
       body.call(jsonPut(json, key1, value1))
       for (const [key, value] of [
         [key2, value2],
@@ -258,7 +251,7 @@ export const odbAuditPackage = odbPackage('odb_audit', (pkg) => {
       },
     },
     ({ params, body }) => {
-      body.call(callLog(odbLiteral('DEBUG'), params.body, params.attributes))
+      body.call(log.invoke(odbLiteral('DEBUG'), params.body, params.attributes))
     },
   )
 
@@ -271,7 +264,7 @@ export const odbAuditPackage = odbPackage('odb_audit', (pkg) => {
       },
     },
     ({ params, body }) => {
-      body.call(callLog(odbLiteral('INFO'), params.body, params.attributes))
+      body.call(log.invoke(odbLiteral('INFO'), params.body, params.attributes))
     },
   )
 
@@ -284,7 +277,7 @@ export const odbAuditPackage = odbPackage('odb_audit', (pkg) => {
       },
     },
     ({ params, body }) => {
-      body.call(callLog(odbLiteral('WARN'), params.body, params.attributes))
+      body.call(log.invoke(odbLiteral('WARN'), params.body, params.attributes))
     },
   )
 
@@ -297,7 +290,7 @@ export const odbAuditPackage = odbPackage('odb_audit', (pkg) => {
       },
     },
     ({ params, body }) => {
-      body.call(callLog(odbLiteral('ERROR'), params.body, params.attributes))
+      body.call(log.invoke(odbLiteral('ERROR'), params.body, params.attributes))
     },
   )
 
@@ -310,7 +303,7 @@ export const odbAuditPackage = odbPackage('odb_audit', (pkg) => {
       },
     },
     ({ params, body }) => {
-      body.call(callLog(odbLiteral('FATAL'), params.body, params.attributes))
+      body.call(log.invoke(odbLiteral('FATAL'), params.body, params.attributes))
     },
   )
 
@@ -324,7 +317,7 @@ export const odbAuditPackage = odbPackage('odb_audit', (pkg) => {
         .select(['severity_text', 'body', 'attributes', 'event_timestamp']),
       (rec, loop) => {
         loop.call(
-          callLog(
+          log.invoke(
             rec.column('severity_text'),
             rec.column('body'),
             rec.column('attributes', 'CLOB'),

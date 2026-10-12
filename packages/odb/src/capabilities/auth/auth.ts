@@ -7,7 +7,6 @@ import {
   odbLiteral,
   PlsqlExpression,
   plsqlExpr,
-  renderPlsql,
   type PlsqlRenderable,
 } from '../../schema/attribute.js'
 import { plsqlBlock, qualify } from '../../schema/ddl.js'
@@ -203,7 +202,7 @@ export const odbAuth = {
 
   /** Require a valid access token and return its authenticated user identifier. */
   requireUser(accessToken: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
-    return new PlsqlExpression('VARCHAR2', `odb_auth.require_user(${renderPlsql(accessToken)})`)
+    return odbAuthPackage.requireUser(accessToken)
   },
 
   seedUser(user: { username: string; password: string; displayName?: string }) {

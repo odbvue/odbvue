@@ -2,23 +2,10 @@
 // TypeScript. The package writes OpenTelemetry LogRecords (logs only) in an autonomous transaction
 // and enriches attributes with resource, HTTP, and exception keys.
 
-import {
-  PlsqlExpression,
-  PlsqlStatement,
-  renderPlsql,
-  type PlsqlRenderable,
-} from '../../schema/attribute.js'
+import { PlsqlExpression, PlsqlStatement, type PlsqlRenderable } from '../../schema/attribute.js'
 import { odbAuditPackage } from './package.js'
 import { auditLogs } from './tables.js'
 import { auditTypes } from './types.js'
-
-function severityCall(name: string, message: PlsqlRenderable, attributes?: PlsqlRenderable) {
-  return new PlsqlStatement(
-    attributes === undefined
-      ? `odb_audit.${name}(${renderPlsql(message)})`
-      : `odb_audit.${name}(${renderPlsql(message)}, ${renderPlsql(attributes)})`,
-  )
-}
 
 /** Installable audit capability plus typed calls into `odb_audit`. */
 export const odbAudit = {
@@ -53,32 +40,32 @@ export const odbAudit = {
 
   /** `odb_audit.debug(<body>[, <attributes>])` */
   debug(message: PlsqlRenderable, attributes?: PlsqlRenderable): PlsqlStatement {
-    return severityCall('debug', message, attributes)
+    return odbAuditPackage.debug(...(attributes === undefined ? [message] : [message, attributes]))
   },
 
   /** `odb_audit.info(<body>[, <attributes>])` */
   info(message: PlsqlRenderable, attributes?: PlsqlRenderable): PlsqlStatement {
-    return severityCall('info', message, attributes)
+    return odbAuditPackage.info(...(attributes === undefined ? [message] : [message, attributes]))
   },
 
   /** `odb_audit.warn(<body>[, <attributes>])` */
   warn(message: PlsqlRenderable, attributes?: PlsqlRenderable): PlsqlStatement {
-    return severityCall('warn', message, attributes)
+    return odbAuditPackage.warn(...(attributes === undefined ? [message] : [message, attributes]))
   },
 
   /** `odb_audit.error(<body>[, <attributes>])` */
   error(message: PlsqlRenderable, attributes?: PlsqlRenderable): PlsqlStatement {
-    return severityCall('error', message, attributes)
+    return odbAuditPackage.error(...(attributes === undefined ? [message] : [message, attributes]))
   },
 
   /** `odb_audit.fatal(<body>[, <attributes>])` */
   fatal(message: PlsqlRenderable, attributes?: PlsqlRenderable): PlsqlStatement {
-    return severityCall('fatal', message, attributes)
+    return odbAuditPackage.fatal(...(attributes === undefined ? [message] : [message, attributes]))
   },
 
   /** `odb_audit.severity_number(<severity>)` → PLS_INTEGER (OTel SeverityNumber) */
   severityNumber(severity: PlsqlRenderable): PlsqlExpression<'PLS_INTEGER'> {
-    return new PlsqlExpression('PLS_INTEGER', `odb_audit.severity_number(${renderPlsql(severity)})`)
+    return odbAuditPackage.severityNumber(severity)
   },
 
   /** `odb_audit.bulk(<json_array>)` */

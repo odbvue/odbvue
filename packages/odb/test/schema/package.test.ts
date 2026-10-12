@@ -21,6 +21,21 @@ import {
 } from '../../src/schema/package.js'
 import { odbTable } from '../../src/schema/table.js'
 describe('odbPackage member typing', () => {
+  it('invokes a declared procedure locally without assembling a call string', () => {
+    const pkg = odbPackage('example', (builder) => {
+      const log = builder.proc('write_log', { in: { message: odbType.string() } }, () => {})
+      const run = builder.proc('run', {}, ({ body }) => {
+        const call = log.invoke(odbLiteral("O'Brien"))
+        expectTypeOf(call).toEqualTypeOf<PlsqlStatement>()
+        body.call(call)
+      })
+      return { log, run }
+    })
+    expect(pkg.toSQLUp()).toContain("write_log('O''Brien');")
+    expect(pkg.toSQLUp()).not.toContain("example.write_log('O''Brien');")
+    expect(pkg.log(odbLiteral('external')).toSQL()).toBe("example.write_log('external')")
+  })
+
   it('generates dynamic blocks with scoped declarations and ordered IN, OUT and IN OUT binds', () => {
     const pkg = odbPackage('dynamic_example', (p) => ({
       run: p.proc(

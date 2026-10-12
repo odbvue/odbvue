@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { odbAuth } from '../../../src/capabilities/auth/auth.js'
+import { odbLiteral } from '../../../src/schema/attribute.js'
 import { OrdsEndpoint } from '../../../src/ords.js'
 import {
   compileApplicationEndpoints,
@@ -255,6 +256,9 @@ describe('odbAuth framework package', () => {
       'odb_auth.read_user(l_id, p_u, p_d)',
     )
     expect(odbAuth.requireUser('l_token').toSQL()).toBe('odb_auth.require_user(l_token)')
+    const userId = odbAuth.requireUser(odbLiteral("token'value"))
+    expect(userId.type).toBe('VARCHAR2')
+    expect(userId.toSQL()).toBe("odb_auth.require_user('token''value')")
     expect(odbAuth.refreshTokenMaxAge).toBe(30 * 24 * 60 * 60)
     expect(Object.keys(odbAuth.types)).toEqual([
       'username',

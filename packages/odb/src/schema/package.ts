@@ -1199,6 +1199,11 @@ export class ProcedureDefinition<TParameters extends ProcedureParameters> {
     return this.procedure.name
   }
 
+  /** Build an unqualified call suitable for another member of the same package. */
+  invoke(...args: PlsqlRenderable[]): PlsqlStatement {
+    return this.procedure.invoke(...args)
+  }
+
   autonomous(): this {
     this.procedure.autonomous()
     return this
