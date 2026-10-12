@@ -1,7 +1,7 @@
 import { odbType } from '../../schema/package.js'
 import { ID_LENGTH, VALUE_LENGTH } from './constants.js'
 
-export type SettingMeta = Record<string, unknown>
+export type SettingMeta = Record<string, unknown> & { secret?: 'Y' | 'N' }
 
 /** Parameter types for settings values, without referring to `odb_settings_store`. */
 export const settingsTypes = {

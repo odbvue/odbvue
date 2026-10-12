@@ -242,7 +242,9 @@ describe('CLI SMTP settings setup', () => {
       ['SMTP_FROM_ADDR', 'from_addr'],
       ['SMTP_FROM_NAME', 'from_name'],
     ]) {
-      expect(sql).toContain(`APP.odb_settings.write('${id}', :${bind}, NULL)`)
+      const meta =
+        id === 'SMTP_PASSWORD' ? `'{"label":"SMTP password","type":"string","secret":"Y"}'` : 'NULL'
+      expect(sql).toContain(`APP.odb_settings.write('${id}', :${bind}, ${meta})`)
     }
     expect(sql).toContain('APP.odb_acl.add_smtp(:host, :port)')
     expect(sql).toContain('IF l_old_host <> :host OR l_old_port <> :port THEN')

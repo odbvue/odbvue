@@ -10,6 +10,26 @@ import {
 } from '../../src/schema/table.js'
 
 describe('odbQuery', () => {
+  it('preserves typed cursor metadata for aliased select expressions', () => {
+    const settings = odbTable('settings', (t) => ({
+      id: t.string(128).primaryKey(),
+      value: t.clob(),
+    }))
+    const query = odbQuery()
+      .selectFrom(settings)
+      .select(settings.id)
+      .selectAs("TO_CLOB('********')", settings.value)
+    expect(query.toSQL()).toBe("SELECT id, TO_CLOB('********') AS value FROM settings")
+    expect(query.compile().sql).toBe(query.toSQL())
+    expect(query.selectedColumns()?.map((column) => column.name)).toEqual(['id', 'value'])
+    expect(query.selectedColumns()?.[1]?.type).toBe('clob')
+    const raw = odbQuery().selectFrom(settings).select('1').selectAs('NULL', settings.value)
+    expect(raw.selectedColumns()).toBeUndefined()
+    const aliased = settings.as('s')
+    const aliasedQuery = odbQuery().selectFrom(aliased).selectAs('s.value', aliased.value)
+    expect(aliasedQuery.toSQL()).toBe('SELECT s.value AS value FROM settings s')
+    expect(aliasedQuery.selectedColumns()?.[0]?.name).toBe('value')
+  })
   it('emits NOWAIT consistently for inline and bound queries without changing default locks', () => {
     const queue = odbTable('queue', (t) => ({ id: t.guid().primaryKey() }))
     const query = odbQuery()

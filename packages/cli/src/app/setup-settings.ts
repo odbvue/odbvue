@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import prompts, { type PromptObject } from 'prompts'
 
-import { odbAcl, odbSettings, withConnection } from '@odbvue/odb'
+import { odbAcl, odbLiteral, odbSettings, withConnection } from '@odbvue/odb'
 
 import { SecretsStore } from '../adapters/secrets-store.js'
 import { logger } from '../shared/logger.js'
@@ -150,7 +150,13 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
     ['SMTP_FROM_ADDR', 'from_addr'],
     ['SMTP_FROM_NAME', 'from_name'],
   ]
-    .map(([id, bind]) => `  ${schema}.${odbSettings.write(`'${id}'`, `:${bind}`).toSQL()};`)
+    .map(([id, bind]) => {
+      const meta =
+        id === 'SMTP_PASSWORD'
+          ? odbLiteral(JSON.stringify({ label: 'SMTP password', type: 'string', secret: 'Y' }))
+          : 'NULL'
+      return `  ${schema}.${odbSettings.write(`'${id}'`, `:${bind}`, meta).toSQL()};`
+    })
     .join('\n')
 
   const sql = `DECLARE

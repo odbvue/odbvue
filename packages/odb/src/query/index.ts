@@ -183,6 +183,25 @@ export class SelectQueryBuilder<
     return this as SelectQueryBuilder<TTable, unknown, true>
   }
 
+  /** Select an expression under a typed column's name, preserving cursor row metadata. */
+  selectAs<TColumn extends TableColumn<TTable>>(
+    expression: SqlExpr,
+    column: TColumn,
+  ): SelectQueryBuilder<
+    TTable,
+    AccumulatedRow<TResult, SelectedRow<TTable, [TColumn]>, THasSelection>,
+    true
+  > {
+    const name = column.name.slice(column.name.lastIndexOf('.') + 1)
+    this._columns.push(`${exprSql(expression)} AS ${name}`)
+    this._selectedColumns?.push({ ...column.toNode(), name })
+    return this as SelectQueryBuilder<
+      TTable,
+      AccumulatedRow<TResult, SelectedRow<TTable, [TColumn]>, THasSelection>,
+      true
+    >
+  }
+
   /** Selected typed columns, when the row shape can be inferred without parsing SQL. */
   selectedColumns(): ColumnNode[] | undefined {
     return this._selectedColumns?.map((column) => ({

@@ -4,6 +4,29 @@ import { odbDbmsCrypto } from '../../../src/oracle/dbms-crypto/dbms-crypto.js'
 import { odbLiteral } from '../../../src/schema/attribute.js'
 
 describe('odbOracle', () => {
+  it('allows absent optional JSON paths without hiding malformed values', () => {
+    expect(
+      odbOracle
+        .jsonValue('l_meta', odbLiteral('$.secret'), {
+          length: 1,
+          errorOnError: true,
+          nullOnEmpty: true,
+        })
+        .toSQL(),
+    ).toBe("JSON_VALUE(l_meta, '$.secret' RETURNING VARCHAR2(1) ERROR ON ERROR NULL ON EMPTY)")
+    expect(
+      odbOracle
+        .jsonValue('l_meta', odbLiteral('$.secret'), {
+          nullOnEmpty: true,
+        })
+        .toSQL(),
+    ).toBe("JSON_VALUE(l_meta, '$.secret' NULL ON EMPTY)")
+  })
+  it('renders a SQL JSON merge-patch expression preserving CLOB output', () => {
+    const value = odbOracle.jsonMergePatch('l_meta', odbLiteral('{"secret":"Y"}'))
+    expect(value.type).toBe('CLOB')
+    expect(value.toSQL()).toBe(`JSON_MERGEPATCH(l_meta, '{"secret":"Y"}' RETURNING CLOB)`)
+  })
   it('renders RAW and UUID expressions compositionally', () => {
     const expression = odbOracle.lower(odbOracle.rawToHex(odbOracle.sysGuid()))
     expect(expression.toSQL()).toBe('LOWER(RAWTOHEX(SYS_GUID()))')

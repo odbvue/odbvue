@@ -5,6 +5,7 @@ import {
   cond,
   expr,
   odbLiteral,
+  Param,
   PlsqlStatement,
   type PlsqlBooleanExpression,
   type PlsqlExpression,
@@ -20,6 +21,53 @@ import {
 } from '../../src/schema/package.js'
 import { odbTable } from '../../src/schema/table.js'
 describe('odbPackage member typing', () => {
+  it('generates dynamic blocks with scoped declarations and ordered IN, OUT and IN OUT binds', () => {
+    const pkg = odbPackage('dynamic_example', (p) => ({
+      run: p.proc(
+        'run',
+        {
+          in: { input: odbType.string() },
+          out: { output: odbType.string() },
+          inOut: { counter: odbType.number() },
+        },
+        ({ params: { input, output, counter }, body }) => {
+          body.executeImmediate(
+            (dynamic) => {
+              const { value } = dynamic.variables({ value: odbType.string(128) })
+              dynamic.set(value, new Param(':input', 'VARCHAR2'))
+              dynamic.set(new Param(':output', 'VARCHAR2'), value)
+              dynamic.set(new Param(':counter', 'NUMBER'), odbLiteral(1))
+              dynamic.when('NO_DATA_FOUND', (handler) => handler.invalid('DYNAMIC_NOT_FOUND'))
+            },
+            [
+              { direction: 'IN', value: input },
+              { direction: 'OUT', value: output },
+              { direction: 'IN OUT', value: counter },
+            ],
+          )
+        },
+      ),
+    }))
+    const sql = pkg.toSQLUp()
+    expect(sql).toContain(
+      "EXECUTE IMMEDIATE 'DECLARE\n  l_value VARCHAR2(128);\nBEGIN\n  l_value := :input;\n  :output := l_value;\n  :counter := 1;",
+    )
+    expect(sql).toContain("''ODB_ERROR|VALIDATION_ERROR|DYNAMIC_NOT_FOUND''")
+    expect(sql).toContain("END;' USING IN p_input, OUT p_output, IN OUT p_counter;")
+    expect(sql.indexOf('l_value VARCHAR2(128)')).toBeGreaterThan(sql.indexOf('EXECUTE IMMEDIATE'))
+  })
+
+  it('generates empty dynamic blocks without DECLARE or USING clauses', () => {
+    const body = new ProcedureBody()
+    body.executeImmediate(() => {})
+    expect(body.toNode().statements).toEqual([
+      {
+        kind: 'call',
+        sql: "EXECUTE IMMEDIATE 'BEGIN\n  NULL;\nEND;'",
+      },
+    ])
+  })
+
   it('exposes typed package member invokers and rejects unknown members', () => {
     const settings = odbPackage('PCK_SETTINGS', (p) => ({
       getValue: p.func('GET_VALUE', odbType.string(), (fn) => {

@@ -151,6 +151,12 @@ const tablespaceName = odbEnv.read('ODBVUE_ADB_TABLESPACE', 'DATA')
 
 `odbEnv.appUsername` and `odbEnv.appPassword` read the required `ODBVUE_APP_ADMIN_USERNAME` and `ODBVUE_APP_ADMIN_PASSWORD` values used to seed the application administrator and grant its admin role. Database setup in `ov setup` prompts for both values, defaulting to `admin@odbvue.com` and `MySecurePass123!`, and saves them alongside the schema credentials in the selected environment's `.env`. Choose a unique password for deployed environments. For environments configured before these prompts were added, supply both variables before loading the bootstrap migration.
 
+Database setup also generates `ODBVUE_APP_MASTER_KEY` once per environment
+and saves it in the ignored `.env` without displaying it. Subsequent setup runs
+preserve the key so encrypted settings remain decryptable across deployments.
+See [Settings master keys](./capabilities/settings) for the Vault-first provider,
+private package-constant fallback, and rotation requirements.
+
 Pass a second argument to provide a default value. The default is used only when the environment variable is missing or empty; if no default is provided, the error identifies the missing variable by name.
 
 ### Migrations

@@ -26,8 +26,43 @@ export type RegexpSubstrOptions = {
   subexpression?: PlsqlRenderable | number
 }
 
+export type JsonValueOptions = {
+  length?: number
+  errorOnError?: boolean
+  nullOnEmpty?: boolean
+}
+
 /** Typed expressions for Oracle SQL built-in functions and pseudocolumns. */
 export const odbOracle = {
+  /** SQL-only JSON merge-patch expression returning CLOB; use with SELECT INTO, not assignment. */
+  jsonMergePatch(value: PlsqlRenderable, patch: PlsqlRenderable): PlsqlExpression<'CLOB'> {
+    return new PlsqlExpression(
+      'CLOB',
+      `JSON_MERGEPATCH(${renderPlsql(value)}, ${renderPlsql(patch)} RETURNING CLOB)`,
+    )
+  },
+
+  /** Read a JSON scalar as VARCHAR2, optionally bounding its length and rejecting errors. */
+  jsonValue(
+    value: PlsqlRenderable,
+    path: PlsqlRenderable,
+    options: JsonValueOptions = {},
+  ): PlsqlExpression<'VARCHAR2'> {
+    if (
+      options.length !== undefined &&
+      (!Number.isInteger(options.length) || options.length < 1 || options.length > 32767)
+    ) {
+      throw new Error('odbOracle.jsonValue: length must be an integer from 1 to 32767.')
+    }
+    const returning = options.length === undefined ? '' : ` RETURNING VARCHAR2(${options.length})`
+    const errors = options.errorOnError ? ' ERROR ON ERROR' : ''
+    const empty = options.nullOnEmpty ? ' NULL ON EMPTY' : ''
+    return new PlsqlExpression(
+      'VARCHAR2',
+      `JSON_VALUE(${renderPlsql(value)}, ${renderPlsql(path)}${returning}${errors}${empty})`,
+    )
+  },
+
   /** `RAWTOHEX(<raw>)` -> VARCHAR2 */
   rawToHex(value: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
     return call('VARCHAR2', 'RAWTOHEX', [value])

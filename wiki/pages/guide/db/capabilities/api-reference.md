@@ -16,6 +16,25 @@ transaction boundaries, typed calls, and sandbox services.
 Bootstrap leaves `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`,
 `SMTP_FROM_ADDR`, and `SMTP_FROM_NAME` empty. Run `ov setup-settings` (alias `ov ss`)
 after deployment to fill them and update the SMTP host ACL.
+`SMTP_PASSWORD` is encrypted and masked by [Settings](./settings); configure its
+master-key provider before running the command.
+
+## DBMS_CLOUD
+
+`odbDbmsCloud` wraps Oracle's cloud HTTP request API:
+
+- `response`: the `DBMS_CLOUD_TYPES.resp` record descriptor for `body.variables`.
+- `METHOD_GET`: the Oracle method constant.
+- `sendRequest(credentialName, uri, method?)`: typed response expression; defaults to GET.
+- `getResponseStatusCode(response)`: numeric HTTP status.
+- `getResponseText(response)`: CLOB response body.
+
+These wrappers render calls; they do not install Oracle cloud packages or credentials.
+Direct calls require those packages at compilation time. Use
+`body.executeImmediate(build, bindings)` to generate a dynamic anonymous block
+with isolated declarations and ordered `IN`, `OUT`, or `IN OUT` bindings when
+cloud support is optional. The [Settings provider](./settings) uses this path
+to retain local-database fallback support.
 
 ## LOB
 

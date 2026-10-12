@@ -37,13 +37,22 @@
               class="mb-3"
               maxlength="128"
             />
-            <v-text-field v-model="value" label="Value" hide-details="auto" maxlength="2000" />
+            <v-text-field
+              v-model="value"
+              :label="secret ? 'New secret value' : 'Value'"
+              :type="secret ? 'password' : 'text'"
+              :placeholder="secret ? 'Stored value is hidden' : undefined"
+              :hint="secret ? 'Enter a replacement; the stored secret cannot be read.' : undefined"
+              :persistent-hint="secret"
+              hide-details="auto"
+              maxlength="2000"
+            />
           </v-card-text>
           <v-card-actions>
             <v-btn
               color="primary"
               prepend-icon="$mdiContentSave"
-              :disabled="!id || !auth.authenticated.value || !!busy"
+              :disabled="!id || !auth.authenticated.value || !!busy || (secret && !value)"
               :loading="busy === 'write'"
               @click="write"
               >Write</v-btn
@@ -111,7 +120,7 @@
 <script setup lang="ts">
 import { useAuth } from '@/capabilities/auth'
 import { useHttp } from '@/capabilities/http'
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { components } from '@/api/openapi.generated'
 
 definePage({
@@ -132,11 +141,28 @@ const http = useHttp()
 const id = ref('SANDBOX_DEMO')
 const value = ref('')
 const items = ref<Item[]>([])
+const loaded = ref<{ id: string; meta: unknown }>()
+const secretMeta = (meta: unknown) =>
+  meta !== null && typeof meta === 'object' && 'secret' in meta && meta.secret === 'Y'
+const secret = computed(
+  () =>
+    id.value === 'SMTP_PASSWORD' ||
+    (loaded.value?.id === id.value && secretMeta(loaded.value.meta)) ||
+    items.value.some((item) => item.id === id.value && secretMeta(item.meta)),
+)
 const nextCursor = ref<string>()
 const busy = ref<Action>()
 const message = ref<{ type: 'success' | 'error'; text: string }>()
 
 const url = () => `/sandbox/settings/${encodeURIComponent(id.value)}`
+
+watch(
+  id,
+  () => {
+    value.value = ''
+  },
+  { flush: 'sync' },
+)
 
 async function run(action: Action, success: string, failure: string, call: () => Promise<void>) {
   busy.value = action
@@ -155,13 +181,15 @@ const write = () =>
   run('write', 'Setting saved.', 'Setting could not be saved.', async () => {
     const response = await http.put(url(), { value: value.value })
     if (response.error) throw response.error
+    if (secret.value) value.value = ''
   })
 
 const read = () =>
   run('read', 'Setting loaded.', 'Setting could not be loaded.', async () => {
-    const response = await http.get<{ value: string | null }>(url())
+    const response = await http.get<{ value: string | null; meta: unknown }>(url())
     if (response.error || !response.data) throw response.error ?? new Error('Not found')
-    value.value = response.data.value ?? ''
+    loaded.value = { id: id.value, meta: response.data.meta }
+    value.value = secret.value ? '' : (response.data.value ?? '')
   })
 
 const remove = () =>
@@ -187,6 +215,7 @@ const list = (cursor?: string) =>
 
 function pick(item: Item) {
   id.value = item.id
-  value.value = item.value ?? ''
+  loaded.value = { id: item.id, meta: item.meta }
+  value.value = secret.value ? '' : (item.value ?? '')
 }
 </script>

@@ -47,6 +47,10 @@ export type AnyQueryBuilder = {
   selectedColumns?(): ColumnNode[] | undefined
 }
 
+export type DynamicSqlBinding =
+  | { direction: 'IN'; value: PlsqlRenderable }
+  | { direction: 'OUT' | 'IN OUT'; value: PlsqlReference }
+
 export type OdbTypeDescriptor<TType extends PlsqlType | string> = {
   type: TType
   length?: number
@@ -931,6 +935,7 @@ export class ProcedureBody {
     for (const [name, columns] of child._cursorResultColumns) {
       this._cursorResultColumns.set(name, columns)
     }
+
     this._statements.push({
       kind: 'block',
       statements: [...child._statements],
@@ -941,6 +946,31 @@ export class ProcedureBody {
               statements: [...handler.statements],
             }))
           : undefined,
+    })
+    return this
+  }
+
+  /** Execute a generated anonymous block; its declarations stay inside the dynamic SQL. */
+  executeImmediate(
+    build: (body: ProcedureBody) => void,
+    bindings: readonly DynamicSqlBinding[] = [],
+  ): this {
+    const dynamic = new ProcedureBody()
+    build(dynamic)
+    const body = dynamic.toNode()
+    const lines: string[] = []
+    emitBodyDeclarations(lines, body, '  ')
+    if (lines.length > 0) lines.unshift('DECLARE')
+    lines.push('BEGIN', ...emitStatementBlock(body.statements, '  '))
+    emitExceptionSection(lines, body.exceptionHandlers, '')
+    lines.push('END;')
+    const using =
+      bindings.length === 0
+        ? ''
+        : ` USING ${bindings.map((binding) => `${binding.direction} ${renderPlsql(binding.value)}`).join(', ')}`
+    this._statements.push({
+      kind: 'call',
+      sql: `EXECUTE IMMEDIATE ${renderPlsqlLiteral(lines.join('\n'))}${using}`,
     })
     return this
   }

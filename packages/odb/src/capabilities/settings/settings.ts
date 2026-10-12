@@ -19,8 +19,17 @@ function lit(text: string): string {
 
 /** Installable settings capability plus typed calls into `odb_settings`. */
 export const odbSettings = {
-  toSQLUp(options: { schema?: string } = {}): string {
-    return [settingsStore.toSQLUp(options), odbSettingsPackage.toSQLUp(options)].join('\n')
+  toSQLUp(options: { schema?: string; masterKey?: string } = {}): string {
+    const masterKey = options.masterKey ?? process.env.ODBVUE_APP_MASTER_KEY ?? ''
+    if (masterKey !== '' && !/^[a-fA-F0-9]{64}$/.test(masterKey)) {
+      throw new Error(
+        'odbSettings: masterKey must be exactly 64 hexadecimal characters (32 bytes).',
+      )
+    }
+    return [
+      settingsStore.toSQLUp(options),
+      odbSettingsPackage.toSQLUp({ ...options, substitutions: { masterKey } }),
+    ].join('\n')
   },
 
   toSQLDown(options: { schema?: string } = {}): string {
@@ -40,6 +49,10 @@ export const odbSettings = {
     return odbSettingsPackage.read(id, value, meta)
   },
 
+  /** Reads for presentation without decrypting secrets or loading the master key. */
+  readMasked(id: PlsqlRenderable, value: PlsqlRenderable, meta: PlsqlRenderable) {
+    return odbSettingsPackage.readMasked(id, value, meta)
+  },
   /** `odb_settings.write(<id>, <value>, <meta>)`; the default `NULL` meta keeps existing metadata. */
   write(id: PlsqlRenderable, value: PlsqlRenderable, meta: PlsqlRenderable = 'NULL') {
     return odbSettingsPackage.write(id, value, meta)

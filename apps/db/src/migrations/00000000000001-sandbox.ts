@@ -156,7 +156,7 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
       out: { value: odbSettings.types.value, meta: odbSettings.types.meta },
     },
     ({ params: { id, value, meta }, body }) => {
-      body.call(odbSettings.read(id, value, meta))
+      body.call(odbSettings.readMasked(id, value, meta))
     },
   )
   defineService(readSetting, {

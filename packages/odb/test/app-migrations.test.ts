@@ -7,6 +7,7 @@ beforeAll(() => {
   process.env.ODBVUE_ADB_SCHEMA_PASSWORD = 'test-password'
   process.env.ODBVUE_APP_ADMIN_USERNAME = 'owner@example.com'
   process.env.ODBVUE_APP_ADMIN_PASSWORD = 'CustomSecure123!'
+  process.env.ODBVUE_APP_MASTER_KEY = ''
 })
 
 const migrations = {
@@ -36,6 +37,13 @@ describe('app-owned ORDS migrations', () => {
       expect(sql).toContain(`ODBVUE.odb_settings.write('${id}', ''`)
     }
     expect(sql).not.toContain("ODBVUE.odb_settings.write('smtp'")
+    expect(sql).toContain(
+      `ODBVUE.odb_settings.write('SMTP_PASSWORD', '', '{"label":"SMTP password","type":"string","secret":"Y"}')`,
+    )
+    expect(sql).toContain("ODBVUE.odb_settings.write('APP_SETTINGS_MASTER_KEY_URI', ''")
+    expect(sql.indexOf('CREATE OR REPLACE PACKAGE ODBVUE.odb_audit AS')).toBeLessThan(
+      sql.indexOf('CREATE OR REPLACE PACKAGE ODBVUE.odb_settings AS'),
+    )
     const aclPackageSql = odbAclPackage.toSQLUp({ schema: 'ODBVUE' })
     expect(sql).toContain(aclPackageSql)
     const bootstrapSql = sql.replace(aclPackageSql, '')
@@ -218,7 +226,8 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain("odb_auth.has_role(v_auth_user_id, ''admin'')")
     expect(sql).not.toContain('p_authorization IN')
     expect(sql).toContain('odb_settings.list(p_after, p_limit, p_items)')
-    expect(sql).toContain('odb_settings.read(p_id, p_value, p_meta)')
+    expect(sql).toContain('odb_settings.read_masked(p_id, p_value, p_meta)')
+    expect(sql).not.toContain('odb_settings.read(p_id, p_value, p_meta)')
     expect(sql).toContain('odb_settings.write(p_id, p_value, NULL)')
     expect(sql).toContain('odb_settings.remove(p_id)')
     expect(sql).not.toContain("ODBVUE.odb_settings.write('SANDBOX_DEMO'")

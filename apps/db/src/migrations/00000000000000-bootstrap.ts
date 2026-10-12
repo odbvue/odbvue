@@ -33,10 +33,10 @@ export const migration = defineMigration('00000000000000_bootstrap', {
   .install(odbHttp)
   .install(odbRateLimit)
   .install(odbAuth)
+  .install(odbAudit)
   .install(odbSettings)
   .install(odbAcl)
   .install(odbLob)
-  .install(odbAudit)
   .install(odbStorage)
   .install(odbEmails)
   .install(
@@ -44,10 +44,21 @@ export const migration = defineMigration('00000000000000_bootstrap', {
       { id: 'SMTP_HOST', value: '', meta: { label: 'SMTP host', type: 'string' } },
       { id: 'SMTP_PORT', value: '', meta: { label: 'SMTP port', type: 'number' } },
       { id: 'SMTP_USERNAME', value: '', meta: { label: 'SMTP username', type: 'string' } },
-      { id: 'SMTP_PASSWORD', value: '', meta: { label: 'SMTP password', type: 'string' } },
+      {
+        id: 'SMTP_PASSWORD',
+        value: '',
+        meta: { label: 'SMTP password', type: 'string', secret: 'Y' },
+      },
       { id: 'SMTP_FROM_ADDR', value: '', meta: { label: 'SMTP sender address', type: 'string' } },
       { id: 'SMTP_FROM_NAME', value: '', meta: { label: 'SMTP sender name', type: 'string' } },
     ),
+  )
+  .install(
+    odbSettings.seed({
+      id: 'APP_SETTINGS_MASTER_KEY_URI',
+      value: '',
+      meta: { label: 'OCI Vault master key secret bundle URI', type: 'string' },
+    }),
   )
   .install(
     odbSettings.seed({

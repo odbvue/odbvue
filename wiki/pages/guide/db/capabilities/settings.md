@@ -49,18 +49,43 @@ HTTP exposure, authorization, and mapping ODB errors to HTTP responses belong to
 
 ## Procedures
 
-| Procedure | Parameters                                                | Behavior                                                                                                                                                                                                  |
-| --------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list`    | `p_after` IN, `p_limit` IN, `p_items` OUT `SYS_REFCURSOR` | Up to `p_limit` rows (`NULL` = 50) ordered by `id`, starting after `p_after` (`NULL` for the first page). Columns: `id`, `value`, `meta`. Callers detect a further page by requesting `p_limit + 1` rows. |
-| `read`    | `p_id` IN, `p_value` OUT, `p_meta` OUT                    | Reads one setting; raises the ODB `NOT_FOUND` error if it does not exist.                                                                                                                                 |
-| `write`   | `p_id`, `p_value`, `p_meta` IN                            | Creates or updates a setting. A `NULL` `p_meta` keeps existing metadata (`{}` on create).                                                                                                                 |
-| `remove`  | `p_id` IN                                                 | Deletes a setting.                                                                                                                                                                                        |
+| Procedure     | Parameters                                                | Behavior                                                                                                                                                                                                  |
+| ------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list`        | `p_after` IN, `p_limit` IN, `p_items` OUT `SYS_REFCURSOR` | Up to `p_limit` rows (`NULL` = 50) ordered by `id`, starting after `p_after` (`NULL` for the first page). Columns: `id`, `value`, `meta`. Callers detect a further page by requesting `p_limit + 1` rows. |
+| `read`        | `p_id` IN, `p_value` OUT, `p_meta` OUT                    | Reads one setting, decrypting secrets; raises the ODB `NOT_FOUND` error if it does not exist.                                                                                                             |
+| `read_masked` | `p_id` IN, `p_value` OUT, `p_meta` OUT                    | Reads one setting, returning `********` for secrets without loading the key.                                                                                                                              |
+| `write`       | `p_id`, `p_value`, `p_meta` IN                            | Creates or updates a setting. A `NULL` `p_meta` keeps existing metadata (`{}` on create).                                                                                                                 |
+| `remove`      | `p_id` IN                                                 | Deletes a setting.                                                                                                                                                                                        |
 
-`meta` is free-form JSON text for presentation or validation hints (label, type, and so on); the package stores it without interpreting it. Values are stored as text up to 2000 characters.
+`meta` is JSON text for presentation or validation hints (label, type, and so on).
+`meta.secret` is reserved: `'Y'` marks an encrypted secret; omitted, `null`, or
+`'N'` means ordinary configuration. The table exposes this flag as a virtual
+`secret` column. Plaintext input is limited to 2000 characters. The stored `value`
+is a CLOB so encrypted UTF-8 values can grow without truncation.
+Both the write-path lookup and virtual column use `NULL ON EMPTY` with
+`ERROR ON ERROR`: an omitted flag defaults to `'N'`, but malformed/non-scalar
+flag values are not silently treated as ordinary configuration.
+
+`SMTP_PASSWORD` is always marked secret, including when recreated after deletion.
+The CLI seeds/writes its metadata explicitly. `SMTP_USERNAME` remains ordinary
+configuration; other credentials can opt in with `meta: { secret: 'Y' }`.
+
+Metadata updates use `odbOracle.jsonMergePatch` through `odbQuery` and
+`SELECT ... INTO`. Its SQL-only `RETURNING CLOB` clause must not be emitted as
+a direct PL/SQL assignment.
+
+Install `odbAudit` before `odbSettings` for key-provider failure logging, and grant
+`EXECUTE ON DBMS_CRYPTO`, `UTL_RAW`, and `UTL_I18N` as required by the database.
 
 ### `read`
 
 Reads a setting by ID.
+
+`read` decrypts secrets for trusted PL/SQL callers, including SMTP delivery.
+Use `odbSettings.readMasked(id, value, meta)` (`odb_settings.read_masked`) for
+presentation: secret values are always `********`, even when empty. This path
+does not fetch or use the master key. Both sandbox list and get use masked output.
+`list` also always masks secrets, retaining the `id`, `value`, `meta` response shape.
 
 If the setting does not exist, `read` raises the standard ODB `NOT_FOUND` error. The caller decides how that error is exposed; for example, an ORDS service may map it to HTTP 404.
 
@@ -103,7 +128,7 @@ const api = odbPackage('pck_app_api', (pkg) => {
       out: { value: odbSettings.types.value, meta: odbSettings.types.meta },
     },
     ({ params: { id, value, meta }, body }) => {
-      body.call(odbSettings.read(id, value, meta))
+      body.call(odbSettings.readMasked(id, value, meta))
     },
   )
 
@@ -134,8 +159,73 @@ body.call(odbSettings.remove(id))
 
 Transactions belong to the caller; ORDS commits after a successful handler.
 
-## Limits
+## Master Key And Encryption
 
-Secret (encrypted) settings are not part of this package. Do not store secrets in `value` until an encryption provider is added.
+Secret writes encrypt automatically; updates without metadata preserve the existing
+secret flag. A write of the display mask `********` to a secret raises
+`SETTINGS_SECRET_MASKED_VALUE`, rather than replacing the credential.
+The sandbox editor treats secrets as password-style replacement fields, not readable
+configuration. Trusted callers can explicitly write `NULL` to clear a secret.
 
-The table layout differs from earlier Settings versions (`id`, `value`, `meta`). Existing deployments need an explicit data migration; editing an applied bootstrap migration does not migrate an existing table.
+The provider tries the `APP_SETTINGS_MASTER_KEY_URI` setting first. Set it to an
+OCI Vault secret-bundle endpoint:
+
+```text
+https://secrets.vaults.<region>.oci.oraclecloud.com/20190301/secretbundles/<secret-ocid>
+```
+
+The secret OCID must start with `ocid1.vaultsecret.`, not `ocid1.secret.`.
+
+Enable the database resource principal, grant its dynamic group permission to read
+that Vault secret, and provision outbound HTTPS access as required. The secret
+bundle's Base64 content must decode to exactly **32 raw key bytes**, not a
+64-character hexadecimal text value. `DBMS_CLOUD` is invoked dynamically, allowing
+local databases to use the fallback without installing the cloud packages.
+The request is defined with the typed `odbDbmsCloud` Oracle wrappers and
+`ProcedureBody.executeImmediate` block builder, rather than handwritten PL/SQL.
+
+An optional deployment variable, `ODBVUE_APP_MASTER_KEY`, supplies the same
+32-byte key encoded as exactly **64 hexadecimal characters**. The CLI loads it from
+the current environment's ignored `.env`; alternatively pass `masterKey` to
+`odbSettings.toSQLUp`. It becomes a private PL/SQL constant. No default key is
+provided. With neither a working Vault provider nor a configured fallback,
+nonempty secret writes and decrypted reads fail explicitly.
+
+`ov setup` generates this fallback with `randomBytes(32)` during database
+configuration when the selected environment has no key. It saves the hexadecimal
+value in that environment's ignored `.env` without printing it. Later setup runs
+preserve the existing key; invalid configured keys abort setup instead of being
+silently replaced. Each environment gets its own key.
+
+Back up the environment key securely. For an already deployed database, adding
+the variable does not change the installed package constant: redeploy the Settings
+package using the retained key. Do not generate a replacement for an existing
+encrypted database if its original key has been lost.
+
+Vault request failures are audit-logged before trying the configured fallback;
+invalid key lengths fail explicitly. Masked reads and ordinary configuration
+remain available without a key. Empty bootstrap secrets require no key.
+
+Ciphertext uses AES-256-CBC with a fresh random IV and encrypt-then-HMAC-SHA256.
+Encryption and authentication keys are derived separately from the master key.
+The versioned envelope authenticates the setting ID, IV, and ciphertext, and
+verification occurs before decryption. Text is encoded as UTF-8.
+
+**Security boundary:** the fallback constant is readable by schema owners in
+package source and appears in generated deployment SQL. Keep deployment output
+and environment files out of source control, restrict access, and prefer
+principal-only Vault access in production. Encryption does not protect against
+a compromised schema owner or an authorized caller of the internal decrypted API.
+Never return the fallback through Settings.
+
+Keep the Vault and fallback keys identical. Changing either key does not rotate
+existing ciphertext: decrypt and re-encrypt secrets under a controlled rotation
+procedure before retiring an old key. Loss of all copies of the key makes the
+stored secrets unrecoverable.
+
+## Deployment
+
+This updates the bootstrap table layout (`value` becomes CLOB, with a virtual
+`secret` column). Redeploy the database when editing the original migrations.
+Existing deployments otherwise need an explicit table/data migration; editing
+an applied bootstrap does not migrate an existing table.

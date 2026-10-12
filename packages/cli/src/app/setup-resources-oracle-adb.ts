@@ -1,5 +1,6 @@
 import prompts from 'prompts'
 import path from 'path'
+import { randomBytes } from 'node:crypto'
 
 import { logger } from '../shared/logger.js'
 
@@ -34,6 +35,14 @@ const containerPortValidation = (value: string, ports: string[]) => {
 
 export const runSetupOracleAdb = async () => {
   logger.info('Setting up Oracle Database...')
+
+  const secretsStore = new SecretsStore()
+  const masterKey = secretsStore.get('ODBVUE_APP_MASTER_KEY')
+  if (masterKey && !/^[a-fA-F0-9]{64}$/.test(masterKey)) {
+    throw new Error(
+      'ODBVUE_APP_MASTER_KEY must be exactly 64 hexadecimal characters (32 bytes); the existing key was not changed.',
+    )
+  }
 
   const { projectName, envDir } = new EnvironmentStore().getCurrent()
 
@@ -195,13 +204,33 @@ export const runSetupOracleAdb = async () => {
     },
   ])
 
-  const secretsStore = new SecretsStore()
+  if (
+    ![
+      credentials.adminPassword,
+      credentials.walletPassword,
+      credentials.schemaUsername,
+      credentials.schemaPassword,
+      credentials.appUsername,
+      credentials.appPassword,
+    ].every((value) => typeof value === 'string' && value.trim().length > 0)
+  ) {
+    throw new Error(
+      'Database credential setup was incomplete; credentials and the Settings fallback key were not changed.',
+    )
+  }
+
   secretsStore.set('ODBVUE_ADB_ADMIN_PASSWORD', credentials.adminPassword)
   secretsStore.set('ODBVUE_ADB_WALLET_PASSWORD', credentials.walletPassword)
   secretsStore.set('ODBVUE_ADB_SCHEMA_USERNAME', credentials.schemaUsername)
   secretsStore.set('ODBVUE_ADB_SCHEMA_PASSWORD', credentials.schemaPassword)
   secretsStore.set('ODBVUE_APP_ADMIN_USERNAME', credentials.appUsername)
   secretsStore.set('ODBVUE_APP_ADMIN_PASSWORD', credentials.appPassword)
+  if (!masterKey) {
+    secretsStore.set('ODBVUE_APP_MASTER_KEY', randomBytes(32).toString('hex'))
+    logger.info(
+      'Generated a Settings encryption fallback key in the environment .env. Keep it for future deployments; subsequent setup runs preserve it.',
+    )
+  }
 
   logger.lf()
 }

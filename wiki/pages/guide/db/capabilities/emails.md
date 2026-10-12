@@ -93,8 +93,11 @@ Individual values can also be edited with the admin Settings page or, for exampl
 `PUT /sandbox/settings/SMTP_HOST`. Those edits do not update ACLs; use the CLI
 when changing the host or port. The Network ACL sandbox page can manage grants
 independently, but does not change SMTP settings. Do not place real credentials in migrations or
-source control. Settings are admin-only, but are not encrypted at rest by this
-capability.
+source control. `SMTP_PASSWORD` is marked `meta.secret = 'Y'` and encrypted by
+[`odbSettings`](./settings); SMTP delivery reads the decrypted value internally.
+Sandbox Settings list/get return `********` for secrets, and the editor accepts
+only replacement values. Configure the Settings master key before running
+`ov ss`. `SMTP_USERNAME` remains ordinary configuration.
 
 Register the sender as an approved sender in OCI Email Delivery. Bootstrap grants
 `EXECUTE ON UTL_SMTP` but does not create a host ACL while settings are empty.

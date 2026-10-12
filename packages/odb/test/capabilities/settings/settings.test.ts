@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   odbSettings,
   odbSettingsPackage,
@@ -7,7 +7,18 @@ import {
 import * as settings from '../../../src/capabilities/settings/index.js'
 
 describe('Settings', () => {
-  const sql = odbSettings.toSQLUp({ schema: 'APP' })
+  const sql = odbSettings.toSQLUp({ schema: 'APP', masterKey: '' })
+
+  it('loads the fallback constant from the application master-key environment variable', () => {
+    vi.stubEnv('ODBVUE_APP_MASTER_KEY', 'ab'.repeat(32))
+    try {
+      expect(odbSettings.toSQLUp()).toContain(
+        `c_master_key_local CONSTANT VARCHAR2(64) := '${'ab'.repeat(32)}'`,
+      )
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
 
   it('exports the same capability, package and table through the barrel', () => {
     expect(settings.odbSettings).toBe(odbSettings)
@@ -26,10 +37,14 @@ describe('Settings', () => {
   })
 
   it('implements list, read, write and remove in PL/SQL', () => {
-    expect(sql).toContain('OPEN p_items FOR SELECT id, value, meta FROM odb_settings_store')
+    expect(sql).toContain(
+      "OPEN p_items FOR SELECT id, CASE WHEN secret = 'Y' THEN TO_CLOB('********') ELSE value END AS value, meta FROM odb_settings_store",
+    )
     expect(sql).toContain('p_after IS NULL OR id > p_after')
     expect(sql).toContain('ORDER BY id ASC FETCH FIRST NVL(p_limit, 50) ROWS ONLY')
-    expect(sql).toContain('INTO p_value, p_meta FROM odb_settings_store WHERE id = p_id')
+    expect(sql).toContain(
+      'INTO l_stored_value, p_meta, l_secret FROM odb_settings_store WHERE id = p_id',
+    )
     expect(sql).toContain("raise_application_error(-20998, 'ODB_ERROR|NOT_FOUND|NOT_FOUND')")
     expect(sql).not.toContain('odb_http')
     expect(sql).toContain('MERGE INTO odb_settings_store target')
@@ -38,11 +53,19 @@ describe('Settings', () => {
 
   it('stores meta as a CLOB constrained to JSON', () => {
     expect(sql).toContain("meta CLOB DEFAULT '{}' NOT NULL CHECK (meta IS JSON)")
+    expect(sql).toContain(
+      "GENERATED ALWAYS AS (NVL(JSON_VALUE(meta, '$.secret' RETURNING VARCHAR2(1) ERROR ON ERROR NULL ON EMPTY), 'N')) VIRTUAL",
+    )
+    expect(sql).toContain("CHECK (secret IN ('Y', 'N'))")
+    expect(sql).toContain('value CLOB')
   })
 
   it('emits typed calls to the package procedures', () => {
     expect(odbSettings.read('p_id', 'l_value', 'l_meta').toSQL()).toBe(
       'odb_settings.read(p_id, l_value, l_meta)',
+    )
+    expect(odbSettings.readMasked('p_id', 'l_value', 'l_meta').toSQL()).toBe(
+      'odb_settings.read_masked(p_id, l_value, l_meta)',
     )
     expect(odbSettings.write('p_id', 'p_value').toSQL()).toBe(
       'odb_settings.write(p_id, p_value, NULL)',
@@ -51,6 +74,131 @@ describe('Settings', () => {
       'odb_settings.list(NULL, NULL, p_items)',
     )
     expect(odbSettings.remove('p_id').toSQL()).toBe('odb_settings.remove(p_id)')
+  })
+
+  it('keeps list cursor metadata and the response shape intact while masking secrets', () => {
+    expect(odbSettings.list('after', 'limit', 'items').cursors?.ITEMS).toEqual([
+      { name: 'id', type: 'string', nullable: false },
+      { name: 'value', type: 'clob', nullable: true },
+      { name: 'meta', type: 'json', nullable: false },
+    ])
+    expect(sql).toContain('read_value(p_id, 0, p_value, p_meta)')
+    expect(sql).toContain('read_value(p_id, 1, p_value, p_meta)')
+    expect(sql).toMatch(
+      /IF p_masked = 1 THEN\s+p_value := '\*{8}';\s+ELSE\s+p_value := decrypt_value\(p_id, l_stored_value\)/,
+    )
+  })
+
+  it('encrypts only secret writes and preserves metadata on ordinary updates', () => {
+    expect(sql).toContain(
+      'SELECT meta INTO l_effective_meta FROM odb_settings_store WHERE id = p_id FOR UPDATE',
+    )
+    expect(sql).toContain('l_effective_meta := NVL(p_meta, l_effective_meta)')
+    expect(sql).toContain("IF p_id = 'SMTP_PASSWORD' THEN")
+    expect(sql).toContain(`JSON_MERGEPATCH(l_effective_meta, '{"secret":"Y"}' RETURNING CLOB)`)
+    expect(sql).toContain(
+      `SELECT JSON_MERGEPATCH(l_effective_meta, '{"secret":"Y"}' RETURNING CLOB) INTO l_effective_meta FROM dual`,
+    )
+    expect(sql).not.toContain('l_effective_meta := JSON_MERGEPATCH')
+    expect(sql).toContain("IF p_value = '********' THEN")
+    expect(sql).toContain('SETTINGS_SECRET_MASKED_VALUE')
+    expect(sql).toMatch(
+      /l_stored_value := encrypt_value\(p_id, p_value\);\s+ELSE\s+l_stored_value := TO_CLOB\(p_value\)/,
+    )
+    expect(sql).toContain('IF LENGTH(p_value) > 2000 THEN')
+    expect(sql).toContain('SETTINGS_VALUE_TOO_LONG')
+    expect(sql).toContain('SETTINGS_META_INVALID')
+    expect(sql).toContain('SETTINGS_SECRET_INVALID')
+    expect(sql).toContain(
+      "l_secret := NVL(JSON_VALUE(l_effective_meta, '$.secret' RETURNING VARCHAR2(10) ERROR ON ERROR NULL ON EMPTY), 'N')",
+    )
+  })
+
+  it('uses authenticated AES-256 encryption, random IVs, UTF-8 and setting-bound MACs', () => {
+    expect(sql).toContain('DBMS_CRYPTO.RANDOMBYTES(16)')
+    expect(sql).toContain(
+      'DBMS_CRYPTO.ENCRYPT_AES256 + DBMS_CRYPTO.CHAIN_CBC + DBMS_CRYPTO.PAD_PKCS5',
+    )
+    expect(sql).toContain("UTL_I18N.STRING_TO_RAW(p_value, 'AL32UTF8')")
+    expect(sql).toContain('UTL_I18N.RAW_TO_CHAR(DBMS_CRYPTO.DECRYPT')
+    expect(sql).toContain("'odb-settings:encryption'")
+    expect(sql).toContain("'odb-settings:authentication'")
+    expect(sql).toContain("UTL_I18N.STRING_TO_RAW(p_id, 'AL32UTF8')")
+    expect(sql).toContain('SETTINGS_CIPHERTEXT_INVALID')
+    const decrypt = sql.slice(
+      sql.indexOf('FUNCTION decrypt_value(p_id', sql.indexOf('CREATE OR REPLACE PACKAGE BODY')),
+    )
+    expect(decrypt.indexOf('UTL_RAW.COMPARE')).toBeLessThan(decrypt.indexOf('DBMS_CRYPTO.DECRYPT'))
+    expect(sql).toContain(
+      "RETURN TO_CLOB('v1:' || RAWTOHEX(l_iv) || RAWTOHEX(l_mac) || RAWTOHEX(l_ciphertext))",
+    )
+    expect(sql).toContain('IF p_value IS NULL THEN')
+  })
+
+  it.each([
+    [
+      'https://secrets.vaults.eu-stockholm-1.oci.oraclecloud.com/20190301/secretbundles/ocid1.vaultsecret.oc1..aaaaaaaaexample',
+      true,
+    ],
+    [
+      'https://secrets.vaults.us-phoenix-1.oci.oraclecloud.com/20190301/secretbundles/ocid1.vaultsecret.oc1.phx.aaaaaaaaexample',
+      true,
+    ],
+    [
+      'https://secrets.vaults.eu-stockholm-1.oci.oraclecloud.com/20190301/secretbundles/ocid1.secret.oc1..aaaaaaaaexample',
+      false,
+    ],
+    [
+      'https://secrets.vaults.eu-stockholm-1.oci.oraclecloud.com/20190301/secretbundles/ocid1.key.oc1..aaaaaaaaexample',
+      false,
+    ],
+    ['https://secrets.vaults.eu-stockholm-1.oci.oraclecloud.com/20190301/secretbundles/', false],
+    [
+      'https://secrets.vaults.eu-stockholm-1.oci.oraclecloud.com/20190301/secretbundles/ocid1.vaultsecret.',
+      false,
+    ],
+    [
+      'http://secrets.vaults.eu-stockholm-1.oci.oraclecloud.com/20190301/secretbundles/ocid1.vaultsecret.oc1..aaaaaaaaexample',
+      false,
+    ],
+    [
+      'https://secrets.vaults.eu-stockholm-1.oci.oraclecloud.com.evil.example/20190301/secretbundles/ocid1.vaultsecret.oc1..aaaaaaaaexample',
+      false,
+    ],
+    ['https://example.com/20190301/secretbundles/ocid1.vaultsecret.oc1..aaaaaaaaexample', false],
+    [
+      'https://secrets.vaults.eu-stockholm-1.oci.oraclecloud.com/20190301/secrets/ocid1.vaultsecret.oc1..aaaaaaaaexample',
+      false,
+    ],
+  ])('validates the generated Vault URI pattern for %s', (uri, expected) => {
+    const pattern = sql.match(/REGEXP_LIKE\(l_uri, '([^']+)'\)/)?.[1]
+    if (pattern === undefined) throw new Error('Generated Vault URI validation pattern is missing.')
+    expect(new RegExp(pattern).test(uri)).toBe(expected)
+  })
+
+  it('uses principal first, audits fallback failures, and never ships a default master key', () => {
+    expect(sql).toContain("c_master_key_local CONSTANT VARCHAR2(64) := ''")
+    expect(sql).toContain('APP_SETTINGS_MASTER_KEY_URI')
+    expect(sql).toContain(
+      "SELECT MAX(DBMS_LOB.SUBSTR(value, 2000, 1)) INTO l_uri FROM odb_settings_store WHERE id = 'APP_SETTINGS_MASTER_KEY_URI'",
+    )
+    expect(sql).toContain("credential_name => ''OCI$RESOURCE_PRINCIPAL''")
+    expect(sql).toContain('DBMS_CLOUD.GET_RESPONSE_STATUS_CODE')
+    expect(sql).toContain('SETTINGS_VAULT_SECRET_MISSING')
+    expect(sql).toContain('SETTINGS_VAULT_REQUEST_FAILED')
+    expect(sql).toContain('method => DBMS_CLOUD.METHOD_GET')
+    expect(sql).toContain("END;' USING IN l_uri, OUT l_key")
+    expect(sql).toContain('odb_audit.warn(')
+    expect(sql).toContain('odb_audit.error(')
+    expect(sql).toContain('SETTINGS_MASTER_KEY_UNAVAILABLE')
+    expect(sql).toContain('SETTINGS_MASTER_KEY_INVALID')
+    expect(sql).toContain('SETTINGS_MASTER_KEY_URI_INVALID')
+    expect(sql).not.toContain('SQLERRM')
+    const configured = odbSettings.toSQLUp({ masterKey: 'ab'.repeat(32) })
+    expect(configured).toContain(`c_master_key_local CONSTANT VARCHAR2(64) := '${'ab'.repeat(32)}'`)
+    for (const masterKey of ['short', 'g'.repeat(64), 'a'.repeat(63), 'a'.repeat(65)]) {
+      expect(() => odbSettings.toSQLUp({ masterKey })).toThrow('64 hexadecimal')
+    }
   })
 
   it('seeds and removes settings through the package', () => {

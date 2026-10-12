@@ -15,6 +15,7 @@ export {
   type OrdsServiceDefinition,
   type ProcedureServiceDefinition,
   type Package,
+  type DynamicSqlBinding,
 } from './schema/package.js'
 export * from './introspect.js'
 export * from './env.js'
