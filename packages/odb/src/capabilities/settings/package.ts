@@ -1,11 +1,11 @@
-import { cond, odbLiteral, plsqlExpr } from '../../schema/attribute.js'
+import { cond, odbLiteral, PlsqlExpression } from '../../schema/attribute.js'
 import { odbPackage, odbType } from '../../schema/package.js'
 import { odbQuery } from '../../query/index.js'
 import { DEFAULT_LIMIT, PACKAGE_NAME } from './constants.js'
 import { settingsStore } from './tables.js'
 import { settingsTypes } from './types.js'
 import { settingsEncryption } from './encryption.js'
-import { odbOracle } from '../../oracle/index.js'
+import { odbDbmsLob, odbOracle } from '../../oracle/index.js'
 import { VALUE_LENGTH } from './constants.js'
 
 /** PL/SQL API for the settings store. Callers own authorization and transactions. */
@@ -36,7 +36,7 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
           .select(settingsStore.meta)
           .where(cond.or([cond.isNull(after), cond.gt(settingsStore.id, after)]))
           .orderBy(settingsStore.id)
-          .limit(plsqlExpr.call('PLS_INTEGER', 'NVL', limit, odbLiteral(DEFAULT_LIMIT))),
+          .limit(odbOracle.nvl(limit, odbLiteral(DEFAULT_LIMIT))),
       )
     },
   )
@@ -68,17 +68,7 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
             (plain) => plain.set(value, decrypt.invoke(id, storedValue)),
           )
         },
-        (plain) =>
-          plain.set(
-            value,
-            plsqlExpr.call(
-              'VARCHAR2',
-              'DBMS_LOB.SUBSTR',
-              storedValue,
-              odbLiteral(VALUE_LENGTH),
-              odbLiteral(1),
-            ),
-          ),
+        (plain) => plain.set(value, odbDbmsLob.substr(storedValue, VALUE_LENGTH, 1)),
       )
       body.when('NO_DATA_FOUND', (handler) => handler.notFound())
     })
@@ -165,18 +155,18 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
         .using({ id, value: storedValue, meta: effectiveMeta }, 'source')
       const sourceId = merge.sourceRef('id')
       const sourceValue = merge.sourceRef('value')
-      const sourceMeta = merge.sourceRef('meta')
+      const sourceMeta = new PlsqlExpression(effectiveMeta.type, merge.sourceRef('meta').toSQL())
       body.query(
         merge
           .on((t, source) => cond.eq(t.id, source.id))
           .whenMatched({
             value: sourceValue,
-            meta: plsqlExpr.call('CLOB', 'NVL', sourceMeta, target.meta),
+            meta: odbOracle.nvl(sourceMeta, target.meta),
           })
           .whenNotMatched({
             id: sourceId,
             value: sourceValue,
-            meta: plsqlExpr.call('CLOB', 'NVL', sourceMeta, odbLiteral('{}')),
+            meta: odbOracle.nvl(sourceMeta, odbLiteral('{}')),
           }),
       )
     },

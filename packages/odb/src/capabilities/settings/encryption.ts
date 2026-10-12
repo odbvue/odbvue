@@ -110,7 +110,7 @@ export function settingsEncryption(pkg: Pick<Package, 'privateConstant' | 'priva
           )
           missing.invalid('SETTINGS_MASTER_KEY_UNAVAILABLE')
         })
-        then.set(key, plsqlExpr.call('RAW', 'HEXTORAW', fallback))
+        then.set(key, odbOracle.hexToRaw(fallback))
       })
       body.return(key)
     })
@@ -171,14 +171,10 @@ export function settingsEncryption(pkg: Pick<Package, 'privateConstant' | 'priva
         mac: odbType.raw(32),
       })
       body.ifThen(cond.isNull(value), (then) => then.return(odbOracle.null()))
-      body.ifThen(
-        cond.gt(plsqlExpr.call('NUMBER', 'DBMS_LOB.GETLENGTH', value), 32767),
-        (invalid) => invalid.invalid('SETTINGS_CIPHERTEXT_INVALID'),
+      body.ifThen(cond.gt(odbDbmsLob.getLength(value), 32767), (invalid) =>
+        invalid.invalid('SETTINGS_CIPHERTEXT_INVALID'),
       )
-      body.set(
-        envelope,
-        plsqlExpr.call('VARCHAR2', 'DBMS_LOB.SUBSTR', value, odbLiteral(32767), odbLiteral(1)),
-      )
+      body.set(envelope, odbDbmsLob.substr(value, 32767, 1))
       body.ifThen(
         cond.or([
           cond.not(cond.regexpLike(envelope, '^v1:[0-9A-F]+$')),
@@ -187,9 +183,9 @@ export function settingsEncryption(pkg: Pick<Package, 'privateConstant' | 'priva
         ]),
         (invalid) => invalid.invalid('SETTINGS_CIPHERTEXT_INVALID'),
       )
-      body.set(iv, plsqlExpr.call('RAW', 'HEXTORAW', odbOracle.substr(envelope, 4, 32)))
-      body.set(mac, plsqlExpr.call('RAW', 'HEXTORAW', odbOracle.substr(envelope, 36, 64)))
-      body.set(ciphertext, plsqlExpr.call('RAW', 'HEXTORAW', odbOracle.substr(envelope, 100)))
+      body.set(iv, odbOracle.hexToRaw(odbOracle.substr(envelope, 4, 32)))
+      body.set(mac, odbOracle.hexToRaw(odbOracle.substr(envelope, 36, 64)))
+      body.set(ciphertext, odbOracle.hexToRaw(odbOracle.substr(envelope, 100)))
       body.set(key, masterKey.invoke())
       body.ifThen(
         cond.ne(odbUtlRaw.compare(mac, signature(id.name, iv.name, ciphertext.name, key.name)), 0),

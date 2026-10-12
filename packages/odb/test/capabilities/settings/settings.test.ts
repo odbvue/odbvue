@@ -135,6 +135,18 @@ describe('Settings', () => {
     expect(sql).toContain('IF p_value IS NULL THEN')
   })
 
+  it('preserves LOB, RAW conversion and merge expressions when using typed wrappers', () => {
+    expect(sql).toContain('p_value := DBMS_LOB.SUBSTR(l_stored_value, 2000, 1)')
+    expect(sql).toContain('DBMS_LOB.GETLENGTH(p_value) > 32767')
+    expect(sql).toContain('l_envelope := DBMS_LOB.SUBSTR(p_value, 32767, 1)')
+    expect(sql).toContain('l_key := HEXTORAW(c_master_key_local)')
+    expect(sql).toContain('l_iv := HEXTORAW(SUBSTR(l_envelope, 4, 32))')
+    expect(sql).toContain('l_mac := HEXTORAW(SUBSTR(l_envelope, 36, 64))')
+    expect(sql).toContain('l_ciphertext := HEXTORAW(SUBSTR(l_envelope, 100))')
+    expect(sql).toContain('meta = NVL(source.meta, target.meta)')
+    expect(sql).toContain("NVL(source.meta, '{}')")
+  })
+
   it.each([
     [
       'https://secrets.vaults.eu-stockholm-1.oci.oraclecloud.com/20190301/secretbundles/ocid1.vaultsecret.oc1..aaaaaaaaexample',

@@ -1,7 +1,7 @@
 import { cond, odbLiteral, plsqlExpr, PlsqlExpression } from '../../schema/attribute.js'
 import { odbPackage, odbType } from '../../schema/package.js'
 import { odbQuery } from '../../query/index.js'
-import { odbOracle } from '../../oracle/index.js'
+import { odbDbmsLob, odbOracle } from '../../oracle/index.js'
 import { DEFAULT_LIMIT, MAX_FILE_BYTES, PACKAGE_NAME } from './constants.js'
 import { storageFiles } from './tables.js'
 import { storageTypes } from './types.js'
@@ -37,7 +37,7 @@ export const odbStoragePackage = odbPackage(PACKAGE_NAME, (pkg) => {
             ]),
           )
           .orderBy(storageFiles.id)
-          .limit(plsqlExpr.call('PLS_INTEGER', 'NVL', limit, odbLiteral(DEFAULT_LIMIT))),
+          .limit(odbOracle.nvl(limit, odbLiteral(DEFAULT_LIMIT))),
       )
     },
   )
@@ -82,7 +82,7 @@ export const odbStoragePackage = odbPackage(PACKAGE_NAME, (pkg) => {
           invalid.invalid('STORAGE_META_INVALID'),
         )
       })
-      body.set(fileSize, plsqlExpr.call('NUMBER', 'DBMS_LOB.GETLENGTH', content))
+      body.set(fileSize, plsqlExpr.cast<'NUMBER'>(odbDbmsLob.getLength(content)))
       body.ifThen(cond.gt(fileSize, MAX_FILE_BYTES), (then) =>
         then.invalid('STORAGE_FILE_TOO_LARGE'),
       )

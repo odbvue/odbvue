@@ -45,17 +45,12 @@ export const odbAclPackage = odbPackage('odb_acl', (pkg) => {
           cond.isNull(port),
           cond.lt(port, 1),
           cond.gt(port, 65535),
-          cond.ne(port, plsqlExpr.call('NUMBER', 'TRUNC', port)),
+          cond.ne(port, odbOracle.trunc(port)),
         ]),
         (then) => then.invalid('ACL_PORT_INVALID'),
       )
       const { count } = body.variables({ count: odbType.integer() })
-      const owner = plsqlExpr.call(
-        'VARCHAR2',
-        'SYS_CONTEXT',
-        odbLiteral('USERENV'),
-        odbLiteral('CURRENT_USER'),
-      )
+      const owner = odbOracle.sysContext(odbLiteral('USERENV'), odbLiteral('CURRENT_USER'))
       const normalizedHost = odbOracle.lower(host)
       const ace = plsqlExpr.call(
         'XS$ACE_TYPE',
@@ -70,7 +65,7 @@ export const odbAclPackage = odbPackage('odb_acl', (pkg) => {
           then.query(
             odbQuery()
               .selectFrom(hostAces)
-              .select(plsqlExpr.call('NUMBER', 'COUNT', '*'))
+              .select(odbOracle.count())
               .into(count)
               .where(
                 cond.and([
@@ -120,7 +115,7 @@ export const odbAclPackage = odbPackage('odb_acl', (pkg) => {
         body.call(
           change.invoke(
             host,
-            plsqlExpr.call('NUMBER', 'NVL', port, odbLiteral(defaultPort)),
+            odbOracle.nvl(port, odbLiteral(defaultPort)),
             odbLiteral(privilege),
             removing ? 'TRUE' : 'FALSE',
           ),
@@ -144,12 +139,7 @@ export const odbAclPackage = odbPackage('odb_acl', (pkg) => {
             cond.and([
               cond.eq(
                 hostAces.principal,
-                plsqlExpr.call(
-                  'VARCHAR2',
-                  'SYS_CONTEXT',
-                  odbLiteral('USERENV'),
-                  odbLiteral('CURRENT_USER'),
-                ),
+                odbOracle.sysContext(odbLiteral('USERENV'), odbLiteral('CURRENT_USER')),
               ),
               cond.eq(hostAces.principalType, 'DATABASE'),
               cond.eq(hostAces.grantType, 'GRANT'),

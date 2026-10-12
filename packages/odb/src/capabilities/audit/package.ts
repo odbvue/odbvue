@@ -183,14 +183,7 @@ export const odbAuditPackage = odbPackage('odb_audit', (pkg) => {
         body.block((inner) => {
           inner.set(
             serviceName,
-            odbOracle.lower(
-              plsqlExpr.call(
-                'VARCHAR2',
-                'SYS_CONTEXT',
-                odbLiteral('USERENV'),
-                odbLiteral('DB_NAME'),
-              ),
-            ),
+            odbOracle.lower(odbOracle.sysContext(odbLiteral('USERENV'), odbLiteral('DB_NAME'))),
           )
           inner.ifThen(cond.isNotNull(serviceName), (then) =>
             then.call(jsonPut(parsed, odbLiteral('service.name'), serviceName)),

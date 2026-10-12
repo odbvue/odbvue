@@ -83,6 +83,19 @@ export const odbOracle = {
     return new PlsqlExpression('TIMESTAMP', 'SYSTIMESTAMP')
   },
 
+  /** `SYS_CONTEXT(<namespace>, <parameter>[, <length>])` -> VARCHAR2 */
+  sysContext(
+    namespace: PlsqlRenderable,
+    parameter: PlsqlRenderable,
+    length?: PlsqlRenderable | number,
+  ): PlsqlExpression<'VARCHAR2'> {
+    return call(
+      'VARCHAR2',
+      'SYS_CONTEXT',
+      length === undefined ? [namespace, parameter] : [namespace, parameter, length],
+    )
+  },
+
   /** `LOWER(<value>)` -> VARCHAR2 */
   lower(value: PlsqlRenderable): PlsqlExpression<'VARCHAR2'> {
     return call('VARCHAR2', 'LOWER', [value])
@@ -162,6 +175,14 @@ export const odbOracle = {
 
   ceil(value: PlsqlRenderable): PlsqlExpression<'NUMBER'> {
     return call('NUMBER', 'CEIL', [value])
+  },
+
+  /** Numeric `TRUNC(<value>[, <places>])` -> NUMBER; not the date overload. */
+  trunc(
+    value: PlsqlRenderable | number,
+    places?: PlsqlRenderable | number,
+  ): PlsqlExpression<'NUMBER'> {
+    return call('NUMBER', 'TRUNC', places === undefined ? [value] : [value, places])
   },
 
   replace(

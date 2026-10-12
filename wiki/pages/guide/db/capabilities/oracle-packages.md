@@ -18,7 +18,18 @@ body.set(sessionId, odbOracle.lower(odbOracle.rawToHex(odbOracle.sysGuid())))
 body.set(now, odbOracle.sysTimestamp())
 ```
 
-Includes `rawToHex`, `hexToRaw`, `sysGuid`, `sysTimestamp`, `lower`, `trim`, `nvl`, `toNumber`, `regexpReplace`, and `regexpSubstr`.
+Includes `rawToHex`, `hexToRaw`, `sysGuid`, `sysTimestamp`, `sysContext`, `lower`, `trim`, `nvl`, numeric `trunc`, `toNumber`, `regexpReplace`, and `regexpSubstr`.
+
+```ts
+odbOracle.sysContext(odbLiteral('USERENV'), odbLiteral('CURRENT_USER'))
+odbOracle.sysContext(odbLiteral('USERENV'), odbLiteral('CLIENT_IDENTIFIER'), 4000)
+odbOracle.trunc('p_port') // TRUNC(p_port), returning NUMBER
+odbOracle.trunc('p_amount', 2) // TRUNC(p_amount, 2)
+```
+
+Pass text literals through `odbLiteral`; plain strings represent SQL expressions. `trunc` covers the numeric overload, not date truncation.
+
+Prefer an existing typed wrapper over `plsqlExpr.call`. When an Oracle function is used more than once in framework code, add a shared typed wrapper. Keep generic invocation for obscure one-off constructors such as ACL-specific `XS$ACE_TYPE` and `XS$NAME_LIST`, or custom schema-qualified functions.
 
 ## `odbUtlI18n` — `UTL_I18N`
 

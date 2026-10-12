@@ -1,9 +1,40 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import { odbOracle } from '../../../src/oracle/standard/standard.js'
 import { odbDbmsCrypto } from '../../../src/oracle/dbms-crypto/dbms-crypto.js'
-import { odbLiteral } from '../../../src/schema/attribute.js'
+import { odbLiteral, Param, type PlsqlExpression } from '../../../src/schema/attribute.js'
 
 describe('odbOracle', () => {
+  it('renders typed context expressions with optional literal or expression lengths', () => {
+    const context = odbOracle.sysContext(odbLiteral('USERENV'), odbLiteral('CURRENT_USER'))
+    expectTypeOf(context).toEqualTypeOf<PlsqlExpression<'VARCHAR2'>>()
+    expect(context.type).toBe('VARCHAR2')
+    expect(context.toSQL()).toBe("SYS_CONTEXT('USERENV', 'CURRENT_USER')")
+    expect(
+      odbOracle.sysContext(odbLiteral('USERENV'), odbLiteral('CLIENT_IDENTIFIER'), 4000).toSQL(),
+    ).toBe("SYS_CONTEXT('USERENV', 'CLIENT_IDENTIFIER', 4000)")
+    expect(odbOracle.sysContext('p_namespace', 'p_parameter', 'p_length').toSQL()).toBe(
+      'SYS_CONTEXT(p_namespace, p_parameter, p_length)',
+    )
+    expect(
+      odbOracle.sysContext(odbLiteral("app's context"), odbLiteral('attribute'), 0).toSQL(),
+    ).toBe("SYS_CONTEXT('app''s context', 'attribute', 0)")
+    expect(odbOracle.lower(context).toSQL()).toBe("LOWER(SYS_CONTEXT('USERENV', 'CURRENT_USER'))")
+  })
+
+  it('renders numeric truncation with optional precision without dropping zero', () => {
+    const truncated = odbOracle.trunc(new Param('p_port', 'NUMBER'))
+    expectTypeOf(truncated).toEqualTypeOf<PlsqlExpression<'NUMBER'>>()
+    expect(truncated.type).toBe('NUMBER')
+    expect(truncated.toSQL()).toBe('TRUNC(p_port)')
+    expect(odbOracle.trunc(12.345, 2).toSQL()).toBe('TRUNC(12.345, 2)')
+    expect(odbOracle.trunc(-12.345, 0).toSQL()).toBe('TRUNC(-12.345, 0)')
+    expect(odbOracle.trunc(1234, -2).toSQL()).toBe('TRUNC(1234, -2)')
+    expect(odbOracle.trunc('p_value', new Param('p_places', 'PLS_INTEGER')).toSQL()).toBe(
+      'TRUNC(p_value, p_places)',
+    )
+    expect(odbOracle.trunc(odbOracle.toNumber('p_value')).toSQL()).toBe('TRUNC(TO_NUMBER(p_value))')
+  })
+
   it('allows absent optional JSON paths without hiding malformed values', () => {
     expect(
       odbOracle
