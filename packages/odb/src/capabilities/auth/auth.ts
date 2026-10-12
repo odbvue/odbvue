@@ -153,7 +153,7 @@ export const odbAuth = {
     },
   },
 
-  perm: {
+  permission: {
     has(userId: PlsqlRenderable, permission: PlsqlRenderable) {
       return odbAuthPackage.hasPermission(userId, permission)
     },
