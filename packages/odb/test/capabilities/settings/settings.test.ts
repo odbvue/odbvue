@@ -90,10 +90,10 @@ describe('Settings', () => {
 
   it('encrypts only secret writes and preserves metadata on ordinary updates', () => {
     expect(sql).toContain(
-      'SELECT meta INTO l_effective_meta FROM odb_settings_store WHERE id = p_id FOR UPDATE',
+      'SELECT meta, secret INTO l_effective_meta, l_existing_secret FROM odb_settings_store WHERE id = p_id FOR UPDATE',
     )
     expect(sql).toContain('l_effective_meta := NVL(p_meta, l_effective_meta)')
-    expect(sql).toContain("IF (p_id = 'SMTP_PASSWORD' OR p_id = 'AUTH_JWT_SECRET') THEN")
+    expect(sql).toContain("IF l_existing_secret = 'Y' THEN")
     expect(sql).toContain(`JSON_MERGEPATCH(l_effective_meta, '{"secret":"Y"}' RETURNING CLOB)`)
     expect(sql).toContain(
       `SELECT JSON_MERGEPATCH(l_effective_meta, '{"secret":"Y"}' RETURNING CLOB) INTO l_effective_meta FROM dual`,
@@ -111,6 +111,27 @@ describe('Settings', () => {
     expect(sql).toContain(
       "l_secret := NVL(JSON_VALUE(l_effective_meta, '$.secret' RETURNING VARCHAR2(10) ERROR ON ERROR NULL ON EMPTY), 'N')",
     )
+  })
+
+  it('prevents metadata replacement from downgrading any existing secret', () => {
+    const write = sql.slice(
+      sql.indexOf('PROCEDURE write(', sql.indexOf('CREATE OR REPLACE PACKAGE BODY')),
+      sql.indexOf('PROCEDURE remove(', sql.indexOf('CREATE OR REPLACE PACKAGE BODY')),
+    )
+    expect(write).toMatch(
+      /WHEN NO_DATA_FOUND THEN\s+l_effective_meta := '\{\}';\s+l_existing_secret := 'N';/,
+    )
+    const replacement = write.indexOf('l_effective_meta := NVL(p_meta, l_effective_meta)')
+    const preservation = write.indexOf("IF l_existing_secret = 'Y' THEN")
+    const encryption = write.indexOf("IF l_secret = 'Y' THEN")
+    expect(replacement).toBeGreaterThan(-1)
+    expect(preservation).toBeGreaterThan(replacement)
+    expect(encryption).toBeGreaterThan(preservation)
+    expect(write).toMatch(
+      /IF l_existing_secret = 'Y' THEN\s+l_secret := 'Y';\s+SELECT JSON_MERGEPATCH\(l_effective_meta, '\{"secret":"Y"\}' RETURNING CLOB\) INTO l_effective_meta FROM dual;\s+END IF;/,
+    )
+    expect(write).not.toContain('SMTP_PASSWORD')
+    expect(write).not.toContain('AUTH_JWT_SECRET')
   })
 
   it('uses authenticated AES-256 encryption, random IVs, UTF-8 and setting-bound MACs', () => {
@@ -253,16 +274,13 @@ describe('Settings', () => {
     )
   })
 
-  it.each(['SOME_SECRET', 'SMTP_PASSWORD', 'AUTH_JWT_SECRET'])(
-    'allows empty secret seeds for %s',
-    (id) => {
-      const seed = odbSettings.seed({ id, value: '', meta: { secret: 'Y' } })
-      expect(seed.toSQLUp({ schema: 'APP' })).toContain(
-        `APP.odb_settings.write('${id}', '', '{"secret":"Y"}')`,
-      )
-      expect(seed.toSQLDown({ schema: 'APP' })).toContain(`APP.odb_settings.remove('${id}')`)
-    },
-  )
+  it.each(['SOME_SECRET', 'ANOTHER_SECRET'])('allows empty secret seeds for %s', (id) => {
+    const seed = odbSettings.seed({ id, value: '', meta: { secret: 'Y' } })
+    expect(seed.toSQLUp({ schema: 'APP' })).toContain(
+      `APP.odb_settings.write('${id}', '', '{"secret":"Y"}')`,
+    )
+    expect(seed.toSQLDown({ schema: 'APP' })).toContain(`APP.odb_settings.remove('${id}')`)
+  })
 
   it.each(['actual-secret', ' ', '********'])('rejects non-empty secret seeds (%s)', (value) => {
     expect(() =>
@@ -273,25 +291,16 @@ describe('Settings', () => {
     ).toThrow('Secret values must not be embedded in migrations.')
   })
 
-  it.each(['SMTP_PASSWORD', 'AUTH_JWT_SECRET'])(
-    'rejects reserved credential literals regardless of metadata: %s',
-    (id) => {
-      for (const meta of [undefined, { secret: 'N' as const }, { secret: 'Y' as const }]) {
-        expect(() => odbSettings.seed({ id, value: 'hunter2', meta })).toThrow(
-          'Secret values must not be embedded in migrations.',
+  it.each([undefined, {}, { secret: 'N' as const }])(
+    'preserves seed values not marked secret (%j)',
+    (meta) => {
+      for (const id of ['VERSION', 'SMTP_PASSWORD', 'AUTH_JWT_SECRET']) {
+        expect(odbSettings.seed({ id, value: '1.0', meta }).toSQLUp()).toContain(
+          `odb_settings.write('${id}', '1.0', ${meta ? `'${JSON.stringify(meta)}'` : 'NULL'})`,
         )
       }
-      expect(odbSettings.seed({ id, value: '' }).toSQLUp()).toContain(
-        `odb_settings.write('${id}', '', NULL)`,
-      )
     },
   )
-
-  it('preserves non-secret seed values', () => {
-    expect(
-      odbSettings.seed({ id: 'VERSION', value: '1.0', meta: { secret: 'N' } }).toSQLUp(),
-    ).toContain(`odb_settings.write('VERSION', '1.0', '{"secret":"N"}')`)
-  })
 
   it('revalidates secret values and metadata before generating SQL', () => {
     const setting = { id: 'SOME_SECRET', value: '', meta: { secret: 'Y' as 'Y' | 'N' } }

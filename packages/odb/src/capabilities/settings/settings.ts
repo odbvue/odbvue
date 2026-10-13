@@ -44,7 +44,7 @@ export const odbSettings = {
   readMasked(id: PlsqlRenderable, value: PlsqlRenderable, meta: PlsqlRenderable) {
     return odbSettingsPackage.readMasked(id, value, meta)
   },
-  /** `odb_settings.write(<id>, <value>, <meta>)`; the default `NULL` meta keeps existing metadata. */
+  /** `odb_settings.write(<id>, <value>, <meta>)`; null meta keeps metadata; secrets cannot downgrade. */
   write(id: PlsqlRenderable, value: PlsqlRenderable, meta: PlsqlRenderable = 'NULL') {
     return odbSettingsPackage.write(id, value, meta)
   },
@@ -64,12 +64,7 @@ export const odbSettings = {
       throw new Error('odbSettings.seed(): at least one setting is required.')
     const validateSecrets = () => {
       for (const setting of settings) {
-        if (
-          (setting.meta?.secret === 'Y' ||
-            setting.id === 'SMTP_PASSWORD' ||
-            setting.id === 'AUTH_JWT_SECRET') &&
-          setting.value !== ''
-        ) {
+        if (setting.meta?.secret === 'Y' && setting.value !== '') {
           throw new Error('odbSettings.seed(): Secret values must not be embedded in migrations.')
         }
       }

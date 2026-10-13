@@ -44,9 +44,9 @@ export const migration = defineMigration('20260802140000_settings', {
 `seed` upserts each setting through `odb_settings.write` and removes it on rollback.
 
 Do not use `odbSettings.seed()` to embed non-empty secret values in migrations.
-It rejects any non-empty `value` when `meta.secret` is `'Y'`, or when the ID is
-`SMTP_PASSWORD` or `AUTH_JWT_SECRET` (which are always secret), both at seed creation
-and SQL generation.
+It rejects any non-empty `value` when `meta.secret` is `'Y'`, both at seed creation
+and SQL generation. The owning capability declares which settings are secret;
+Settings does not infer secrecy from IDs.
 Encryption during `write` does not protect plaintext literals in source or generated SQL.
 Seed an empty placeholder instead:
 
@@ -83,9 +83,13 @@ Both the write-path lookup and virtual column use `NULL ON EMPTY` with
 `ERROR ON ERROR`: an omitted flag defaults to `'N'`, but malformed/non-scalar
 flag values are not silently treated as ordinary configuration.
 
-`SMTP_PASSWORD` is always marked secret, including when recreated after deletion.
-The CLI seeds/writes its metadata explicitly. `SMTP_USERNAME` remains ordinary
-configuration; other credentials can opt in with `meta: { secret: 'Y' }`.
+Once a stored setting is secret, `write` preserves `secret: 'Y'` even when replacement
+metadata omits the flag, sets it to `null`, or sets it to `'N'`. Other replacement
+metadata fields still take effect. Ordinary writes cannot downgrade a secret;
+any intentional downgrade requires an explicit privileged database operation.
+New settings default to ordinary configuration unless their metadata declares
+`secret: 'Y'`. Auth and Email provisioning declare their own secret metadata,
+including when recreating settings after deletion.
 
 Metadata updates use `odbOracle.jsonMergePatch` through `odbQuery` and
 `SELECT ... INTO`. Its SQL-only `RETURNING CLOB` clause must not be emitted as

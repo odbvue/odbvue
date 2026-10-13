@@ -142,7 +142,8 @@ odbSettings.seed({ id: 'APP_VERSION', value: '1.0.0', meta: { label: 'Applicatio
 ```
 
 Secret values must not be embedded in migrations: `seed` rejects non-empty values
-with `meta.secret: 'Y'`, and non-empty `SMTP_PASSWORD` values regardless of metadata.
+with `meta.secret: 'Y'`. Owning capabilities declare secret metadata; Settings
+does not recognize credential IDs. Existing secrets cannot be downgraded by `write`.
 Use `value: ''` for secret placeholders, then supply credentials after deployment
 through bind variables (for SMTP, use `ov setup-settings`). Validation runs at seed
 creation and again before SQL generation.

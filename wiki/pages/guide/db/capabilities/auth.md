@@ -119,7 +119,8 @@ already signed into existing tokens.
 
 The sandbox Settings API masks the key and rejects writes/removals of
 `AUTH_JWT_*`; use trusted setup or direct authorized database administration.
-`secret=Y` is enforced for `AUTH_JWT_SECRET` even if caller metadata says otherwise.
+Auth seeds `AUTH_JWT_SECRET` with `secret=Y`; Settings preserves that flag on
+subsequent writes even if replacement metadata says otherwise.
 `ODBVUE_AUTH_JWT_SECRET` and the `jwtSecret` SQL-generation option are retired.
 Rebuilding the original database migrations creates the new dependency order and
 placeholders; run setup afterwards. No incremental migration is supplied here.

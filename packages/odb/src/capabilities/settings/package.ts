@@ -87,15 +87,16 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
     ({ params: { id, value, meta }, body }) => body.call(readValue.invoke(id, '1', value, meta)),
   )
 
-  /** Creates or updates a setting; a null `meta` keeps the existing metadata (or `{}` on create). */
+  /** Creates or updates a setting; null `meta` keeps metadata, and existing secrets stay secret. */
   const write = pkg.proc(
     'write',
     { in: { id: settingsStore.id, value: settingsTypes.value, meta: settingsStore.meta } },
     ({ params: { id, value, meta }, body }) => {
-      const { effectiveMeta, storedValue, secret } = body.variables({
+      const { effectiveMeta, storedValue, secret, existingSecret } = body.variables({
         effectiveMeta: settingsStore.meta,
         storedValue: odbType.clob(),
         secret: odbType.string(10),
+        existingSecret: settingsStore.secret,
       })
       body.ifThen(cond.gt(odbOracle.length(value), VALUE_LENGTH), (invalid) =>
         invalid.invalid('SETTINGS_VALUE_TOO_LONG'),
@@ -104,12 +105,15 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
         existing.query(
           odbQuery()
             .selectFrom(settingsStore)
-            .select(settingsStore.meta)
-            .into(effectiveMeta)
+            .select([settingsStore.meta, settingsStore.secret])
+            .into(effectiveMeta, existingSecret)
             .where(cond.eq(settingsStore.id, id))
             .forUpdate(),
         )
-        existing.when('NO_DATA_FOUND', (missing) => missing.set(effectiveMeta, odbLiteral('{}')))
+        existing.when('NO_DATA_FOUND', (missing) => {
+          missing.set(effectiveMeta, odbLiteral('{}'))
+          missing.set(existingSecret, odbLiteral('N'))
+        })
       })
       body.set(effectiveMeta, odbOracle.nvl(meta, effectiveMeta))
       body.ifThen(cond.not(cond.isJson(effectiveMeta)), (invalid) =>
@@ -129,19 +133,15 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
       body.ifThen(cond.not(cond.or([cond.eq(secret, 'Y'), cond.eq(secret, 'N')])), (invalid) =>
         invalid.invalid('SETTINGS_SECRET_INVALID'),
       )
-      // Reserved credentials remain secret regardless of caller-supplied metadata.
-      body.ifThen(
-        cond.or([cond.eq(id, 'SMTP_PASSWORD'), cond.eq(id, 'AUTH_JWT_SECRET')]),
-        (then) => {
-          then.set(secret, odbLiteral('Y'))
-          then.query(
-            odbQuery()
-              .selectFrom('dual')
-              .select(odbOracle.jsonMergePatch(effectiveMeta, odbLiteral('{"secret":"Y"}')))
-              .into(effectiveMeta),
-          )
-        },
-      )
+      body.ifThen(cond.eq(existingSecret, 'Y'), (then) => {
+        then.set(secret, odbLiteral('Y'))
+        then.query(
+          odbQuery()
+            .selectFrom('dual')
+            .select(odbOracle.jsonMergePatch(effectiveMeta, odbLiteral('{"secret":"Y"}')))
+            .into(effectiveMeta),
+        )
+      })
       body.ifThen(
         cond.eq(secret, 'Y'),
         (then) => {
