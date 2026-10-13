@@ -21,8 +21,9 @@ const cipherSuite = odbDbmsCrypto.cipherSuite(
   odbDbmsCrypto.PAD_PKCS5,
 )
 
-export function settingsEncryption(pkg: Pick<Package, 'privateConstant' | 'privateFunc'>) {
-  const fallback = pkg.privateConstant('c_master_key_local', odbType.string(64), 'masterKey')
+export function settingsEncryption(pkg: Pick<Package, 'privateVariable' | 'privateFunc'>) {
+  const cachedKey = pkg.privateVariable('g_master_key', odbType.raw(32))
+  const cachedUri = pkg.privateVariable('g_master_key_uri', odbType.string(2000))
   const masterKey = pkg.privateFunc('master_key', odbType.raw(32), (fn) => {
     fn.body((body) => {
       const { uri, key } = body.variables({ uri: odbType.string(2000), key: odbType.raw(32767) })
@@ -35,84 +36,93 @@ export function settingsEncryption(pkg: Pick<Package, 'privateConstant' | 'priva
           .into(uri)
           .where(cond.eq(settingsStore.id, 'APP_SETTINGS_MASTER_KEY_URI')),
       )
-      body.ifThen(cond.isNotNull(uri), (then) => {
-        then.ifThen(
-          cond.not(
-            cond.regexpLike(
-              uri,
-              '^https://secrets[.]vaults[.][a-z0-9-]+[.]oci[.]oraclecloud[.]com/20190301/secretbundles/ocid1[.]vaultsecret[.][A-Za-z0-9._-]+$',
-            ),
-          ),
-          (invalid) => invalid.invalid('SETTINGS_MASTER_KEY_URI_INVALID'),
-        )
-        then.block((request) => {
-          // Dynamic SQL keeps local databases independent of the ADB-only DBMS_CLOUD packages.
-          request.executeImmediate(
-            (cloud) => {
-              const { response, json, content } = cloud.variables({
-                response: odbDbmsCloud.response,
-                json: odbType.clob(),
-                content: odbType.string(128),
-              })
-              cloud.set(
-                response,
-                odbDbmsCloud.sendRequest(
-                  odbLiteral('OCI$RESOURCE_PRINCIPAL'),
-                  new Param(':uri', 'VARCHAR2'),
-                ),
-              )
-              cloud.ifThen(cond.ne(odbDbmsCloud.getResponseStatusCode(response), 200), (failed) =>
-                failed.invalid('SETTINGS_VAULT_REQUEST_FAILED'),
-              )
-              cloud.set(json, odbDbmsCloud.getResponseText(response))
-              cloud.set(
-                content,
-                odbOracle.jsonValue(json, odbLiteral('$.secretBundleContent.content'), {
-                  length: 128,
-                  errorOnError: true,
-                }),
-              )
-              cloud.ifThen(cond.isNull(content), (missing) =>
-                missing.invalid('SETTINGS_VAULT_SECRET_MISSING'),
-              )
-              cloud.set(
-                new Param(':key', 'RAW'),
-                odbUtlEncode.base64Decode(odbUtlRaw.castToRaw(content)),
-              )
-            },
-            [
-              { direction: 'IN', value: uri },
-              { direction: 'OUT', value: key },
-            ],
-          )
-          request.whenOthers((handler) => {
-            handler.call(
-              odbAudit.warn(
-                odbLiteral(
-                  'Settings master key: Vault request failed; attempting configured local fallback',
-                ),
+      body.ifThen(
+        cond.and([
+          cond.isNotNull(cachedKey),
+          cond.or([cond.eq(uri, cachedUri), cond.and([cond.isNull(uri), cond.isNull(cachedUri)])]),
+        ]),
+        (hit) => hit.return(cachedKey),
+      )
+      body.set(cachedKey, null)
+      body.set(cachedUri, null)
+      body.ifThen(
+        cond.isNotNull(uri),
+        (then) => {
+          then.ifThen(
+            cond.not(
+              cond.regexpLike(
+                uri,
+                '^https://secrets[.]vaults[.][a-z0-9-]+[.]oci[.]oraclecloud[.]com/20190301/secretbundles/ocid1[.]vaultsecret[.][A-Za-z0-9._-]+$',
               ),
-            )
-            handler.set(key, null)
-          })
-        })
-        then.ifThen(
-          cond.and([cond.isNotNull(key), cond.ne(odbUtlRaw.length(key), 32)]),
-          (invalid) => invalid.invalid('SETTINGS_MASTER_KEY_INVALID'),
-        )
-      })
-      body.ifThen(cond.isNull(key), (then) => {
-        then.ifThen(cond.isNull(fallback), (missing) => {
-          missing.call(
-            odbAudit.error(
-              odbLiteral('Settings master key unavailable; no local fallback configured'),
             ),
+            (invalid) => invalid.invalid('SETTINGS_MASTER_KEY_URI_INVALID'),
           )
-          missing.invalid('SETTINGS_MASTER_KEY_UNAVAILABLE')
-        })
-        then.set(key, odbOracle.hexToRaw(fallback))
-      })
+          then.block((request) => {
+            // Dynamic SQL keeps local databases independent of the ADB-only DBMS_CLOUD packages.
+            request.executeImmediate(
+              (cloud) => {
+                const { response, json, content } = cloud.variables({
+                  response: odbDbmsCloud.response,
+                  json: odbType.clob(),
+                  content: odbType.string(128),
+                })
+                cloud.set(
+                  response,
+                  odbDbmsCloud.sendRequest(
+                    odbLiteral('OCI$RESOURCE_PRINCIPAL'),
+                    new Param(':uri', 'VARCHAR2'),
+                  ),
+                )
+                cloud.ifThen(cond.ne(odbDbmsCloud.getResponseStatusCode(response), 200), (failed) =>
+                  failed.invalid('SETTINGS_VAULT_REQUEST_FAILED'),
+                )
+                cloud.set(json, odbDbmsCloud.getResponseText(response))
+                cloud.set(
+                  content,
+                  odbOracle.jsonValue(json, odbLiteral('$.secretBundleContent.content'), {
+                    length: 128,
+                    errorOnError: true,
+                  }),
+                )
+                cloud.ifThen(cond.isNull(content), (missing) =>
+                  missing.invalid('SETTINGS_VAULT_SECRET_MISSING'),
+                )
+                cloud.set(
+                  new Param(':key', 'RAW'),
+                  odbUtlEncode.base64Decode(odbUtlRaw.castToRaw(content)),
+                )
+              },
+              [
+                { direction: 'IN', value: uri },
+                { direction: 'OUT', value: key },
+              ],
+            )
+          })
+        },
+        (local) => {
+          local.query(
+            odbQuery()
+              .selectFrom('dual')
+              .select(
+                odbDbmsCrypto.hash(
+                  utf8(odbOracle.sysContext(odbLiteral('USERENV'), odbLiteral('DB_UNIQUE_NAME'))),
+                  odbDbmsCrypto.HASH_SH256,
+                ),
+              )
+              .into(key),
+          )
+        },
+      )
+      body.ifThen(cond.or([cond.isNull(key), cond.ne(odbUtlRaw.length(key), 32)]), (invalid) =>
+        invalid.invalid('SETTINGS_MASTER_KEY_INVALID'),
+      )
+      body.set(cachedUri, uri)
+      body.set(cachedKey, key)
       body.return(key)
+      body.whenOthers((handler) => {
+        handler.call(odbAudit.error(odbLiteral('Settings master key: key loading failed')))
+        handler.raise()
+      })
     })
   })
 

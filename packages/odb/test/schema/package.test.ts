@@ -276,6 +276,27 @@ describe('Procedure ORDS contracts', () => {
 })
 
 describe('private package members', () => {
+  it('emits typed session variables only in the package body', () => {
+    const pkg = odbPackage('PCK_CACHE', (p) => {
+      const key = p.privateVariable('g_key', odbType.raw(32))
+      p.privateVariable('g_uri', odbType.string(2000))
+      p.func('KEY_VALUE', odbType.raw(32), (fn) =>
+        fn.body((body) => {
+          body.set(key, null)
+          body.return(key)
+        }),
+      )
+    })
+    const sql = pkg.toSQLUp()
+    const bodyStart = sql.indexOf('CREATE OR REPLACE PACKAGE BODY')
+    expect(sql.slice(0, bodyStart)).not.toContain('g_key')
+    expect(sql.slice(bodyStart)).toContain('g_key RAW(32);')
+    expect(sql.slice(bodyStart)).toContain('g_uri VARCHAR2(2000);')
+    expect(sql).toContain('g_key := NULL;')
+    expect(sql).toContain('RETURN g_key;')
+    expect(pkg.application().privateVariables).toHaveLength(2)
+  })
+
   it('emits private members in the body and supports local typed calls', () => {
     const pkg = odbPackage('PCK_PRIVATE', (p) => {
       const normalize = p.privateFunc('NORMALIZE', odbType.string(), (fn) => {

@@ -167,7 +167,8 @@ secret flag. A write of the display mask `********` to a secret raises
 The sandbox editor treats secrets as password-style replacement fields, not readable
 configuration. Trusted callers can explicitly write `NULL` to clear a secret.
 
-The provider tries the `APP_SETTINGS_MASTER_KEY_URI` setting first. Set it to an
+When `APP_SETTINGS_MASTER_KEY_URI` is set, the provider reads exclusively from
+OCI Vault. Set it to an
 OCI Vault secret-bundle endpoint:
 
 ```text
@@ -180,48 +181,47 @@ Enable the database resource principal, grant its dynamic group permission to re
 that Vault secret, and provision outbound HTTPS access as required. The secret
 bundle's Base64 content must decode to exactly **32 raw key bytes**, not a
 64-character hexadecimal text value. `DBMS_CLOUD` is invoked dynamically, allowing
-local databases to use the fallback without installing the cloud packages.
+local databases to use a generated local key without installing the cloud packages.
 The request is defined with the typed `odbDbmsCloud` Oracle wrappers and
 `ProcedureBody.executeImmediate` block builder, rather than handwritten PL/SQL.
 
-An optional deployment variable, `ODBVUE_APP_MASTER_KEY`, supplies the same
-32-byte key encoded as exactly **64 hexadecimal characters**. The CLI loads it from
-the current environment's ignored `.env`; alternatively pass `masterKey` to
-`odbSettings.toSQLUp`. It becomes a private PL/SQL constant. No default key is
-provided. With neither a working Vault provider nor a configured fallback,
-nonempty secret writes and decrypted reads fail explicitly.
+If the URI is not set, the database generates a deterministic 32-byte local key
+by hashing the UTF-8 encoding of `SYS_CONTEXT('USERENV', 'DB_UNIQUE_NAME')` with
+`DBMS_CRYPTO.HASH_SH256`. The query uses `odbQuery` and typed Oracle wrappers
+with `SELECT ... INTO ... FROM dual`; no access to `v$database` is needed.
+`ov setup` no longer generates, reads, validates, or stores a master key.
+`ODBVUE_APP_MASTER_KEY` and the `masterKey` SQL-generation option are retired.
 
-`ov setup` generates this fallback with `randomBytes(32)` during database
-configuration when the selected environment has no key. It saves the hexadecimal
-value in that environment's ignored `.env` without printing it. Later setup runs
-preserve the existing key; invalid configured keys abort setup instead of being
-silently replaced. Each environment gets its own key.
-
-Back up the environment key securely. For an already deployed database, adding
-the variable does not change the installed package constant: redeploy the Settings
-package using the retained key. Do not generate a replacement for an existing
-encrypted database if its original key has been lost.
-
-Vault request failures are audit-logged before trying the configured fallback;
-invalid key lengths fail explicitly. Masked reads and ordinary configuration
-remain available without a key. Empty bootstrap secrets require no key.
+With a configured URI, request errors, missing content, and invalid key lengths
+are audit-logged and raise exceptions; they never select the local key.
+Only successfully loaded, validated keys are cached in private package variables
+for the current database session, for both providers. Every key use checks the
+current URI: changing or removing it clears the cache and reloads the key.
+A failed load leaves the cache empty so later calls retry. Rotating a Vault secret
+at the same URI requires resetting database sessions/package state to refresh
+cached keys. Masked reads and ordinary configuration remain available without
+loading a key. Empty bootstrap secrets require no key.
 
 Ciphertext uses AES-256-CBC with a fresh random IV and encrypt-then-HMAC-SHA256.
 Encryption and authentication keys are derived separately from the master key.
 The versioned envelope authenticates the setting ID, IV, and ciphertext, and
 verification occurs before decryption. Text is encoded as UTF-8.
 
-**Security boundary:** the fallback constant is readable by schema owners in
-package source and appears in generated deployment SQL. Keep deployment output
-and environment files out of source control, restrict access, and prefer
-principal-only Vault access in production. Encryption does not protect against
+**Security boundary:** the local key is derived from a non-secret database name
+and can be reproduced by anyone who knows that name. It is intended for local
+development, not as a production secret. Databases sharing `DB_UNIQUE_NAME`
+derive the same key; changing the name changes the key. Use resource-principal
+Vault access in production. Encryption does not protect against
 a compromised schema owner or an authorized caller of the internal decrypted API.
-Never return the fallback through Settings.
+Never return the master key through Settings.
 
-Keep the Vault and fallback keys identical. Changing either key does not rotate
-existing ciphertext: decrypt and re-encrypt secrets under a controlled rotation
-procedure before retiring an old key. Loss of all copies of the key makes the
-stored secrets unrecoverable.
+Changing provider or key does not rotate existing ciphertext: decrypt and
+re-encrypt secrets under a controlled rotation procedure before retiring an old
+key. For existing deployments using the old environment/package-constant key,
+either provision those same 32 bytes in Vault before redeploying, or decrypt with
+the old implementation and re-encrypt under the new local key. Redeploying alone
+cannot migrate ciphertext. Loss of the original key makes stored secrets
+unrecoverable.
 
 ## Deployment
 

@@ -4,13 +4,11 @@ const state = vi.hoisted(() => ({
   environment: 'dev',
   values: new Map<string, Map<string, string>>(),
   prompts: vi.fn<(questions: unknown) => Promise<Record<string, string>>>(),
-  randomBytes: vi.fn<(size: number) => Buffer>(),
   set: vi.fn<(key: string, value: string) => void>(),
   info: vi.fn<(message: string) => void>(),
   addService: vi.fn<(service: unknown) => void>(),
 }))
 
-vi.mock('node:crypto', () => ({ randomBytes: state.randomBytes }))
 vi.mock('../../../cli/node_modules/prompts/index.js', () => ({ default: state.prompts }))
 vi.mock('../../../cli/src/adapters/environment-store.js', () => ({
   EnvironmentStore: class {
@@ -85,21 +83,18 @@ const preparePrompts = () => {
     .mockResolvedValueOnce(credentials)
 }
 
-describe('database setup Settings fallback key', () => {
+describe('database setup credentials', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     state.environment = 'dev'
     state.values.clear()
-    state.randomBytes.mockReturnValue(Buffer.alloc(32, 0xab))
   })
 
-  it('generates a 32-byte hexadecimal key and persists it without logging it', async () => {
+  it('persists credentials without creating a Settings master key', async () => {
     preparePrompts()
     await runSetupOracleAdb()
-    expect(state.randomBytes).toHaveBeenCalledExactlyOnceWith(32)
-    const key = state.values.get('dev')?.get('ODBVUE_APP_MASTER_KEY')
-    expect(key).toMatch(/^[0-9a-f]{64}$/)
-    expect(state.set).toHaveBeenCalledWith('ODBVUE_APP_MASTER_KEY', key)
+    expect(state.values.get('dev')?.has('ODBVUE_APP_MASTER_KEY')).toBe(false)
+    expect(state.set).toHaveBeenCalledTimes(6)
     for (const [name, value] of [
       ['ODBVUE_ADB_ADMIN_PASSWORD', credentials.adminPassword],
       ['ODBVUE_ADB_WALLET_PASSWORD', credentials.walletPassword],
@@ -110,71 +105,47 @@ describe('database setup Settings fallback key', () => {
     ]) {
       expect(state.set).toHaveBeenCalledWith(name, value)
     }
-    expect(state.info.mock.calls.flat().join('\n')).not.toContain(key)
+    expect(state.info.mock.calls.flat().join('\n')).not.toContain('fallback key')
   })
 
-  it('preserves an existing key verbatim on repeated setup', async () => {
-    const key = 'AB'.repeat(32)
-    state.values.set('dev', new Map([['ODBVUE_APP_MASTER_KEY', key]]))
+  it.each(['AB'.repeat(32), 'obsolete-key', ''])(
+    'ignores an existing retired key %s',
+    async (key) => {
+      state.values.set('dev', new Map([['ODBVUE_APP_MASTER_KEY', key]]))
+      preparePrompts()
+      await runSetupOracleAdb()
+      expect(state.set.mock.calls.some(([name]) => name === 'ODBVUE_APP_MASTER_KEY')).toBe(false)
+      expect(state.values.get('dev')?.get('ODBVUE_APP_MASTER_KEY')).toBe(key)
+    },
+  )
+
+  it('does not create a master key on repeated setup', async () => {
     preparePrompts()
     await runSetupOracleAdb()
-    expect(state.randomBytes).not.toHaveBeenCalled()
-    expect(state.set.mock.calls.some(([name]) => name === 'ODBVUE_APP_MASTER_KEY')).toBe(false)
-    expect(state.values.get('dev')?.get('ODBVUE_APP_MASTER_KEY')).toBe(key)
+    preparePrompts()
+    await runSetupOracleAdb()
+    expect(state.values.get('dev')?.has('ODBVUE_APP_MASTER_KEY')).toBe(false)
+    expect(state.set).toHaveBeenCalledTimes(12)
   })
 
-  it('does not rotate a generated key on the next setup run', async () => {
-    preparePrompts()
-    await runSetupOracleAdb()
-    const key = state.values.get('dev')?.get('ODBVUE_APP_MASTER_KEY')
-    preparePrompts()
-    await runSetupOracleAdb()
-    expect(state.randomBytes).toHaveBeenCalledTimes(1)
-    expect(state.values.get('dev')?.get('ODBVUE_APP_MASTER_KEY')).toBe(key)
-  })
-
-  it('generates independent keys for separate environments', async () => {
-    state.randomBytes
-      .mockReturnValueOnce(Buffer.alloc(32, 0xab))
-      .mockReturnValueOnce(Buffer.alloc(32, 0xcd))
+  it('keeps credential setup isolated to each environment without generating keys', async () => {
     preparePrompts()
     await runSetupOracleAdb()
     state.environment = 'test'
     preparePrompts()
     await runSetupOracleAdb()
-    expect(state.values.get('dev')?.get('ODBVUE_APP_MASTER_KEY')).not.toBe(
-      state.values.get('test')?.get('ODBVUE_APP_MASTER_KEY'),
-    )
-    expect(state.randomBytes).toHaveBeenCalledTimes(2)
+    for (const environment of ['dev', 'test']) {
+      expect(state.values.get(environment)?.get('ODBVUE_ADB_SCHEMA_USERNAME')).toBe('APP')
+      expect(state.values.get(environment)?.has('ODBVUE_APP_MASTER_KEY')).toBe(false)
+    }
   })
 
-  it('treats an empty key as unconfigured', async () => {
-    state.values.set('dev', new Map([['ODBVUE_APP_MASTER_KEY', '']]))
-    preparePrompts()
-    await runSetupOracleAdb()
-    expect(state.randomBytes).toHaveBeenCalledExactlyOnceWith(32)
-  })
-
-  it.each(['short', 'g'.repeat(64), 'a'.repeat(63), 'a'.repeat(65)])(
-    'rejects an invalid existing key without changing configuration or credentials',
-    async (key) => {
-      state.values.set('dev', new Map([['ODBVUE_APP_MASTER_KEY', key]]))
-      await expect(runSetupOracleAdb()).rejects.toThrow('64 hexadecimal')
-      expect(state.randomBytes).not.toHaveBeenCalled()
-      expect(state.prompts).not.toHaveBeenCalled()
-      expect(state.addService).not.toHaveBeenCalled()
-      expect(state.set).not.toHaveBeenCalled()
-      expect(state.values.get('dev')?.get('ODBVUE_APP_MASTER_KEY')).toBe(key)
-    },
-  )
-
-  it('does not generate a key or overwrite credentials after incomplete prompts', async () => {
+  it('does not overwrite credentials after incomplete prompts', async () => {
     state.prompts
       .mockResolvedValueOnce({ dbName: 'example-adb' })
       .mockResolvedValueOnce({ listenerPort: '1522', ordsPort: '8443' })
       .mockResolvedValueOnce({})
     await expect(runSetupOracleAdb()).rejects.toThrow('credential setup was incomplete')
-    expect(state.randomBytes).not.toHaveBeenCalled()
     expect(state.set).not.toHaveBeenCalled()
   })
 })

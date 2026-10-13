@@ -380,6 +380,7 @@ export type OdbApplication = {
   privateProcedures?: ProcedureNode[]
   privateFunctions?: FunctionNode[]
   privateConstants?: PrivateConstantNode[]
+  privateVariables?: LocalVarNode[]
   subtypes?: SubtypeNode[]
 }
 
@@ -1621,6 +1622,10 @@ export type Package<
     type: TType | OdbTypeDescriptor<TType>,
     source: string | { value: PlsqlExpressionValue },
   ): PlsqlExpression<TType>
+  privateVariable<TType extends PlsqlType | string>(
+    name: string,
+    type: TType | OdbTypeDescriptor<TType>,
+  ): LocalVar<TType>
   subtype<TName extends string>(
     name: TName,
     type: OdbTypeDescriptor<PlsqlType | string>,
@@ -1644,6 +1649,7 @@ export class PackageImpl<
   private _privateProcedures: Procedure[] = []
   private _privateFunctions: PlsqlFunction<any>[] = []
   private _privateConstants: PrivateConstantNode[] = []
+  private _privateVariables: LocalVarNode[] = []
   private _subtypes: SubtypeNode[] = []
   private _memberLookup: Record<string, PackageMemberDefinition> = {}
 
@@ -1771,6 +1777,16 @@ export class PackageImpl<
     return new PlsqlExpression(definition.type, name)
   }
 
+  privateVariable<TType extends PlsqlType | string>(
+    name: string,
+    type: TType | OdbTypeDescriptor<TType>,
+  ): LocalVar<TType> {
+    const definition = typeof type === 'object' ? type : { type }
+    const variable = new LocalVar(name, definition.type, { length: definition.length })
+    this._privateVariables.push(variable.toNode())
+    return variable
+  }
+
   subtype<TName extends string>(
     name: TName,
     type: OdbTypeDescriptor<PlsqlType | string>,
@@ -1819,6 +1835,7 @@ export class PackageImpl<
       privateProcedures: this._privateProcedures.map((p) => p.toNode()),
       privateFunctions: this._privateFunctions.map((f) => f.toNode()),
       privateConstants: this._privateConstants.map((constant) => ({ ...constant })),
+      privateVariables: this._privateVariables.map((variable) => ({ ...variable })),
       subtypes: this._subtypes.map((subtype) => ({ ...subtype })),
     }
   }
@@ -1897,6 +1914,10 @@ function emitPackageBody(pkg: OdbApplication, options: PackageSqlOptions = {}): 
     lines.push(
       `  ${constant.name} CONSTANT ${emitPlsqlType(constant.type, { length: constant.length })} := ${renderedValue};`,
     )
+  }
+
+  for (const variable of pkg.privateVariables ?? []) {
+    lines.push(`  ${emitLocalVarDecl(variable)}`)
   }
 
   emitRoutineDeclarations(lines, pkg.privateProcedures, pkg.privateFunctions, '  ')

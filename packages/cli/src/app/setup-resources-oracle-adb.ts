@@ -1,6 +1,5 @@
 import prompts from 'prompts'
 import path from 'path'
-import { randomBytes } from 'node:crypto'
 
 import { logger } from '../shared/logger.js'
 
@@ -37,13 +36,6 @@ export const runSetupOracleAdb = async () => {
   logger.info('Setting up Oracle Database...')
 
   const secretsStore = new SecretsStore()
-  const masterKey = secretsStore.get('ODBVUE_APP_MASTER_KEY')
-  if (masterKey && !/^[a-fA-F0-9]{64}$/.test(masterKey)) {
-    throw new Error(
-      'ODBVUE_APP_MASTER_KEY must be exactly 64 hexadecimal characters (32 bytes); the existing key was not changed.',
-    )
-  }
-
   const { projectName, envDir } = new EnvironmentStore().getCurrent()
 
   const config = new ConfigStore()
@@ -214,9 +206,7 @@ export const runSetupOracleAdb = async () => {
       credentials.appPassword,
     ].every((value) => typeof value === 'string' && value.trim().length > 0)
   ) {
-    throw new Error(
-      'Database credential setup was incomplete; credentials and the Settings fallback key were not changed.',
-    )
+    throw new Error('Database credential setup was incomplete; credentials were not changed.')
   }
 
   secretsStore.set('ODBVUE_ADB_ADMIN_PASSWORD', credentials.adminPassword)
@@ -225,12 +215,5 @@ export const runSetupOracleAdb = async () => {
   secretsStore.set('ODBVUE_ADB_SCHEMA_PASSWORD', credentials.schemaPassword)
   secretsStore.set('ODBVUE_APP_ADMIN_USERNAME', credentials.appUsername)
   secretsStore.set('ODBVUE_APP_ADMIN_PASSWORD', credentials.appPassword)
-  if (!masterKey) {
-    secretsStore.set('ODBVUE_APP_MASTER_KEY', randomBytes(32).toString('hex'))
-    logger.info(
-      'Generated a Settings encryption fallback key in the environment .env. Keep it for future deployments; subsequent setup runs preserve it.',
-    )
-  }
-
   logger.lf()
 }

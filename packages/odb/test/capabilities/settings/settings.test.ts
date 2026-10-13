@@ -7,14 +7,13 @@ import {
 import * as settings from '../../../src/capabilities/settings/index.js'
 
 describe('Settings', () => {
-  const sql = odbSettings.toSQLUp({ schema: 'APP', masterKey: '' })
+  const sql = odbSettings.toSQLUp({ schema: 'APP' })
 
-  it('loads the fallback constant from the application master-key environment variable', () => {
-    vi.stubEnv('ODBVUE_APP_MASTER_KEY', 'ab'.repeat(32))
+  it('ignores the retired application master-key environment variable', () => {
+    vi.stubEnv('ODBVUE_APP_MASTER_KEY', 'obsolete-key')
     try {
-      expect(odbSettings.toSQLUp()).toContain(
-        `c_master_key_local CONSTANT VARCHAR2(64) := '${'ab'.repeat(32)}'`,
-      )
+      expect(odbSettings.toSQLUp()).not.toContain('obsolete-key')
+      expect(odbSettings.toSQLUp()).not.toContain('c_master_key_local')
     } finally {
       vi.unstubAllEnvs()
     }
@@ -139,7 +138,6 @@ describe('Settings', () => {
     expect(sql).toContain('p_value := DBMS_LOB.SUBSTR(l_stored_value, 2000, 1)')
     expect(sql).toContain('DBMS_LOB.GETLENGTH(p_value) > 32767')
     expect(sql).toContain('l_envelope := DBMS_LOB.SUBSTR(p_value, 32767, 1)')
-    expect(sql).toContain('l_key := HEXTORAW(c_master_key_local)')
     expect(sql).toContain('l_iv := HEXTORAW(SUBSTR(l_envelope, 4, 32))')
     expect(sql).toContain('l_mac := HEXTORAW(SUBSTR(l_envelope, 36, 64))')
     expect(sql).toContain('l_ciphertext := HEXTORAW(SUBSTR(l_envelope, 100))')
@@ -188,8 +186,7 @@ describe('Settings', () => {
     expect(new RegExp(pattern).test(uri)).toBe(expected)
   })
 
-  it('uses principal first, audits fallback failures, and never ships a default master key', () => {
-    expect(sql).toContain("c_master_key_local CONSTANT VARCHAR2(64) := ''")
+  it('loads Vault exclusively when configured and logs and rethrows failures', () => {
     expect(sql).toContain('APP_SETTINGS_MASTER_KEY_URI')
     expect(sql).toContain(
       "SELECT MAX(DBMS_LOB.SUBSTR(value, 2000, 1)) INTO l_uri FROM odb_settings_store WHERE id = 'APP_SETTINGS_MASTER_KEY_URI'",
@@ -200,17 +197,44 @@ describe('Settings', () => {
     expect(sql).toContain('SETTINGS_VAULT_REQUEST_FAILED')
     expect(sql).toContain('method => DBMS_CLOUD.METHOD_GET')
     expect(sql).toContain("END;' USING IN l_uri, OUT l_key")
-    expect(sql).toContain('odb_audit.warn(')
     expect(sql).toContain('odb_audit.error(')
-    expect(sql).toContain('SETTINGS_MASTER_KEY_UNAVAILABLE')
+    expect(sql).toContain("odb_audit.error('Settings master key: key loading failed')")
+    expect(sql).toMatch(/WHEN OTHERS THEN\s+odb_audit.error\([^\n]+\);\s+RAISE;/)
+    expect(sql).not.toContain('odb_audit.warn(')
+    expect(sql).not.toContain('fallback')
     expect(sql).toContain('SETTINGS_MASTER_KEY_INVALID')
     expect(sql).toContain('SETTINGS_MASTER_KEY_URI_INVALID')
     expect(sql).not.toContain('SQLERRM')
-    const configured = odbSettings.toSQLUp({ masterKey: 'ab'.repeat(32) })
-    expect(configured).toContain(`c_master_key_local CONSTANT VARCHAR2(64) := '${'ab'.repeat(32)}'`)
-    for (const masterKey of ['short', 'g'.repeat(64), 'a'.repeat(63), 'a'.repeat(65)]) {
-      expect(() => odbSettings.toSQLUp({ masterKey })).toThrow('64 hexadecimal')
-    }
+    expect(sql).toMatch(
+      /IF l_uri IS NOT NULL THEN[\s\S]+EXECUTE IMMEDIATE[\s\S]+ELSE\s+SELECT DBMS_CRYPTO.HASH/,
+    )
+    expect(sql).toContain('IF (l_key IS NULL OR UTL_RAW.LENGTH(l_key) != 32) THEN')
+  })
+
+  it('derives the local key deterministically from DB_UNIQUE_NAME using typed SQL', () => {
+    expect(sql).toContain(
+      "SELECT DBMS_CRYPTO.HASH(UTL_I18N.STRING_TO_RAW(SYS_CONTEXT('USERENV', 'DB_UNIQUE_NAME'), 'AL32UTF8'), DBMS_CRYPTO.HASH_SH256) INTO l_key FROM dual",
+    )
+    expect(sql).not.toContain('c_master_key_local')
+    expect(sql).not.toContain('v$database')
+  })
+
+  it('caches validated local and Vault keys per session and reloads when the URI changes', () => {
+    expect(sql).toContain('g_master_key RAW(32);')
+    expect(sql).toContain('g_master_key_uri VARCHAR2(2000);')
+    expect(sql).toContain(
+      'IF (g_master_key IS NOT NULL AND (l_uri = g_master_key_uri OR (l_uri IS NULL AND g_master_key_uri IS NULL))) THEN',
+    )
+    expect(sql).toMatch(
+      /RETURN g_master_key;\s+END IF;\s+g_master_key := NULL;\s+g_master_key_uri := NULL;/,
+    )
+    expect(sql).toMatch(
+      /SETTINGS_MASTER_KEY_INVALID'\);\s+END IF;\s+g_master_key_uri := l_uri;\s+g_master_key := l_key;\s+RETURN l_key;/,
+    )
+    const hit = sql.indexOf('RETURN g_master_key;')
+    expect(sql.indexOf('INTO l_uri')).toBeLessThan(hit)
+    expect(hit).toBeLessThan(sql.indexOf('EXECUTE IMMEDIATE'))
+    expect(hit).toBeLessThan(sql.indexOf('SELECT DBMS_CRYPTO.HASH'))
   })
 
   it('seeds and removes settings through the package', () => {

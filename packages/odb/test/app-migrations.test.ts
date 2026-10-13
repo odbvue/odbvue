@@ -7,7 +7,6 @@ beforeAll(() => {
   process.env.ODBVUE_ADB_SCHEMA_PASSWORD = 'test-password'
   process.env.ODBVUE_APP_ADMIN_USERNAME = 'owner@example.com'
   process.env.ODBVUE_APP_ADMIN_PASSWORD = 'CustomSecure123!'
-  process.env.ODBVUE_APP_MASTER_KEY = ''
 })
 
 const migrations = {
