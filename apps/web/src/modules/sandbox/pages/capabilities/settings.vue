@@ -42,8 +42,15 @@
               :label="secret ? 'New secret value' : 'Value'"
               :type="secret ? 'password' : 'text'"
               :placeholder="secret ? 'Stored value is hidden' : undefined"
-              :hint="secret ? 'Enter a replacement; the stored secret cannot be read.' : undefined"
-              :persistent-hint="secret"
+              :readonly="trustedSetup"
+              :hint="
+                trustedSetup
+                  ? 'Managed through ov setup settings.'
+                  : secret
+                    ? 'Enter a replacement; the stored secret cannot be read.'
+                    : undefined
+              "
+              :persistent-hint="secret || trustedSetup"
               hide-details="auto"
               maxlength="2000"
             />
@@ -52,7 +59,9 @@
             <v-btn
               color="primary"
               prepend-icon="$mdiContentSave"
-              :disabled="!id || !auth.authenticated.value || !!busy || (secret && !value)"
+              :disabled="
+                !id || !auth.authenticated.value || !!busy || trustedSetup || (secret && !value)
+              "
               :loading="busy === 'write'"
               @click="write"
               >Write</v-btn
@@ -67,7 +76,7 @@
             <v-btn
               color="error"
               prepend-icon="$mdiDelete"
-              :disabled="!id || !auth.authenticated.value || !!busy"
+              :disabled="!id || !auth.authenticated.value || !!busy || trustedSetup"
               :loading="busy === 'remove'"
               @click="remove"
               >Delete</v-btn
@@ -147,9 +156,11 @@ const secretMeta = (meta: unknown) =>
 const secret = computed(
   () =>
     id.value === 'SMTP_PASSWORD' ||
+    id.value === 'AUTH_JWT_SECRET' ||
     (loaded.value?.id === id.value && secretMeta(loaded.value.meta)) ||
     items.value.some((item) => item.id === id.value && secretMeta(item.meta)),
 )
+const trustedSetup = computed(() => id.value.startsWith('AUTH_JWT_'))
 const nextCursor = ref<string>()
 const busy = ref<Action>()
 const message = ref<{ type: 'success' | 'error'; text: string }>()

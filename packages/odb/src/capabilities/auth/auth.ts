@@ -15,20 +15,22 @@ import { odbOracle } from '../../oracle/index.js'
 import { odbRateLimit } from '../rate-limit/rate-limit.js'
 import { REFRESH_TOKEN_MAX_AGE_SECONDS } from './constants.js'
 import { odbAuthCrypto, dummyPasswordHash } from './crypto.js'
-import { odbAuthJwt, jwtSecretOf } from './jwt.js'
+import { odbAuthJwt } from './jwt.js'
 import { odbAuthPackage } from './package.js'
 import { authSessions, authUsers, authRoles, authUserRoles, authRolePermissions } from './tables.js'
-import { authTypes, type OdbAuthOptions } from './types.js'
-/** Installable auth capability plus typed calls into `odb_auth`. Install it after `odbRateLimit`. */
+import { authTypes } from './types.js'
+import { odbSettings } from '../settings/settings.js'
+import { authJwtSettings } from './settings.js'
+/** Install after `odbRateLimit` and `odbSettings` (which requires `odbAudit`). */
 export const odbAuth = {
-  toSQLUp(options: { schema?: string } & OdbAuthOptions = {}): string {
+  toSQLUp(options: { schema?: string } = {}): string {
     const { schema } = options
     return [
       authUsers.toSQLUp({ schema }),
       authSessions.toSQLUp({ schema }),
       authorizationTablesSQL(schema),
       odbAuthCrypto.toSQLUp({ schema }),
-      odbAuthJwt.toSQLUp({ schema, substitutions: { jwtSecret: jwtSecretOf(options) } }),
+      odbAuthJwt.toSQLUp({ schema }),
       odbAuthPackage.toSQLUp({
         schema,
         substitutions: { dummyPasswordHash: dummyPasswordHash() },
@@ -49,6 +51,7 @@ export const odbAuth = {
           'END;',
           '/',
           authorizationTablesSQL(schema, true),
+          odbAuthJwt.toSQLUp({ schema }),
           odbAuthPackage.toSQLUp({
             schema,
             substitutions: { dummyPasswordHash: dummyPasswordHash() },
@@ -56,6 +59,49 @@ export const odbAuth = {
         ].join('\n')
       },
       toSQLDown() {
+        return ''
+      },
+    }
+  },
+  /** Seed missing JWT configuration only; provisioning supplies the secret later. */
+  seedSettings() {
+    const settings = [
+      {
+        id: 'AUTH_JWT_SECRET',
+        value: '',
+        meta: { label: 'JWT signing secret', type: 'string', secret: 'Y' as const },
+      },
+      {
+        id: 'AUTH_JWT_ISSUER',
+        value: authJwtSettings.defaultIssuer,
+        meta: { label: 'JWT issuer', type: 'string' },
+      },
+      {
+        id: 'AUTH_JWT_EXPIRATION_SECONDS',
+        value: String(authJwtSettings.defaultExpirationSeconds),
+        meta: { label: 'JWT expiration (seconds)', type: 'number' },
+      },
+    ]
+    return {
+      toSQLUp({ schema }: { schema?: string } = {}): string {
+        const store = qualify('odb_settings_store', schema)
+        return settings
+          .map(({ id, value, meta }) =>
+            [
+              'DECLARE',
+              '  l_count PLS_INTEGER;',
+              'BEGIN',
+              `  SELECT COUNT(*) INTO l_count FROM ${store} WHERE id = '${id}';`,
+              '  IF l_count = 0 THEN',
+              `    ${schema ? `${schema}.` : ''}${odbSettings.write(odbLiteral(id), odbLiteral(value), odbLiteral(JSON.stringify(meta))).toSQL()};`,
+              '  END IF;',
+              'END;',
+              '/',
+            ].join('\n'),
+          )
+          .join('\n')
+      },
+      toSQLDown(): string {
         return ''
       },
     }

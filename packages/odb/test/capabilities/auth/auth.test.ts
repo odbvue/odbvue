@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { odbAuth } from '../../../src/capabilities/auth/auth.js'
 import { odbLiteral } from '../../../src/schema/attribute.js'
 import { OrdsEndpoint } from '../../../src/ords.js'
@@ -9,6 +9,8 @@ import {
   odbType,
 } from '../../../src/schema/package.js'
 import { generateApplicationOpenApi } from '../../../src/application.js'
+import { authJwtSettings } from '../../../src/capabilities/auth/settings.js'
+import { odbAuthJwt } from '../../../src/capabilities/auth/jwt.js'
 
 describe('service authorization generation', () => {
   it('binds verified identity without a public request parameter and emits OpenAPI security', () => {
@@ -106,7 +108,7 @@ describe('service authorization generation', () => {
 
 describe('odbAuth framework package', () => {
   it('preserves the declared foreign keys in installs and idempotent upgrades', () => {
-    const install = odbAuth.toSQLUp({ schema: 'APP', jwtSecret: 'x'.repeat(32) })
+    const install = odbAuth.toSQLUp({ schema: 'APP' })
     const upgrade = odbAuth.upgrade().toSQLUp({ schema: 'APP' })
     const constraints = [
       'ALTER TABLE APP.odb_auth_user_roles ADD CONSTRAINT odb_auth_user_roles_fk_user FOREIGN KEY (user_id) REFERENCES APP.odb_auth_users (id) ON DELETE CASCADE',
@@ -121,7 +123,7 @@ describe('odbAuth framework package', () => {
   })
 
   it('stores normalized roles, grants and permissions with live validity and enabled-user checks', () => {
-    const sql = odbAuth.toSQLUp({ schema: 'APP', jwtSecret: 'x'.repeat(32) })
+    const sql = odbAuth.toSQLUp({ schema: 'APP' })
     expect(sql).toContain('CREATE TABLE APP.odb_auth_roles')
     expect(sql).toContain('CREATE TABLE APP.odb_auth_user_roles')
     expect(sql).toContain('CREATE TABLE APP.odb_auth_role_permissions')
@@ -174,15 +176,14 @@ describe('odbAuth framework package', () => {
   })
 
   it('emits tables and auth primitives without ORDS endpoints', () => {
-    const sql = odbAuth.toSQLUp({ schema: 'APP', jwtSecret: 'x'.repeat(32) })
+    const sql = odbAuth.toSQLUp({ schema: 'APP' })
     expect(sql).toContain('CREATE TABLE APP.odb_auth_users')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_auth_crypto AS')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_auth_jwt AS')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_auth AS')
     expect(sql).not.toContain('odb_http')
-    expect(sql).toContain(
-      "c_jwt_secret CONSTANT VARCHAR2(32767) := 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';",
-    )
+    expect(sql).not.toContain('c_jwt_secret')
+    expect(sql).toContain("odb_settings.read('AUTH_JWT_SECRET', l_secret, l_meta)")
     expect(sql).not.toContain('__ODB_AUTH_')
     expect(sql).toContain("'pbkdf2-sha512$210000$' || l_salt || '$' || l_hash")
     expect(sql).toContain(
@@ -206,22 +207,23 @@ describe('odbAuth framework package', () => {
   })
 
   it('implements HS256 access tokens in odb_auth_jwt without a separate JWT package', () => {
-    const sql = odbAuth.toSQLUp({ schema: 'APP', jwtSecret: 'x'.repeat(32) })
+    const sql = odbAuth.toSQLUp({ schema: 'APP' })
     expect(sql).not.toContain('odb_jwt')
     expect(sql).toContain('FUNCTION base64url_encode(p_bytes IN RAW) RETURN VARCHAR2 IS')
     expect(sql).toContain(
-      'DBMS_CRYPTO.MAC(UTL_RAW.CAST_TO_RAW(p_input), DBMS_CRYPTO.HMAC_SH256, UTL_RAW.CAST_TO_RAW(c_jwt_secret))',
+      'DBMS_CRYPTO.MAC(UTL_RAW.CAST_TO_RAW(p_input), DBMS_CRYPTO.HMAC_SH256, UTL_RAW.CAST_TO_RAW(g_jwt_secret))',
     )
     expect(sql).toContain("l_signing_input := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' || '.'")
-    expect(sql).toContain("'exp' VALUE l_now + 900")
+    expect(sql).toContain("'exp' VALUE l_now + g_jwt_expiration_seconds")
+    expect(sql).toContain("'iss' VALUE g_jwt_issuer")
     expect(sql).toContain(
       'IF sign(SUBSTR(p_token, 1, l_dot2 - 1)) != SUBSTR(p_token, l_dot2 + 1) THEN',
     )
-    expect(sql).toContain('IF (l_expires_at IS NULL OR l_now > l_expires_at) THEN')
+    expect(sql).toContain('IF (l_expires_at IS NULL OR l_now >= l_expires_at) THEN')
   })
 
   it('keeps odb_auth transport-independent', () => {
-    const sql = odbAuth.toSQLUp({ schema: 'APP', jwtSecret: 'x'.repeat(32) })
+    const sql = odbAuth.toSQLUp({ schema: 'APP' })
     const pkg = sql.slice(sql.indexOf('CREATE OR REPLACE PACKAGE APP.odb_auth AS'))
     expect(pkg).toContain(
       'PROCEDURE login(p_username IN odb_auth_users.username%TYPE, p_password IN VARCHAR2, p_access_token OUT VARCHAR2, p_refresh_token OUT VARCHAR2);',
@@ -277,4 +279,94 @@ describe('odbAuth framework package', () => {
     expect(sql).toContain('MERGE INTO APP.odb_auth_users')
     expect(sql).toContain("APP.odb_auth_crypto.hash_password('secret')")
   })
+
+  it('does not embed the retired JWT environment secret', () => {
+    vi.stubEnv('ODBVUE_AUTH_JWT_SECRET', 'obsolete-signing-key-do-not-embed')
+    try {
+      const sql = odbAuth.toSQLUp()
+      expect(sql).not.toContain('obsolete-signing-key')
+      expect(sql).not.toContain('change-this-development-only')
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('loads and caches a complete validated configuration before token operations', () => {
+    const sql = odbAuthJwt.toSQLUp()
+    const start = sql.indexOf('PROCEDURE load_config IS')
+    const load = sql.slice(start, sql.indexOf('FUNCTION base64url_encode', start))
+    expect(load.indexOf('SYSTIMESTAMP < g_config_expires_at')).toBeLessThan(
+      load.indexOf('odb_settings.read'),
+    )
+    expect(load).toContain('RETURN;')
+    expect(load).toContain("odb_settings.read('AUTH_JWT_ISSUER', l_issuer, l_meta)")
+    expect(load).toContain("odb_settings.read('AUTH_JWT_EXPIRATION_SECONDS', l_expiration, l_meta)")
+    expect(load).toContain("REGEXP_LIKE(l_secret, '^[0-9A-Fa-f]{64}$')")
+    expect(load).toContain('TO_NUMBER(l_expiration) > 86400')
+    expect(load).toContain("SYSTIMESTAMP + NUMTODSINTERVAL(30, 'SECOND')")
+    expect(load.indexOf('AUTH_JWT_EXPIRATION_INVALID')).toBeLessThan(
+      load.indexOf('g_jwt_secret := l_secret'),
+    )
+    expect(load).toMatch(/WHEN OTHERS THEN\s+g_config_expires_at := NULL;\s+g_jwt_secret := NULL;/)
+    expect(load).toContain("odb_audit.error('Auth JWT: configuration loading failed')")
+    expect(load).toContain('RAISE;')
+    expect(sql.match(/load_config\(\);/g)).toHaveLength(2)
+    expect(sql).toContain('l_issuer IS NULL OR l_issuer != g_jwt_issuer')
+    expect(sql).not.toContain('FROM odb_settings_store')
+    expect(odbAuth.upgrade().toSQLUp()).toContain('PROCEDURE load_config IS')
+  })
+
+  it('seeds only missing JWT settings without key generation or destructive rollback', () => {
+    const seed = odbAuth.seedSettings()
+    const sql = seed.toSQLUp({ schema: 'APP' })
+    expect(sql.match(/IF l_count = 0 THEN/g)).toHaveLength(3)
+    expect(sql).toContain("FROM APP.odb_settings_store WHERE id = 'AUTH_JWT_SECRET'")
+    expect(sql).toContain("APP.odb_settings.write('AUTH_JWT_SECRET', '',")
+    expect(sql).toContain("APP.odb_settings.write('AUTH_JWT_ISSUER', 'odbvue',")
+    expect(sql).toContain("APP.odb_settings.write('AUTH_JWT_EXPIRATION_SECONDS', '900',")
+    expect(sql).not.toContain('RANDOMBYTES')
+    expect(seed.toSQLDown()).toBe('')
+  })
+})
+
+describe('JWT configuration validation', () => {
+  it.each(['00'.repeat(32), 'aF'.repeat(32)])(
+    'accepts exactly 32 bytes of hexadecimal key material',
+    (secret) => {
+      expect(authJwtSettings.secretValid(secret)).toBe(true)
+    },
+  )
+  it.each([
+    undefined,
+    null,
+    '',
+    'a'.repeat(63),
+    'a'.repeat(65),
+    'g'.repeat(64),
+    'a'.repeat(64) + '\n',
+    'change-this-development-only-odbvue-auth-secret-2026',
+  ])('rejects malformed key material', (secret) => {
+    expect(authJwtSettings.secretValid(secret)).toBe(false)
+  })
+  it.each([1, 900, 86400])('accepts expiration boundary %i', (seconds) => {
+    expect(authJwtSettings.expirationValid(seconds)).toBe(true)
+  })
+  it.each([0, -1, 86401, 1.5, '900', NaN, Infinity, null])(
+    'rejects invalid expiration %s',
+    (seconds) => {
+      expect(authJwtSettings.expirationValid(seconds)).toBe(false)
+    },
+  )
+  it.each(['odbvue', 'https://auth.example.com', 'a'.repeat(255)])(
+    'accepts a valid issuer',
+    (issuer) => {
+      expect(authJwtSettings.issuerValid(issuer)).toBe(true)
+    },
+  )
+  it.each(['', ' ', ' issuer', 'issuer\n', 'a'.repeat(256), null])(
+    'rejects an invalid issuer',
+    (issuer) => {
+      expect(authJwtSettings.issuerValid(issuer)).toBe(false)
+    },
+  )
 })

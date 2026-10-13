@@ -15,7 +15,8 @@ storage-backed attachments. See the [Emails guide](./emails) for SMTP settings,
 transaction boundaries, typed calls, and sandbox services.
 Bootstrap leaves `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`,
 `SMTP_FROM_ADDR`, and `SMTP_FROM_NAME` empty. Run `ov setup-settings` (alias `ov ss`)
-after deployment to fill them and update the SMTP host ACL.
+after deployment to fill them and update the SMTP host ACL. The command also
+provisions [JWT settings](./auth#jwt-configuration); `ov setup settings` is equivalent.
 `SMTP_PASSWORD` is encrypted and masked by [Settings](./settings); configure its
 master-key provider before running the command.
 

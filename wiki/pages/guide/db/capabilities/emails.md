@@ -56,36 +56,47 @@ ov setup-settings
 ov ss
 # Supply all or some values from a JSON file:
 ov setup-settings .config/dev/settings.json
+# Also supported:
+ov setup settings .config/dev/settings.json
 ```
 
 JSON keys are case-insensitive (`smtp_host`, `SMTP_HOST`, and `Smtp_Host` are
-equivalent). The supported keys are the six setting IDs listed above. For example:
+equivalent). The command also provisions [JWT configuration](./auth#jwt-configuration).
+The supported keys are the six SMTP IDs above plus `AUTH_JWT_SECRET`,
+`AUTH_JWT_ISSUER`, and `AUTH_JWT_EXPIRATION_SECONDS`. For example:
 
 ```json
 {
   "smtp_host": "smtp.email.eu-stockholm-1.oci.oraclecloud.com",
-  "smtp_port": 587
+  "smtp_port": 587,
+  "auth_jwt_issuer": "odbvue",
+  "auth_jwt_expiration_seconds": 900
 }
 ```
 
 The command applies file values and prompts only for missing settings, masking
-the password when prompted. A complete file needs no prompts. The port must be a
-JSON number; the other values must be strings. Invalid values, unknown keys, and
+the password when prompted. A complete SMTP file with JWT issuer and expiration
+needs no prompts; the signing secret is optional and freshly generated if omitted.
+The port and JWT expiration must be JSON numbers; the other values must be strings.
+Invalid values, unknown keys, and
 duplicate keys differing only in case are rejected before any database changes.
 Keep files containing credentials out of source control.
 
-Without a file, the command prompts for all six values. It connects using
+Without a file, the command prompts for the six SMTP values, JWT issuer, and JWT
+expiration (default 900 seconds). It never prompts for or prints the signing key.
+It connects using
 the current environment's ADMIN wallet and credentials and uses
 `ODBVUE_ADB_SCHEMA_USERNAME` as the settings owner and ACL principal. It writes
 values through `odb_settings.write` using bind variables. It calls
-[`odbAcl`](./acl) to remove and add host grants, granting only `smtp`
-on the chosen host and port. On reconfiguration it removes the prior configured
-host/port's SMTP grant for that schema, if present; other privileges are untouched.
-Settings and ACL changes commit together or roll back on failure. Cancelling a
-prompt changes nothing. Re-running the command for the same host/port is safe.
+[`odbAcl`](./acl) to add the `smtp` grant on the chosen host and port.
+Setup does not read previous settings or remove old host grants; manage those
+separately through the Network ACL page when needed.
+SMTP, JWT, and ACL changes commit together or roll back on failure. Cancelling a
+prompt changes nothing. Re-running updates all settings, including the JWT key;
+an omitted signing secret generates a new random key.
 
 The previous `smtp` JSON setting is no longer read. Existing deployments must
-install the updated email package and seed the six setting IDs before running
+install the updated email package and seed the SMTP and JWT setting IDs before running
 the command; editing bootstrap does not reapply an already deployed migration.
 Do not reset an existing database just to configure SMTP.
 

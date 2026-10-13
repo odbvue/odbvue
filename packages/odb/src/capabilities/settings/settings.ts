@@ -65,7 +65,9 @@ export const odbSettings = {
     const validateSecrets = () => {
       for (const setting of settings) {
         if (
-          (setting.meta?.secret === 'Y' || setting.id === 'SMTP_PASSWORD') &&
+          (setting.meta?.secret === 'Y' ||
+            setting.id === 'SMTP_PASSWORD' ||
+            setting.id === 'AUTH_JWT_SECRET') &&
           setting.value !== ''
         ) {
           throw new Error('odbSettings.seed(): Secret values must not be embedded in migrations.')

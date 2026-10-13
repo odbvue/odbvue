@@ -195,6 +195,13 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).not.toContain('Set-Cookie')
     expect(sql).not.toContain('__Host-odb_refresh')
     expect(sql).not.toContain("p_base_path      => 'auth/'")
+    expect(sql.indexOf('CREATE OR REPLACE PACKAGE ODBVUE.odb_settings AS')).toBeLessThan(
+      sql.indexOf('CREATE OR REPLACE PACKAGE ODBVUE.odb_auth_jwt AS'),
+    )
+    expect(sql).toContain("ODBVUE.odb_settings.write('AUTH_JWT_SECRET', '',")
+    expect(sql).toContain("ODBVUE.odb_settings.write('AUTH_JWT_ISSUER', 'odbvue',")
+    expect(sql).toContain("ODBVUE.odb_settings.write('AUTH_JWT_EXPIRATION_SECONDS', '900',")
+    expect(sql).not.toContain('change-this-development-only')
   })
 
   it('exposes auth and settings services from a single pck_sandbox package', async () => {
@@ -229,6 +236,8 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).not.toContain('odb_settings.read(p_id, p_value, p_meta)')
     expect(sql).toContain('odb_settings.write(p_id, p_value, NULL)')
     expect(sql).toContain('odb_settings.remove(p_id)')
+    expect(sql.match(/AUTH_SETTINGS_REQUIRE_TRUSTED_SETUP/g)).toHaveLength(2)
+    expect(sql).toContain("REGEXP_LIKE(p_id, '^AUTH_JWT_')")
     expect(sql).not.toContain("ODBVUE.odb_settings.write('SANDBOX_DEMO'")
     expect(sql).not.toContain('odb_settings_store')
   })

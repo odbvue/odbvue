@@ -47,7 +47,7 @@ const findButton = (wrapper: ReturnType<typeof setup>, text: string) =>
 
 describe('sandbox Settings secrets', () => {
   beforeEach(() => {
-    vi.stubGlobal('definePage', vi.fn())
+    vi.stubGlobal('definePage', vi.fn<() => void>())
     authenticated.value = true
     get.mockReset().mockResolvedValue({ data: { items: [] }, error: null })
     put.mockReset().mockResolvedValue({ data: null, error: null })
@@ -122,6 +122,23 @@ describe('sandbox Settings secrets', () => {
     expect(wrapper.get<HTMLInputElement>('[aria-label="Value"]').element.value).toBe('')
     wrapper.unmount()
   })
+
+  it.each(['AUTH_JWT_SECRET', 'AUTH_JWT_ISSUER', 'AUTH_JWT_EXPIRATION_SECONDS'])(
+    'keeps trusted auth configuration read-only: %s',
+    async (id) => {
+      const wrapper = setup()
+      await wrapper.get('[aria-label="ID"]').setValue(id)
+      expect(findButton(wrapper, 'Write').attributes('disabled')).toBeDefined()
+      expect(findButton(wrapper, 'Delete').attributes('disabled')).toBeDefined()
+      expect(findButton(wrapper, 'Read').attributes('disabled')).toBeUndefined()
+      if (id === 'AUTH_JWT_SECRET') {
+        expect(wrapper.get('[aria-label="New secret value"]').attributes('type')).toBe('password')
+      }
+      expect(put).not.toHaveBeenCalled()
+      expect(remove).not.toHaveBeenCalled()
+      wrapper.unmount()
+    },
+  )
 
   it('surfaces write failures without reporting success or discarding the replacement', async () => {
     put.mockResolvedValueOnce({ data: null, error: new Error('Encryption unavailable') })

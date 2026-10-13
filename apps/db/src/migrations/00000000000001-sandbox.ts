@@ -177,6 +177,9 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
       },
     },
     ({ params: { id, value }, body }) => {
+      body.ifThen(cond.regexpLike(id, '^AUTH_JWT_'), (then) =>
+        then.forbidden('AUTH_SETTINGS_REQUIRE_TRUSTED_SETUP'),
+      )
       body.call(odbSettings.write(id, value))
     },
   )
@@ -193,6 +196,9 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
     'remove_setting',
     { in: { id: odbSettings.types.id } },
     ({ params: { id }, body }) => {
+      body.ifThen(cond.regexpLike(id, '^AUTH_JWT_'), (then) =>
+        then.forbidden('AUTH_SETTINGS_REQUIRE_TRUSTED_SETUP'),
+      )
       body.call(odbSettings.remove(id))
     },
   )

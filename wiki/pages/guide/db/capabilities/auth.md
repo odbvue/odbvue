@@ -23,15 +23,21 @@ The test for placement: would another PL/SQL package reasonably call this withou
 
 ## Install
 
-Install it through a migration. Provide a unique production secret of at least 32 characters with `ODBVUE_AUTH_JWT_SECRET`; the built-in secret is for local development only.
+Install it through a migration after `odbRateLimit` and `odbSettings`.
+Settings requires `odbAudit`. JWT configuration is loaded from Settings at runtime;
+there is no built-in signing key, environment fallback, or package-embedded secret.
 
 ```ts
-import { defineMigration, odbAuth } from '@odbvue/odb'
+import { defineMigration, odbAuth, odbAudit, odbRateLimit, odbSettings } from '@odbvue/odb'
 
 const schema = process.env.ODBVUE_ADB_SCHEMA_USERNAME ?? ''
 
 export const migration = defineMigration('20260913120000_auth', { schema })
+  .install(odbRateLimit)
+  .install(odbAudit)
+  .install(odbSettings)
   .install(odbAuth)
+  .install(odbAuth.seedSettings())
   .install(
     odbAuth.seedUser({
       username: 'admin',
@@ -45,6 +51,85 @@ export const migration = defineMigration('20260913120000_auth', { schema })
 
 The runtime packages are defined through ODB's package and query builders. Installation and seeding are a separate concern: `odbAuth.upgrade()` renders idempotent DDL blocks, and seed helpers may render anonymous PL/SQL blocks. These are intentional SQL-string escape hatches, not handwritten runtime package implementations.
 
+## JWT configuration
+
+`odbAuth.seedSettings()` creates only missing settings. It never replaces an
+existing key or configuration, and leaves the signing-key placeholder empty.
+Provision it after deploying the database:
+
+```sh
+ov setup settings .config/dev/settings.json
+# Equivalent commands:
+ov setup-settings .config/dev/settings.json
+ov ss .config/dev/settings.json
+```
+
+This configures SMTP and JWT together. JSON keys are case-insensitive. Add these
+non-secret values to the existing SMTP settings file:
+
+```json
+{
+  "auth_jwt_issuer": "odbvue",
+  "auth_jwt_expiration_seconds": 900
+}
+```
+
+| Setting                       | Contract                                                                                             |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `AUTH_JWT_SECRET`             | Required; exactly 64 hexadecimal characters, marked `secret=Y` and encrypted                         |
+| `AUTH_JWT_ISSUER`             | Required; 1-255 visible ASCII characters without spaces; issued as `iss` and checked on verification |
+| `AUTH_JWT_EXPIRATION_SECONDS` | Required; integer from 1 to 86400; seeded to 900                                                     |
+
+When the secret is omitted, setup generates 32 cryptographically random bytes with
+Node's `crypto.randomBytes`, encoded as hexadecimal. No key needs to be supplied
+or stored in the local JSON file. Trusted deployments can optionally supply
+`auth_jwt_secret` in that file. A valid 64-character hexadecimal key is preserved
+unchanged; other non-blank text (up to 2000 characters) is normalized to the
+lowercase hexadecimal SHA-256 digest of its exact UTF-8 bytes. The normalized key
+is passed as a bind variable, never embedded in SQL or printed.
+Hashing makes the format suitable but **does not add entropy**
+to a weak password. Prefer omitting the field for a random production key.
+Blank secret values are rejected.
+Keep any file containing credentials out of source control.
+The hexadecimal text itself is the HMAC key, matching the text-based signer;
+it is not hex-decoded before signing.
+
+Setup is an initial-configuration command: it writes the supplied settings and
+adds the SMTP host ACL in one transaction. It does not read previous settings,
+manage key rotation, or remove old host grants. Re-running setup updates the
+values again; omitting the secret generates a new key each time. A supplied text
+secret derives the same key on subsequent runs.
+
+The JWT package caches the validated key, issuer, and expiration in private
+variables for **30 seconds per database session**. An unexpired cache performs
+no Settings reads. Expiry reloads and validates the complete configuration before
+publishing it. A failed reload clears the cache, audit-logs a non-secret error,
+and raises; stale configuration is not extended, and subsequent calls retry.
+Configuration changes can therefore take up to 30 seconds to reach pooled sessions.
+The cache contains decrypted key material in trusted database-session memory.
+
+### Deployment boundary
+
+Changing the signing key invalidates existing access-token signatures after
+cached configuration refreshes. There is no key-rotation workflow, overlapping
+old-key verification, or `kid` key ring in setup.
+Issuer changes likewise invalidate tokens carrying the previous issuer after
+the cache refresh. Expiration changes affect newly issued tokens, not the `exp`
+already signed into existing tokens.
+
+The sandbox Settings API masks the key and rejects writes/removals of
+`AUTH_JWT_*`; use trusted setup or direct authorized database administration.
+`secret=Y` is enforced for `AUTH_JWT_SECRET` even if caller metadata says otherwise.
+`ODBVUE_AUTH_JWT_SECRET` and the `jwtSecret` SQL-generation option are retired.
+Rebuilding the original database migrations creates the new dependency order and
+placeholders; run setup afterwards. No incremental migration is supplied here.
+
+Use the [Settings Vault-backed master-key provider](./settings#master-key-and-encryption)
+in production. The local master key is derived from a non-secret database name;
+encryption under that fallback is not production secret protection.
+Settings-backed JWT keys avoid deployment-time source embedding, but do not
+protect against a compromised schema owner or an authorized decrypted Settings caller.
+
 ## HTTP Contract
 
 The sandbox migration (`apps/db/src/migrations/00000000000001-sandbox.ts`) exposes these endpoints beneath `/auth`. `odbAuth` does not register them; the application package does:
@@ -56,7 +141,11 @@ The sandbox migration (`apps/db/src/migrations/00000000000001-sandbox.ts`) expos
 | `POST /auth/logout`  | Revokes the browser session and expires the refresh cookie.                                                 |
 | `GET /auth/me`       | Requires bearer authentication and returns `userId`, `username`, `displayName`, `roles`, and `permissions`. |
 
-The access token is valid for 15 minutes. Refresh tokens are opaque, are stored only as hashes in the database, expire after 30 days, and rotate on every refresh. Revoking a session, disabling a user, or changing its token version invalidates existing access tokens.
+The access token is valid for `AUTH_JWT_EXPIRATION_SECONDS` (15 minutes by default)
+and is rejected at or after its signed expiration. Refresh tokens are opaque,
+are stored only as hashes in the database, expire after 30 days, and rotate on
+every refresh. Revoking a session, disabling a user, or changing its token version
+invalidates existing access tokens.
 
 Authentication failures raise ODB errors that ORDS maps to HTTP responses, including `401 INVALID_CREDENTIALS` for invalid logins and `401 UNAUTHORIZED` for expired, revoked, or malformed sessions.
 
@@ -95,7 +184,7 @@ body.call(odbAuth.logout(refreshCookie.read(cookie)))
 body.set(setCookie, refreshCookie.expire())
 ```
 
-Reuse `odbAuth.types` (`username`, `password`, `accessToken`, `refreshToken`, `userId`, `displayName`) for parameters instead of redeclaring them. Install `odbAuth` after `odbRateLimit`; login throttling uses it.
+Reuse `odbAuth.types` (`username`, `password`, `accessToken`, `refreshToken`, `userId`, `displayName`) for parameters instead of redeclaring them. Install `odbAuth` after `odbRateLimit` and `odbSettings`; login throttling uses the former and JWT configuration uses the latter.
 
 ## Authorization
 

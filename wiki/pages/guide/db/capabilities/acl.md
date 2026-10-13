@@ -69,8 +69,9 @@ maps those wire fields to its display model. Only explicit SQL `NULL` bounds
 represent all-port grants; missing or invalid port fields produce an error.
 
 Transactions belong to callers. `ov setup-settings` uses this capability to
-remove the previous SMTP host/port grant and add the configured one in the same
-transaction as its settings writes. The CLI keeps only settings orchestration,
+add the configured SMTP host/port grant in the same transaction as its settings
+writes. Setup does not remove previous grants; use the Network ACL page for that.
+The CLI keeps only settings orchestration,
 not embedded Oracle ACL administration SQL.
 
 ## Sandbox and upgrades

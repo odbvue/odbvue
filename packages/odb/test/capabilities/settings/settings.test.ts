@@ -93,7 +93,7 @@ describe('Settings', () => {
       'SELECT meta INTO l_effective_meta FROM odb_settings_store WHERE id = p_id FOR UPDATE',
     )
     expect(sql).toContain('l_effective_meta := NVL(p_meta, l_effective_meta)')
-    expect(sql).toContain("IF p_id = 'SMTP_PASSWORD' THEN")
+    expect(sql).toContain("IF (p_id = 'SMTP_PASSWORD' OR p_id = 'AUTH_JWT_SECRET') THEN")
     expect(sql).toContain(`JSON_MERGEPATCH(l_effective_meta, '{"secret":"Y"}' RETURNING CLOB)`)
     expect(sql).toContain(
       `SELECT JSON_MERGEPATCH(l_effective_meta, '{"secret":"Y"}' RETURNING CLOB) INTO l_effective_meta FROM dual`,
@@ -253,13 +253,16 @@ describe('Settings', () => {
     )
   })
 
-  it.each(['SOME_SECRET', 'SMTP_PASSWORD'])('allows empty secret seeds for %s', (id) => {
-    const seed = odbSettings.seed({ id, value: '', meta: { secret: 'Y' } })
-    expect(seed.toSQLUp({ schema: 'APP' })).toContain(
-      `APP.odb_settings.write('${id}', '', '{"secret":"Y"}')`,
-    )
-    expect(seed.toSQLDown({ schema: 'APP' })).toContain(`APP.odb_settings.remove('${id}')`)
-  })
+  it.each(['SOME_SECRET', 'SMTP_PASSWORD', 'AUTH_JWT_SECRET'])(
+    'allows empty secret seeds for %s',
+    (id) => {
+      const seed = odbSettings.seed({ id, value: '', meta: { secret: 'Y' } })
+      expect(seed.toSQLUp({ schema: 'APP' })).toContain(
+        `APP.odb_settings.write('${id}', '', '{"secret":"Y"}')`,
+      )
+      expect(seed.toSQLDown({ schema: 'APP' })).toContain(`APP.odb_settings.remove('${id}')`)
+    },
+  )
 
   it.each(['actual-secret', ' ', '********'])('rejects non-empty secret seeds (%s)', (value) => {
     expect(() =>
@@ -270,16 +273,19 @@ describe('Settings', () => {
     ).toThrow('Secret values must not be embedded in migrations.')
   })
 
-  it('rejects SMTP password literals regardless of metadata', () => {
-    for (const meta of [undefined, { secret: 'N' as const }, { secret: 'Y' as const }]) {
-      expect(() => odbSettings.seed({ id: 'SMTP_PASSWORD', value: 'hunter2', meta })).toThrow(
-        'Secret values must not be embedded in migrations.',
+  it.each(['SMTP_PASSWORD', 'AUTH_JWT_SECRET'])(
+    'rejects reserved credential literals regardless of metadata: %s',
+    (id) => {
+      for (const meta of [undefined, { secret: 'N' as const }, { secret: 'Y' as const }]) {
+        expect(() => odbSettings.seed({ id, value: 'hunter2', meta })).toThrow(
+          'Secret values must not be embedded in migrations.',
+        )
+      }
+      expect(odbSettings.seed({ id, value: '' }).toSQLUp()).toContain(
+        `odb_settings.write('${id}', '', NULL)`,
       )
-    }
-    expect(odbSettings.seed({ id: 'SMTP_PASSWORD', value: '' }).toSQLUp()).toContain(
-      "odb_settings.write('SMTP_PASSWORD', '', NULL)",
-    )
-  })
+    },
+  )
 
   it('preserves non-secret seed values', () => {
     expect(

@@ -46,6 +46,7 @@ const state = vi.hoisted(() => ({
   },
   info: vi.fn<(message: string) => void>(),
   success: vi.fn<(message: string) => void>(),
+  warn: vi.fn<(message: string) => void>(),
   connected: vi.fn<(config: unknown) => void>(),
   fatal: vi.fn<(error: unknown) => void>(),
 }))
@@ -56,6 +57,19 @@ vi.mock('node:fs/promises', async (importOriginal) => ({
 }))
 vi.mock('../../../cli/node_modules/prompts/index.js', () => ({ default: state.prompts }))
 vi.mock('../../../cli/src/app/db-exec.js', () => ({ buildConnectionConfig: state.config }))
+vi.mock('../../../cli/src/app/setup-environment.js', () => ({
+  runSetupEnvironment: vi.fn<() => Promise<void>>(),
+}))
+vi.mock('../../../cli/src/app/setup-platforms.js', () => ({
+  runSetupPlatforms: vi.fn<() => Promise<void>>(),
+}))
+vi.mock('../../../cli/src/app/setup-resources-oracle-adb.js', () => ({
+  runSetupOracleAdb: vi.fn<() => Promise<void>>(),
+}))
+vi.mock('../../../cli/src/app/infra-up.js', () => ({ runInfraUp: vi.fn<() => Promise<void>>() }))
+vi.mock('../../../cli/src/app/db-up.js', () => ({
+  runDbUp: vi.fn<(target?: string) => Promise<void>>(),
+}))
 vi.mock('../../../cli/src/adapters/secrets-store.js', () => ({
   SecretsStore: class {
     get() {
@@ -64,7 +78,7 @@ vi.mock('../../../cli/src/adapters/secrets-store.js', () => ({
   },
 }))
 vi.mock('../../../cli/src/shared/logger.js', () => ({
-  logger: { info: state.info, success: state.success, fatal: state.fatal },
+  logger: { info: state.info, success: state.success, warn: state.warn, fatal: state.fatal },
 }))
 vi.mock('@odbvue/odb', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/index.js')>()
@@ -87,6 +101,7 @@ vi.mock('@odbvue/odb', async (importOriginal) => {
 
 import { runSetupSettings } from '../../../cli/src/app/setup-settings.js'
 import { registerSetupSettingsCommand } from '../../../cli/src/commands/setup-settings.js'
+import { registerSetupCommand } from '../../../cli/src/commands/setup.js'
 
 const settings = {
   host: 'smtp.example.com',
@@ -95,9 +110,23 @@ const settings = {
   password: "password'with:bind",
   from_addr: 'admin@odbvue.com',
   from_name: 'Odbvue Admin',
+  auth_jwt_issuer: 'odbvue',
+  auth_jwt_expiration_seconds: 900,
+}
+const bindings = {
+  host: settings.host,
+  port: settings.port,
+  username: settings.username,
+  password: settings.password,
+  from_addr: settings.from_addr,
+  from_name: settings.from_name,
+  auth_jwt_issuer: settings.auth_jwt_issuer,
+  port_value: '587',
+  jwt_secret: expect.stringMatching(/^[0-9a-f]{64}$/),
+  jwt_expiration: '900',
 }
 
-describe('CLI SMTP settings setup', () => {
+describe('CLI SMTP and JWT settings setup', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     state.schema = 'APP'
@@ -116,6 +145,8 @@ describe('CLI SMTP settings setup', () => {
       'password',
       'from_addr',
       'from_name',
+      'auth_jwt_issuer',
+      'auth_jwt_expiration_seconds',
     ])
     expect(questions).toContainEqual(expect.objectContaining({ name: 'port', initial: 587 }))
     expect(questions).toContainEqual(
@@ -147,15 +178,14 @@ describe('CLI SMTP settings setup', () => {
         smtp_PASSWORD: settings.password,
         SMTP_FROM_ADDR: settings.from_addr,
         smtp_from_name: settings.from_name,
+        Auth_Jwt_Issuer: settings.auth_jwt_issuer,
+        AUTH_JWT_EXPIRATION_SECONDS: settings.auth_jwt_expiration_seconds,
       }),
     )
     await expect(runSetupSettings('settings.json')).resolves.toBe(true)
     expect(state.readFile).toHaveBeenCalledWith('settings.json', 'utf-8')
     expect(state.prompts).not.toHaveBeenCalled()
-    expect(state.connection.execute.mock.calls[0]![1]).toEqual({
-      ...settings,
-      port_value: '587',
-    })
+    expect(state.connection.execute.mock.calls[0]![1]).toEqual(bindings)
     expect(state.connection.commit).toHaveBeenCalledTimes(1)
   })
 
@@ -171,9 +201,16 @@ describe('CLI SMTP settings setup', () => {
       'password',
       'from_addr',
       'from_name',
+      'auth_jwt_issuer',
+      'auth_jwt_expiration_seconds',
     ])
     expect(state.connection.execute.mock.calls[0]![1]).toMatchObject({
-      ...missing,
+      username: missing.username,
+      password: missing.password,
+      from_addr: missing.from_addr,
+      from_name: missing.from_name,
+      auth_jwt_issuer: missing.auth_jwt_issuer,
+      jwt_expiration: '900',
       host: 'mail.example.com',
       port: 2525,
       port_value: '2525',
@@ -184,12 +221,20 @@ describe('CLI SMTP settings setup', () => {
     ['null', 'must contain a JSON object'],
     ['[]', 'must contain a JSON object'],
     ['"settings"', 'must contain a JSON object'],
-    ['{"smtp_port":"587"}', 'Invalid SMTP setting: smtp_port'],
-    ['{"smtp_host":null}', 'Invalid SMTP setting: smtp_host'],
-    ['{"smtp_password":""}', 'Invalid SMTP setting: smtp_password'],
-    ['{"smtp_port":0}', 'Invalid SMTP setting: smtp_port'],
-    ['{"smtp_hots":"mail.example.com"}', 'Unknown SMTP setting key'],
-    ['{"smtp_port":587,"SMTP_PORT":2525}', 'Duplicate SMTP setting key'],
+    ['{"smtp_port":"587"}', 'Invalid setting: smtp_port'],
+    ['{"smtp_host":null}', 'Invalid setting: smtp_host'],
+    ['{"smtp_password":""}', 'Invalid setting: smtp_password'],
+    ['{"smtp_port":0}', 'Invalid setting: smtp_port'],
+    ['{"smtp_hots":"mail.example.com"}', 'Unknown setting key'],
+    ['{"smtp_port":587,"SMTP_PORT":2525}', 'Duplicate setting key'],
+    ['{"host":"mail.example.com"}', 'Unknown setting key'],
+    ['{"auth_jwt_secret":""}', 'Invalid setting: auth_jwt_secret'],
+    ['{"auth_jwt_secret":"   "}', 'Invalid setting: auth_jwt_secret'],
+    ['{"auth_jwt_secret":null}', 'Invalid setting: auth_jwt_secret'],
+    ['{"auth_jwt_issuer":"bad issuer"}', 'Invalid setting: auth_jwt_issuer'],
+    ['{"auth_jwt_expiration_seconds":"900"}', 'Invalid setting: auth_jwt_expiration_seconds'],
+    ['{"auth_jwt_expiration_seconds":86401}', 'Invalid setting: auth_jwt_expiration_seconds'],
+    ['{"auth_jwt_expiration":900}', 'Unknown setting key'],
   ])('rejects an invalid file before prompting or connecting: %s', async (json, message) => {
     state.readFile.mockResolvedValue(json)
     await expect(runSetupSettings('settings.json')).rejects.toThrow(message)
@@ -229,11 +274,11 @@ describe('CLI SMTP settings setup', () => {
     expect(state.fatal).not.toHaveBeenCalled()
   })
 
-  it('writes six bound values and updates the configured schema ACL in one transaction', async () => {
+  it('writes bound SMTP and JWT values and updates the configured schema ACL in one transaction', async () => {
     state.schema = ' app '
     await expect(runSetupSettings()).resolves.toBe(true)
-    const [sql, bindings] = state.connection.execute.mock.calls[0]!
-    expect(bindings).toEqual({ ...settings, port_value: '587' })
+    const [sql, actualBindings] = state.connection.execute.mock.calls[0]!
+    expect(actualBindings).toEqual(bindings)
     for (const [id, bind] of [
       ['SMTP_HOST', 'host'],
       ['SMTP_PORT', 'port_value'],
@@ -241,16 +286,18 @@ describe('CLI SMTP settings setup', () => {
       ['SMTP_PASSWORD', 'password'],
       ['SMTP_FROM_ADDR', 'from_addr'],
       ['SMTP_FROM_NAME', 'from_name'],
+      ['AUTH_JWT_SECRET', 'jwt_secret'],
+      ['AUTH_JWT_ISSUER', 'auth_jwt_issuer'],
+      ['AUTH_JWT_EXPIRATION_SECONDS', 'jwt_expiration'],
     ]) {
-      const meta =
-        id === 'SMTP_PASSWORD' ? `'{"label":"SMTP password","type":"string","secret":"Y"}'` : 'NULL'
-      expect(sql).toContain(`APP.odb_settings.write('${id}', :${bind}, ${meta})`)
+      expect(sql).toContain(`APP.odb_settings.write('${id}', :${bind}, NULL)`)
     }
     expect(sql).toContain('APP.odb_acl.add_smtp(:host, :port)')
-    expect(sql).toContain('IF l_old_host <> :host OR l_old_port <> :port THEN')
-    expect(sql).toContain('length(l_old_host) <= 255')
-    expect(sql).toContain('IF l_old_port BETWEEN 1 AND 65535 THEN')
-    expect(sql).toContain('APP.odb_acl.remove_smtp(l_old_host, l_old_port)')
+    expect(sql).not.toContain('DECLARE')
+    expect(sql).not.toContain('SELECT')
+    expect(sql).not.toContain('odb_settings.read')
+    expect(sql).not.toContain('odb_acl.remove_smtp')
+    expect(sql).not.toContain('rotate_jwt_secret')
     expect(sql).not.toContain('DBMS_NETWORK_ACL_ADMIN')
     expect(sql).not.toContain('dba_host_aces')
     expect(sql).not.toContain(settings.password)
@@ -260,6 +307,7 @@ describe('CLI SMTP settings setup', () => {
     expect(state.connection.rollback).not.toHaveBeenCalled()
     expect(state.connection.close).toHaveBeenCalledTimes(1)
     expect(state.success).toHaveBeenCalledTimes(1)
+    expect(state.warn).not.toHaveBeenCalled()
   })
 
   it('accepts Enter on the real number prompt without typing the displayed default', async () => {
@@ -331,7 +379,7 @@ describe('CLI SMTP settings setup', () => {
     { from_name: 'Admin\nInjected' },
   ])('rejects invalid settings before connecting: %j', async (invalid) => {
     state.prompts.mockResolvedValue({ ...settings, ...invalid })
-    await expect(runSetupSettings()).rejects.toThrow('Invalid SMTP settings')
+    await expect(runSetupSettings()).rejects.toThrow('Invalid settings')
     expect(state.connected).not.toHaveBeenCalled()
   })
 
@@ -348,5 +396,105 @@ describe('CLI SMTP settings setup', () => {
       port,
       port_value: String(port),
     })
+  })
+  it('accepts an explicit key only as a bind variable and never logs it', async () => {
+    const secret = 'aF'.repeat(32)
+    state.readFile.mockResolvedValue(
+      JSON.stringify({
+        SMTP_HOST: settings.host,
+        SMTP_PORT: settings.port,
+        SMTP_USERNAME: settings.username,
+        SMTP_PASSWORD: settings.password,
+        SMTP_FROM_ADDR: settings.from_addr,
+        SMTP_FROM_NAME: settings.from_name,
+        AUTH_JWT_ISSUER: settings.auth_jwt_issuer,
+        AUTH_JWT_EXPIRATION_SECONDS: settings.auth_jwt_expiration_seconds,
+        AUTH_JWT_SECRET: secret,
+      }),
+    )
+    await runSetupSettings('settings.json')
+    expect(state.prompts).not.toHaveBeenCalled()
+    const [sql, values] = state.connection.execute.mock.calls[0]!
+    expect(values).toMatchObject({ jwt_secret: secret })
+    expect(sql).not.toContain(secret)
+    expect(
+      JSON.stringify([
+        ...state.info.mock.calls,
+        ...state.success.mock.calls,
+        ...state.warn.mock.calls,
+      ]),
+    ).not.toContain(secret)
+  })
+
+  it('normalizes short file text to a deterministic SHA-256 key without logging the text', async () => {
+    state.readFile.mockResolvedValue('{"auth_jwt_secret":"abc"}')
+    await runSetupSettings('settings.json')
+    const [sql, values] = state.connection.execute.mock.calls[0]!
+    expect(values).toMatchObject({
+      jwt_secret: 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+    })
+    expect(sql).not.toContain("'abc'")
+    expect(state.warn).not.toHaveBeenCalled()
+    expect(
+      JSON.stringify([
+        ...state.info.mock.calls,
+        ...state.success.mock.calls,
+        ...state.warn.mock.calls,
+      ]),
+    ).not.toContain('abc')
+    await runSetupSettings('settings.json')
+    expect(state.connection.execute.mock.calls[1]![1]).toEqual(values)
+  })
+
+  it('generates a new random key for each setup when no secret is supplied', async () => {
+    await runSetupSettings()
+    await runSetupSettings()
+    const first = state.connection.execute.mock.calls[0]![1]?.jwt_secret
+    const second = state.connection.execute.mock.calls[1]![1]?.jwt_secret
+    expect(first).toMatch(/^[0-9a-f]{64}$/)
+    expect(second).toMatch(/^[0-9a-f]{64}$/)
+    expect(second).not.toBe(first)
+    expect(state.warn).not.toHaveBeenCalled()
+  })
+
+  it('supports ov setup settings with a file', async () => {
+    state.readFile.mockResolvedValue('{"auth_jwt_expiration_seconds":900}')
+    const program = new Command()
+    registerSetupCommand(program)
+    await program.parseAsync(['setup', 'settings', 'settings.json'], {
+      from: 'user',
+    })
+    expect(state.readFile).toHaveBeenCalledWith('settings.json', 'utf-8')
+    expect(state.connection.commit).toHaveBeenCalledOnce()
+    expect(state.fatal).not.toHaveBeenCalled()
+  })
+
+  it('does not expose JWT rotation options', () => {
+    const program = new Command()
+    registerSetupCommand(program)
+    registerSetupSettingsCommand(program)
+    for (const command of program.commands) {
+      expect(command.helpInformation()).not.toContain('--rotate-jwt-secret')
+    }
+  })
+
+  it.each([1, 86400])('accepts JWT expiration boundary %i', async (seconds) => {
+    state.prompts.mockResolvedValue({ ...settings, auth_jwt_expiration_seconds: seconds })
+    await runSetupSettings()
+    expect(state.connection.execute.mock.calls[0]![1]).toMatchObject({
+      jwt_expiration: String(seconds),
+    })
+  })
+
+  it.each([
+    { auth_jwt_issuer: '' },
+    { auth_jwt_issuer: 'bad\nissuer' },
+    { auth_jwt_expiration_seconds: 0 },
+    { auth_jwt_expiration_seconds: 86401 },
+    { auth_jwt_expiration_seconds: 1.5 },
+  ])('rejects invalid prompted JWT configuration before connecting', async (invalid) => {
+    state.prompts.mockResolvedValue({ ...settings, ...invalid })
+    await expect(runSetupSettings()).rejects.toThrow('Invalid settings')
+    expect(state.connected).not.toHaveBeenCalled()
   })
 })

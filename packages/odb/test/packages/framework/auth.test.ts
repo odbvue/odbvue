@@ -3,15 +3,14 @@ import { odbAuth } from '../../../src/capabilities/auth/auth.js'
 
 describe('odbAuth framework package', () => {
   it('emits tables and auth primitives without ORDS endpoints', () => {
-    const sql = odbAuth.toSQLUp({ schema: 'APP', jwtSecret: 'x'.repeat(32) })
+    const sql = odbAuth.toSQLUp({ schema: 'APP' })
     expect(sql).toContain('CREATE TABLE APP.odb_auth_users')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_auth_crypto AS')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_auth_jwt AS')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_auth AS')
     expect(sql).not.toContain('odb_http')
-    expect(sql).toContain(
-      "c_jwt_secret CONSTANT VARCHAR2(32767) := 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';",
-    )
+    expect(sql).not.toContain('c_jwt_secret')
+    expect(sql).toContain("odb_settings.read('AUTH_JWT_SECRET', l_secret, l_meta)")
     expect(sql).not.toContain('__ODB_AUTH_')
     expect(sql).toContain("'pbkdf2-sha512$210000$' || l_salt || '$' || l_hash")
     expect(sql).toContain(
@@ -35,22 +34,22 @@ describe('odbAuth framework package', () => {
   })
 
   it('implements HS256 access tokens in odb_auth_jwt without a separate JWT package', () => {
-    const sql = odbAuth.toSQLUp({ schema: 'APP', jwtSecret: 'x'.repeat(32) })
+    const sql = odbAuth.toSQLUp({ schema: 'APP' })
     expect(sql).not.toContain('odb_jwt')
     expect(sql).toContain('FUNCTION base64url_encode(p_bytes IN RAW) RETURN VARCHAR2 IS')
     expect(sql).toContain(
-      'DBMS_CRYPTO.MAC(UTL_RAW.CAST_TO_RAW(p_input), DBMS_CRYPTO.HMAC_SH256, UTL_RAW.CAST_TO_RAW(c_jwt_secret))',
+      'DBMS_CRYPTO.MAC(UTL_RAW.CAST_TO_RAW(p_input), DBMS_CRYPTO.HMAC_SH256, UTL_RAW.CAST_TO_RAW(g_jwt_secret))',
     )
     expect(sql).toContain("l_signing_input := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' || '.'")
-    expect(sql).toContain("'exp' VALUE l_now + 900")
+    expect(sql).toContain("'exp' VALUE l_now + g_jwt_expiration_seconds")
     expect(sql).toContain(
       'IF sign(SUBSTR(p_token, 1, l_dot2 - 1)) != SUBSTR(p_token, l_dot2 + 1) THEN',
     )
-    expect(sql).toContain('IF (l_expires_at IS NULL OR l_now > l_expires_at) THEN')
+    expect(sql).toContain('IF (l_expires_at IS NULL OR l_now >= l_expires_at) THEN')
   })
 
   it('keeps odb_auth transport-independent', () => {
-    const sql = odbAuth.toSQLUp({ schema: 'APP', jwtSecret: 'x'.repeat(32) })
+    const sql = odbAuth.toSQLUp({ schema: 'APP' })
     const pkg = sql.slice(sql.indexOf('CREATE OR REPLACE PACKAGE APP.odb_auth AS'))
     expect(pkg).toContain(
       'PROCEDURE login(p_username IN odb_auth_users.username%TYPE, p_password IN VARCHAR2, p_access_token OUT VARCHAR2, p_refresh_token OUT VARCHAR2);',

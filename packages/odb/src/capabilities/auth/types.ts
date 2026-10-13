@@ -8,7 +8,3 @@ export const authTypes = {
   userId: odbType.guid(),
   displayName: odbType.string(256),
 }
-
-export interface OdbAuthOptions {
-  jwtSecret?: string
-}

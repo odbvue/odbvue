@@ -129,16 +129,19 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
       body.ifThen(cond.not(cond.or([cond.eq(secret, 'Y'), cond.eq(secret, 'N')])), (invalid) =>
         invalid.invalid('SETTINGS_SECRET_INVALID'),
       )
-      // SMTP_PASSWORD remains a secret even if removed and recreated through the generic API.
-      body.ifThen(cond.eq(id, 'SMTP_PASSWORD'), (then) => {
-        then.set(secret, odbLiteral('Y'))
-        then.query(
-          odbQuery()
-            .selectFrom('dual')
-            .select(odbOracle.jsonMergePatch(effectiveMeta, odbLiteral('{"secret":"Y"}')))
-            .into(effectiveMeta),
-        )
-      })
+      // Reserved credentials remain secret regardless of caller-supplied metadata.
+      body.ifThen(
+        cond.or([cond.eq(id, 'SMTP_PASSWORD'), cond.eq(id, 'AUTH_JWT_SECRET')]),
+        (then) => {
+          then.set(secret, odbLiteral('Y'))
+          then.query(
+            odbQuery()
+              .selectFrom('dual')
+              .select(odbOracle.jsonMergePatch(effectiveMeta, odbLiteral('{"secret":"Y"}')))
+              .into(effectiveMeta),
+          )
+        },
+      )
       body.ifThen(
         cond.eq(secret, 'Y'),
         (then) => {

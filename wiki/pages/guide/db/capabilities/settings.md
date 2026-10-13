@@ -45,7 +45,8 @@ export const migration = defineMigration('20260802140000_settings', {
 
 Do not use `odbSettings.seed()` to embed non-empty secret values in migrations.
 It rejects any non-empty `value` when `meta.secret` is `'Y'`, or when the ID is
-`SMTP_PASSWORD` (which is always secret), both at seed creation and SQL generation.
+`SMTP_PASSWORD` or `AUTH_JWT_SECRET` (which are always secret), both at seed creation
+and SQL generation.
 Encryption during `write` does not protect plaintext literals in source or generated SQL.
 Seed an empty placeholder instead:
 
@@ -54,7 +55,10 @@ odbSettings.seed({ id: 'SMTP_PASSWORD', value: '', meta: { secret: 'Y' } })
 ```
 
 Supply actual credentials after deployment through bind variables, as
-`ov setup-settings` does for SMTP credentials. Never put credentials in migration literals.
+`ov setup-settings` does for SMTP credentials and JWT provisioning. Never put
+credentials in migration literals. [Auth](./auth#jwt-configuration) loads its
+signing key and configuration through the trusted decrypted Settings API, with
+a bounded session-local cache.
 
 `odbSettings` is transport-independent. It provides database operations and raises standard ODB errors such as `NOT_FOUND`.
 
