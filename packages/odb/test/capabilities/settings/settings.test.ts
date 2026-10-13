@@ -252,4 +252,51 @@ describe('Settings', () => {
       down.indexOf('odb_settings_store'),
     )
   })
+
+  it.each(['SOME_SECRET', 'SMTP_PASSWORD'])('allows empty secret seeds for %s', (id) => {
+    const seed = odbSettings.seed({ id, value: '', meta: { secret: 'Y' } })
+    expect(seed.toSQLUp({ schema: 'APP' })).toContain(
+      `APP.odb_settings.write('${id}', '', '{"secret":"Y"}')`,
+    )
+    expect(seed.toSQLDown({ schema: 'APP' })).toContain(`APP.odb_settings.remove('${id}')`)
+  })
+
+  it.each(['actual-secret', ' ', '********'])('rejects non-empty secret seeds (%s)', (value) => {
+    expect(() =>
+      odbSettings.seed(
+        { id: 'VERSION', value: '1.0' },
+        { id: 'SOME_SECRET', value, meta: { secret: 'Y' } },
+      ),
+    ).toThrow('Secret values must not be embedded in migrations.')
+  })
+
+  it('rejects SMTP password literals regardless of metadata', () => {
+    for (const meta of [undefined, { secret: 'N' as const }, { secret: 'Y' as const }]) {
+      expect(() => odbSettings.seed({ id: 'SMTP_PASSWORD', value: 'hunter2', meta })).toThrow(
+        'Secret values must not be embedded in migrations.',
+      )
+    }
+    expect(odbSettings.seed({ id: 'SMTP_PASSWORD', value: '' }).toSQLUp()).toContain(
+      "odb_settings.write('SMTP_PASSWORD', '', NULL)",
+    )
+  })
+
+  it('preserves non-secret seed values', () => {
+    expect(
+      odbSettings.seed({ id: 'VERSION', value: '1.0', meta: { secret: 'N' } }).toSQLUp(),
+    ).toContain(`odb_settings.write('VERSION', '1.0', '{"secret":"N"}')`)
+  })
+
+  it('revalidates secret values and metadata before generating SQL', () => {
+    const setting = { id: 'SOME_SECRET', value: '', meta: { secret: 'Y' as 'Y' | 'N' } }
+    const seed = odbSettings.seed(setting)
+    setting.value = 'actual-secret'
+    expect(() => seed.toSQLUp()).toThrow('Secret values must not be embedded in migrations.')
+    setting.meta.secret = 'N'
+    expect(seed.toSQLUp()).toContain("'actual-secret'")
+    setting.meta.secret = 'Y'
+    expect(() => seed.toSQLUp({ schema: 'APP' })).toThrow(
+      'Secret values must not be embedded in migrations.',
+    )
+  })
 })

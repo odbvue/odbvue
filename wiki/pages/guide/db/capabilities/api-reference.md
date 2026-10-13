@@ -140,6 +140,12 @@ Schema-aware migration artifact that upserts settings through `odb_settings.writ
 odbSettings.seed({ id: 'APP_VERSION', value: '1.0.0', meta: { label: 'Application version' } })
 ```
 
+Secret values must not be embedded in migrations: `seed` rejects non-empty values
+with `meta.secret: 'Y'`, and non-empty `SMTP_PASSWORD` values regardless of metadata.
+Use `value: ''` for secret placeholders, then supply credentials after deployment
+through bind variables (for SMTP, use `ov setup-settings`). Validation runs at seed
+creation and again before SQL generation.
+
 ## ORDS Services
 
 Declare a procedure and its implementation with `proc()`, then attach its explicit HTTP contract with `defineService()`:

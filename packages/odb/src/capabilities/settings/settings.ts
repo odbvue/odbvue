@@ -56,13 +56,26 @@ export const odbSettings = {
 
   /**
    * Migration artifact that upserts settings through `odb_settings.write` and removes
-   * them on rollback. Install it after `odbSettings`.
+   * them on rollback. Install it after `odbSettings`. Secret values must be empty;
+   * supply credentials later through bind variables, not migration literals.
    */
   seed(...settings: Array<{ id: string; value: string; meta?: SettingMeta }>) {
     if (settings.length === 0)
       throw new Error('odbSettings.seed(): at least one setting is required.')
+    const validateSecrets = () => {
+      for (const setting of settings) {
+        if (
+          (setting.meta?.secret === 'Y' || setting.id === 'SMTP_PASSWORD') &&
+          setting.value !== ''
+        ) {
+          throw new Error('odbSettings.seed(): Secret values must not be embedded in migrations.')
+        }
+      }
+    }
+    validateSecrets()
     return {
       toSQLUp({ schema }: { schema?: string } = {}): string {
+        validateSecrets()
         const pkg = qualify(PACKAGE_NAME, schema)
         return settings
           .map((s) =>
