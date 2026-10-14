@@ -232,6 +232,146 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
     },
   })
 
+  const googleLinkStart = pkg.proc(
+    'google_link_start',
+    {
+      in: {
+        subject: odbAuth.types.userId,
+        redirect: odbType.string(2048),
+        password: odbAuth.types.password,
+        cookie: odbType.string(4000),
+        origin: odbType.string(2000),
+        fetchSite: odbType.string(32),
+      },
+      out: {
+        authorizationUrl: odbType.string(4000),
+        setCookie: odbType.string(4000),
+        cacheControl: odbType.string(32),
+      },
+    },
+    ({ params: p, body }) => {
+      const { appUrl, browserToken } = body.variables({
+        appUrl: odbSettings.types.value,
+        browserToken: odbType.string(64),
+      })
+      body.set(appUrl, odbGoogle.publicUrl())
+      body.ifThen(
+        cond.or([
+          cond.isNull(p.origin),
+          cond.ne(
+            odbOracle.lower(p.origin),
+            odbOracle.lower(odbOracle.regexpSubstr(appUrl, odbLiteral('^https?://[^/]+'))),
+          ),
+          cond.eq(p.fetchSite, 'cross-site'),
+        ]),
+        (then) => then.forbidden('GOOGLE_ORIGIN_INVALID'),
+      )
+      body.call(
+        odbGoogle.startLink(
+          p.redirect,
+          p.subject,
+          refreshCookie.read(p.cookie),
+          p.password,
+          p.authorizationUrl,
+          browserToken,
+        ),
+      )
+      body.set(p.setCookie, googleCookie.set(browserToken))
+      body.set(p.cacheControl, 'no-store')
+    },
+  )
+  defineService(googleLinkStart, {
+    auth: 'authenticated',
+    method: 'POST',
+    path: '/google/link/start',
+    module: 'auth',
+    basePath: '/auth',
+    summary: 'Reauthenticate and bind Google linking to the current user and browser session',
+    context: { userId: googleLinkStart.parameters.subject },
+    body: {
+      redirect: googleLinkStart.parameters.redirect,
+      password: googleLinkStart.parameters.password,
+    },
+    response: { authorizationUrl: googleLinkStart.parameters.authorizationUrl },
+    headers: {
+      Cookie: googleLinkStart.parameters.cookie,
+      Origin: googleLinkStart.parameters.origin,
+      'Sec-Fetch-Site': googleLinkStart.parameters.fetchSite,
+      'Set-Cookie': googleLinkStart.parameters.setCookie,
+      'Cache-Control': googleLinkStart.parameters.cacheControl,
+    },
+  })
+
+  const googleLinkCallback = pkg.proc(
+    'google_link_callback',
+    {
+      in: {
+        state: odbType.string(128),
+        code: odbType.string(4000),
+        error: odbType.string(256),
+        cookie: odbType.string(4000),
+      },
+      out: {
+        location: odbType.string(4000),
+        cacheControl: odbType.string(32),
+        referrerPolicy: odbType.string(32),
+      },
+    },
+    ({ params: p, body }) => {
+      const { appUrl, returnPath, outcome } = body.variables({
+        appUrl: odbSettings.types.value,
+        returnPath: odbType.string(2048),
+        outcome: odbType.string(32),
+      })
+      body.set(appUrl, odbGoogle.publicUrl())
+      body.block((link) => {
+        link.call(
+          odbGoogle.completeLink(
+            p.state,
+            p.code,
+            googleCookie.read(p.cookie),
+            p.error,
+            refreshCookie.read(p.cookie),
+            returnPath,
+            outcome,
+          ),
+        )
+        link.whenOthers((handler) => {
+          handler.rollback()
+          handler.set(outcome, 'error')
+        })
+      })
+      body.ifThen(cond.eq(outcome, 'success'), (then) => then.set(outcome, 'linked'))
+      // The account destination is fixed: neither provider input nor a failed transaction can redirect elsewhere.
+      body.set(
+        p.location,
+        plsqlExpr.concat(odbOracle.rtrim(appUrl, odbLiteral('/')), '/account?google=', outcome),
+      )
+      body.set(p.cacheControl, 'no-store')
+      body.set(p.referrerPolicy, 'no-referrer')
+    },
+  )
+  defineService(googleLinkCallback, {
+    auth: 'anonymous',
+    method: 'GET',
+    path: '/google/link/callback',
+    module: 'auth',
+    basePath: '/auth',
+    responseStatus: 303,
+    summary: 'Attach a verified Google identity without changing the current session',
+    query: {
+      state: googleLinkCallback.parameters.state,
+      code: googleLinkCallback.parameters.code,
+      error: googleLinkCallback.parameters.error,
+    },
+    headers: {
+      Cookie: googleLinkCallback.parameters.cookie,
+      Location: googleLinkCallback.parameters.location,
+      'Cache-Control': googleLinkCallback.parameters.cacheControl,
+      'Referrer-Policy': googleLinkCallback.parameters.referrerPolicy,
+    },
+  })
+
   const login = pkg.proc(
     'login',
     {

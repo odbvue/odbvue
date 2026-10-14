@@ -8,6 +8,10 @@ export const googleTransactions = odbTable('odb_google_transactions', (t) => ({
   clientId: t.string(256).notNull(),
   redirectUri: t.string(2048).notNull(),
   returnPath: t.string(2048).notNull(),
+  purpose: t.string(8).notNull().default('login'),
+  userId: t.guid(),
+  sessionId: t.guid(),
+  tokenVersion: t.number(),
   expiresAt: t.timestamp().notNull(),
 })).index('odb_google_transactions_ix_exp', (c) => [c.expiresAt])
 

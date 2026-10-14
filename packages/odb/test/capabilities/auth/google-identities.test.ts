@@ -3,7 +3,10 @@ import { odbAuth } from '../../../src/capabilities/auth/auth.js'
 
 function procedure(sql: string, name: string): string {
   const body = sql.indexOf('PACKAGE BODY APP.odb_auth AS')
-  const start = sql.indexOf(`PROCEDURE ${name}(`, body)
+  const start = sql.indexOf(
+    sql.slice(body).match(new RegExp(`PROCEDURE ${name}\\([^\\n]*\\) IS`))![0],
+    body,
+  )
   return sql.slice(start, sql.indexOf(`END ${name};`, start))
 }
 
@@ -73,5 +76,53 @@ describe('trusted Google identities', () => {
     expect(procedure(sql, 'login')).toContain('c_dummy_password_hash')
     expect(procedure(sql, 'recover_password')).toMatch(/WHEN NO_DATA_FOUND THEN\s+RETURN;/)
     expect(procedure(sql, 'reset_password')).toContain('PASSWORD_RESET_INVALID')
+  })
+
+  it('reauthenticates password users without creating or rotating a session', () => {
+    const sql = odbAuth.toSQLUp({ schema: 'APP' })
+    const start = procedure(sql, 'prepare_google_link')
+    expect(start).toContain("odb_rate_limit.enforce('AUTH_GOOGLE_LINK_USER', p_user_id)")
+    expect(start).toContain('l_password_hash IS NULL')
+    expect(start).toContain('p_password IS NULL')
+    expect(start).toContain('verify_password(p_password, l_password_hash) = FALSE')
+    expect(start).toContain('GOOGLE_LINK_PASSWORD_INVALID')
+    expect(start).not.toMatch(/open_session|INSERT INTO odb_auth_sessions|UPDATE odb_auth/)
+    const session = procedure(sql, 'link_session')
+    for (const guard of [
+      'enabled = 1',
+      'user_id = p_user_id',
+      'refresh_token_hash = odb_auth_crypto.hash_token(p_refresh_token)',
+      'revoked_at IS NULL',
+      'expires_at > SYSTIMESTAMP',
+      'FOR UPDATE',
+    ])
+      expect(session).toContain(guard)
+    expect(session).not.toContain('previous_refresh_token_hash')
+    const check = procedure(sql, 'check_google_link')
+    for (const guard of [
+      'p_session_id IS NULL',
+      'p_token_version IS NULL',
+      'p_session_id != l_current_session',
+      'p_token_version != l_current_version',
+    ])
+      expect(check).toContain(guard)
+  })
+
+  it('links verified subjects idempotently and resolves unique-constraint races by owner', () => {
+    const sql = odbAuth.toSQLUp({ schema: 'APP' })
+    const link = procedure(sql, 'link_google')
+    expect(link).toContain('GOOGLE_IDENTITY_INVALID')
+    expect(link).toContain(
+      'check_google_link(p_user_id, p_session_id, p_token_version, p_refresh_token)',
+    )
+    expect(link).toContain('INSERT INTO odb_auth_identities')
+    expect(link).toContain("VALUES ('https://accounts.google.com', p_subject, p_user_id)")
+    expect(link).toContain('WHEN DUP_VAL_ON_INDEX THEN')
+    expect(link).toContain("issuer = 'https://accounts.google.com'")
+    expect(link).toContain('subject = p_subject')
+    expect(link).toContain('IF l_owner != p_user_id THEN')
+    expect(link).toContain('GOOGLE_IDENTITY_EXISTS')
+    expect(link).not.toMatch(/UPDATE |DELETE |open_session|login_google|grant_role|hash_password/)
+    expect(link.indexOf('check_google_link(')).toBeLessThan(link.indexOf('INSERT INTO'))
   })
 })

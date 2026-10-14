@@ -1,7 +1,10 @@
 import { $fetch, type FetchContext, type FetchOptions } from 'ofetch'
 import { decodeOdbJson, requiresBearerToken, type OdbOpenApiDocument } from './json.js'
 
-type HttpRequestOptions = FetchOptions<'json' | 'blob'>
+type HttpRequestOptions = FetchOptions<'json' | 'blob'> & {
+  /** Password reauthentication failures must not refresh or replace the current session. */
+  skipAuthRefresh?: boolean
+}
 
 export { decodeOdbJson, type OdbOpenApiDocument } from './json.js'
 
@@ -181,6 +184,7 @@ async function executeRequest<T>(
     const status = getErrorStatus(error)
     const shouldRefresh =
       status === 401 &&
+      !options?.skipAuthRefresh &&
       authenticatedRequest &&
       !!configuration.refreshAccessToken &&
       (configuration.shouldRefresh?.(request, options) ?? true)

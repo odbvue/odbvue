@@ -141,9 +141,9 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
     }
     for (const [key, value] of Object.entries(values)) {
       const normalized = key.toLowerCase()
-      if (normalized === 'auth_google_redirect_uri') {
+      if (['auth_google_redirect_uri', 'auth_google_link_redirect_uri'].includes(normalized)) {
         throw new Error(
-          'AUTH_GOOGLE_REDIRECT_URI is derived automatically; remove it from the settings file',
+          `${normalized.toUpperCase()} is derived automatically; remove it from the settings file`,
         )
       }
       const name = ['vite_google_client_id', 'google_client_id'].includes(normalized)
@@ -349,6 +349,11 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
       development ? undefined : new ConfigStore().getConfig().runtime?.apiUrl,
     )
     settingWrites.push(['AUTH_GOOGLE_REDIRECT_URI', 'auth_google_redirect_uri'])
+    googleBindings.auth_google_link_redirect_uri = googleBindings.auth_google_redirect_uri.replace(
+      /\/callback$/,
+      '/link/callback',
+    )
+    settingWrites.push(['AUTH_GOOGLE_LINK_REDIRECT_URI', 'auth_google_link_redirect_uri'])
     googleBindings.google_secret_meta = JSON.stringify({ secret: 'Y' })
   }
   const writes = settingWrites
@@ -388,6 +393,9 @@ END;`
   if (settings.auth_google_enabled) {
     logger.info(
       `Register this Google OAuth redirect URI: ${googleBindings.auth_google_redirect_uri}`,
+    )
+    logger.info(
+      `Register this Google OAuth linking redirect URI: ${googleBindings.auth_google_link_redirect_uri}`,
     )
   }
   logger.success(

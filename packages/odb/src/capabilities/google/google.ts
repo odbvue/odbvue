@@ -10,6 +10,9 @@ import { googleSettings } from './settings.js'
  * Google OIDC primitives; the application owns Origin checks, cookies and redirects.
  * Requires settings/auth/rate-limit, outbound HTTPS trust and DBMS_CRYPTO RSA verification.
  * Commit start() before redirecting; complete() consumes the bound transaction even on failure.
+ * Register both /auth/google/callback and /auth/google/link/callback in Google's authorized
+ * redirect URIs. Provision AUTH_GOOGLE_REDIRECT_URI and AUTH_GOOGLE_LINK_REDIRECT_URI separately;
+ * link flows never fall back to the login redirect URI.
  */
 export const odbGoogle = {
   toSQLUp(options: { schema?: string } = {}): string {
@@ -21,6 +24,35 @@ export const odbGoogle = {
     return [odbGooglePackage, googleKeys, googleTransactions]
       .map((artifact) => artifact.toSQLDown(options))
       .join('\n')
+  },
+  /** Preserve active login transactions while adding purpose-bound linking metadata. */
+  upgrade() {
+    return {
+      toSQLUp(options: { schema?: string } = {}): string {
+        return [
+          ...[
+            "purpose VARCHAR2(8 CHAR) DEFAULT 'login' NOT NULL",
+            'user_id VARCHAR2(32 CHAR)',
+            'session_id VARCHAR2(32 CHAR)',
+            'token_version NUMBER',
+          ].map((column) =>
+            [
+              'BEGIN',
+              `  EXECUTE IMMEDIATE 'ALTER TABLE ${qualify('odb_google_transactions', options.schema)} ADD (${column.replace(/'/g, "''")})';`,
+              'EXCEPTION WHEN OTHERS THEN',
+              '  IF SQLCODE != -1430 THEN RAISE; END IF;',
+              'END;',
+              '/',
+            ].join('\n'),
+          ),
+          odbGooglePackage.toSQLUp(options),
+          odbGoogle.seedSettings().toSQLUp(options),
+        ].join('\n')
+      },
+      toSQLDown(): string {
+        return ''
+      },
+    }
   },
   /** Missing-only provisioning; never replace a configured credential or enable Google. */
   seedSettings() {
@@ -61,6 +93,42 @@ export const odbGoogle = {
     browserToken: PlsqlRenderable,
   ) {
     return odbGooglePackage.start(returnPath, authorizationUrl, browserToken)
+  },
+  startLink(
+    returnPath: PlsqlRenderable,
+    userId: PlsqlRenderable,
+    refreshToken: PlsqlRenderable,
+    password: PlsqlRenderable,
+    authorizationUrl: PlsqlRenderable,
+    browserToken: PlsqlRenderable,
+  ) {
+    return odbGooglePackage.startLink(
+      returnPath,
+      userId,
+      refreshToken,
+      password,
+      authorizationUrl,
+      browserToken,
+    )
+  },
+  completeLink(
+    state: PlsqlRenderable,
+    code: PlsqlRenderable,
+    browserToken: PlsqlRenderable,
+    providerError: PlsqlRenderable,
+    currentRefresh: PlsqlRenderable,
+    returnPath: PlsqlRenderable,
+    outcome: PlsqlRenderable,
+  ) {
+    return odbGooglePackage.completeLink(
+      state,
+      code,
+      browserToken,
+      providerError,
+      currentRefresh,
+      returnPath,
+      outcome,
+    )
   },
   complete(
     state: PlsqlRenderable,

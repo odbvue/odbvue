@@ -204,3 +204,21 @@ endpoint. Only call it after provider-token and transaction verification.
 It creates no local password, grants no roles, and rejects email-based account
 merges. See [Google sign-in](./auth#google-sign-in) for provisioning, security
 policy, and manual deployment requirements.
+
+Explicit linking is a separate authenticated flow, not an alternative outcome
+of `loginGoogle`. A password-confirmed linking transaction binds the initiating
+user and session to the verified Google identity. Linking never creates a user,
+changes profile fields or roles, or opens a replacement session. An identity
+owned by another user is rejected; reconnecting the same identity to its owner
+is idempotent. Register both login and linking callback URIs and retain all OIDC
+transaction checks.
+
+Use `odbGoogle.startLink(returnPath, userId, refreshToken, password, authorizationUrl, browserToken)`
+and `odbGoogle.completeLink(state, code, browserToken, providerError, currentRefresh, returnPath, outcome)`
+from the application transport. The user ID must come from authenticated server
+context and the refresh token from the current HttpOnly cookie, not request-body
+identity fields. `odbAuth.linkGoogle` remains a trusted server-only primitive,
+called only after successful provider and transaction verification.
+For an existing Google installation, `odbGoogle.upgrade()` adds transaction
+binding columns, replaces the package, and seeds missing settings without
+overwriting existing configuration.
