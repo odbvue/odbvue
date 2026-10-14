@@ -28,5 +28,13 @@
   "auth.confirm.description": "Bestätigen Sie Ihre E-Mail-Adresse, um Ihr Konto zu aktivieren.",
   "auth.confirm.action": "E-Mail bestätigen",
   "auth.confirm.success": "E-Mail bestätigt. Sie können sich jetzt anmelden.",
-  "auth.confirm.invalid": "Dieser Link ist ungültig, abgelaufen oder bereits verwendet. Registrieren Sie sich erneut mit derselben E-Mail und demselben Passwort, um einen neuen Link anzufordern."
+  "auth.confirm.invalid": "Dieser Link ist ungültig, abgelaufen oder bereits verwendet. Registrieren Sie sich erneut mit derselben E-Mail und demselben Passwort, um einen neuen Link anzufordern.",
+  "auth.recover.title": "Passwort vergessen?",
+  "auth.recover.description": "Geben Sie die E-Mail-Adresse Ihres Kontos ein, um einen Link zum Zurücksetzen anzufordern.",
+  "auth.recover.action": "Link senden",
+  "auth.recover.sent": "Wenn ein aktives Konto für diese E-Mail-Adresse existiert, wurde ein Link gesendet. Prüfen Sie Ihren Posteingang und Spamordner. Der Link läuft nach einer Stunde ab.",
+  "auth.reset.title": "Passwort zurücksetzen",
+  "auth.reset.action": "Passwort zurücksetzen",
+  "auth.reset.success": "Passwort zurückgesetzt. Alle bisherigen Sitzungen wurden abgemeldet. Melden Sie sich mit Ihrem neuen Passwort an.",
+  "auth.reset.invalid": "Dieser Link ist ungültig, abgelaufen oder bereits verwendet. Fordern Sie einen neuen Link an."
 }

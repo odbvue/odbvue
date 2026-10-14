@@ -24,6 +24,7 @@ import {
   authUserRoles,
   authRolePermissions,
   authConfirmations,
+  authPasswordResets,
 } from './tables.js'
 import { authTypes } from './types.js'
 import { odbSettings } from '../settings/settings.js'
@@ -36,6 +37,7 @@ export const odbAuth = {
       authUsers.toSQLUp({ schema }),
       authSessions.toSQLUp({ schema }),
       authConfirmations.toSQLUp({ schema }),
+      authPasswordResets.toSQLUp({ schema }),
       authorizationTablesSQL(schema),
       odbAuthCrypto.toSQLUp({ schema }),
       odbAuthJwt.toSQLUp({ schema }),
@@ -59,8 +61,9 @@ export const odbAuth = {
           'END;',
           '/',
           authorizationTablesSQL(schema, true),
-          authConfirmations
-            .toSQLUp({ schema })
+          [authConfirmations, authPasswordResets]
+            .map((table) => table.toSQLUp({ schema }))
+            .join('\n')
             .split(';')
             .map((statement) => statement.trim())
             .filter(Boolean)
@@ -134,6 +137,7 @@ export const odbAuth = {
       authRoles,
       authSessions,
       authConfirmations,
+      authPasswordResets,
       authUsers,
     ]
       .map((artifact) => artifact.toSQLDown(options))
@@ -159,6 +163,16 @@ export const odbAuth = {
   /** Consumes an unexpired confirmation token and enables its account. */
   confirmEmail(token: PlsqlRenderable) {
     return odbAuthPackage.confirmEmail(token)
+  },
+
+  /** Returns a fresh recovery token for an enabled account, or NULL for an unknown/disabled one. */
+  recoverPassword(username: PlsqlRenderable, resetToken: PlsqlRenderable) {
+    return odbAuthPackage.recoverPassword(username, resetToken)
+  },
+
+  /** Consumes a recovery token, changes the password, and revokes all existing sessions. */
+  resetPassword(token: PlsqlRenderable, password: PlsqlRenderable) {
+    return odbAuthPackage.resetPassword(token, password)
   },
 
   role: {

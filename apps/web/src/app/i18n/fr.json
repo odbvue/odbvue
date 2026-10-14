@@ -28,5 +28,13 @@
   "auth.confirm.description": "Confirmez votre adresse e-mail pour activer votre compte.",
   "auth.confirm.action": "Confirmer l'e-mail",
   "auth.confirm.success": "E-mail confirmé. Vous pouvez maintenant vous connecter.",
-  "auth.confirm.invalid": "Ce lien est invalide, expiré ou déjà utilisé. Inscrivez-vous à nouveau avec le même e-mail et le même mot de passe pour demander un nouveau lien."
+  "auth.confirm.invalid": "Ce lien est invalide, expiré ou déjà utilisé. Inscrivez-vous à nouveau avec le même e-mail et le même mot de passe pour demander un nouveau lien.",
+  "auth.recover.title": "Mot de passe oublié ?",
+  "auth.recover.description": "Saisissez l'adresse e-mail de votre compte pour demander un lien de réinitialisation.",
+  "auth.recover.action": "Envoyer le lien",
+  "auth.recover.sent": "Si un compte actif existe pour cette adresse, un lien a été envoyé. Consultez votre boîte de réception et vos courriers indésirables. Le lien expire dans une heure.",
+  "auth.reset.title": "Réinitialiser le mot de passe",
+  "auth.reset.action": "Réinitialiser le mot de passe",
+  "auth.reset.success": "Mot de passe réinitialisé. Toutes les sessions précédentes ont été déconnectées. Connectez-vous avec votre nouveau mot de passe.",
+  "auth.reset.invalid": "Ce lien est invalide, expiré ou déjà utilisé. Demandez un nouveau lien."
 }

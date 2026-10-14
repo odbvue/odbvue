@@ -14,6 +14,9 @@
         >
           {{ t('auth.signup') }}
         </v-btn>
+        <v-btn to="/recover-password" variant="text" class="mt-4">
+          {{ t('auth.recover.title') }}
+        </v-btn>
       </v-col>
     </v-row>
   </v-container>

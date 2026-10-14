@@ -2,6 +2,78 @@ import { describe, expect, it } from 'vitest'
 import { odbAuth } from '../../../src/capabilities/auth/auth.js'
 
 describe('odbAuth framework package', () => {
+  it('isolates hashed one-hour recovery tokens and installs/upgrades/drops their table', () => {
+    const sql = odbAuth.toSQLUp({ schema: 'APP' })
+    expect(sql).toContain('CREATE TABLE APP.odb_auth_password_resets')
+    expect(sql).toContain(
+      'odb_auth_pw_resets_fk_user FOREIGN KEY (user_id) REFERENCES APP.odb_auth_users (id) ON DELETE CASCADE',
+    )
+    expect(odbAuth.upgrade().toSQLUp({ schema: 'APP' })).toContain(
+      "EXECUTE IMMEDIATE 'CREATE TABLE APP.odb_auth_password_resets",
+    )
+    const down = odbAuth.toSQLDown({ schema: 'APP' })
+    expect(down.indexOf('DROP TABLE APP.odb_auth_password_resets')).toBeLessThan(
+      down.indexOf('DROP TABLE APP.odb_auth_users'),
+    )
+    const start = sql.indexOf(
+      'PROCEDURE recover_password(',
+      sql.indexOf('PACKAGE BODY APP.odb_auth AS'),
+    )
+    const recovery = sql.slice(start, sql.indexOf('PROCEDURE reset_password(', start))
+    expect(recovery).toContain('p_reset_token := NULL')
+    expect(recovery).toContain('l_email := LOWER(TRIM(p_username))')
+    expect(recovery).toContain('enabled = 1')
+    expect(recovery).toContain('FOR UPDATE')
+    expect(recovery).toMatch(/WHEN NO_DATA_FOUND THEN\s+RETURN;/)
+    expect(recovery).toContain('MERGE INTO odb_auth_password_resets')
+    expect(recovery).toContain('p_reset_token := odb_auth_crypto.random_token(32)')
+    expect(recovery).toContain('odb_auth_crypto.hash_token(p_reset_token)')
+    expect(recovery).toContain("NUMTODSINTERVAL(3600, 'SECOND')")
+    expect(recovery).not.toContain('UPDATE odb_auth_users')
+    expect(recovery).not.toContain('odb_auth_confirmations')
+    expect(recovery).toContain("odb_rate_limit.failure('AUTH_RECOVERY_EMAIL', l_email)")
+    expect(odbAuth.recoverPassword('p_email', 'l_token').toSQL()).toBe(
+      'odb_auth.recover_password(p_email, l_token)',
+    )
+  })
+
+  it('rechecks reset tokens under the account lock and atomically changes password and revokes sessions', () => {
+    const sql = odbAuth.toSQLUp({ schema: 'APP' })
+    const start = sql.indexOf(
+      'PROCEDURE reset_password(',
+      sql.indexOf('PACKAGE BODY APP.odb_auth AS'),
+    )
+    const reset = sql.slice(start, sql.indexOf('PROCEDURE login(', start))
+    expect(reset).toContain("REGEXP_LIKE(p_token, '^[A-F0-9]{64}$')")
+    expect(reset).toContain('LENGTH(p_password) < 8')
+    expect(reset).toContain('LENGTH(p_password) > 256')
+    expect(reset.match(/FROM odb_auth_password_resets/g)).toHaveLength(3)
+    expect(reset).toContain('expires_at > CAST(SYSTIMESTAMP AS TIMESTAMP)')
+    expect(reset).toContain('enabled = 1')
+    const lock = reset.indexOf('FROM odb_auth_users')
+    expect(lock).toBeGreaterThan(reset.indexOf('FROM odb_auth_password_resets'))
+    expect(lock).toBeLessThan(reset.lastIndexOf('SELECT user_id'))
+    expect(reset).toContain('password_hash = odb_auth_crypto.hash_password(p_password)')
+    expect(reset).toContain('token_version = token_version + 1')
+    expect(reset).toContain('UPDATE odb_auth_sessions SET revoked_at = SYSTIMESTAMP')
+    expect(reset).toContain('DELETE FROM odb_auth_password_resets WHERE user_id = l_user_id')
+    expect(reset).toContain("odb_rate_limit.success('AUTH_LOGIN_USERNAME', LOWER(l_email))")
+    expect(reset).toContain('ODB_ERROR|VALIDATION_ERROR|PASSWORD_RESET_INVALID')
+    expect(reset).not.toContain('COMMIT')
+    expect(reset).not.toContain('enabled = 1,')
+    expect(reset).not.toContain('create_access_token')
+    const login = sql.slice(
+      sql.indexOf('PROCEDURE login(', start),
+      sql.indexOf('PROCEDURE refresh(', start),
+    )
+    expect(login).toContain('FOR UPDATE')
+    expect(login.indexOf('FOR UPDATE')).toBeLessThan(login.indexOf('verify_password'))
+    expect(login).toMatch(/WHEN NO_DATA_FOUND THEN\s+l_password_hash := c_dummy_password_hash;/)
+    expect(odbAuth.resetPassword('p_token', 'p_password').toSQL()).toBe(
+      'odb_auth.reset_password(p_token, p_password)',
+    )
+  })
+
   it('creates inactive accounts with hashed single-use confirmation tokens and password-protected retries', () => {
     const sql = odbAuth.toSQLUp({ schema: 'APP' })
     expect(sql).toContain('CREATE TABLE APP.odb_auth_confirmations')

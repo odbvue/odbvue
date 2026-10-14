@@ -38,9 +38,17 @@ export interface SignupCredentials {
   passwordRepeat: string
 }
 
+export interface ResetPasswordCredentials {
+  token: string
+  password: string
+  passwordRepeat: string
+}
+
 export interface AuthEndpoints {
   signup: string
   confirmEmail: string
+  recoverPassword: string
+  resetPassword: string
   login: string
   refresh: string
   logout: string
@@ -61,6 +69,8 @@ export interface Auth<User extends AuthUser = AuthUser> {
   login(credentials: AuthCredentials): Promise<void>
   signup(credentials: SignupCredentials): Promise<void>
   confirmEmail(token: string): Promise<void>
+  recoverPassword(email: string): Promise<void>
+  resetPassword(credentials: ResetPasswordCredentials): Promise<void>
   logout(): Promise<void>
   refresh(): Promise<boolean>
   restore(): Promise<boolean>
@@ -72,6 +82,8 @@ export interface Auth<User extends AuthUser = AuthUser> {
 const defaultEndpoints: AuthEndpoints = {
   signup: '/auth/signup',
   confirmEmail: '/auth/confirm-email',
+  recoverPassword: '/auth/recover-password',
+  resetPassword: '/auth/reset-password',
   login: '/auth/login',
   refresh: '/auth/refresh',
   logout: '/auth/logout',
@@ -167,6 +179,13 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
     },
     confirmEmail(token) {
       return anonymousPost(endpoints.confirmEmail, { token })
+    },
+    recoverPassword(email) {
+      return anonymousPost(endpoints.recoverPassword, { email })
+    },
+    async resetPassword(credentials) {
+      await anonymousPost(endpoints.resetPassword, credentials)
+      clear()
     },
     async login(credentials) {
       loading.value = true

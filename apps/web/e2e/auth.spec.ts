@@ -1,5 +1,60 @@
 import { expect, test, type Page } from '@playwright/test'
 
+test('requests recovery and resets a password only after explicit submission', async ({ page }) => {
+  const token = 'A'.repeat(64)
+  const actions: string[] = []
+  await page.route('**/auth/*', async (route) => {
+    const action = new URL(route.request().url()).pathname.split('/').at(-1)
+    actions.push(action ?? '')
+    if (action === 'refresh') {
+      await route.fulfill({ status: 401, json: {} })
+    } else if (action === 'recover-password') {
+      expect(route.request().postDataJSON()).toEqual({ email: 'ada+reset@example.com' })
+      await route.fulfill({ status: 204 })
+    } else if (action === 'reset-password') {
+      expect(route.request().postDataJSON()).toEqual({
+        token,
+        password: 'new secure password!',
+        passwordRepeat: 'new secure password!',
+      })
+      await route.fulfill({ status: 204 })
+    } else await route.abort()
+  })
+
+  await page.goto('/login')
+  await page.getByRole('link', { name: 'Forgot password?', exact: true }).click()
+  await expect(page).toHaveURL(/\/recover-password$/)
+  await page.getByRole('button', { name: 'Send reset link', exact: true }).click()
+  await expect(page.getByText('Email is required', { exact: true })).toBeVisible()
+  expect(actions).toEqual(['refresh'])
+  await page.getByLabel('Email', { exact: true }).fill('ada+reset@example.com')
+  await page.getByLabel('Email', { exact: true }).press('Enter')
+  await expect(page.getByText(/If an active account exists/)).toBeVisible()
+  expect(actions).toEqual(['refresh', 'recover-password'])
+
+  await page.goto(`/reset-password#token=${token}`)
+  await expect(page).toHaveURL(/\/reset-password$/)
+  expect(actions).toEqual(['refresh', 'recover-password', 'refresh'])
+  await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('autocomplete', 'new-password')
+  await page.getByLabel('Password', { exact: true }).fill('new secure password!')
+  await page.getByLabel('Repeat password', { exact: true }).fill('different')
+  await page.getByRole('button', { name: 'Reset password', exact: true }).click()
+  await expect(page.getByText('Passwords must match', { exact: true })).toBeVisible()
+  expect(actions).toHaveLength(3)
+  await page.getByLabel('Repeat password', { exact: true }).fill('new secure password!')
+  await page.getByLabel('Repeat password', { exact: true }).press('Enter')
+  await expect(page.getByText(/Password reset. All previous sessions/)).toBeVisible()
+  expect(actions).toEqual(['refresh', 'recover-password', 'refresh', 'reset-password'])
+  const persisted = await page.evaluate(() => ({
+    local: { ...localStorage },
+    session: { ...sessionStorage },
+  }))
+  expect(JSON.stringify(persisted)).not.toContain(token)
+  expect(JSON.stringify(persisted)).not.toContain('new secure password!')
+  await page.getByRole('link', { name: 'Login', exact: true }).last().click()
+  await expect(page).toHaveURL(/\/login$/)
+})
+
 async function mockAuth(
   page: Page,
   options: { restored?: boolean; roles?: string[]; logoutFailure?: boolean } = {},

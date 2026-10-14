@@ -1,5 +1,11 @@
 import { odbPackage, odbType } from '../../schema/package.js'
-import { cond, odbLiteral, PlsqlExpression, PlsqlStatement } from '../../schema/attribute.js'
+import {
+  cond,
+  odbLiteral,
+  plsqlExpr,
+  PlsqlExpression,
+  PlsqlStatement,
+} from '../../schema/attribute.js'
 import { odbQuery } from '../../query/index.js'
 import { odbOracle } from '../../oracle/index.js'
 import { odbRateLimitApi } from '../rate-limit/rate-limit.js'
@@ -13,6 +19,7 @@ import {
   authUserRoles,
   authRolePermissions,
   authConfirmations,
+  authPasswordResets,
 } from './tables.js'
 import { authTypes } from './types.js'
 
@@ -189,6 +196,145 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
     },
   )
 
+  const recoverPassword = pkg.proc(
+    'recover_password',
+    { in: { username: authTypes.username }, out: { resetToken: odbType.string(64) } },
+    ({ params: { username, resetToken }, body }) => {
+      const { email, userId } = body.variables({
+        email: authUsers.username,
+        userId: authUsers.id,
+      })
+      body.set(resetToken, odbOracle.null())
+      body.ifThen(
+        cond.or([
+          cond.isNull(odbOracle.trim(username)),
+          cond.gt(odbOracle.length(odbOracle.trim(username)), 128),
+          cond.not(
+            cond.regexpLike(
+              odbOracle.trim(username),
+              '^[^[:space:]@]+@[^[:space:]@.]+([.][^[:space:]@.]+)+$',
+            ),
+          ),
+        ]),
+        (then) => then.invalid('RECOVERY_EMAIL_INVALID'),
+      )
+      body.set(email, odbOracle.lower(odbOracle.trim(username)))
+      body.call(odbRateLimitApi.enforce(odbLiteral('AUTH_RECOVERY_EMAIL'), email))
+      body.call(odbRateLimitApi.failure(odbLiteral('AUTH_RECOVERY_EMAIL'), email))
+      body.block((inner) => {
+        inner.query(
+          odbQuery()
+            .selectFrom(authUsers)
+            .select(authUsers.id)
+            .into(userId)
+            .where(
+              cond.and([
+                cond.eq(odbOracle.lower(authUsers.username), email),
+                cond.eq(authUsers.enabled, true),
+              ]),
+            )
+            .forUpdate(),
+        )
+        inner.when('NO_DATA_FOUND', (handler) => handler.return())
+      })
+      body.set(resetToken, odbAuthCrypto.randomToken(odbLiteral(32)))
+      body.query(
+        odbQuery()
+          .mergeInto(authPasswordResets.as('target'))
+          .using({ userId }, 'source')
+          .on((target, source) => cond.eq(target.userId, source.userId))
+          .whenMatched({
+            tokenHash: odbAuthCrypto.hashToken(resetToken),
+            expiresAt: odbOracle.plus(odbOracle.sysTimestamp(), odbOracle.interval.seconds(3600)),
+          })
+          .whenNotMatched({
+            userId,
+            tokenHash: odbAuthCrypto.hashToken(resetToken),
+            expiresAt: odbOracle.plus(odbOracle.sysTimestamp(), odbOracle.interval.seconds(3600)),
+          }),
+      )
+    },
+  )
+
+  const resetPassword = pkg.proc(
+    'reset_password',
+    { in: { token: odbType.string(64), password: authTypes.password } },
+    ({ params: { token, password }, body }) => {
+      const { userId, lockedUserId, email } = body.variables({
+        userId: authUsers.id,
+        lockedUserId: authUsers.id,
+        email: authUsers.username,
+      })
+      body.ifThen(
+        cond.or([cond.isNull(token), cond.not(cond.regexpLike(token, '^[A-F0-9]{64}$'))]),
+        (then) => then.invalid('PASSWORD_RESET_INVALID'),
+      )
+      body.ifThen(
+        cond.or([
+          cond.isNull(password),
+          cond.lt(odbOracle.length(password), 8),
+          cond.gt(odbOracle.length(password), 256),
+        ]),
+        (then) => then.invalid('PASSWORD_RESET_PASSWORD_INVALID'),
+      )
+      const validToken = () =>
+        cond.and([
+          cond.eq(authPasswordResets.tokenHash, odbAuthCrypto.hashToken(token)),
+          cond.gt(
+            authPasswordResets.expiresAt,
+            new PlsqlExpression('TIMESTAMP', 'CAST(SYSTIMESTAMP AS TIMESTAMP)'),
+          ),
+        ])
+      body.query(
+        odbQuery()
+          .selectFrom(authPasswordResets)
+          .select(authPasswordResets.userId)
+          .into(userId)
+          .where(validToken()),
+      )
+      // Match recovery's lock order, then recheck the token after concurrent retries/resets.
+      body.query(
+        odbQuery()
+          .selectFrom(authUsers)
+          .select([authUsers.id, authUsers.username])
+          .into(lockedUserId, email)
+          .where(cond.and([cond.eq(authUsers.id, userId), cond.eq(authUsers.enabled, true)]))
+          .forUpdate(),
+      )
+      body.query(
+        odbQuery()
+          .selectFrom(authPasswordResets)
+          .select(authPasswordResets.userId)
+          .into(userId)
+          .where(validToken())
+          .forUpdate(),
+      )
+      body.query(
+        odbQuery()
+          .updateTable(authUsers)
+          .set({
+            passwordHash: odbAuthCrypto.hashPassword(password),
+            tokenVersion: plsqlExpr.add(authUsers.tokenVersion, 1),
+            updatedAt: odbOracle.sysTimestamp(),
+          })
+          .where(cond.eq(authUsers.id, userId)),
+      )
+      body.query(
+        odbQuery()
+          .updateTable(authSessions)
+          .set({ revokedAt: odbOracle.sysTimestamp() })
+          .where(
+            cond.and([cond.eq(authSessions.userId, userId), cond.isNull(authSessions.revokedAt)]),
+          ),
+      )
+      body.query(
+        odbQuery().deleteFrom(authPasswordResets).where(cond.eq(authPasswordResets.userId, userId)),
+      )
+      body.call(odbRateLimitApi.success(odbLiteral('AUTH_LOGIN_USERNAME'), odbOracle.lower(email)))
+      body.when('NO_DATA_FOUND', (handler) => handler.invalid('PASSWORD_RESET_INVALID'))
+    },
+  )
+
   /** Verifies credentials and opens a session; raises UNAUTHORIZED (`INVALID_CREDENTIALS`) on failure. */
   const login = pkg.proc(
     'login',
@@ -208,18 +354,24 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
         })
       statements.set(loginSubject, odbOracle.lower(odbOracle.trim(username)))
       statements.call(odbRateLimitApi.enforce(odbLiteral('AUTH_LOGIN_USERNAME'), loginSubject))
-      statements.query(
-        odbQuery()
-          .selectFrom(authUsers)
-          .select(['MAX(id)', 'MAX(password_hash)', 'MAX(token_version)'])
-          .into(userId, passwordHash, tokenVersion)
-          .where(
-            cond.and([
-              cond.eq(odbOracle.lower(authUsers.username), odbOracle.lower(username)),
-              cond.eq(authUsers.enabled, true),
-            ]),
-          ),
-      )
+      statements.block((inner) => {
+        inner.query(
+          odbQuery()
+            .selectFrom(authUsers)
+            .select([authUsers.id, authUsers.passwordHash, authUsers.tokenVersion])
+            .into(userId, passwordHash, tokenVersion)
+            .where(
+              cond.and([
+                cond.eq(odbOracle.lower(authUsers.username), odbOracle.lower(username)),
+                cond.eq(authUsers.enabled, true),
+              ]),
+            )
+            .forUpdate(),
+        )
+        inner.when('NO_DATA_FOUND', (handler) =>
+          handler.set(passwordHash, dummyPasswordHashConstant),
+        )
+      })
       statements.set(passwordHash, odbOracle.nvl(passwordHash, dummyPasswordHashConstant))
       statements.ifThen(
         cond.or([
@@ -591,6 +743,8 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
   return {
     signup,
     confirmEmail,
+    recoverPassword,
+    resetPassword,
     login,
     refresh,
     logout,

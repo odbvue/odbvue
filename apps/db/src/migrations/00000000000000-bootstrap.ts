@@ -234,6 +234,103 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
     summary: 'Activate an account using a single-use email confirmation token',
     body: { token: confirmEmail.parameters.token },
   })
+  const recoverPassword = pkg.proc(
+    'recover_password',
+    { in: { email: odbType.string(128) } },
+    ({ params: { email }, body }) => {
+      const { token, appUrl, meta, emailId, address, ip } = body.variables({
+        token: odbType.string(64),
+        appUrl: odbSettings.types.value,
+        meta: odbSettings.types.meta,
+        emailId: odbEmails.types.id,
+        address: odbType.string(128),
+        ip: odbType.string(128),
+      })
+      body.set(ip, odbOracle.sysContext(odbLiteral('USERENV'), odbLiteral('IP_ADDRESS')))
+      body.call(odbRateLimitApi.enforce(odbLiteral('AUTH_RECOVERY_IP'), ip))
+      body.call(odbRateLimitApi.failure(odbLiteral('AUTH_RECOVERY_IP'), ip))
+      body.call(odbSettings.read(odbLiteral('APP_PUBLIC_URL'), appUrl, meta))
+      body.ifThen(
+        cond.or([
+          cond.isNull(appUrl),
+          cond.not(cond.regexpLike(appUrl, '^https?://[^[:space:]<>"\'&?#]+$')),
+        ]),
+        (then) => then.invalid('RECOVERY_URL_NOT_CONFIGURED'),
+      )
+      body.call(odbAuth.recoverPassword(email, token))
+      body.ifThen(cond.isNull(token), (then) => then.return())
+      body.set(address, odbOracle.lower(odbOracle.trim(email)))
+      const link = plsqlExpr.concat(
+        odbOracle.rtrim(appUrl, odbLiteral('/')),
+        odbLiteral('/reset-password#token='),
+        token,
+      )
+      body.call(
+        odbEmails.mail(
+          address,
+          odbOracle.null(),
+          odbLiteral('Reset your OdbVue password'),
+          odbOracle.toClob(
+            plsqlExpr.concat(
+              odbLiteral('<p>A password reset was requested for your account.</p><p><a href="'),
+              link,
+              odbLiteral(
+                '">Reset password</a></p><p>This link expires in one hour. If you did not request this, ignore this email. Your password has not changed.</p>',
+              ),
+            ),
+          ),
+          odbLiteral(1),
+          emailId,
+        ),
+      )
+      body.commit()
+      body.call(odbEmails.send(emailId))
+    },
+  )
+  defineService(recoverPassword, {
+    auth: 'anonymous',
+    method: 'POST',
+    module: 'auth',
+    basePath: '/auth',
+    path: '/recover-password',
+    summary: 'Request a password reset email without disclosing account existence',
+    body: { email: recoverPassword.parameters.email },
+  })
+
+  const resetPassword = pkg.proc(
+    'reset_password',
+    {
+      in: {
+        token: odbType.string(64),
+        password: odbAuth.types.password,
+        passwordRepeat: odbAuth.types.password,
+      },
+    },
+    ({ params: { token, password, passwordRepeat }, body }) => {
+      const { ip } = body.variables({ ip: odbType.string(128) })
+      body.set(ip, odbOracle.sysContext(odbLiteral('USERENV'), odbLiteral('IP_ADDRESS')))
+      body.call(odbRateLimitApi.enforce(odbLiteral('AUTH_RESET_IP'), ip))
+      body.call(odbRateLimitApi.failure(odbLiteral('AUTH_RESET_IP'), ip))
+      body.ifThen(
+        cond.or([cond.isNull(passwordRepeat), cond.ne(password, passwordRepeat)]),
+        (then) => then.invalid('PASSWORD_RESET_PASSWORD_MISMATCH'),
+      )
+      body.call(odbAuth.resetPassword(token, password))
+    },
+  )
+  defineService(resetPassword, {
+    auth: 'anonymous',
+    method: 'POST',
+    module: 'auth',
+    basePath: '/auth',
+    path: '/reset-password',
+    summary: 'Consume a single-use recovery token and revoke existing sessions',
+    body: {
+      token: resetPassword.parameters.token,
+      password: resetPassword.parameters.password,
+      passwordRepeat: resetPassword.parameters.passwordRepeat,
+    },
+  })
   return {}
 })
 
@@ -279,7 +376,7 @@ export const migration = defineMigration('00000000000000_bootstrap', {
     odbSettings.seed({
       id: 'APP_PUBLIC_URL',
       value: '',
-      meta: { label: 'Public application URL for confirmation emails', type: 'string' },
+      meta: { label: 'Public application URL for account emails', type: 'string' },
     }),
   )
   .install(

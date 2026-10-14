@@ -106,6 +106,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/recover-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request a password reset email without disclosing account existence */
+        post: operations["auth_recover_password"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Consume a single-use recovery token and revoke existing sessions */
+        post: operations["auth_reset_password"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sandbox/auth/login": {
         parameters: {
             query?: never;
@@ -422,6 +456,8 @@ export interface components {
         };
         AuthSignupResponse: Record<string, never>;
         AuthConfirmEmailResponse: Record<string, never>;
+        AuthRecoverPasswordResponse: Record<string, never>;
+        AuthResetPasswordResponse: Record<string, never>;
         SandboxAuthLoginResponse: {
             accessToken: string;
         };
@@ -675,6 +711,60 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthConfirmEmailResponse"];
+                };
+            };
+        };
+    };
+    auth_recover_password: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    email?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthRecoverPasswordResponse"];
+                };
+            };
+        };
+    };
+    auth_reset_password: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    token?: string;
+                    password?: string;
+                    passwordRepeat?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthResetPasswordResponse"];
                 };
             };
         };

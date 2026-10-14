@@ -28,5 +28,13 @@
   "auth.confirm.description": "Confirm your email address to activate your account.",
   "auth.confirm.action": "Confirm email",
   "auth.confirm.success": "Email confirmed. You can now log in.",
-  "auth.confirm.invalid": "This confirmation link is invalid, expired, or already used. Sign up again with the same email and password to request a new link."
+  "auth.confirm.invalid": "This confirmation link is invalid, expired, or already used. Sign up again with the same email and password to request a new link.",
+  "auth.recover.title": "Forgot password?",
+  "auth.recover.description": "Enter your account email address to request a password reset link.",
+  "auth.recover.action": "Send reset link",
+  "auth.recover.sent": "If an active account exists for this email address, a reset link has been sent. Check your inbox and spam folder. The link expires in one hour.",
+  "auth.reset.title": "Reset password",
+  "auth.reset.action": "Reset password",
+  "auth.reset.success": "Password reset. All previous sessions have been signed out. Log in with your new password.",
+  "auth.reset.invalid": "This reset link is invalid, expired, or already used. Request a new link."
 }

@@ -10,6 +10,7 @@
 - password hashing and verification;
 - access-token and refresh-token primitives;
 - `login`, `refresh`, `logout`, `read_user`, and `require_user`;
+- signup, email confirmation, and single-use password recovery tokens;
 - standard ODB errors (`UNAUTHORIZED`, `NOT_FOUND`, `TOO_MANY_REQUESTS`).
 
 The application owns:
@@ -140,14 +141,16 @@ not register them; the application package does. The sandbox retains duplicate
 login, refresh, logout, and `me` procedures under `/sandbox/auth`, without
 overwriting the application's public routes.
 
-| Endpoint                   | Purpose                                                                                                                    |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `POST /auth/login`         | Accepts JSON `{ username, password }`, sets the refresh cookie, and returns `{ accessToken }`.                             |
-| `POST /auth/signup`        | Accepts JSON `{ email, fullName, password, passwordRepeat }`, creates an inactive account, and sends a confirmation email. |
-| `POST /auth/confirm-email` | Accepts JSON `{ token }`, consumes an unexpired confirmation token, and enables the account without creating a session.    |
-| `POST /auth/refresh`       | Rotates the refresh cookie and returns `{ accessToken }`.                                                                  |
-| `POST /auth/logout`        | Revokes the browser session and expires the refresh cookie.                                                                |
-| `GET /auth/me`             | Requires bearer authentication and returns `userId`, `username`, `displayName`, `roles`, and `permissions`.                |
+| Endpoint                      | Purpose                                                                                                                                      |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /auth/login`            | Accepts JSON `{ username, password }`, sets the refresh cookie, and returns `{ accessToken }`.                                               |
+| `POST /auth/signup`           | Accepts JSON `{ email, fullName, password, passwordRepeat }`, creates an inactive account, and sends a confirmation email.                   |
+| `POST /auth/confirm-email`    | Accepts JSON `{ token }`, consumes an unexpired confirmation token, and enables the account without creating a session.                      |
+| `POST /auth/recover-password` | Accepts JSON `{ email }` and sends a reset link for an active account; unknown or disabled accounts receive the same empty success response. |
+| `POST /auth/reset-password`   | Accepts JSON `{ token, password, passwordRepeat }`, changes the password, and revokes existing sessions without logging in.                  |
+| `POST /auth/refresh`          | Rotates the refresh cookie and returns `{ accessToken }`.                                                                                    |
+| `POST /auth/logout`           | Revokes the browser session and expires the refresh cookie.                                                                                  |
+| `GET /auth/me`                | Requires bearer authentication and returns `userId`, `username`, `displayName`, `roles`, and `permissions`.                                  |
 
 ### Email signup
 
@@ -191,6 +194,40 @@ attempts use the existing database rate limiter (signup by email and caller IP,
 confirmation by caller IP). Behind a proxy, the database may see a shared IP;
 deployment-level throttling should account for that.
 
+### Password recovery
+
+Login links to `/recover-password`. Recovery uses the same `APP_PUBLIC_URL`,
+SMTP configuration, email queue, and delivery mechanism as signup. Redeploy
+the bootstrap migration to install `odb_auth_password_resets` and the two new
+anonymous endpoints.
+
+Only active accounts are eligible; recovery never activates an unconfirmed
+signup or re-enables an administratively disabled account. Requesting a link
+does not disable the account or change its password. The response does not
+disclose account existence. Configuration and delivery errors are still
+reported as errors rather than success.
+
+Recovery tokens are cryptographically random, stored only as hashes in the
+auth table, separate from confirmation tokens, and expire after **one hour**.
+Each request replaces the previous token for that account. The email links to
+`/reset-password#token=...`; the page removes the fragment from browser history
+and waits for a password form submission. Opening a link never consumes it.
+As with signup, trusted email-queue administrators can see the link.
+
+Reset requires matching passwords of 8-256 characters. An unexpired token is
+consumed atomically with the password change, a token-version increment, and
+revocation of all previous refresh sessions. Concurrent retries and reset
+submissions serialize on the account, and login locks the account while
+verifying credentials and issuing a session so an old-password login cannot
+escape a concurrent reset. Reset also clears the account's login-attempt
+throttle. The user must log in normally afterward.
+
+Recovery attempts are throttled by normalized email and caller IP; reset
+attempts are throttled by caller IP. Failed SMTP delivery leaves the committed
+token and queued email available for diagnosis; retrying recovery sends a new
+link. Neutral responses do not guarantee identical timing for unknown accounts
+and SMTP delivery; deployment-level abuse protection remains important.
+
 The access token is valid for `AUTH_JWT_EXPIRATION_SECONDS` (15 minutes by default)
 and is rejected at or after its signed expiration. Refresh tokens are opaque,
 are stored only as hashes in the database, expire after 30 days, and rotate on
@@ -201,13 +238,15 @@ Authentication failures raise ODB errors that ORDS maps to HTTP responses, inclu
 
 ## Procedures
 
-| Procedure      | Parameters                                                             | Behavior                                                                                         |
-| -------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `login`        | `p_username`, `p_password` IN; `p_access_token`, `p_refresh_token` OUT | Verifies credentials, opens a session. Raises `UNAUTHORIZED` (`INVALID_CREDENTIALS`) on failure. |
-| `refresh`      | `p_refresh_token` IN; `p_access_token`, `p_next_refresh_token` OUT     | Rotates the refresh token. Reuse of a rotated token revokes the session.                         |
-| `logout`       | `p_refresh_token` IN                                                   | Revokes the session; unknown or empty tokens are ignored.                                        |
-| `read_user`    | `p_user_id` IN; `p_username`, `p_display_name` OUT                     | Reads an enabled user; raises `NOT_FOUND` otherwise.                                             |
-| `require_user` | `p_access_token` IN                                                    | Returns the user id behind a valid access token; raises `UNAUTHORIZED` otherwise.                |
+| Procedure          | Parameters                                                             | Behavior                                                                                                                                            |
+| ------------------ | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `login`            | `p_username`, `p_password` IN; `p_access_token`, `p_refresh_token` OUT | Verifies credentials, opens a session. Raises `UNAUTHORIZED` (`INVALID_CREDENTIALS`) on failure.                                                    |
+| `refresh`          | `p_refresh_token` IN; `p_access_token`, `p_next_refresh_token` OUT     | Rotates the refresh token. Reuse of a rotated token revokes the session.                                                                            |
+| `logout`           | `p_refresh_token` IN                                                   | Revokes the session; unknown or empty tokens are ignored.                                                                                           |
+| `recover_password` | `p_username` IN; `p_reset_token` OUT                                   | Returns a one-hour token for an enabled account, otherwise NULL. The trusted application sends the email.                                           |
+| `reset_password`   | `p_token`, `p_password` IN                                             | Consumes a recovery token, changes the password, increments token version, and revokes sessions. Invalid tokens/passwords raise `VALIDATION_ERROR`. |
+| `read_user`        | `p_user_id` IN; `p_username`, `p_display_name` OUT                     | Reads an enabled user; raises `NOT_FOUND` otherwise.                                                                                                |
+| `require_user`     | `p_access_token` IN                                                    | Returns the user id behind a valid access token; raises `UNAUTHORIZED` otherwise.                                                                   |
 
 Tokens are plain values. Use `odbHttp.defineCookie(...)` in the application package for refresh-token transport. Protected services automatically extract bearer tokens:
 

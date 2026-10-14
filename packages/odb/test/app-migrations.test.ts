@@ -267,6 +267,16 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain("ODBVUE.odb_settings.write('APP_PUBLIC_URL', ''")
     expect(sql).toContain('odb_auth.signup(p_email, p_password, p_full_name, l_token)')
     expect(sql).toContain('odb_auth.confirm_email(p_token)')
+    expect(sql).toContain('odb_auth.recover_password(p_email, l_token)')
+    expect(sql).toContain('odb_auth.reset_password(p_token, p_password)')
+    expect(sql).toContain('/reset-password#token=')
+    expect(sql).toContain('PASSWORD_RESET_PASSWORD_MISMATCH')
+    expect(sql).toContain('RECOVERY_URL_NOT_CONFIGURED')
+    expect(sql).toMatch(/IF l_token IS NULL THEN\s+RETURN;/)
+    for (const scope of ['AUTH_RECOVERY_IP', 'AUTH_RECOVERY_EMAIL', 'AUTH_RESET_IP']) {
+      expect(sql).toContain(`odb_rate_limit.enforce('${scope}'`)
+      expect(sql).toContain(`odb_rate_limit.failure('${scope}'`)
+    }
     expect(sql).toContain('SIGNUP_PASSWORD_MISMATCH')
     expect(sql).toContain('SIGNUP_URL_NOT_CONFIGURED')
     expect(sql).toContain('/confirm-email#token=')
@@ -293,6 +303,8 @@ describe('app-owned ORDS migrations', () => {
       ['/auth/logout', 'post'],
       ['/auth/signup', 'post'],
       ['/auth/confirm-email', 'post'],
+      ['/auth/recover-password', 'post'],
+      ['/auth/reset-password', 'post'],
       ['/auth/me', 'get'],
     ]) {
       expect(publicApi.paths[path!]?.[method!]?.security).toEqual(
@@ -305,6 +317,18 @@ describe('app-owned ORDS migrations', () => {
     ).toMatchObject({
       email: { type: 'string' },
       fullName: { type: 'string' },
+      password: { type: 'string' },
+      passwordRepeat: { type: 'string' },
+    })
+    expect(
+      publicApi.paths['/auth/recover-password']?.post?.requestBody?.content['application/json']
+        .schema.properties,
+    ).toEqual({ email: { type: 'string' } })
+    expect(
+      publicApi.paths['/auth/reset-password']?.post?.requestBody?.content['application/json'].schema
+        .properties,
+    ).toMatchObject({
+      token: { type: 'string' },
       password: { type: 'string' },
       passwordRepeat: { type: 'string' },
     })
