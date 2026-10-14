@@ -295,6 +295,34 @@ export const odbAuth = {
     return odbAuthPackage.loginGoogle(subject, email, displayName, accessToken, refreshToken)
   },
 
+  prepareGoogleLink(
+    userId: PlsqlRenderable,
+    refreshToken: PlsqlRenderable,
+    password: PlsqlRenderable,
+    sessionId: PlsqlRenderable,
+    tokenVersion: PlsqlRenderable,
+  ) {
+    return odbAuthPackage.prepareGoogleLink(userId, refreshToken, password, sessionId, tokenVersion)
+  },
+  checkGoogleLink(
+    userId: PlsqlRenderable,
+    sessionId: PlsqlRenderable,
+    tokenVersion: PlsqlRenderable,
+    refreshToken: PlsqlRenderable,
+  ) {
+    return odbAuthPackage.checkGoogleLink(userId, sessionId, tokenVersion, refreshToken)
+  },
+  /** Server-only: Google subject must already have passed OIDC and transaction verification. */
+  linkGoogle(
+    userId: PlsqlRenderable,
+    sessionId: PlsqlRenderable,
+    tokenVersion: PlsqlRenderable,
+    refreshToken: PlsqlRenderable,
+    subject: PlsqlRenderable,
+  ) {
+    return odbAuthPackage.linkGoogle(userId, sessionId, tokenVersion, refreshToken, subject)
+  },
+
   /** `odb_auth.refresh(<refreshToken>, <accessToken>, <nextRefreshToken>)` with OUT tokens. */
   refresh(
     refreshToken: PlsqlRenderable,

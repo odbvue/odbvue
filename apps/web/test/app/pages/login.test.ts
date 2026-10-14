@@ -8,6 +8,7 @@ import { i18n } from '@/capabilities/i18n'
 import { useHttp } from '@/capabilities/http'
 import { useUi } from '@/capabilities/ui'
 import Login from '@/app/pages/login.vue'
+import messages from '@/app/i18n/en.json'
 
 const session = vi.hoisted((): { auth?: Auth } => ({}))
 vi.mock('@/capabilities/auth', async (importOriginal) => {
@@ -97,6 +98,17 @@ describe('login page using application auth', () => {
     expect(context.ui.notification.value).toBeUndefined()
     expect(context.router.currentRoute.value.query).toEqual({ redirect: '/sandbox' })
     expect(context.fetch).toHaveBeenCalledTimes(1)
+    context.wrapper.unmount()
+  })
+
+  it('guides email conflicts to existing-account login then explicit connection without autolinking', async () => {
+    const context = await setup('/login?google=conflict')
+    await flushPromises()
+    expect(messages['auth.google.conflict']).toContain('Connect Google')
+    expect(messages['auth.google.conflict']).toContain('never linked automatically')
+    expect(context.auth.authenticated.value).toBe(false)
+    expect(context.fetch).toHaveBeenCalledTimes(1)
+    expect(context.router.currentRoute.value.path).toBe('/login')
     context.wrapper.unmount()
   })
 

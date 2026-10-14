@@ -11,4 +11,5 @@ export const googleSettings = [
     meta: { type: 'string', secret: 'Y' as const },
   },
   { id: 'AUTH_GOOGLE_REDIRECT_URI', value: '', meta: { type: 'string' } },
+  { id: 'AUTH_GOOGLE_LINK_REDIRECT_URI', value: '', meta: { type: 'string' } },
 ]

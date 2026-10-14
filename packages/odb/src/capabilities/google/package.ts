@@ -120,6 +120,7 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
 
   const load = pkg.privateProc('load_config', (proc) => {
     const outputs = proc.parameters({
+      in: { purpose: text(8) },
       out: {
         clientId: text(256),
         clientSecret: text(4000),
@@ -134,7 +135,14 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
         ['clientSecret', 'AUTH_GOOGLE_CLIENT_SECRET', 4000],
         ['redirectUri', 'AUTH_GOOGLE_REDIRECT_URI', 2048],
       ] as const) {
-        body.call(odbSettings.read(odbLiteral(id), value, meta))
+        const setting =
+          key === 'redirectUri'
+            ? new PlsqlExpression(
+                'VARCHAR2',
+                "CASE WHEN p_purpose = 'link' THEN 'AUTH_GOOGLE_LINK_REDIRECT_URI' ELSE 'AUTH_GOOGLE_REDIRECT_URI' END",
+              )
+            : odbLiteral(id)
+        body.call(odbSettings.read(setting, value, meta))
         body.ifThen(cond.gt(odbOracle.length(value), limit), (then) =>
           then.invalid('GOOGLE_CONFIG_INVALID'),
         )
@@ -148,6 +156,10 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
             cond.regexpLike(outputs.clientId, '^[A-Za-z0-9._-]+[.]apps[.]googleusercontent[.]com$'),
           ),
           cond.isNull(outputs.redirectUri),
+          cond.and([
+            cond.eq(outputs.purpose, 'link'),
+            cond.not(cond.regexpLike(outputs.redirectUri, '/auth/google/link/callback$')),
+          ]),
           cond.regexpLike(outputs.redirectUri, '[[:space:][:cntrl:]?#\\\\]'),
           cond.not(
             cond.regexpLike(
@@ -162,17 +174,32 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
   })
 
   const consume = pkg.privateProc('consume_transaction', (proc) => {
-    const { state, browserToken, nonceHash, verifier, clientId, redirectUri, returnPath } =
-      proc.parameters({
-        in: { state: text(128), browserToken: text(128) },
-        out: {
-          nonceHash: text(64),
-          verifier: text(64),
-          clientId: text(256),
-          redirectUri: text(2048),
-          returnPath: text(2048),
-        },
-      })
+    const {
+      state,
+      browserToken,
+      nonceHash,
+      verifier,
+      clientId,
+      redirectUri,
+      returnPath,
+      purpose,
+      userId,
+      sessionId,
+      tokenVersion,
+    } = proc.parameters({
+      in: { state: text(128), browserToken: text(128) },
+      out: {
+        nonceHash: text(64),
+        verifier: text(64),
+        clientId: text(256),
+        redirectUri: text(2048),
+        returnPath: text(2048),
+        purpose: googleTransactions.purpose,
+        userId: googleTransactions.userId,
+        sessionId: googleTransactions.sessionId,
+        tokenVersion: googleTransactions.tokenVersion,
+      },
+    })
     proc.autonomous()
     proc.body((body) => {
       const { expiresAt, stateHash, browserHash } = body.variables({
@@ -201,8 +228,23 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
             googleTransactions.redirectUri,
             googleTransactions.returnPath,
             googleTransactions.expiresAt,
+            googleTransactions.purpose,
+            googleTransactions.userId,
+            googleTransactions.sessionId,
+            googleTransactions.tokenVersion,
           ])
-          .into(nonceHash, verifier, clientId, redirectUri, returnPath, expiresAt)
+          .into(
+            nonceHash,
+            verifier,
+            clientId,
+            redirectUri,
+            returnPath,
+            expiresAt,
+            purpose,
+            userId,
+            sessionId,
+            tokenVersion,
+          )
           .where(
             cond.and([
               cond.eq(googleTransactions.stateHash, stateHash),
@@ -225,13 +267,20 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
       })
     })
   })
-  const start = pkg.proc(
-    'start_login',
-    {
-      in: { returnPath: text(2048) },
+  const startTransaction = pkg.privateProc('start_transaction', (proc) => {
+    const params = proc.parameters({
+      in: {
+        returnPath: text(2048),
+        purpose: text(8),
+        userId: authTypes.userId,
+        sessionId: odbType.guid(),
+        tokenVersion: odbType.number(),
+      },
       out: { authorizationUrl: text(4000), browserToken: text(64) },
-    },
-    ({ params: { returnPath, authorizationUrl, browserToken }, body }) => {
+    })
+    const { returnPath, purpose, userId, sessionId, tokenVersion, authorizationUrl, browserToken } =
+      params
+    proc.body((body) => {
       const {
         clientId,
         clientSecret,
@@ -258,7 +307,7 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
       body.set(ip, odbOracle.sysContext(odbLiteral('USERENV'), odbLiteral('IP_ADDRESS')))
       body.call(odbRateLimitApi.enforce(odbLiteral('AUTH_GOOGLE_START_IP'), ip))
       body.call(odbRateLimitApi.failure(odbLiteral('AUTH_GOOGLE_START_IP'), ip))
-      body.call(load.invoke(clientId, clientSecret, redirectUri))
+      body.call(load.invoke(purpose, clientId, clientSecret, redirectUri))
       body.ifThen(
         cond.or([
           cond.isNull(returnPath),
@@ -311,24 +360,103 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
         clientId,
         redirectUri,
         returnPath,
+        purpose,
+        userId,
+        sessionId,
+        tokenVersion,
         expiresAt: new PlsqlExpression(
           'TIMESTAMP',
           "CAST(SYSTIMESTAMP AS TIMESTAMP) + INTERVAL '5' MINUTE",
         ),
       })
+    })
+  })
+
+  const start = pkg.proc(
+    'start_login',
+    {
+      in: { returnPath: text(2048) },
+      out: { authorizationUrl: text(4000), browserToken: text(64) },
+    },
+    ({ params: { returnPath, authorizationUrl, browserToken }, body }) => {
+      body.call(
+        startTransaction.invoke(
+          returnPath,
+          odbLiteral('login'),
+          odbOracle.null(),
+          odbOracle.null(),
+          odbOracle.null(),
+          authorizationUrl,
+          browserToken,
+        ),
+      )
     },
   )
 
-  const complete = pkg.proc(
-    'complete',
+  const startLink = pkg.proc(
+    'start_link',
     {
-      in: { state: text(128), code: text(4000), browserToken: text(128), providerError: text(256) },
-      out: { refreshToken: authTypes.refreshToken, returnPath: text(2048), outcome: text(32) },
+      in: {
+        returnPath: text(2048),
+        userId: authTypes.userId,
+        refreshToken: authTypes.refreshToken,
+        password: authTypes.password,
+      },
+      out: { authorizationUrl: text(4000), browserToken: text(64) },
     },
     ({
-      params: { state, code, browserToken, providerError, refreshToken, returnPath, outcome },
+      params: { returnPath, userId, refreshToken, password, authorizationUrl, browserToken },
       body,
     }) => {
+      const { sessionId, tokenVersion } = body.variables({
+        sessionId: odbType.guid(),
+        tokenVersion: odbType.number(),
+      })
+      body.call(odbAuth.prepareGoogleLink(userId, refreshToken, password, sessionId, tokenVersion))
+      body.call(
+        startTransaction.invoke(
+          returnPath,
+          odbLiteral('link'),
+          userId,
+          sessionId,
+          tokenVersion,
+          authorizationUrl,
+          browserToken,
+        ),
+      )
+    },
+  )
+
+  const completeTransaction = pkg.privateProc('complete_transaction', (proc) => {
+    const params = proc.parameters({
+      in: {
+        state: text(128),
+        code: text(4000),
+        browserToken: text(128),
+        providerError: text(256),
+        purpose: text(8),
+        currentRefresh: authTypes.refreshToken,
+      },
+      out: { refreshToken: authTypes.refreshToken, returnPath: text(2048), outcome: text(32) },
+    })
+    const {
+      state,
+      code,
+      browserToken,
+      providerError,
+      refreshToken,
+      returnPath,
+      outcome,
+      purpose,
+      currentRefresh,
+    } = params
+    proc.body((body) => {
+      const binding = body.variables({
+        transactionPurpose: text(8),
+        userId: authTypes.userId,
+        sessionId: odbType.guid(),
+        tokenVersion: odbType.number(),
+      })
       const {
         nonceHash,
         verifier,
@@ -370,9 +498,30 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
           snapshotClient,
           snapshotRedirect,
           returnPath,
+          binding.transactionPurpose,
+          binding.userId,
+          binding.sessionId,
+          binding.tokenVersion,
         ),
       )
-      body.call(load.invoke(clientId, clientSecret, redirectUri))
+      body.ifThen(
+        cond.or([
+          cond.isNull(binding.transactionPurpose),
+          cond.ne(binding.transactionPurpose, purpose),
+        ]),
+        (then) => then.unauthorized('GOOGLE_PURPOSE_INVALID'),
+      )
+      body.ifThen(cond.eq(purpose, 'link'), (then) => {
+        then.call(
+          odbAuth.checkGoogleLink(
+            binding.userId,
+            binding.sessionId,
+            binding.tokenVersion,
+            currentRefresh,
+          ),
+        )
+      })
+      body.call(load.invoke(purpose, clientId, clientSecret, redirectUri))
       body.ifThen(
         cond.or([cond.ne(clientId, snapshotClient), cond.ne(redirectUri, snapshotRedirect)]),
         (then) => then.unauthorized('GOOGLE_CONFIG_CHANGED'),
@@ -433,7 +582,25 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
         })
       })
       // Trusted auth procedure is a cross-capability contract, never a transport action.
-      body.call(odbAuth.loginGoogle(subject, email, displayName, accessToken, refreshToken))
+      body.ifThen(
+        cond.eq(purpose, 'link'),
+        (then) => {
+          then.call(
+            odbAuth.linkGoogle(
+              binding.userId,
+              binding.sessionId,
+              binding.tokenVersion,
+              currentRefresh,
+              subject,
+            ),
+          )
+        },
+        (otherwise) => {
+          otherwise.call(
+            odbAuth.loginGoogle(subject, email, displayName, accessToken, refreshToken),
+          )
+        },
+      )
       body.set(outcome, 'success')
       body.when('OTHERS', (handler) => {
         handler.block((log) => {
@@ -442,7 +609,58 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
         })
         handler.raise()
       })
+    })
+  })
+  const complete = pkg.proc(
+    'complete',
+    {
+      in: { state: text(128), code: text(4000), browserToken: text(128), providerError: text(256) },
+      out: { refreshToken: authTypes.refreshToken, returnPath: text(2048), outcome: text(32) },
+    },
+    ({ params: p, body }) => {
+      body.call(
+        completeTransaction.invoke(
+          p.state,
+          p.code,
+          p.browserToken,
+          p.providerError,
+          odbLiteral('login'),
+          odbOracle.null(),
+          p.refreshToken,
+          p.returnPath,
+          p.outcome,
+        ),
+      )
     },
   )
-  return { publicUrl, enabled, start, complete }
+  const completeLink = pkg.proc(
+    'complete_link',
+    {
+      in: {
+        state: text(128),
+        code: text(4000),
+        browserToken: text(128),
+        providerError: text(256),
+        currentRefresh: authTypes.refreshToken,
+      },
+      out: { returnPath: text(2048), outcome: text(32) },
+    },
+    ({ params: p, body }) => {
+      const { unusedRefresh } = body.variables({ unusedRefresh: authTypes.refreshToken })
+      body.call(
+        completeTransaction.invoke(
+          p.state,
+          p.code,
+          p.browserToken,
+          p.providerError,
+          odbLiteral('link'),
+          p.currentRefresh,
+          unusedRefresh,
+          p.returnPath,
+          p.outcome,
+        ),
+      )
+    },
+  )
+  return { publicUrl, enabled, start, complete, startLink, completeLink }
 })

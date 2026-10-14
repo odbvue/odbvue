@@ -19,6 +19,60 @@ const migrations = {
 const load = async (file: keyof typeof migrations) => (await migrations[file]()).migration
 
 describe('app-owned ORDS migrations', () => {
+  it('protects link start with bearer auth, browser origin, password and refresh-cookie binding', async () => {
+    const migration = await load('00000000000000-bootstrap')
+    const sql = migration.compile().up().join('\n')
+    const app = migration.applications()[0]!
+    const start = app.procedures.find((p) => p.name === 'google_link_start')!
+    expect(start.service).toMatchObject({
+      auth: 'authenticated',
+      method: 'POST',
+      path: 'google/link/start',
+    })
+    expect(start.service?.params).toMatchObject({
+      body: { redirect: { name: 'p_redirect' }, password: { name: 'p_password' } },
+    })
+    const startBody = sql.slice(
+      sql.indexOf('PROCEDURE google_link_start(', sql.indexOf('PACKAGE BODY ODBVUE.PCK_APP')),
+      sql.indexOf('END google_link_start;'),
+    )
+    expect(startBody).toContain('GOOGLE_ORIGIN_INVALID')
+    expect(startBody).toContain(
+      'odb_google.start_link(p_redirect, p_subject, REGEXP_SUBSTR(p_cookie',
+    )
+    expect(startBody).toContain('__Host-odb_refresh=')
+    expect(startBody).toContain('p_password, p_authorization_url')
+    expect(startBody).not.toContain("p_set_cookie := '__Host-odb_refresh=")
+    const openapi = generateApplicationOpenApi(app) as {
+      paths: Record<
+        string,
+        Record<string, { security: unknown; responses: Record<string, unknown> }>
+      >
+    }
+    expect(openapi.paths['/auth/google/link/start']?.post?.security).toEqual([{ bearerAuth: [] }])
+    expect(openapi.paths['/auth/google/link/callback']?.get?.security).toEqual([])
+    expect(openapi.paths['/auth/google/link/callback']?.get?.responses).toHaveProperty('303')
+  })
+
+  it('keeps link callback session-neutral on success, cancellation and failure in bootstrap', async () => {
+    const migration = await load('00000000000000-bootstrap')
+    const sql = migration.compile().up().join('\n')
+    const callback = sql.slice(
+      sql.indexOf('PROCEDURE google_link_callback(', sql.indexOf('PACKAGE BODY ODBVUE.PCK_APP')),
+      sql.indexOf('END google_link_callback;'),
+    )
+    expect(callback).toContain('odb_google.complete_link(')
+    expect(callback).toContain('__Host-odb_google=')
+    expect(callback).toContain('__Host-odb_refresh=')
+    expect(callback).toContain(
+      "p_location := RTRIM(l_app_url, '/') || '/account?google=' || l_outcome",
+    )
+    expect(callback).toContain("l_outcome := 'linked'")
+    expect(callback).toContain("l_outcome := 'error'")
+    expect(callback).toContain('ROLLBACK;')
+    expect(callback).not.toMatch(/set_cookie|Max-Age|odb_auth[.](login|refresh|logout)\(/i)
+  })
+
   it('installs emails and seeds six empty SMTP settings without a host ACL', async () => {
     const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
     expect(sql).toContain('CREATE TABLE ODBVUE.odb_emails_queue')

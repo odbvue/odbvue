@@ -647,6 +647,7 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
           auth_google_client_id: google.auth_google_client_id,
           auth_google_client_secret: google.auth_google_client_secret,
           auth_google_redirect_uri: 'http://localhost:5173/api/auth/google/callback',
+          auth_google_link_redirect_uri: 'http://localhost:5173/api/auth/google/link/callback',
           google_secret_meta: '{"secret":"Y"}',
         })
         expect(sql).toContain(
@@ -654,6 +655,9 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
         )
         expect(sql).toContain(
           "APP.odb_settings.write('AUTH_GOOGLE_REDIRECT_URI', :auth_google_redirect_uri, NULL)",
+        )
+        expect(sql).toContain(
+          "APP.odb_settings.write('AUTH_GOOGLE_LINK_REDIRECT_URI', :auth_google_link_redirect_uri, NULL)",
         )
         expect(sql).toContain("APP.odb_acl.add_http('www.googleapis.com', 443)")
         expect(sql).toContain("APP.odb_acl.add_http('oauth2.googleapis.com', 443)")
@@ -738,9 +742,13 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
         await runSetupSettings('settings.json')
         expect(state.connection.execute.mock.calls[0]![1]).toMatchObject({
           auth_google_redirect_uri: redirect,
+          auth_google_link_redirect_uri: redirect.replace(/\/callback$/, '/link/callback'),
         })
         expect(state.info).toHaveBeenCalledWith(
           `Register this Google OAuth redirect URI: ${redirect}`,
+        )
+        expect(state.info).toHaveBeenCalledWith(
+          `Register this Google OAuth linking redirect URI: ${redirect.replace(/\/callback$/, '/link/callback')}`,
         )
       },
     )
@@ -752,21 +760,26 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
       expect(state.connected).not.toHaveBeenCalled()
     })
 
-    it.each(['auth_google_redirect_uri', 'AUTH_GOOGLE_REDIRECT_URI'])(
-      'rejects a manually configured callback %s with migration guidance',
-      async (key) => {
-        state.readFile.mockResolvedValue(
-          JSON.stringify({ [key]: 'https://api.example.com/callback' }),
-        )
-        await expect(runSetupSettings('settings.json')).rejects.toThrow('derived automatically')
-        expect(state.prompts).not.toHaveBeenCalled()
-        expect(state.connected).not.toHaveBeenCalled()
-      },
-    )
+    it.each([
+      'auth_google_redirect_uri',
+      'AUTH_GOOGLE_REDIRECT_URI',
+      'auth_google_link_redirect_uri',
+      'AUTH_GOOGLE_LINK_REDIRECT_URI',
+    ])('rejects a manually configured callback %s with migration guidance', async (key) => {
+      state.readFile.mockResolvedValue(
+        JSON.stringify({ [key]: 'https://api.example.com/callback' }),
+      )
+      await expect(runSetupSettings('settings.json')).rejects.toThrow('derived automatically')
+      expect(state.prompts).not.toHaveBeenCalled()
+      expect(state.connected).not.toHaveBeenCalled()
+    })
 
     it('does not write a callback when Google is disabled', async () => {
       await runSetupSettings()
       expect(state.connection.execute.mock.calls[0]![0]).not.toContain('AUTH_GOOGLE_REDIRECT_URI')
+      expect(state.connection.execute.mock.calls[0]![0]).not.toContain(
+        'AUTH_GOOGLE_LINK_REDIRECT_URI',
+      )
     })
 
     it('fails before connecting when production has no configured runtime API URL', async () => {

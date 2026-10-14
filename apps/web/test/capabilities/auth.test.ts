@@ -10,6 +10,153 @@ function response<T>(data: T | null, status = 200) {
 }
 
 describe('authentication capability', () => {
+  async function linkSession() {
+    const http = createHttpClient()
+    const post = vi
+      .spyOn(http, 'post')
+      .mockResolvedValue(response({ accessToken: 'original-token' }))
+    vi.spyOn(http, 'get').mockResolvedValue(response({ userId: 7, username: 'ada' }))
+    const auth = createAuth({ http })
+    await auth.restore()
+    post.mockClear()
+    return { auth, post }
+  }
+
+  it('requires a ready authenticated session and current password before linking', async () => {
+    const http = createHttpClient()
+    const post = vi.spyOn(http, 'post').mockResolvedValue(response(null, 401))
+    const auth = createAuth({ http })
+    await expect(auth.startGoogleLink({ password: 'password' })).rejects.toThrow('Sign in')
+    expect(post).not.toHaveBeenCalled()
+    await auth.restore()
+    post.mockClear()
+    await expect(auth.startGoogleLink({ password: 'password' })).rejects.toThrow('Sign in')
+    expect(post).not.toHaveBeenCalled()
+    const context = await linkSession()
+    await expect(context.auth.startGoogleLink({ password: '' })).rejects.toThrow('password')
+    expect(context.post).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    '/account',
+    '//evil.example',
+    'https://evil.example',
+    '/login',
+    '/account?google=linked',
+  ])(
+    'links with bearer auth, cookies and fixed account destination instead of %s',
+    async (redirect) => {
+      const { auth, post } = await linkSession()
+      const user = auth.user.value
+      const authorizationUrl = 'https://accounts.google.com/o/oauth2/v2/auth?state=link'
+      post.mockResolvedValue(response({ authorizationUrl, accessToken: 'different-token' }))
+      await expect(
+        auth.startGoogleLink({ redirect, password: 'current-password' }),
+      ).resolves.toMatchObject({
+        authorizationUrl,
+      })
+      expect(post).toHaveBeenCalledWith(
+        '/auth/google/link/start',
+        { redirect: '/account', password: 'current-password' },
+        {
+          credentials: 'include',
+          headers: { Authorization: ['Bearer', 'original-token'].join(' ') },
+          skipAuthRefresh: true,
+        },
+      )
+      expect(auth.user.value).toBe(user)
+      expect(auth.accessToken.value).toBe('original-token')
+      expect(auth.loading.value).toBe(false)
+    },
+  )
+
+  it.each([
+    'https://evil.example/o/oauth2/v2/auth',
+    'http://accounts.google.com/o/oauth2/v2/auth',
+    'https://accounts.google.com:444/o/oauth2/v2/auth',
+    'https://accounts.google.com/other',
+    'https://accounts.google.com.evil.example/o/oauth2/v2/auth',
+    'https://user@accounts.google.com/o/oauth2/v2/auth',
+    '/o/oauth2/v2/auth',
+    'javascript:alert(1)',
+    '',
+    undefined,
+  ])(
+    'preserves the session when a link URL is unsafe or malformed: %s',
+    async (authorizationUrl) => {
+      const { auth, post } = await linkSession()
+      post.mockResolvedValue(response({ authorizationUrl }))
+      await expect(auth.startGoogleLink({ password: 'password' })).rejects.toThrow()
+      expect(auth.accessToken.value).toBe('original-token')
+      expect(auth.user.value?.id).toBe(7)
+      expect(auth.loading.value).toBe(false)
+    },
+  )
+
+  it('does not refresh or switch sessions on link password rejection', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>()
+    const refresh = vi.fn<() => Promise<boolean>>()
+    const auth = createAuth({
+      http: createHttpClient({ fetch, configuration: { refreshAccessToken: refresh } }),
+    })
+    fetch
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ accessToken: 'original-token' }), {
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ userId: 7, username: 'ada' }), {
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+    await auth.restore()
+    fetch.mockClear()
+    fetch.mockResolvedValueOnce(new Response('{}', { status: 401 }))
+    await expect(auth.startGoogleLink({ password: 'wrong-password' })).rejects.toMatchObject({
+      status: 401,
+    })
+    expect(refresh).not.toHaveBeenCalled()
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(auth.accessToken.value).toBe('original-token')
+    expect(auth.authenticated.value).toBe(true)
+    expect(auth.loading.value).toBe(false)
+  })
+
+  it.each([403, 409, 429, 500])('preserves auth after link HTTP %s', async (status) => {
+    const { auth, post } = await linkSession()
+    post.mockResolvedValue({
+      ...response(null, status),
+      error: Object.assign(new Error('Link rejected'), {
+        status,
+        request: '/auth/google/link/start',
+      }),
+    })
+    await expect(auth.startGoogleLink({ password: 'password' })).rejects.toThrow('Link rejected')
+    expect(auth.accessToken.value).toBe('original-token')
+    expect(auth.authenticated.value).toBe(true)
+    expect(auth.loading.value).toBe(false)
+  })
+
+  it('rejects duplicate link starts and preserves auth after a network failure', async () => {
+    const { auth, post } = await linkSession()
+    let fail!: (error: Error) => void
+    post.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          fail = reject
+        }),
+    )
+    const first = auth.startGoogleLink({ password: 'password' })
+    await expect(auth.startGoogleLink({ password: 'password' })).rejects.toThrow('in progress')
+    expect(post).toHaveBeenCalledTimes(1)
+    fail(new Error('Offline'))
+    await expect(first).rejects.toThrow('Offline')
+    expect(auth.authenticated.value).toBe(true)
+    expect(auth.accessToken.value).toBe('original-token')
+    expect(auth.loading.value).toBe(false)
+  })
+
   it.each([true, false])('reads the anonymous Google configuration (%s)', async (enabled) => {
     const http: Pick<HttpClient, 'get' | 'post'> = createHttpClient()
     const get = vi.spyOn(http, 'get').mockResolvedValue(response({ enabled }))

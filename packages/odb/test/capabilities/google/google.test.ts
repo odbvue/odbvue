@@ -7,6 +7,13 @@ import { odbLiteral, PlsqlExpression } from '../../../src/schema/attribute.js'
 const sql = odbGoogle.toSQLUp()
 const packageBody = sql.slice(sql.indexOf('CREATE OR REPLACE PACKAGE BODY'))
 const routine = (name: string) => {
+  name =
+    (
+      { start_login: 'start_transaction', complete: 'complete_transaction' } as Record<
+        string,
+        string
+      >
+    )[name] ?? name
   const match = packageBody.match(
     new RegExp(`(?:PROCEDURE|FUNCTION) ${name}(?:\\([^\\n]*\\))?(?: RETURN [^\\n]+)? IS\\n`, 'i'),
   )
@@ -52,7 +59,7 @@ describe('Google OIDC local SQL generation', () => {
         .toSQL(),
     ).toBe('odb_google.complete(l_state, l_code, l_browser, l_error, l_refresh, l_path, l_outcome)')
     const publicNames = odbGooglePackage.application().procedures.map((p) => p.name)
-    expect(publicNames).toEqual(['start_login', 'complete'])
+    expect(publicNames).toEqual(['start_login', 'start_link', 'complete', 'complete_link'])
     expect(sql).not.toMatch(/\bPROCEDURE\s+start\s*\(/i)
     expect(sql).not.toMatch(/\bodb_google\.start\s*\(/i)
     expect(sql).not.toMatch(/OWA_|HTP[.]|ORDS[.]|SET_COOKIE|tokeninfo|access_type=offline|HS256/i)
@@ -62,21 +69,104 @@ describe('Google OIDC local SQL generation', () => {
     expect(sql).toContain('odb_google_transactions')
     expect(sql).toContain('odb_google_keys')
     expect(sql).toContain('state_hash')
+    const transactions = sql.slice(0, sql.indexOf('CREATE TABLE odb_google_keys'))
+    expect(transactions).toContain("purpose VARCHAR2(8 CHAR) DEFAULT 'login' NOT NULL")
+    expect(transactions).toContain('user_id CHAR(32 CHAR)')
+    expect(transactions).toContain('session_id CHAR(32 CHAR)')
+    expect(transactions).toContain('token_version NUMBER')
     const down = odbGoogle.toSQLDown({ schema: 'app' })
     expect(down.indexOf('PACKAGE')).toBeLessThan(down.indexOf('TABLE'))
     expect(down).toContain('app.odb_google_transactions')
   })
 
+  it('separates login and link purpose and binds link transactions only to authenticated server values', () => {
+    const start = routine('start_transaction')
+    expect(start).toContain('purpose, user_id, session_id, token_version')
+    const linkStart = routine('start_link')
+    expect(linkStart).toContain(
+      'odb_auth.prepare_google_link(p_user_id, p_refresh_token, p_password, l_session_id, l_token_version)',
+    )
+    expect(linkStart).toContain(
+      "start_transaction(p_return_path, 'link', p_user_id, l_session_id, l_token_version",
+    )
+    expect(linkStart).not.toContain('login_google')
+    expect(packageBody).toContain("start_transaction(p_return_path, 'login', NULL, NULL, NULL")
+    expect(packageBody).toContain("p_provider_error, 'login', NULL, p_refresh_token")
+    expect(routine('complete_link')).toContain(
+      "p_provider_error, 'link', p_current_refresh, l_unused_refresh",
+    )
+    const complete = routine('complete_transaction')
+    expect(complete).toContain('l_transaction_purpose != p_purpose')
+    expect(complete).toContain('GOOGLE_PURPOSE_INVALID')
+    expect(complete.indexOf('consume_transaction(')).toBeLessThan(
+      complete.indexOf('GOOGLE_PURPOSE_INVALID'),
+    )
+    expect(complete.indexOf('GOOGLE_PURPOSE_INVALID')).toBeLessThan(
+      complete.indexOf('request_json('),
+    )
+    expect(complete).toContain(
+      'odb_auth.check_google_link(l_user_id, l_session_id, l_token_version, p_current_refresh)',
+    )
+    expect(complete.indexOf('check_google_link(')).toBeLessThan(
+      complete.indexOf("= 'access_denied'"),
+    )
+    expect(complete.indexOf('verify_token(')).toBeLessThan(
+      complete.indexOf('odb_auth.link_google('),
+    )
+    expect(complete).toContain("IF p_purpose = 'link' THEN")
+    expect(complete).toContain(
+      'odb_auth.link_google(l_user_id, l_session_id, l_token_version, p_current_refresh, l_subject)',
+    )
+    expect(routine('load_config')).toContain(
+      "WHEN p_purpose = 'link' THEN 'AUTH_GOOGLE_LINK_REDIRECT_URI'",
+    )
+    expect(routine('load_config')).toContain(
+      "p_purpose = 'link' AND NOT (REGEXP_LIKE(p_redirect_uri, '/auth/google/link/callback$'))",
+    )
+    expect(start).toContain('load_config(p_purpose, l_client_id, l_client_secret, l_redirect_uri)')
+    expect(complete).toContain(
+      'load_config(p_purpose, l_client_id, l_client_secret, l_redirect_uri)',
+    )
+    expect(complete).toContain('escape_value(l_redirect_uri)')
+    expect(
+      odbGoogle
+        .startLink('p_path', 'p_user', 'p_refresh', 'p_password', 'l_url', 'l_browser')
+        .toSQL(),
+    ).toBe('odb_google.start_link(p_path, p_user, p_refresh, p_password, l_url, l_browser)')
+    expect(
+      odbGoogle
+        .completeLink(
+          'p_state',
+          'p_code',
+          'p_browser',
+          'p_error',
+          'p_refresh',
+          'l_path',
+          'l_outcome',
+        )
+        .toSQL(),
+    ).toBe(
+      'odb_google.complete_link(p_state, p_code, p_browser, p_error, p_refresh, l_path, l_outcome)',
+    )
+  })
+
   it('seeds exact missing-only defaults without enabling or overwriting credentials', () => {
     const seed = odbGoogle.seedSettings().toSQLUp({ schema: 'app' })
-    for (const id of ['ENABLED', 'CLIENT_ID', 'CLIENT_SECRET', 'REDIRECT_URI']) {
+    for (const id of [
+      'ENABLED',
+      'CLIENT_ID',
+      'CLIENT_SECRET',
+      'REDIRECT_URI',
+      'LINK_REDIRECT_URI',
+    ]) {
       expect(seed).toContain(`AUTH_GOOGLE_${id}`)
     }
-    expect(seed.match(/IF l_count = 0 THEN/g)).toHaveLength(4)
+    expect(seed.match(/IF l_count = 0 THEN/g)).toHaveLength(5)
     expect(seed).not.toContain('WALLET')
     expect(seed).toContain("'AUTH_GOOGLE_ENABLED', 'N'")
     expect(seed).toContain("'AUTH_GOOGLE_CLIENT_ID', ''")
     expect(seed).toContain("'AUTH_GOOGLE_CLIENT_SECRET', ''")
+    expect(seed).toContain("'AUTH_GOOGLE_LINK_REDIRECT_URI', ''")
     expect(seed).toContain('"secret":"Y"')
     expect(seed).not.toContain('.apps.googleusercontent.com')
     expect(seed).toContain('app.odb_settings_store')

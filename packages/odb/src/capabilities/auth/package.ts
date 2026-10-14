@@ -508,6 +508,156 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
     },
   )
 
+  const linkSession = pkg.privateProc('link_session', (proc) => {
+    const { userId, refreshToken, sessionId, tokenVersion, passwordHash } = proc.parameters({
+      in: { userId: authUsers.id, refreshToken: authTypes.refreshToken },
+      out: {
+        sessionId: authSessions.id,
+        tokenVersion: authUsers.tokenVersion,
+        passwordHash: authUsers.passwordHash,
+      },
+    })
+    proc.body((body) => {
+      body.ifThen(
+        cond.or([
+          cond.isNull(refreshToken),
+          cond.not(cond.regexpLike(refreshToken, '^[[:xdigit:]]{128}$')),
+        ]),
+        (then) => then.unauthorized('GOOGLE_LINK_SESSION_INVALID'),
+      )
+      body.query(
+        odbQuery()
+          .selectFrom(authUsers)
+          .select([authUsers.tokenVersion, authUsers.passwordHash])
+          .into(tokenVersion, passwordHash)
+          .where(cond.and([cond.eq(authUsers.id, userId), cond.eq(authUsers.enabled, true)]))
+          .forUpdate(),
+      )
+      body.query(
+        odbQuery()
+          .selectFrom(authSessions)
+          .select(authSessions.id)
+          .into(sessionId)
+          .where(
+            cond.and([
+              cond.eq(authSessions.userId, userId),
+              cond.eq(authSessions.refreshTokenHash, odbAuthCrypto.hashToken(refreshToken)),
+              cond.isNull(authSessions.revokedAt),
+              cond.gt(authSessions.expiresAt, odbOracle.sysTimestamp()),
+            ]),
+          )
+          .forUpdate(),
+      )
+      body.when('NO_DATA_FOUND', (handler) => handler.unauthorized('GOOGLE_LINK_SESSION_INVALID'))
+    })
+  })
+
+  const prepareGoogleLink = pkg.proc(
+    'prepare_google_link',
+    {
+      in: {
+        userId: authUsers.id,
+        refreshToken: authTypes.refreshToken,
+        password: authTypes.password,
+      },
+      out: { sessionId: authSessions.id, tokenVersion: authUsers.tokenVersion },
+    },
+    ({ params: { userId, refreshToken, password, sessionId, tokenVersion }, body }) => {
+      const { passwordHash } = body.variables({ passwordHash: authUsers.passwordHash })
+      body.call(odbRateLimitApi.enforce(odbLiteral('AUTH_GOOGLE_LINK_USER'), userId))
+      body.call(odbRateLimitApi.failure(odbLiteral('AUTH_GOOGLE_LINK_USER'), userId))
+      body.call(linkSession.invoke(userId, refreshToken, sessionId, tokenVersion, passwordHash))
+      body.ifThen(
+        cond.or([
+          cond.isNull(passwordHash),
+          cond.isNull(password),
+          cond.gt(odbOracle.length(password), 256),
+          cond.eq(odbAuthCrypto.verifyPassword(password, passwordHash), false),
+        ]),
+        (invalid) => invalid.unauthorized('GOOGLE_LINK_PASSWORD_INVALID'),
+      )
+    },
+  )
+
+  const checkGoogleLink = pkg.proc(
+    'check_google_link',
+    {
+      in: {
+        userId: authUsers.id,
+        sessionId: authSessions.id,
+        tokenVersion: authUsers.tokenVersion,
+        refreshToken: authTypes.refreshToken,
+      },
+    },
+    ({ params: { userId, sessionId, tokenVersion, refreshToken }, body }) => {
+      const current = body.variables({
+        currentSession: authSessions.id,
+        currentVersion: authUsers.tokenVersion,
+        passwordHash: authUsers.passwordHash,
+      })
+      body.call(
+        linkSession.invoke(
+          userId,
+          refreshToken,
+          current.currentSession,
+          current.currentVersion,
+          current.passwordHash,
+        ),
+      )
+      body.ifThen(
+        cond.or([
+          cond.isNull(sessionId),
+          cond.isNull(tokenVersion),
+          cond.ne(sessionId, current.currentSession),
+          cond.ne(tokenVersion, current.currentVersion),
+        ]),
+        (then) => then.unauthorized('GOOGLE_LINK_SESSION_CHANGED'),
+      )
+    },
+  )
+
+  /** Trusted verified-subject entry point; no profile, credential or session changes. */
+  const linkGoogle = pkg.proc(
+    'link_google',
+    {
+      in: {
+        userId: authUsers.id,
+        sessionId: authSessions.id,
+        tokenVersion: authUsers.tokenVersion,
+        refreshToken: authTypes.refreshToken,
+        subject: authIdentities.subject,
+      },
+    },
+    ({ params: { userId, sessionId, tokenVersion, refreshToken, subject }, body }) => {
+      const { owner } = body.variables({ owner: authUsers.id })
+      const issuer = odbLiteral('https://accounts.google.com')
+      body.ifThen(
+        cond.or([cond.isNull(subject), cond.not(cond.regexpLike(subject, '^[0-9]{1,255}$'))]),
+        (then) => then.unauthorized('GOOGLE_IDENTITY_INVALID'),
+      )
+      body.call(checkGoogleLink.invoke(userId, sessionId, tokenVersion, refreshToken))
+      body.block((insert) => {
+        insert.insertInto(authIdentities, { issuer, subject, userId })
+        // A concurrent insertion may win; read its committed owner instead of merging.
+        insert.when('DUP_VAL_ON_INDEX', (handler) => {
+          handler.query(
+            odbQuery()
+              .selectFrom(authIdentities)
+              .select(authIdentities.userId)
+              .into(owner)
+              .where(
+                cond.and([
+                  cond.eq(authIdentities.issuer, issuer),
+                  cond.eq(authIdentities.subject, subject),
+                ]),
+              ),
+          )
+          handler.ifThen(cond.ne(owner, userId), (then) => then.conflict('GOOGLE_IDENTITY_EXISTS'))
+        })
+      })
+    },
+  )
+
   /** Rotates a refresh token and issues a new access token; reuse of a rotated token revokes the session. */
   const refresh = pkg.proc(
     'refresh',
@@ -854,6 +1004,9 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
     resetPassword,
     login,
     loginGoogle,
+    prepareGoogleLink,
+    checkGoogleLink,
+    linkGoogle,
     refresh,
     logout,
     requireUser,

@@ -22,8 +22,9 @@ AUTH_GOOGLE_ENABLED accepts "Y"/"N" or true/false; omitted values prompt (defaul
 Enabling requires AUTH_GOOGLE_CLIENT_ID and AUTH_GOOGLE_CLIENT_SECRET (masked prompt).
 The redirect URI is derived automatically: loopback APP_PUBLIC_URL + /api/auth/google/callback
 for development, or the configured runtime.apiUrl + /auth/google/callback for production.
-Trailing slashes are normalized. Register the printed URI exactly in Google Cloud.
-Do not supply AUTH_GOOGLE_REDIRECT_URI in the settings file.
+The linking URI uses /auth/google/link/callback with the same API base.
+Trailing slashes are normalized. Register both printed URIs exactly in Google Cloud.
+Do not supply AUTH_GOOGLE_REDIRECT_URI or AUTH_GOOGLE_LINK_REDIRECT_URI in the settings file.
 HTTP callbacks are allowed only on localhost, 127.0.0.1, or [::1]. Credentials,
 queries, fragments, whitespace, and backslashes are not allowed in callback URLs.
 Outbound HTTPS uses database-managed TLS trust, with no application wallet setting.

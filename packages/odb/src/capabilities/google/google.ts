@@ -10,6 +10,9 @@ import { googleSettings } from './settings.js'
  * Google OIDC primitives; the application owns Origin checks, cookies and redirects.
  * Requires settings/auth/rate-limit, outbound HTTPS trust and DBMS_CRYPTO RSA verification.
  * Commit start() before redirecting; complete() consumes the bound transaction even on failure.
+ * Register both /auth/google/callback and /auth/google/link/callback in Google's authorized
+ * redirect URIs. Provision AUTH_GOOGLE_REDIRECT_URI and AUTH_GOOGLE_LINK_REDIRECT_URI separately;
+ * link flows never fall back to the login redirect URI.
  */
 export const odbGoogle = {
   toSQLUp(options: { schema?: string } = {}): string {
@@ -61,6 +64,42 @@ export const odbGoogle = {
     browserToken: PlsqlRenderable,
   ) {
     return odbGooglePackage.start(returnPath, authorizationUrl, browserToken)
+  },
+  startLink(
+    returnPath: PlsqlRenderable,
+    userId: PlsqlRenderable,
+    refreshToken: PlsqlRenderable,
+    password: PlsqlRenderable,
+    authorizationUrl: PlsqlRenderable,
+    browserToken: PlsqlRenderable,
+  ) {
+    return odbGooglePackage.startLink(
+      returnPath,
+      userId,
+      refreshToken,
+      password,
+      authorizationUrl,
+      browserToken,
+    )
+  },
+  completeLink(
+    state: PlsqlRenderable,
+    code: PlsqlRenderable,
+    browserToken: PlsqlRenderable,
+    providerError: PlsqlRenderable,
+    currentRefresh: PlsqlRenderable,
+    returnPath: PlsqlRenderable,
+    outcome: PlsqlRenderable,
+  ) {
+    return odbGooglePackage.completeLink(
+      state,
+      code,
+      browserToken,
+      providerError,
+      currentRefresh,
+      returnPath,
+      outcome,
+    )
   },
   complete(
     state: PlsqlRenderable,

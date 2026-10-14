@@ -55,6 +55,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/google/link/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reauthenticate and bind Google linking to the current user and browser session */
+        post: operations["auth_google_link_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/google/link/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Attach a verified Google identity without changing the current session */
+        get: operations["auth_google_link_callback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -496,6 +530,10 @@ export interface components {
             authorizationUrl: string;
         };
         AuthGoogleCallbackResponse: Record<string, never>;
+        AuthGoogleLinkStartResponse: {
+            authorizationUrl: string;
+        };
+        AuthGoogleLinkCallbackResponse: Record<string, never>;
         AuthLoginResponse: {
             accessToken: string;
         };
@@ -689,6 +727,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthGoogleCallbackResponse"];
+                };
+            };
+        };
+    };
+    auth_google_link_start: {
+        parameters: {
+            query?: never;
+            header?: {
+                Cookie?: string;
+                Origin?: string;
+                "Sec-Fetch-Site"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    redirect?: string;
+                    password?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthGoogleLinkStartResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    auth_google_link_callback: {
+        parameters: {
+            query?: {
+                state?: string;
+                code?: string;
+                error?: string;
+            };
+            header?: {
+                Cookie?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthGoogleLinkCallbackResponse"];
                 };
             };
         };

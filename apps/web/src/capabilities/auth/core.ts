@@ -56,9 +56,17 @@ export interface GoogleLoginResponse {
   authorizationUrl: string
 }
 
+export interface GoogleLinkOptions {
+  redirect?: string
+  password: string
+}
+
+export type GoogleLinkResponse = GoogleLoginResponse
+
 export interface AuthEndpoints {
   googleConfig: string
   googleStart: string
+  googleLinkStart: string
   signup: string
   confirmEmail: string
   recoverPassword: string
@@ -82,6 +90,7 @@ export interface Auth<User extends AuthUser = AuthUser> {
   authenticated: ComputedRef<boolean>
   getGoogleConfig(): Promise<GoogleAuthConfig>
   startGoogleLogin(options?: GoogleLoginOptions): Promise<GoogleLoginResponse>
+  startGoogleLink(options: GoogleLinkOptions): Promise<GoogleLinkResponse>
   login(credentials: AuthCredentials): Promise<void>
   signup(credentials: SignupCredentials): Promise<void>
   confirmEmail(token: string): Promise<void>
@@ -98,6 +107,7 @@ export interface Auth<User extends AuthUser = AuthUser> {
 const defaultEndpoints: AuthEndpoints = {
   googleConfig: '/auth/google/config',
   googleStart: '/auth/google/start',
+  googleLinkStart: '/auth/google/link/start',
   signup: '/auth/signup',
   confirmEmail: '/auth/confirm-email',
   recoverPassword: '/auth/recover-password',
@@ -110,6 +120,20 @@ const defaultEndpoints: AuthEndpoints = {
 
 function toError(error: HttpError | null, fallback: string): Error {
   return error ?? new Error(fallback)
+}
+
+function validateGoogleAuthorization(response: GoogleLoginResponse | null): GoogleLoginResponse {
+  if (typeof response?.authorizationUrl !== 'string')
+    throw new Error('Unable to start Google authorization.')
+  const url = new URL(response.authorizationUrl)
+  if (
+    url.origin !== 'https://accounts.google.com' ||
+    url.pathname !== '/o/oauth2/v2/auth' ||
+    url.username ||
+    url.password
+  )
+    throw new Error('Invalid Google authorization URL.')
+  return response
 }
 
 function authorizationNames(value: readonly string[] | string | undefined): readonly string[] {
@@ -212,15 +236,31 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
         if (response.error) throw response.error
         if (typeof response.data?.authorizationUrl !== 'string')
           throw new Error('Unable to start Google sign-in.')
-        const url = new URL(response.data.authorizationUrl)
-        if (
-          url.origin !== 'https://accounts.google.com' ||
-          url.pathname !== '/o/oauth2/v2/auth' ||
-          url.username ||
-          url.password
+        return validateGoogleAuthorization(response.data)
+      } finally {
+        loading.value = false
+      }
+    },
+    async startGoogleLink(linkOptions) {
+      if (!ready.value || !user.value || !accessToken.value)
+        throw new Error('Sign in before connecting Google.')
+      if (loading.value) throw new Error('An authentication request is already in progress.')
+      if (!linkOptions.password) throw new Error('Current password is required.')
+      loading.value = true
+      try {
+        const response = await requireHttp().post<GoogleLinkResponse>(
+          endpoints.googleLinkStart,
+          { redirect: '/account', password: linkOptions.password },
+          {
+            credentials: 'include',
+            headers: { Authorization: ['Bearer', accessToken.value].join(' ') },
+            skipAuthRefresh: true,
+          },
         )
-          throw new Error('Invalid Google authorization URL.')
-        return response.data
+        if (response.error) throw response.error
+        if (response.status === null || response.status < 200 || response.status >= 300)
+          throw new Error('Unable to connect Google.')
+        return validateGoogleAuthorization(response.data)
       } finally {
         loading.value = false
       }

@@ -19,6 +19,7 @@
             :title="displayName"
             :subtitle="auth.user.value?.username"
           />
+          <v-list-item to="/account" prepend-icon="$mdiAccount" :title="t('auth.account.title')" />
           <v-list-item
             prepend-icon="$mdiLogout"
             :title="t('auth.logout')"
