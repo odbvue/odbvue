@@ -282,13 +282,11 @@ HttpOnly, SameSite=Lax, Path=/, and the `__Host-` prefix.
 Code generation and TypeScript compilation do not install these changes.
 Apply the database artifacts and schema grants yourself. The bootstrap
 migration installs `odb_google`, its transaction table, the provider identity
-table, nullable local passwords, and the application endpoints. Existing
-installations can generate `odbAuth.upgrade()` for the auth schema changes;
-they must also install `odbGoogle`, seed its settings, and update `pck_app` and
-its ORDS services. Do not run only the auth upgrade and expect Google routes.
-For installations already using Google sign-in, apply the
-`00000000000002_google_link` migration: it upgrades auth and Google transaction
-artifacts and refreshes the application package and routes. Re-run `ov ss` to
+table, nullable local passwords, transaction purpose and session bindings, and
+the login and linking endpoints. Google linking is part of the TypeScript-defined
+bootstrap; redeploy the database from that bootstrap rather than applying a
+separate linking migration. The TypeScript builders generate the database
+artifacts; no handwritten linking upgrade PL/SQL is required. Re-run `ov ss` to
 provision the linking callback URI, then register both printed URIs in Google
 Cloud before connecting accounts.
 

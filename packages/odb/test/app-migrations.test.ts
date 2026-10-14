@@ -14,8 +14,6 @@ const migrations = {
     import('../../../apps/db/src/migrations/00000000000000-bootstrap.js'),
   '00000000000001-sandbox': () =>
     import('../../../apps/db/src/migrations/00000000000001-sandbox.js'),
-  '00000000000002-google-link': () =>
-    import('../../../apps/db/src/migrations/00000000000002-google-link.js'),
 }
 
 const load = async (file: keyof typeof migrations) => (await migrations[file]()).migration
@@ -56,12 +54,9 @@ describe('app-owned ORDS migrations', () => {
     expect(openapi.paths['/auth/google/link/callback']?.get?.responses).toHaveProperty('303')
   })
 
-  it('keeps link callback session-neutral on success, cancellation and failure and ships an upgrade', async () => {
-    const migration = await load('00000000000002-google-link')
+  it('keeps link callback session-neutral on success, cancellation and failure in bootstrap', async () => {
+    const migration = await load('00000000000000-bootstrap')
     const sql = migration.compile().up().join('\n')
-    expect(sql).toContain('ALTER TABLE ODBVUE.odb_google_transactions ADD')
-    expect(sql).toContain('CREATE OR REPLACE PACKAGE ODBVUE.odb_auth AS')
-    expect(sql).toContain('CREATE OR REPLACE PACKAGE ODBVUE.odb_google AS')
     const callback = sql.slice(
       sql.indexOf('PROCEDURE google_link_callback(', sql.indexOf('PACKAGE BODY ODBVUE.PCK_APP')),
       sql.indexOf('END google_link_callback;'),

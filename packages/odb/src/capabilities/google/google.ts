@@ -25,35 +25,6 @@ export const odbGoogle = {
       .map((artifact) => artifact.toSQLDown(options))
       .join('\n')
   },
-  /** Preserve active login transactions while adding purpose-bound linking metadata. */
-  upgrade() {
-    return {
-      toSQLUp(options: { schema?: string } = {}): string {
-        return [
-          ...[
-            "purpose VARCHAR2(8 CHAR) DEFAULT 'login' NOT NULL",
-            'user_id VARCHAR2(32 CHAR)',
-            'session_id VARCHAR2(32 CHAR)',
-            'token_version NUMBER',
-          ].map((column) =>
-            [
-              'BEGIN',
-              `  EXECUTE IMMEDIATE 'ALTER TABLE ${qualify('odb_google_transactions', options.schema)} ADD (${column.replace(/'/g, "''")})';`,
-              'EXCEPTION WHEN OTHERS THEN',
-              '  IF SQLCODE != -1430 THEN RAISE; END IF;',
-              'END;',
-              '/',
-            ].join('\n'),
-          ),
-          odbGooglePackage.toSQLUp(options),
-          odbGoogle.seedSettings().toSQLUp(options),
-        ].join('\n')
-      },
-      toSQLDown(): string {
-        return ''
-      },
-    }
-  },
   /** Missing-only provisioning; never replace a configured credential or enable Google. */
   seedSettings() {
     return {

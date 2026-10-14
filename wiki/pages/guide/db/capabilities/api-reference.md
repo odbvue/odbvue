@@ -219,6 +219,6 @@ from the application transport. The user ID must come from authenticated server
 context and the refresh token from the current HttpOnly cookie, not request-body
 identity fields. `odbAuth.linkGoogle` remains a trusted server-only primitive,
 called only after successful provider and transaction verification.
-For an existing Google installation, `odbGoogle.upgrade()` adds transaction
-binding columns, replaces the package, and seeds missing settings without
-overwriting existing configuration.
+The TypeScript-defined bootstrap installs the transaction binding columns and
+both linking endpoints. Redeploy the database from the bootstrap; there is no
+separate Google linking migration or handwritten linking upgrade PL/SQL.

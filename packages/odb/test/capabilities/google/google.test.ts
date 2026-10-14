@@ -69,26 +69,14 @@ describe('Google OIDC local SQL generation', () => {
     expect(sql).toContain('odb_google_transactions')
     expect(sql).toContain('odb_google_keys')
     expect(sql).toContain('state_hash')
+    const transactions = sql.slice(0, sql.indexOf('CREATE TABLE odb_google_keys'))
+    expect(transactions).toContain("purpose VARCHAR2(8 CHAR) DEFAULT 'login' NOT NULL")
+    expect(transactions).toContain('user_id CHAR(32 CHAR)')
+    expect(transactions).toContain('session_id CHAR(32 CHAR)')
+    expect(transactions).toContain('token_version NUMBER')
     const down = odbGoogle.toSQLDown({ schema: 'app' })
     expect(down.indexOf('PACKAGE')).toBeLessThan(down.indexOf('TABLE'))
     expect(down).toContain('app.odb_google_transactions')
-  })
-
-  it('upgrades existing transactions as login without replacing configured settings', () => {
-    const upgrade = odbGoogle.upgrade().toSQLUp({ schema: 'APP' })
-    expect(upgrade).toContain(
-      "ALTER TABLE APP.odb_google_transactions ADD (purpose VARCHAR2(8 CHAR) DEFAULT ''login'' NOT NULL)",
-    )
-    for (const column of [
-      'user_id VARCHAR2(32 CHAR)',
-      'session_id VARCHAR2(32 CHAR)',
-      'token_version NUMBER',
-    ])
-      expect(upgrade).toContain(`ADD (${column})`)
-    expect(upgrade.match(/IF SQLCODE != -1430 THEN/g)).toHaveLength(4)
-    expect(upgrade).toContain('AUTH_GOOGLE_LINK_REDIRECT_URI')
-    expect(upgrade).not.toContain('DROP TABLE')
-    expect(odbGoogle.upgrade().toSQLDown()).toBe('')
   })
 
   it('separates login and link purpose and binds link transactions only to authenticated server values', () => {
