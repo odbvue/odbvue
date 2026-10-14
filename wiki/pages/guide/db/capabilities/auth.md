@@ -158,7 +158,8 @@ Redeploy the database from the reorganized bootstrap migration; this change
 does not supply an incremental signup migration. Bootstrap installs the auth
 confirmation table and all application authentication endpoints together in
 `pck_app`, after the framework packages and settings. The signup page is available
-at `/signup`, linked from Login; there is no Google sign-in or consent dialog.
+at `/signup`, linked from Login. Google sign-in is available separately when
+explicitly enabled through trusted setup.
 
 Configure `APP_PUBLIC_URL` using `ov setup settings`, either through the prompt
 (default `http://localhost:5173/`) or the case-insensitive `app_public_url` key
@@ -235,6 +236,146 @@ every refresh. Revoking a session, disabling a user, or changing its token versi
 invalidates existing access tokens.
 
 Authentication failures raise ODB errors that ORDS maps to HTTP responses, including `401 INVALID_CREDENTIALS` for invalid logins and `401 UNAUTHORIZED` for expired, revoked, or malformed sessions.
+
+## Google sign-in
+
+Google authentication uses a backend-owned OpenID Connect authorization-code
+flow with PKCE (S256), state, and nonce. The Login and Signup pages load
+`GET /auth/google/config` and show **Continue with Google** only when enabled.
+The public client ID is not proof of identity and is not a password. No Google
+script, ID token, or client secret is needed in the frontend.
+
+| Endpoint                    | Contract                                                                                                                                                                                                               |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /auth/google/config`   | Returns `{ "enabled": true }` or `{ "enabled": false }`, without secrets.                                                                                                                                              |
+| `POST /auth/google/start`   | Accepts `{ "redirect": "/local/path" }`, requires the configured application Origin, sets a five-minute HttpOnly transaction cookie, and returns `{ "authorizationUrl": "https://accounts.google.com/..." }`.          |
+| `GET /auth/google/callback` | Accepts Google's `state`, `code`, or `error`, consumes the browser-bound transaction, and redirects with HTTP 303 to Login. On success, sets the normal refresh cookie; the frontend restores its application session. |
+
+The callback must be exposed through the browser-facing deployment and registered
+**exactly** in the Google Cloud OAuth client's authorized redirect URIs.
+Use a Web application OAuth client and configure its consent screen. The
+callback must reach the ORDS endpoint, not a SPA fallback. `ov ss` constructs
+and prints the registered redirect URI automatically:
+
+- **Development:** a loopback `APP_PUBLIC_URL` plus `/api/auth/google/callback`,
+  for example `http://localhost:5173/api/auth/google/callback`, using Vite's API proxy.
+- **Production:** the current environment's `runtime.apiUrl` plus
+  `/auth/google/callback`, for example
+  `https://api.example.com/ords/app/auth/google/callback`. This is the same API
+  base used to configure `VITE_API_URI`, so an external ORDS endpoint does not
+  require an app-origin proxy. A runtime API base ending in `/api/` also works
+  for a production same-origin proxy.
+
+Trailing slashes are normalized and the API's existing base path is retained.
+Keep `APP_PUBLIC_URL` consistent with the application's browser
+origin. Use HTTPS in production; HTTP is allowed only for explicit loopback
+development URLs. The transaction and refresh cookies always use Secure,
+HttpOnly, SameSite=Lax, Path=/, and the `__Host-` prefix.
+
+### Settings and manual deployment
+
+Code generation and TypeScript compilation do not install these changes.
+Apply the database artifacts and schema grants yourself. The bootstrap
+migration installs `odb_google`, its transaction table, the provider identity
+table, nullable local passwords, and the three application endpoints. Existing
+installations can generate `odbAuth.upgrade()` for the auth schema changes;
+they must also install `odbGoogle`, seed its settings, and update `pck_app` and
+its ORDS services. Do not run only the auth upgrade and expect Google routes.
+
+`ov ss` / `ov setup settings` supports these case-insensitive JSON settings:
+
+```json
+{
+  "auth_google_enabled": true,
+  "VITE_GOOGLE_CLIENT_ID": "<your-client-id>.apps.googleusercontent.com",
+  "auth_google_client_secret": "<provision outside source control>"
+}
+```
+
+These keys supplement the existing SMTP/JWT/application settings file.
+`VITE_GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_ID`, and `AUTH_GOOGLE_CLIENT_ID`
+are aliases for the **database** client-ID setting; specifying more than one
+alias is rejected. A frontend `.env` entry alone does not enable Google login.
+Never put the client secret in a `VITE_*` variable.
+
+Do not supply `AUTH_GOOGLE_REDIRECT_URI` in JSON or enter it at a prompt.
+It is an internal database setting written by `ov ss` after deriving the
+callback from the existing URLs. Old JSON files containing this key are
+rejected with removal guidance. For a non-loopback application URL, the
+environment must have a valid HTTPS `runtime.apiUrl`; missing or unsafe URLs
+fail before any database connection. Re-run setup after changing either base URL,
+and register each environment's exact printed callback in Google Cloud.
+
+Google is disabled by default (`AUTH_GOOGLE_ENABLED=N`), with an empty client ID
+and client secret. Enabled setup requires your client ID, client secret, and
+valid existing application/API URLs, stores the secret encrypted with `secret=Y`, and grants
+HTTPS network ACL access only to `oauth2.googleapis.com:443` and
+`www.googleapis.com:443`. Disabled setup preserves previously provisioned Google
+credentials. The sandbox Settings API rejects writes/removals of both
+`AUTH_JWT_*` and `AUTH_GOOGLE_*`; use trusted provisioning.
+
+Google setup asks only whether to enable sign-in, the client ID, and the
+client secret. The callback is derived and HTTPS ACLs are provisioned automatically.
+Outbound HTTPS uses database-managed TLS trust; there is no application wallet
+path setting or prompt. Remove `AUTH_GOOGLE_WALLET_PATH` from older JSON files;
+any existing database value is unused and need not be removed to deploy.
+Missing trust or unavailable endpoints fail explicitly, without bypassing TLS
+verification. Use the production Settings master-key provider for client-secret encryption.
+
+### Identity and session policy
+
+Only a server-verified Google identity can reach the trusted
+`odbAuth.loginGoogle` primitive. Google tokens are verified using Google's
+RSA signing keys, the configured audience, issuer, timestamps, nonce, and
+verified email. Signing-key retrieval is bounded and cached briefly; token
+headers cannot choose a key URL. The existing HS256 verifier is used only for
+the application's own access tokens.
+
+Provider identities are unique by canonical issuer plus subject. Email is an
+attribute, not an identity key. Known identities retain their internal user ID
+even if their Google email changes. Disabled users remain disabled. New
+Google-only users have no local password and no roles. They cannot use password
+login or password recovery/reset to silently establish a password.
+
+An email collision with any existing local account is rejected; signup,
+confirmation state, password, and account enablement are not overwritten.
+There is no automatic linking, account merge, or linking/unlinking UI in this
+release. Existing users should continue with their existing authentication
+method.
+
+Successful Google authentication shares the existing application session
+creation, JWTs, refresh rotation, and revocation controls with password login.
+Google access/refresh tokens are not retained. No application tokens appear in
+redirect URLs or browser storage. Transactions are single-use, including
+cancellation, and expire after five minutes. Start/callback requests are rate
+limited by `odbGoogle.start` and `odbGoogle.complete`, including direct PL/SQL
+calls. The framework also owns reading and validating `APP_PUBLIC_URL` through
+`odbGoogle.publicUrl()`. The application retains Origin checks, cookies, HTTP
+routes and responses, redirect destinations, and error-to-UI mapping.
+Audit events do not include credentials, authorization codes, or tokens.
+
+The Google runtime is authored with TypeScript package/query builders, including
+HTTP lifecycle, JSON validation, key assembly, and claim checks. Small Oracle ports
+wrap `UTL_HTTP`, `UTL_URL`, and the in-memory JSON types; existing crypto, encoding,
+and LOB ports are reused. Deployment still generates PL/SQL for Oracle execution;
+there is no additional JavaScript service or runtime.
+The TypeScript `odbGoogle.start()` call renders `odb_google.start_login(...)`;
+`START` is reserved in PL/SQL and is not used as a procedure name.
+JSON member-presence checks use the object's key list, because Oracle 19c's
+`has()` can raise for absent optional fields under strict error handling.
+Required values and their types are still validated strictly.
+RSA signing keys are assembled as DER SubjectPublicKeyInfo and passed to Oracle's
+verifier as Base64-encoded bytes without PEM headers. This representation was
+verified on Oracle 19.28 using synthetic valid and tampered signatures.
+
+Local SQL-generation and mocked frontend/CLI tests do not establish successful
+Oracle package compilation or live Google login. After manual deployment,
+verify Oracle's RSA verification support, outbound HTTPS access, callback routing,
+and a complete login/cancellation/replay round trip in the target environment.
+Configure reverse-proxy and ORDS access logging to redact callback query
+parameters (especially authorization codes and state). The callback sends
+`Referrer-Policy: no-referrer` and authentication responses use `Cache-Control:
+no-store`.
 
 ## Procedures
 

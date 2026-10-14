@@ -10,6 +10,87 @@ function response<T>(data: T | null, status = 200) {
 }
 
 describe('authentication capability', () => {
+  it.each([true, false])('reads the anonymous Google configuration (%s)', async (enabled) => {
+    const http: Pick<HttpClient, 'get' | 'post'> = createHttpClient()
+    const get = vi.spyOn(http, 'get').mockResolvedValue(response({ enabled }))
+    const auth = createAuth({ http })
+    await expect(auth.getGoogleConfig()).resolves.toEqual({ enabled })
+    expect(get).toHaveBeenCalledWith('/auth/google/config', { credentials: 'omit' })
+    expect(auth.accessToken.value).toBeNull()
+  })
+
+  it('surfaces failed or malformed Google configuration rather than disabling silently', async () => {
+    const http: Pick<HttpClient, 'get' | 'post'> = createHttpClient()
+    const get = vi.spyOn(http, 'get')
+    get
+      .mockResolvedValueOnce({
+        ...response(null, 503),
+        error: Object.assign(new Error('Unavailable'), {
+          status: 503,
+          request: '/auth/google/config',
+        }),
+      })
+      .mockResolvedValueOnce(response({ enabled: 'false' }))
+    const auth = createAuth({ http })
+    await expect(auth.getGoogleConfig()).rejects.toThrow('Unavailable')
+    await expect(auth.getGoogleConfig()).rejects.toThrow('configuration')
+  })
+
+  it('starts backend-owned Google authorization with the transaction cookie', async () => {
+    const authorizationUrl = 'https://accounts.google.com/o/oauth2/v2/auth?state=server-state'
+    const http: Pick<HttpClient, 'get' | 'post'> = createHttpClient()
+    const post = vi.spyOn(http, 'post').mockResolvedValue(response({ authorizationUrl }))
+    const auth = createAuth({ http })
+    await expect(auth.startGoogleLogin({ redirect: '/sandbox' })).resolves.toEqual({
+      authorizationUrl,
+    })
+    expect(post).toHaveBeenCalledWith(
+      '/auth/google/start',
+      { redirect: '/sandbox' },
+      { credentials: 'include' },
+    )
+    expect(auth.accessToken.value).toBeNull()
+    expect(auth.user.value).toBeNull()
+    expect(auth.loading.value).toBe(false)
+  })
+
+  it.each([
+    'https://evil.example/o/oauth2/v2/auth',
+    'https://accounts.google.com.evil.example/o/oauth2/v2/auth',
+    'http://accounts.google.com/o/oauth2/v2/auth',
+    'https://accounts.google.com/other',
+    'https://accounts.google.com:444/o/oauth2/v2/auth',
+    'https://user:password@accounts.google.com/o/oauth2/v2/auth',
+    '/o/oauth2/v2/auth',
+    'javascript:alert(1)',
+    '',
+  ])('rejects unsafe Google navigation: %s', async (authorizationUrl) => {
+    const http: Pick<HttpClient, 'get' | 'post'> = createHttpClient()
+    vi.spyOn(http, 'post').mockResolvedValue(response({ authorizationUrl }))
+    const auth = createAuth({ http })
+    await expect(auth.startGoogleLogin()).rejects.toThrow()
+    expect(auth.loading.value).toBe(false)
+    expect(auth.accessToken.value).toBeNull()
+  })
+
+  it('releases loading state after Google start failures', async () => {
+    const http: Pick<HttpClient, 'get' | 'post'> = createHttpClient()
+    const post = vi.spyOn(http, 'post')
+    post
+      .mockResolvedValueOnce({
+        ...response(null, 429),
+        error: Object.assign(new Error('Too many requests'), {
+          status: 429,
+          request: '/auth/google/start',
+        }),
+      })
+      .mockResolvedValueOnce(response({}))
+    const auth = createAuth({ http })
+    await expect(auth.startGoogleLogin()).rejects.toThrow('Too many requests')
+    await expect(auth.startGoogleLogin()).rejects.toThrow('Unable to start Google sign-in')
+    expect(auth.loading.value).toBe(false)
+  })
+
   it('clears issued tokens if identity hydration fails during login', async () => {
     const auth = createAuth({
       http: {

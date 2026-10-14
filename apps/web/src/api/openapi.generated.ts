@@ -4,6 +4,57 @@
  */
 
 export interface paths {
+    "/auth/google/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Return whether Google sign-in is enabled */
+        get: operations["auth_google_config"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/google/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start a browser-bound Google authorization-code transaction */
+        post: operations["auth_google_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/google/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Consume a Google transaction and establish an application session */
+        get: operations["auth_google_callback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -440,6 +491,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AuthGoogleConfigResponse: Record<string, never>;
+        AuthGoogleStartResponse: {
+            authorizationUrl: string;
+        };
+        AuthGoogleCallbackResponse: Record<string, never>;
         AuthLoginResponse: {
             accessToken: string;
         };
@@ -562,6 +618,81 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    auth_google_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string;
+                };
+            };
+        };
+    };
+    auth_google_start: {
+        parameters: {
+            query?: never;
+            header?: {
+                Origin?: string;
+                "Sec-Fetch-Site"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    redirect?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthGoogleStartResponse"];
+                };
+            };
+        };
+    };
+    auth_google_callback: {
+        parameters: {
+            query?: {
+                state?: string;
+                code?: string;
+                error?: string;
+            };
+            header?: {
+                Cookie?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthGoogleCallbackResponse"];
+                };
+            };
+        };
+    };
     auth_login: {
         parameters: {
             query?: never;

@@ -78,6 +78,7 @@ export type OrdsEndpointNode = {
   params: OrdsParamNode[]
   auth?: ServiceAuthorization
   responseMediaType?: string
+  responseStatus?: number
   comment?: string
 }
 
@@ -164,6 +165,7 @@ export class OrdsEndpoint {
   private _comment?: string
   private _auth?: ServiceAuthorization
   private _responseMediaType?: string
+  private _responseStatus?: number
   private _contextUserId?: string
 
   contextUserId(parameter: string): this {
@@ -179,6 +181,14 @@ export class OrdsEndpoint {
 
   responseMediaType(value: string): this {
     this._responseMediaType = value
+    return this
+  }
+
+  responseStatus(value: number): this {
+    if (!Number.isInteger(value) || value < 200 || value > 399) {
+      throw new Error('responseStatus: status must be an integer from 200 through 399.')
+    }
+    this._responseStatus = value
     return this
   }
 
@@ -350,7 +360,7 @@ export class OrdsEndpoint {
     const normalizeBody = binaryBody
       ? 'IF v_binary_body IS NULL THEN DBMS_LOB.CREATETEMPORARY(v_binary_body, TRUE, DBMS_LOB.CALL); END IF; '
       : ''
-    const call = `${normalizeBody}${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args});`
+    const call = `${normalizeBody}${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args});${this._responseStatus === undefined ? '' : ` :status_code := ${this._responseStatus};`}`
     const envelope = "'ODB_HTTP\\|([4-5][0-9]{2})\\|([A-Z][A-Z0-9_]{0,99})'"
     const status = `REGEXP_SUBSTR(SQLERRM, ${envelope}, 1, 1, NULL, 1)`
     const code = `REGEXP_SUBSTR(SQLERRM, ${envelope}, 1, 1, NULL, 2)`
@@ -408,6 +418,7 @@ export class OrdsEndpoint {
         .map((p) => p.toNode(this.paramSourceType(p))),
       auth: this._auth,
       responseMediaType: this._responseMediaType,
+      responseStatus: this._responseStatus,
       comment: this._comment,
     }
   }

@@ -63,6 +63,7 @@ async function setup(page: typeof Signup | typeof ConfirmEmail = Signup, hash = 
     global: {
       plugins: [createState(), i18n, router],
       stubs: {
+        VOvGoogleSignIn: true,
         VOvForm: form,
         VBtn: button,
         VAlert: { template: '<div><slot /></div>' },
@@ -109,7 +110,7 @@ describe('signup and email confirmation', () => {
     const length = password.rules?.find((rule) => rule.type === 'min-length')
     expect(OvRuleValidate('1234567', length?.type, length?.params)).toBe(false)
     expect(OvRuleValidate('12345678', length?.type, length?.params)).toBe(true)
-    expect(wrapper.text()).not.toMatch(/google/i)
+    expect(wrapper.findComponent({ name: 'VOvGoogleSignIn' }).exists()).toBe(true)
     wrapper.unmount()
   })
 

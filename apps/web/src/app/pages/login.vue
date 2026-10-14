@@ -4,6 +4,7 @@
       <v-col cols="12" sm="8" md="5" lg="4">
         <h1 class="mb-4">{{ t('auth.login') }}</h1>
         <v-ov-form :options="options" :t="t" @submit="submit" />
+        <VOvGoogleSignIn />
         <v-btn
           :to="{
             path: '/signup',
@@ -28,6 +29,7 @@ import { resolveAuthRedirect } from '@/capabilities/routing'
 import { useAuth } from '@/capabilities/auth'
 import { appConfig } from '@/capabilities/config'
 import { useUi } from '@/capabilities/ui'
+import VOvGoogleSignIn from '@/components/auth/VOvGoogleSignIn.vue'
 
 definePage({
   meta: {
@@ -42,6 +44,18 @@ const ui = useUi()
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
+
+onMounted(async () => {
+  const result = route.query.google
+  if (result === undefined) return
+  const query = { ...route.query }
+  delete query.google
+  // Restoration and successful callback navigation belong to the existing auth guard.
+  await router.replace({ path: route.path, query, hash: route.hash })
+  if (result === 'cancelled') ui.error('auth.google.cancelled')
+  else if (result === 'conflict') ui.error('auth.google.conflict')
+  else if (result !== 'success') ui.error('auth.google.failed')
+})
 
 const options: OvFormOptions = {
   fields: [

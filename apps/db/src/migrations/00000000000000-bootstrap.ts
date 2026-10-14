@@ -3,6 +3,7 @@ import {
   defineMigration,
   defineService,
   odbAuth,
+  odbGoogle,
   odbEnv,
   odbHttp,
   odbLob,
@@ -20,6 +21,8 @@ import {
   odbType,
   plsqlExpr,
   type Package,
+  ODB_ERROR_NUMBER,
+  PlsqlExpression,
 } from '@odbvue/odb'
 
 const schemaName = odbEnv.schemaUsername
@@ -34,7 +37,201 @@ const refreshCookie = odbHttp.defineCookie({
   maxAge: odbAuth.refreshTokenMaxAge,
 })
 
+const googleCookie = odbHttp.defineCookie({
+  name: '__Host-odb_google',
+  path: '/',
+  httpOnly: true,
+  secure: true,
+  sameSite: 'Lax',
+  maxAge: 300,
+})
+
 export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (pkg) => {
+  const googleConfig = pkg.proc('google_config', {}, ({ body }) => {
+    const { enabled } = body.variables({ enabled: odbType.boolean() })
+    body.set(enabled, odbGoogle.enabled())
+    body.raw("owa_util.mime_header('application/json', FALSE);")
+    body.raw("htp.p('Cache-Control: no-store');")
+    body.raw('owa_util.http_header_close;')
+    body.ifThen(
+      cond.eq(enabled, true),
+      (then) => then.raw('htp.prn(\'{"enabled":true}\');'),
+      (otherwise) => otherwise.raw('htp.prn(\'{"enabled":false}\');'),
+    )
+  })
+  defineService(googleConfig, {
+    auth: 'anonymous',
+    method: 'GET',
+    path: '/google/config',
+    module: 'auth',
+    basePath: '/auth',
+    summary: 'Return whether Google sign-in is enabled',
+    responseMediaType: 'application/json',
+  })
+
+  const googleStart = pkg.proc(
+    'google_start',
+    {
+      in: {
+        redirect: odbType.string(2048),
+        origin: odbType.string(2000),
+        fetchSite: odbType.string(32),
+      },
+      out: {
+        authorizationUrl: odbType.string(4000),
+        setCookie: odbType.string(4000),
+        cacheControl: odbType.string(32),
+      },
+    },
+    ({
+      params: { redirect, origin, fetchSite, authorizationUrl, setCookie, cacheControl },
+      body,
+    }) => {
+      const { appUrl, browserToken } = body.variables({
+        appUrl: odbSettings.types.value,
+        browserToken: odbType.string(64),
+      })
+      body.set(appUrl, odbGoogle.publicUrl())
+      body.ifThen(
+        cond.or([
+          cond.isNull(origin),
+          cond.ne(
+            odbOracle.lower(origin),
+            odbOracle.lower(odbOracle.regexpSubstr(appUrl, odbLiteral('^https?://[^/]+'))),
+          ),
+          cond.eq(fetchSite, 'cross-site'),
+        ]),
+        (then) => then.forbidden('GOOGLE_ORIGIN_INVALID'),
+      )
+      body.call(odbGoogle.start(redirect, authorizationUrl, browserToken))
+      body.set(setCookie, googleCookie.set(browserToken))
+      body.set(cacheControl, 'no-store')
+    },
+  )
+  defineService(googleStart, {
+    auth: 'anonymous',
+    method: 'POST',
+    path: '/google/start',
+    module: 'auth',
+    basePath: '/auth',
+    summary: 'Start a browser-bound Google authorization-code transaction',
+    body: { redirect: googleStart.parameters.redirect },
+    response: { authorizationUrl: googleStart.parameters.authorizationUrl },
+    headers: {
+      Origin: googleStart.parameters.origin,
+      'Sec-Fetch-Site': googleStart.parameters.fetchSite,
+      'Set-Cookie': googleStart.parameters.setCookie,
+      'Cache-Control': googleStart.parameters.cacheControl,
+    },
+  })
+
+  const googleCallback = pkg.proc(
+    'google_callback',
+    {
+      in: {
+        state: odbType.string(128),
+        code: odbType.string(4000),
+        error: odbType.string(256),
+        cookie: odbType.string(4000),
+      },
+      out: {
+        location: odbType.string(4000),
+        setCookie: odbType.string(4000),
+        cacheControl: odbType.string(32),
+        referrerPolicy: odbType.string(32),
+      },
+    },
+    ({
+      params: { state, code, error, cookie, location, setCookie, cacheControl, referrerPolicy },
+      body,
+    }) => {
+      const { appUrl, refreshToken, returnPath, outcome } = body.variables({
+        appUrl: odbSettings.types.value,
+        refreshToken: odbAuth.types.refreshToken,
+        returnPath: odbType.string(2048),
+        outcome: odbType.string(32),
+      })
+      body.set(appUrl, odbGoogle.publicUrl())
+      body.block((inner) => {
+        inner.call(
+          odbGoogle.complete(
+            state,
+            code,
+            googleCookie.read(cookie),
+            error,
+            refreshToken,
+            returnPath,
+            outcome,
+          ),
+        )
+        inner.whenOthers((handler) => {
+          handler.ifThen(
+            cond.and([
+              cond.eq(new PlsqlExpression('NUMBER', 'SQLCODE'), ODB_ERROR_NUMBER),
+              cond.regexpLike(
+                new PlsqlExpression('VARCHAR2', 'SQLERRM'),
+                'ODB_ERROR\\|CONFLICT\\|GOOGLE_EMAIL_EXISTS',
+              ),
+            ]),
+            (then) => {
+              then.set(outcome, 'conflict')
+              then.call(
+                odbAudit.warn(
+                  odbLiteral('Google sign-in: existing email requires explicit linking'),
+                ),
+              )
+            },
+            (otherwise) => otherwise.raise(),
+          )
+        })
+      })
+      body.ifThen(
+        cond.eq(outcome, 'success'),
+        (then) => then.set(setCookie, refreshCookie.set(refreshToken)),
+        (otherwise) => otherwise.set(setCookie, googleCookie.expire()),
+      )
+      body.set(
+        location,
+        plsqlExpr.concat(
+          odbOracle.rtrim(appUrl, odbLiteral('/')),
+          odbLiteral('/login?google='),
+          outcome,
+          odbLiteral('&redirect='),
+          plsqlExpr.call(
+            'VARCHAR2',
+            'UTL_URL.ESCAPE',
+            odbOracle.nvl(returnPath, odbLiteral('/')),
+            new PlsqlExpression('BOOLEAN', 'TRUE'),
+            odbLiteral('AL32UTF8'),
+          ),
+        ),
+      )
+      body.set(cacheControl, 'no-store')
+      body.set(referrerPolicy, 'no-referrer')
+    },
+  )
+  defineService(googleCallback, {
+    auth: 'anonymous',
+    method: 'GET',
+    path: '/google/callback',
+    module: 'auth',
+    basePath: '/auth',
+    summary: 'Consume a Google transaction and establish an application session',
+    responseStatus: 303,
+    query: {
+      state: googleCallback.parameters.state,
+      code: googleCallback.parameters.code,
+      error: googleCallback.parameters.error,
+    },
+    headers: {
+      Cookie: googleCallback.parameters.cookie,
+      Location: googleCallback.parameters.location,
+      'Set-Cookie': googleCallback.parameters.setCookie,
+      'Cache-Control': googleCallback.parameters.cacheControl,
+      'Referrer-Policy': googleCallback.parameters.referrerPolicy,
+    },
+  })
+
   const login = pkg.proc(
     'login',
     {
@@ -341,6 +538,8 @@ export const schema = odbSchema(schemaName, schemaPassword, (definition) => {
   definition.grant('EXECUTE ON UTL_INADDR')
   definition.grant('EXECUTE ON UTL_TCP')
   definition.grant('EXECUTE ON UTL_SMTP')
+  definition.grant('EXECUTE ON UTL_HTTP')
+  definition.grant('EXECUTE ON UTL_URL')
   definition.grant('EXECUTE ON SYS.DBMS_NETWORK_ACL_ADMIN')
   definition.grant('SELECT ON SYS.DBA_HOST_ACES')
 })
@@ -354,6 +553,8 @@ export const migration = defineMigration('00000000000000_bootstrap', {
   .install(odbSettings)
   .install(odbAuth)
   .install(odbAuth.seedSettings())
+  .install(odbGoogle)
+  .install(odbGoogle.seedSettings())
   .install(odbAcl)
   .install(odbLob)
   .install(odbStorage)

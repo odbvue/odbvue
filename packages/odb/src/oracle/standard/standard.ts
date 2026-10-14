@@ -165,6 +165,14 @@ export const odbOracle = {
     return call('VARCHAR2', 'RPAD', [value, length, pad])
   },
 
+  lpad(
+    value: PlsqlRenderable,
+    length: PlsqlRenderable | number,
+    pad: PlsqlRenderable,
+  ): PlsqlExpression<'VARCHAR2'> {
+    return call('VARCHAR2', 'LPAD', [value, length, pad])
+  },
+
   /** `MOD(<value>, <divisor>)` -> NUMBER */
   mod(
     value: PlsqlRenderable | number,
@@ -292,8 +300,8 @@ export const odbOracle = {
   },
 
   /** `TO_NUMBER(<value>)` -> NUMBER */
-  toNumber(value: PlsqlRenderable): PlsqlExpression<'NUMBER'> {
-    return call('NUMBER', 'TO_NUMBER', [value])
+  toNumber(value: PlsqlRenderable, format?: PlsqlRenderable): PlsqlExpression<'NUMBER'> {
+    return call('NUMBER', 'TO_NUMBER', format === undefined ? [value] : [value, format])
   },
 
   /** `REGEXP_REPLACE(<source>, <pattern>[, <replace>[, <position>[, <occurrence>[, <match_parameter>]]]])` -> VARCHAR2 */

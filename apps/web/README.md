@@ -51,8 +51,19 @@ changes use route HMR. Modules share the same auth/navigation metadata rules.
 
 ## Authentication
 
-The [login page](./src/app/pages/login.vue) supports username/password authentication
-(no Google login). Pages and the [default layout](./src/app/layouts/DefaultLayout.vue)
+The [login page](./src/app/pages/login.vue) supports username/password authentication.
+Login and signup also offer Google sign-in when `GET /auth/google/config` returns
+`{ "enabled": true }`. Configuration failures display a standard UI error.
+The shared Google button sanitizes the local return destination, then calls
+`auth.startGoogleLogin({ redirect })` (`POST /auth/google/start`, credentials included).
+Only the returned HTTPS `accounts.google.com/o/oauth2/v2/auth` URL can be opened.
+The backend owns OIDC authorization-code exchange and the HttpOnly transaction cookie;
+the web app never constructs OAuth requests, loads Google scripts, or stores Google tokens.
+After the backend callback, the existing auth guard restores the refresh-cookie session
+and applies the local redirect. Anonymous callback failures on `/login?google=cancelled`,
+`failed`, or `conflict` show fixed localized feedback and remove the consumed query flag
+without dropping the return destination. No frontend Google client ID is needed.
+Pages and the [default layout](./src/app/layouts/DefaultLayout.vue)
 use `useAuth()` directly. Config supplies title/version, while preferences and UI
 use their own APIs.
 

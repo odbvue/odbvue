@@ -129,7 +129,10 @@ export const odbDbmsCrypto = {
     ])
   },
 
-  /** `DBMS_CRYPTO.VERIFY(<src>, <sign>, <pub_key>, <pubkey_alg>, <sign_alg>)` → BOOLEAN */
+  /**
+   * `DBMS_CRYPTO.VERIFY(<src>, <sign>, <pub_key>, <pubkey_alg>, <sign_alg>)` → BOOLEAN.
+   * Oracle 19c RSA public keys are Base64-encoded DER bytes, without PEM headers.
+   */
   verify(
     src: PlsqlRenderable,
     signature: PlsqlRenderable,

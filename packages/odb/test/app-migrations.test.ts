@@ -242,7 +242,7 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain('odb_settings.write(p_id, p_value, NULL)')
     expect(sql).toContain('odb_settings.remove(p_id)')
     expect(sql.match(/AUTH_SETTINGS_REQUIRE_TRUSTED_SETUP/g)).toHaveLength(2)
-    expect(sql).toContain("REGEXP_LIKE(p_id, '^AUTH_JWT_')")
+    expect(sql).toContain("REGEXP_LIKE(UPPER(p_id), '^AUTH_(JWT|GOOGLE)_')")
     expect(sql).not.toContain("ODBVUE.odb_settings.write('SANDBOX_DEMO'")
     expect(sql).not.toContain('odb_settings_store')
   })
@@ -257,6 +257,75 @@ describe('app-owned ORDS migrations', () => {
     expect(login?.properties).toMatchObject({ accessToken: { type: 'string' } })
     expect(login?.properties).not.toHaveProperty('refreshToken')
     expect(login?.properties).not.toHaveProperty('setCookie')
+  })
+
+  it('wires Google code-flow endpoints without exposing provider identity claims or tokens', async () => {
+    const bootstrap = await load('00000000000000-bootstrap')
+    const sql = bootstrap.compile().up().join('\n')
+    expect(sql).toContain('CREATE TABLE ODBVUE.odb_auth_identities')
+    expect(sql).toContain('CREATE OR REPLACE PACKAGE ODBVUE.odb_google')
+    expect(sql).toContain("odb_rate_limit.enforce('AUTH_GOOGLE_START_IP'")
+    expect(sql).toContain("odb_rate_limit.enforce('AUTH_GOOGLE_CALLBACK_IP'")
+    const appSql = (await migrations['00000000000000-bootstrap']()).appPackage.toSQLUp()
+    const start = appSql.slice(
+      appSql.indexOf('PROCEDURE google_start(', appSql.indexOf('PACKAGE BODY')),
+      appSql.indexOf('END google_start;'),
+    )
+    const callback = appSql.slice(
+      appSql.indexOf('PROCEDURE google_callback(', appSql.indexOf('PACKAGE BODY')),
+      appSql.indexOf('END google_callback;'),
+    )
+    expect(start).toContain('l_app_url := odb_google.public_url()')
+    expect(callback).toContain('l_app_url := odb_google.public_url()')
+    expect(start).not.toContain('odb_rate_limit.')
+    expect(callback).not.toContain('odb_rate_limit.')
+    expect(appSql).not.toContain('read_google_app_url')
+    expect(appSql).not.toContain('GOOGLE_APP_URL_INVALID')
+    expect(sql).toContain('GOOGLE_ORIGIN_INVALID')
+    expect(sql).toContain('p_origin IS NULL')
+    expect(sql).toContain("p_fetch_site = 'cross-site'")
+    expect(sql).toContain(
+      'odb_google.start_login(p_redirect, p_authorization_url, l_browser_token)',
+    )
+    expect(sql).not.toMatch(/\bodb_google\.start\s*\(/i)
+    expect(sql).toContain('__Host-odb_google=')
+    expect(sql).toContain('; HttpOnly')
+    expect(sql).toContain('; Secure')
+    expect(sql).toContain("p_referrer_policy := 'no-referrer'")
+    expect(sql).toContain("p_cache_control := 'no-store'")
+    expect(sql).toContain(':status_code := 303')
+    const schemaSql = (await migrations['00000000000000-bootstrap']()).schema.toSQLUp()
+    expect(schemaSql).toContain('GRANT EXECUTE ON UTL_HTTP')
+    expect(schemaSql).toContain('GRANT EXECUTE ON UTL_URL')
+    const document = generateApplicationOpenApi(bootstrap.applications()[0]) as {
+      paths: Record<
+        string,
+        Record<
+          string,
+          {
+            security: unknown[]
+            responses: Record<string, unknown>
+            requestBody?: {
+              content: { 'application/json': { schema: { properties: Record<string, unknown> } } }
+            }
+            parameters?: Array<{ name: string; in: string }>
+          }
+        >
+      >
+    }
+    expect(document.paths['/auth/google/config']?.get?.security).toEqual([])
+    expect(
+      document.paths['/auth/google/start']?.post?.requestBody?.content['application/json'].schema
+        .properties,
+    ).toEqual({
+      redirect: { type: 'string' },
+    })
+    expect(document.paths['/auth/google/callback']?.get?.responses).toHaveProperty('303')
+    const query = document.paths['/auth/google/callback']?.get?.parameters?.filter(
+      (item) => item.in === 'query',
+    )
+    expect(query?.map((item) => item.name)).toEqual(['state', 'code', 'error'])
+    expect(Object.keys(document.paths).some((path) => path.includes('login-google'))).toBe(false)
   })
 
   it('owns all auth endpoints in pck_app with signup and email delivery wired into bootstrap', async () => {

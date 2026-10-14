@@ -10,6 +10,7 @@
           <p class="mb-4">{{ t('auth.signup.check.email') }}</p>
         </template>
         <v-ov-form v-else :options="options" :data="data" :t="t" @submit="submit" />
+        <VOvGoogleSignIn v-if="!submitted" />
         <v-btn :to="loginLink" variant="text" class="mt-4">{{ t('auth.login') }}</v-btn>
       </v-col>
     </v-row>
@@ -20,6 +21,7 @@
 import type { OvFormData, OvFormOptions } from '@/components'
 import { useAuth } from '@/capabilities/auth'
 import { useUi } from '@/capabilities/ui'
+import VOvGoogleSignIn from '@/components/auth/VOvGoogleSignIn.vue'
 
 definePage({ meta: { title: 'Sign up', access: 'anonymous', navigation: false } })
 

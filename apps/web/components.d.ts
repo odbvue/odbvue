@@ -17,6 +17,7 @@ declare module 'vue' {
     VOvDialog: typeof import('./src/components/overlays/VOvDialog.vue')['default']
     VOvEditor: typeof import('./src/components/forms/VOvEditor.vue')['default']
     VOvForm: typeof import('./src/components/forms/VOvForm.vue')['default']
+    VOvGoogleSignIn: typeof import('./src/components/auth/VOvGoogleSignIn.vue')['default']
     VOvMap: typeof import('./src/components/content/VOvMap.vue')['default']
     VOvMedia: typeof import('./src/components/content/VOvMedia.vue')['default']
     VOvPad: typeof import('./src/components/forms/VOvPad.vue')['default']

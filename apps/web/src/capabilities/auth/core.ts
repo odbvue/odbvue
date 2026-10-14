@@ -44,7 +44,21 @@ export interface ResetPasswordCredentials {
   passwordRepeat: string
 }
 
+export interface GoogleAuthConfig {
+  enabled: boolean
+}
+
+export interface GoogleLoginOptions {
+  redirect?: string
+}
+
+export interface GoogleLoginResponse {
+  authorizationUrl: string
+}
+
 export interface AuthEndpoints {
+  googleConfig: string
+  googleStart: string
   signup: string
   confirmEmail: string
   recoverPassword: string
@@ -66,6 +80,8 @@ export interface Auth<User extends AuthUser = AuthUser> {
   loading: Readonly<Ref<boolean>>
   ready: Readonly<Ref<boolean>>
   authenticated: ComputedRef<boolean>
+  getGoogleConfig(): Promise<GoogleAuthConfig>
+  startGoogleLogin(options?: GoogleLoginOptions): Promise<GoogleLoginResponse>
   login(credentials: AuthCredentials): Promise<void>
   signup(credentials: SignupCredentials): Promise<void>
   confirmEmail(token: string): Promise<void>
@@ -80,6 +96,8 @@ export interface Auth<User extends AuthUser = AuthUser> {
 }
 
 const defaultEndpoints: AuthEndpoints = {
+  googleConfig: '/auth/google/config',
+  googleStart: '/auth/google/start',
   signup: '/auth/signup',
   confirmEmail: '/auth/confirm-email',
   recoverPassword: '/auth/recover-password',
@@ -174,6 +192,39 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
     loading: readonly(loading),
     ready: readonly(ready),
     authenticated: computed(() => !!user.value && !!accessToken.value),
+    async getGoogleConfig() {
+      const response = await requireHttp().get<GoogleAuthConfig>(endpoints.googleConfig, {
+        credentials: 'omit',
+      })
+      if (response.error) throw response.error
+      if (typeof response.data?.enabled !== 'boolean')
+        throw new Error('Unable to retrieve Google sign-in configuration.')
+      return response.data
+    },
+    async startGoogleLogin(loginOptions = {}) {
+      loading.value = true
+      try {
+        const response = await requireHttp().post<GoogleLoginResponse>(
+          endpoints.googleStart,
+          loginOptions,
+          { credentials: 'include' },
+        )
+        if (response.error) throw response.error
+        if (typeof response.data?.authorizationUrl !== 'string')
+          throw new Error('Unable to start Google sign-in.')
+        const url = new URL(response.data.authorizationUrl)
+        if (
+          url.origin !== 'https://accounts.google.com' ||
+          url.pathname !== '/o/oauth2/v2/auth' ||
+          url.username ||
+          url.password
+        )
+          throw new Error('Invalid Google authorization URL.')
+        return response.data
+      } finally {
+        loading.value = false
+      }
+    },
     signup(credentials) {
       return anonymousPost(endpoints.signup, credentials)
     },

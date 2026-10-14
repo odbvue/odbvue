@@ -49,6 +49,34 @@ const application = odbPackage('PCK_USERS', (p) => {
 })
 
 describe('ODB application contract', () => {
+  it('preserves explicit redirect status through serialization, handler generation and OpenAPI', () => {
+    const pkg = odbPackage('pck_redirects', (builder) => {
+      const callback = builder.proc(
+        'callback',
+        { out: { location: odbType.string() } },
+        ({ params, body }) => {
+          body.set(params.location, 'https://app.example.com/login')
+        },
+      )
+      defineService(callback, {
+        auth: 'anonymous',
+        method: 'GET',
+        path: '/callback',
+        responseStatus: 303,
+        headers: { Location: callback.parameters.location },
+      })
+    })
+    const model = JSON.parse(JSON.stringify(pkg.application())) as OdbApplication
+    const generated = generateApplication(model)
+    expect(generated.ords).toContain(':status_code := 303')
+    expect(generated.ords).toContain("p_name               => 'Location'")
+    const document = generateApplicationOpenApi(model) as {
+      paths: Record<string, { get: { responses: Record<string, unknown> } }>
+    }
+    expect(document.paths['/redirects/callback']?.get.responses).toHaveProperty('303')
+    expect(document.paths['/redirects/callback']?.get.responses).not.toHaveProperty('200')
+  })
+
   it('documents a single BLOB body and rejects mixed binary/JSON or GET bodies', () => {
     const binary = odbPackage('PCK_FILES', (pkg) => {
       const upload = pkg.proc(

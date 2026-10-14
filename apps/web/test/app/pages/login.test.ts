@@ -28,7 +28,7 @@ function json(data: unknown, status = 200) {
   })
 }
 
-async function setup() {
+async function setup(location = '/login?redirect=/sandbox') {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -37,7 +37,7 @@ async function setup() {
       { path: '/sandbox', component: {} },
     ],
   })
-  await router.push('/login?redirect=/sandbox')
+  await router.push(location)
   const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(json({}, 401))
   const auth: Auth = createAuth({
     http: () => useHttp({ fetch, configuration: { getAccessToken: () => auth.accessToken.value } }),
@@ -50,6 +50,7 @@ async function setup() {
     global: {
       plugins: [createState(), i18n, router],
       stubs: {
+        VOvGoogleSignIn: true,
         VOvForm: form,
         VContainer: { template: '<div><slot /></div>' },
         VRow: { template: '<div><slot /></div>' },
@@ -69,6 +70,34 @@ describe('login page using application auth', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+  })
+
+  it.each([
+    ['cancelled', 'auth.google.cancelled'],
+    ['failed', 'auth.google.failed'],
+    ['conflict', 'auth.google.conflict'],
+    ['untrusted backend detail', 'auth.google.failed'],
+  ])('consumes Google callback %s once and preserves the destination', async (result, message) => {
+    const context = await setup(
+      `/login?redirect=/sandbox&google=${encodeURIComponent(result)}&other=kept`,
+    )
+    await flushPromises()
+    expect(context.ui.notification.value?.message).toBe(message)
+    expect(context.router.currentRoute.value.query).toEqual({
+      redirect: '/sandbox',
+      other: 'kept',
+    })
+    expect(context.fetch).toHaveBeenCalledTimes(1)
+    context.wrapper.unmount()
+  })
+
+  it('leaves successful restoration and redirects to the auth guard', async () => {
+    const context = await setup('/login?google=success&redirect=/sandbox')
+    await flushPromises()
+    expect(context.ui.notification.value).toBeUndefined()
+    expect(context.router.currentRoute.value.query).toEqual({ redirect: '/sandbox' })
+    expect(context.fetch).toHaveBeenCalledTimes(1)
+    context.wrapper.unmount()
   })
 
   it('logs in, redirects, and keeps credentials out of storage', async () => {

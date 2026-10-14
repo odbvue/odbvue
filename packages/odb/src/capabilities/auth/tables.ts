@@ -3,13 +3,29 @@ import { odbTable } from '../../schema/table.js'
 export const authUsers = odbTable('odb_auth_users', (t) => ({
   id: t.guid().primaryKey().defaultSysGuid(),
   username: t.string(128).notNull(),
-  passwordHash: t.string(512).notNull(),
+  passwordHash: t.string(512),
   displayName: t.string(256),
   enabled: t.boolean().notNull().default(true),
   tokenVersion: t.number().notNull().default(0),
   createdAt: t.timestamp().notNull().defaultSysTimestamp(),
   updatedAt: t.timestamp().notNull().defaultSysTimestamp(),
 })).unique('odb_auth_users_uq_username', (columns) => [columns.username])
+
+export const authIdentities = odbTable('odb_auth_identities', (t) => ({
+  issuer: t.string(128).notNull(),
+  subject: t.string(255).notNull(),
+  userId: t.guid().notNull(),
+  createdAt: t.timestamp().notNull().defaultSysTimestamp(),
+}))
+  .unique('odb_auth_identities_uq', (columns) => [columns.issuer, columns.subject])
+  .index('odb_auth_identities_ix_user', (columns) => [columns.userId])
+  .foreignKey(
+    'odb_auth_identities_fk_user',
+    (columns) => [columns.userId],
+    authUsers,
+    (columns) => [columns.id],
+    { onDelete: 'cascade' },
+  )
 
 export const authSessions = odbTable('odb_auth_sessions', (t) => ({
   id: t.guid().primaryKey().defaultSysGuid(),

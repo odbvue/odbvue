@@ -25,6 +25,7 @@ import {
   authRolePermissions,
   authConfirmations,
   authPasswordResets,
+  authIdentities,
 } from './tables.js'
 import { authTypes } from './types.js'
 import { odbSettings } from '../settings/settings.js'
@@ -35,6 +36,7 @@ export const odbAuth = {
     const { schema } = options
     return [
       authUsers.toSQLUp({ schema }),
+      authIdentities.toSQLUp({ schema }),
       authSessions.toSQLUp({ schema }),
       authConfirmations.toSQLUp({ schema }),
       authPasswordResets.toSQLUp({ schema }),
@@ -52,6 +54,7 @@ export const odbAuth = {
       toSQLUp(options: { schema?: string } = {}): string {
         const { schema } = options
         const sessions = qualify('odb_auth_sessions', schema)
+        const users = qualify('odb_auth_users', schema)
         return [
           odbRateLimit.upgrade().toSQLUp({ schema }),
           'BEGIN',
@@ -60,8 +63,17 @@ export const odbAuth = {
           '  IF SQLCODE != -1430 THEN RAISE; END IF;',
           'END;',
           '/',
+          'DECLARE',
+          '  l_nullable VARCHAR2(1);',
+          'BEGIN',
+          `  SELECT nullable INTO l_nullable FROM all_tab_columns WHERE owner = ${schema ? `'${schema.toUpperCase()}'` : "SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')"} AND table_name = 'ODB_AUTH_USERS' AND column_name = 'PASSWORD_HASH';`,
+          "  IF l_nullable = 'N' THEN",
+          `    EXECUTE IMMEDIATE 'ALTER TABLE ${users} MODIFY (password_hash NULL)';`,
+          '  END IF;',
+          'END;',
+          '/',
           authorizationTablesSQL(schema, true),
-          [authConfirmations, authPasswordResets]
+          [authConfirmations, authPasswordResets, authIdentities]
             .map((table) => table.toSQLUp({ schema }))
             .join('\n')
             .split(';')
@@ -138,6 +150,7 @@ export const odbAuth = {
       authSessions,
       authConfirmations,
       authPasswordResets,
+      authIdentities,
       authUsers,
     ]
       .map((artifact) => artifact.toSQLDown(options))
@@ -269,6 +282,17 @@ export const odbAuth = {
     refreshToken: PlsqlRenderable,
   ) {
     return odbAuthPackage.login(username, password, accessToken, refreshToken)
+  },
+
+  /** Trusted server-only entry point; the caller must verify Google's token and transaction first. */
+  loginGoogle(
+    subject: PlsqlRenderable,
+    email: PlsqlRenderable,
+    displayName: PlsqlRenderable,
+    accessToken: PlsqlRenderable,
+    refreshToken: PlsqlRenderable,
+  ) {
+    return odbAuthPackage.loginGoogle(subject, email, displayName, accessToken, refreshToken)
   },
 
   /** `odb_auth.refresh(<refreshToken>, <accessToken>, <nextRefreshToken>)` with OUT tokens. */

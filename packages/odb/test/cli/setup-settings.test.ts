@@ -7,14 +7,14 @@ import type { OdbExecutor, OracleExecuteResult } from '../../src/execution/execu
 type PromptQuestion = {
   name: string
   type: string
-  initial?: string | number
+  initial?: string | number | boolean
   validate?: (value: number | string) => boolean | string
 }
 
 const require = createRequire(import.meta.url)
 const NumberPrompt: new (options: {
   message: string
-  initial?: string | number
+  initial?: string | number | boolean
   validate?: PromptQuestion['validate']
   stdin: PassThrough
   stdout: PassThrough
@@ -37,6 +37,7 @@ const state = vi.hoisted(() => ({
     >(),
   config: vi.fn<(silent: boolean) => { user: string }>(),
   schema: 'APP',
+  apiUrl: 'https://api.example.com/ords/app/',
   connection: {
     execute:
       vi.fn<(sql: string, bindings?: Record<string, unknown>) => Promise<OracleExecuteResult>>(),
@@ -77,6 +78,13 @@ vi.mock('../../../cli/src/adapters/secrets-store.js', () => ({
     }
   },
 }))
+vi.mock('../../../cli/src/adapters/config-store.js', () => ({
+  ConfigStore: class {
+    getConfig() {
+      return { runtime: { apiUrl: state.apiUrl } }
+    }
+  },
+}))
 vi.mock('../../../cli/src/shared/logger.js', () => ({
   logger: { info: state.info, success: state.success, warn: state.warn, fatal: state.fatal },
 }))
@@ -99,7 +107,7 @@ vi.mock('@odbvue/odb', async (importOriginal) => {
   }
 })
 
-import { runSetupSettings } from '../../../cli/src/app/setup-settings.js'
+import { deriveGoogleRedirectUri, runSetupSettings } from '../../../cli/src/app/setup-settings.js'
 import { registerSetupSettingsCommand } from '../../../cli/src/commands/setup-settings.js'
 import { registerSetupCommand } from '../../../cli/src/commands/setup.js'
 
@@ -113,6 +121,7 @@ const settings = {
   auth_jwt_issuer: 'odbvue',
   auth_jwt_expiration_seconds: 900,
   app_public_url: 'http://localhost:5173/',
+  auth_google_enabled: false,
 }
 const bindings = {
   host: settings.host,
@@ -126,13 +135,18 @@ const bindings = {
   jwt_secret: expect.stringMatching(/^[0-9a-f]{64}$/),
   jwt_expiration: '900',
   app_public_url: settings.app_public_url,
+  google_enabled: 'N',
 }
 
 describe('CLI SMTP, JWT, and application URL settings setup', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     state.schema = 'APP'
-    state.prompts.mockResolvedValue({ ...settings })
+    state.apiUrl = 'https://api.example.com/ords/app/'
+    state.prompts.mockImplementation(async (questions) => {
+      const answers: Record<string, unknown> = settings
+      return Object.fromEntries(questions.map(({ name }) => [name, answers[name]]))
+    })
     state.config.mockReturnValue({ user: 'ADMIN' })
     state.connection.execute.mockResolvedValue({})
   })
@@ -141,6 +155,7 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
     await runSetupSettings()
     const [questions] = state.prompts.mock.calls[0]!
     expect(questions.map((question: { name: string }) => question.name)).toEqual([
+      'auth_google_enabled',
       'host',
       'port',
       'username',
@@ -187,6 +202,7 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
         Auth_Jwt_Issuer: settings.auth_jwt_issuer,
         AUTH_JWT_EXPIRATION_SECONDS: settings.auth_jwt_expiration_seconds,
         App_Public_Url: settings.app_public_url,
+        AUTH_GOOGLE_ENABLED: false,
       }),
     )
     await expect(runSetupSettings('settings.json')).resolves.toBe(true)
@@ -204,6 +220,7 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
     state.prompts.mockResolvedValue(missing)
     await expect(runSetupSettings('settings.json')).resolves.toBe(true)
     expect(state.prompts.mock.calls[0]![0].map((question) => question.name)).toEqual([
+      'auth_google_enabled',
       'username',
       'password',
       'from_addr',
@@ -306,6 +323,7 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
       ['AUTH_JWT_ISSUER', 'auth_jwt_issuer'],
       ['AUTH_JWT_EXPIRATION_SECONDS', 'jwt_expiration'],
       ['APP_PUBLIC_URL', 'app_public_url'],
+      ['AUTH_GOOGLE_ENABLED', 'google_enabled'],
     ]) {
       expect(sql).toContain(`APP.odb_settings.write('${id}', :${bind}, NULL)`)
     }
@@ -438,6 +456,7 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
         AUTH_JWT_EXPIRATION_SECONDS: settings.auth_jwt_expiration_seconds,
         AUTH_JWT_SECRET: secret,
         APP_PUBLIC_URL: settings.app_public_url,
+        AUTH_GOOGLE_ENABLED: false,
       }),
     )
     await runSetupSettings('settings.json')
@@ -503,7 +522,7 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
       JSON.stringify(
         Object.fromEntries(
           Object.entries(existing).map(([key, value]) => [
-            key.startsWith('auth_jwt_') ? key : `smtp_${key}`,
+            key.startsWith('auth_') ? key : `smtp_${key}`,
             value,
           ]),
         ),
@@ -553,5 +572,310 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
     state.prompts.mockResolvedValue({ ...settings, ...invalid })
     await expect(runSetupSettings()).rejects.toThrow('Invalid settings')
     expect(state.connected).not.toHaveBeenCalled()
+  })
+
+  describe('Google authorization code configuration', () => {
+    const google = {
+      auth_google_enabled: true,
+      auth_google_client_id:
+        '1072025622820-jodheg6ka328ga1rgueo0u65q856hmfo.apps.googleusercontent.com',
+      auth_google_client_secret: "secret'with:bind",
+    }
+
+    it('asks whether to enable Google even when absent from a complete legacy file', async () => {
+      const { auth_google_enabled: _enabled, ...legacy } = settings
+      state.readFile.mockResolvedValue(
+        JSON.stringify(
+          Object.fromEntries(
+            Object.entries(legacy).map(([key, value]) => [
+              key.startsWith('auth_') || key === 'app_public_url' ? key : `smtp_${key}`,
+              value,
+            ]),
+          ),
+        ),
+      )
+      state.prompts.mockResolvedValue({ auth_google_enabled: false })
+      await runSetupSettings('settings.json')
+      expect(state.prompts.mock.calls[0]![0]).toEqual([
+        expect.objectContaining({ name: 'auth_google_enabled', type: 'confirm', initial: false }),
+      ])
+      expect(state.connection.execute.mock.calls[0]![0]).not.toContain('AUTH_GOOGLE_CLIENT_SECRET')
+    })
+
+    it('prompts only for missing enabled configuration and masks the client secret', async () => {
+      state.readFile.mockResolvedValue(
+        JSON.stringify({
+          AUTH_GOOGLE_ENABLED: 'Y',
+          GOOGLE_CLIENT_ID: google.auth_google_client_id,
+        }),
+      )
+      state.prompts.mockResolvedValueOnce(settings).mockResolvedValueOnce(google)
+      await runSetupSettings('settings.json')
+      const questions = state.prompts.mock.calls[1]![0]
+      expect(questions.map(({ name }) => name)).toEqual(['auth_google_client_secret'])
+      expect(questions).toContainEqual(
+        expect.objectContaining({ name: 'auth_google_client_secret', type: 'password' }),
+      )
+    })
+
+    it.each(['AUTH_GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_ID', 'VITE_GOOGLE_CLIENT_ID'])(
+      'accepts case-insensitive client ID alias %s without implicitly enabling Google',
+      async (alias) => {
+        state.readFile.mockResolvedValue(
+          JSON.stringify({ [alias.toLowerCase()]: google.auth_google_client_id }),
+        )
+        await runSetupSettings('settings.json')
+        expect(state.prompts).toHaveBeenCalledTimes(1)
+        const [sql, values] = state.connection.execute.mock.calls[0]!
+        expect(values?.google_enabled).toBe('N')
+        expect(sql).not.toContain('AUTH_GOOGLE_CLIENT_SECRET')
+        expect(sql).not.toContain('add_http')
+        expect(values).not.toHaveProperty('auth_google_client_id')
+      },
+    )
+
+    it.each([true, 'Y'])(
+      'persists enabled=%s with bound secret metadata and exact HTTPS ACLs',
+      async (enabled) => {
+        state.readFile.mockResolvedValue(
+          JSON.stringify({ ...google, auth_google_enabled: enabled }),
+        )
+        await runSetupSettings('settings.json')
+        const [sql, values] = state.connection.execute.mock.calls[0]!
+        expect(values).toMatchObject({
+          google_enabled: 'Y',
+          auth_google_client_id: google.auth_google_client_id,
+          auth_google_client_secret: google.auth_google_client_secret,
+          auth_google_redirect_uri: 'http://localhost:5173/api/auth/google/callback',
+          google_secret_meta: '{"secret":"Y"}',
+        })
+        expect(sql).toContain(
+          "APP.odb_settings.write('AUTH_GOOGLE_CLIENT_SECRET', :auth_google_client_secret, :google_secret_meta)",
+        )
+        expect(sql).toContain(
+          "APP.odb_settings.write('AUTH_GOOGLE_REDIRECT_URI', :auth_google_redirect_uri, NULL)",
+        )
+        expect(sql).toContain("APP.odb_acl.add_http('www.googleapis.com', 443)")
+        expect(sql).toContain("APP.odb_acl.add_http('oauth2.googleapis.com', 443)")
+        expect(sql.match(/odb_acl\.add_http/g)).toHaveLength(2)
+        expect(sql).not.toContain('WALLET')
+        expect(values).not.toHaveProperty('auth_google_wallet_path')
+        expect(sql).not.toContain(google.auth_google_client_secret)
+        expect(JSON.stringify(state.success.mock.calls)).not.toContain(
+          google.auth_google_client_secret,
+        )
+        expect(state.connection.commit).toHaveBeenCalledOnce()
+      },
+    )
+
+    it.each([false, 'N'])(
+      'preserves existing Google credentials when disabled=%s',
+      async (enabled) => {
+        state.readFile.mockResolvedValue(
+          JSON.stringify({ ...google, auth_google_enabled: enabled }),
+        )
+        await runSetupSettings('settings.json')
+        const [sql, values] = state.connection.execute.mock.calls[0]!
+        expect(values?.google_enabled).toBe('N')
+        expect(values).not.toHaveProperty('auth_google_client_secret')
+        expect(sql).not.toContain('AUTH_GOOGLE_CLIENT_SECRET')
+        expect(sql).not.toContain('add_http')
+      },
+    )
+
+    it.each([
+      ['AUTH_GOOGLE_ENABLED', 'true'],
+      ['AUTH_GOOGLE_ENABLED', 'yes'],
+      ['AUTH_GOOGLE_ENABLED', 1],
+      ['AUTH_GOOGLE_CLIENT_ID', 'not-a-client-id'],
+      ['AUTH_GOOGLE_CLIENT_SECRET', ''],
+      ['AUTH_GOOGLE_REDIRECT_URI', 'http://api.example.com/callback'],
+      ['AUTH_GOOGLE_REDIRECT_URI', 'http://localhost.evil.com/callback'],
+      ['AUTH_GOOGLE_REDIRECT_URI', 'http://127.1/callback'],
+      ['AUTH_GOOGLE_REDIRECT_URI', 'https://*.example.com/callback'],
+      ['AUTH_GOOGLE_REDIRECT_URI', 'https://api.example.com/{callback}'],
+      ['AUTH_GOOGLE_REDIRECT_URI', 'https://api.example.com/callback?next=evil'],
+      ['AUTH_GOOGLE_REDIRECT_URI', 'https://api.example.com/callback#fragment'],
+      ['AUTH_GOOGLE_REDIRECT_URI', 'https://user:pass@api.example.com/callback'],
+      ['AUTH_GOOGLE_REDIRECT_URI', 'https://api.example.com/callback%0a'],
+    ])('rejects invalid file setting %s=%j before prompting or connecting', async (key, value) => {
+      state.readFile.mockResolvedValue(JSON.stringify({ [key]: value }))
+      await expect(runSetupSettings('settings.json')).rejects.toThrow(
+        key === 'AUTH_GOOGLE_REDIRECT_URI' ? 'derived automatically' : 'Invalid setting',
+      )
+      expect(state.prompts).not.toHaveBeenCalled()
+      expect(state.connected).not.toHaveBeenCalled()
+    })
+
+    it.each(['GOOGLE_CLIENT_ID', 'VITE_GOOGLE_CLIENT_ID', 'auth_google_client_id'])(
+      'rejects duplicate client ID alias %s',
+      async (alias) => {
+        state.readFile.mockResolvedValue(
+          JSON.stringify({
+            AUTH_GOOGLE_CLIENT_ID: google.auth_google_client_id,
+            [alias]: google.auth_google_client_id,
+          }),
+        )
+        await expect(runSetupSettings('settings.json')).rejects.toThrow('Duplicate setting key')
+        expect(state.connected).not.toHaveBeenCalled()
+      },
+    )
+
+    it.each([
+      ['https://app.example.com/', 'https://api.example.com/ords/app/auth/google/callback'],
+      ['http://localhost:8080/', 'http://localhost:8080/api/auth/google/callback'],
+      ['http://127.0.0.1:8080/', 'http://127.0.0.1:8080/api/auth/google/callback'],
+      ['http://[::1]:8080/', 'http://[::1]:8080/api/auth/google/callback'],
+    ])(
+      'derives the callback for %s without deployment-specific options',
+      async (appUrl, redirect) => {
+        state.readFile.mockResolvedValue(
+          JSON.stringify({
+            ...google,
+            app_public_url: appUrl,
+          }),
+        )
+        await runSetupSettings('settings.json')
+        expect(state.connection.execute.mock.calls[0]![1]).toMatchObject({
+          auth_google_redirect_uri: redirect,
+        })
+        expect(state.info).toHaveBeenCalledWith(
+          `Register this Google OAuth redirect URI: ${redirect}`,
+        )
+      },
+    )
+
+    it('rejects the removed wallet option before prompting or connecting', async () => {
+      state.readFile.mockResolvedValue(JSON.stringify({ AUTH_GOOGLE_WALLET_PATH: 'file:/wallet' }))
+      await expect(runSetupSettings('settings.json')).rejects.toThrow('Unknown setting key')
+      expect(state.prompts).not.toHaveBeenCalled()
+      expect(state.connected).not.toHaveBeenCalled()
+    })
+
+    it.each(['auth_google_redirect_uri', 'AUTH_GOOGLE_REDIRECT_URI'])(
+      'rejects a manually configured callback %s with migration guidance',
+      async (key) => {
+        state.readFile.mockResolvedValue(
+          JSON.stringify({ [key]: 'https://api.example.com/callback' }),
+        )
+        await expect(runSetupSettings('settings.json')).rejects.toThrow('derived automatically')
+        expect(state.prompts).not.toHaveBeenCalled()
+        expect(state.connected).not.toHaveBeenCalled()
+      },
+    )
+
+    it('does not write a callback when Google is disabled', async () => {
+      await runSetupSettings()
+      expect(state.connection.execute.mock.calls[0]![0]).not.toContain('AUTH_GOOGLE_REDIRECT_URI')
+    })
+
+    it('fails before connecting when production has no configured runtime API URL', async () => {
+      state.apiUrl = ''
+      state.readFile.mockResolvedValue(
+        JSON.stringify({ ...google, app_public_url: 'https://app.example.com/' }),
+      )
+      await expect(runSetupSettings('settings.json')).rejects.toThrow('runtime.apiUrl')
+      expect(state.connected).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      'http://api.example.com/ords/app/',
+      'https://api.example.com/ords/app/?next=evil',
+      'https://api.example.com/ords/app/#fragment',
+      'https://user:password@api.example.com/',
+      'https://api.example.com/%0a',
+    ])('rejects an unsafe production API URL %s before connecting', async (apiUrl) => {
+      state.apiUrl = apiUrl
+      state.readFile.mockResolvedValue(
+        JSON.stringify({ ...google, app_public_url: 'https://app.example.com/' }),
+      )
+      await expect(runSetupSettings('settings.json')).rejects.toThrow('valid HTTPS Google callback')
+      expect(state.connected).not.toHaveBeenCalled()
+    })
+
+    it('cancels enabled follow-up prompts without connecting', async () => {
+      state.prompts.mockResolvedValueOnce({ ...settings, auth_google_enabled: true })
+      state.prompts.mockImplementationOnce(async (_questions, options) => {
+        options.onCancel()
+        return {}
+      })
+      await expect(runSetupSettings()).resolves.toBe(false)
+      expect(state.connected).not.toHaveBeenCalled()
+    })
+
+    it('offers only the public client ID as an initial value when enabling interactively', async () => {
+      state.prompts.mockResolvedValueOnce({ ...settings, auth_google_enabled: true })
+      state.prompts.mockResolvedValueOnce(google)
+      await runSetupSettings()
+      expect(state.prompts.mock.calls[1]![0].map(({ name }) => name)).toEqual([
+        'auth_google_client_id',
+        'auth_google_client_secret',
+      ])
+      expect(state.prompts.mock.calls[1]![0]).toContainEqual(
+        expect.objectContaining({
+          name: 'auth_google_client_id',
+          initial: google.auth_google_client_id,
+        }),
+      )
+      expect(
+        state.prompts.mock.calls[1]![0].find(({ name }) => name === 'auth_google_client_secret'),
+      ).not.toHaveProperty('initial')
+    })
+
+    it('rejects invalid prompted Google values before connecting', async () => {
+      state.prompts.mockResolvedValueOnce({ ...settings, auth_google_enabled: true })
+      state.prompts.mockResolvedValueOnce({ ...google, auth_google_client_secret: '' })
+      await expect(runSetupSettings()).rejects.toThrow('Invalid settings')
+      expect(state.connected).not.toHaveBeenCalled()
+    })
+
+    it('documents the server-only secret and enabled/alias contract in command help', () => {
+      const program = new Command()
+      registerSetupSettingsCommand(program)
+      let help = ''
+      program.commands[0]!.configureOutput({
+        writeOut: (text) => {
+          help += text
+        },
+      }).outputHelp()
+      expect(help).toContain('AUTH_GOOGLE_ENABLED accepts "Y"/"N" or true/false')
+      expect(help).toContain('VITE_GOOGLE_CLIENT_ID')
+      expect(help).toContain('redirect URI is derived automatically')
+      expect(help).toContain('Never store the client secret in frontend config')
+    })
+  })
+
+  describe('Google callback URL derivation', () => {
+    it.each<[string, string | undefined, string]>([
+      ['http://localhost:5173', undefined, 'http://localhost:5173/api/auth/google/callback'],
+      [
+        'http://localhost:5173///',
+        'https://ignored.example.com/',
+        'http://localhost:5173/api/auth/google/callback',
+      ],
+      [
+        'https://app.example.com/',
+        'https://api.example.com/ords/app///',
+        'https://api.example.com/ords/app/auth/google/callback',
+      ],
+      [
+        'https://app.example.com/',
+        'https://app.example.com/api/',
+        'https://app.example.com/api/auth/google/callback',
+      ],
+    ])('normalizes %s with API base %s to %s', (appUrl, apiUrl, expected) => {
+      expect(deriveGoogleRedirectUri(appUrl, apiUrl)).toBe(expected)
+    })
+
+    it.each([
+      'http://app.example.com/',
+      'http://localhost.evil.com/',
+      'http://127.1/',
+      'https://*.example.com/',
+      'https://app.example.com/{base}',
+      'https://app.example.com/%0a',
+    ])('rejects unsafe application URL %s', (appUrl) => {
+      expect(() => deriveGoogleRedirectUri(appUrl, state.apiUrl)).toThrow('APP_PUBLIC_URL')
+    })
   })
 })

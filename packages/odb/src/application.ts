@@ -211,7 +211,7 @@ export function generateApplicationsOpenApi(
           ...(typeof endpoint.auth === 'object'
             ? { '403': { description: 'Insufficient authorization' } }
             : {}),
-          '200': {
+          [String(endpoint.responseStatus ?? 200)]: {
             description: 'Successful response',
             content: endpoint.responseMediaType
               ? {

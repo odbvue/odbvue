@@ -334,6 +334,7 @@ export type ServiceNode = {
   summary?: string
   /** Media type for a binary response streamed directly by the procedure instead of JSON outputs. */
   responseMediaType?: string
+  responseStatus?: number
   module?: string
   basePath?: string
   paramTypes?: Record<string, OrdsParamType>
@@ -1125,6 +1126,8 @@ export type OrdsServiceDefinition = {
   summary?: string
   /** Media type for a binary response streamed directly by the procedure instead of JSON outputs. */
   responseMediaType?: string
+  /** Successful HTTP status; defaults to 200. */
+  responseStatus?: number
   /** ORDS module name. Defaults to the package-derived module name. */
   module?: string
   /** ORDS module base path. Defaults to `<module>/`. */
@@ -1284,6 +1287,7 @@ function buildOrdsEndpoint(
   if (service.path !== undefined) endpoint.pattern(service.path)
   if (service.summary) endpoint.comment(service.summary)
   if (service.responseMediaType) endpoint.responseMediaType(service.responseMediaType)
+  if (service.responseStatus !== undefined) endpoint.responseStatus(service.responseStatus)
 
   const typeOverrides = new Map(
     Object.entries(service.paramTypes ?? {}).map(([name, type]) => [name.toUpperCase(), type]),

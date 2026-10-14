@@ -35,7 +35,10 @@ test('requests recovery and resets a password only after explicit submission', a
   await page.goto(`/reset-password#token=${token}`)
   await expect(page).toHaveURL(/\/reset-password$/)
   expect(actions).toEqual(['refresh', 'recover-password', 'refresh'])
-  await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('autocomplete', 'new-password')
+  await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute(
+    'autocomplete',
+    'new-password',
+  )
   await page.getByLabel('Password', { exact: true }).fill('new secure password!')
   await page.getByLabel('Repeat password', { exact: true }).fill('different')
   await page.getByRole('button', { name: 'Reset password', exact: true }).click()

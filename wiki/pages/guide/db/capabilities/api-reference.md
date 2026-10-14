@@ -177,6 +177,30 @@ Direct bindings map public HTTP names to typed procedure parameters. Bind every 
 
 For example, a POST request body is explicit: `body: { username: procedure.parameters.username }`. Use `headers` and `uri` for their respective transports.
 
+`responseStatus` declares a successful HTTP status from 200 through 399
+(default 200) in both the generated ORDS handler and OpenAPI. A redirect
+procedure can use `responseStatus: 303` and an OUT `Location` header; error
+translation still determines the status when the procedure raises.
+
 ## Authentication
 
 `odbAuth` installs the `odb_auth` PL/SQL package, user and session tables, and JWT support. It provides `login`, `refresh`, `logout`, `read_user`, and `require_user` as transport-independent database operations; the application package exposes them over HTTP and owns headers, cookies, and routes. See the [Authentication capability](./auth) for installation and client integration.
+
+## Google OpenID Connect
+
+Install `odbGoogle` after `odbAuth` and `odbSettings`, then install
+`odbGoogle.seedSettings()` to create missing, disabled-by-default provider
+configuration. Its `enabled()`, `publicUrl()`, `start(returnPath, authorizationUrl, browserToken)`,
+and `complete(state, code, browserToken, providerError, refreshToken, returnPath, outcome)`
+helpers build calls into the transport-independent `odb_google` package.
+`publicUrl()` reads and validates `APP_PUBLIC_URL`. The `start` and `complete`
+primitives enforce attempt throttling for direct PL/SQL callers as well as HTTP
+requests. The application owns Origin checks, cookies, callback routes,
+redirects, and mapping business errors to UI outcomes.
+
+`odbAuth.loginGoogle(subject, email, displayName, accessToken, refreshToken)`
+is a **trusted server-only** identity/session primitive, not a public login
+endpoint. Only call it after provider-token and transaction verification.
+It creates no local password, grants no roles, and rejects email-based account
+merges. See [Google sign-in](./auth#google-sign-in) for provisioning, security
+policy, and manual deployment requirements.

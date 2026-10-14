@@ -169,11 +169,22 @@ export const cond = {
   isNotNull(value: { toSQL(): string }): PlsqlBooleanExpression {
     return condition(`${value.toSQL()} IS NOT NULL`)
   },
-  isJson(value: { toSQL(): string }): PlsqlBooleanExpression {
-    return condition(`${value.toSQL()} IS JSON`)
+  isJson(
+    value: { toSQL(): string },
+    options: { strict?: boolean; uniqueKeys?: boolean } = {},
+  ): PlsqlBooleanExpression {
+    return condition(
+      `${value.toSQL()} IS JSON${options.strict ? ' STRICT' : ''}${options.uniqueKeys ? ' WITH UNIQUE KEYS' : ''}`,
+    )
   },
-  regexpLike(value: { toSQL(): string }, pattern: string): PlsqlBooleanExpression {
-    return condition(`REGEXP_LIKE(${value.toSQL()}, ${renderExpressionValue(pattern)})`)
+  regexpLike(
+    value: { toSQL(): string },
+    pattern: string,
+    matchParameter?: string,
+  ): PlsqlBooleanExpression {
+    return condition(
+      `REGEXP_LIKE(${value.toSQL()}, ${renderExpressionValue(pattern)}${matchParameter === undefined ? '' : `, ${renderExpressionValue(matchParameter)}`})`,
+    )
   },
   not(value: PlsqlBooleanExpression): PlsqlBooleanExpression {
     return condition(`NOT (${value.toSQL()})`, `NOT (${queryConditionSql(value)})`)
