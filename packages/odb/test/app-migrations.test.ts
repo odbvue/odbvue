@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { generateApplicationOpenApi } from '../src/application.js'
+import { generateApplicationOpenApi, generateApplicationsOpenApi } from '../src/application.js'
 import { odbAclPackage } from '../src/capabilities/acl/index.js'
 
 beforeAll(() => {
@@ -170,9 +170,11 @@ describe('app-owned ORDS migrations', () => {
     })
   })
 
-  it('keeps auth and settings routes out of bootstrap', async () => {
+  it('installs app auth routes in bootstrap while keeping sandbox settings separate', async () => {
     const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
-    expect(sql).not.toContain("p_base_path      => 'auth/'")
+    expect(sql).toContain('CREATE OR REPLACE PACKAGE ODBVUE.PCK_APP_BLUE AS')
+    expect(sql).toContain('CREATE OR REPLACE SYNONYM ODBVUE.pck_app')
+    expect(sql).toContain("p_base_path      => 'auth/'")
     expect(sql).not.toContain("p_base_path      => 'secrets/'")
     expect(sql).not.toContain("p_base_path      => 'settings/'")
     expect(sql).not.toContain('CREATE OR REPLACE PACKAGE ODBVUE.PCK_SECRETS_BLUE AS')
@@ -192,9 +194,12 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain('CREATE OR REPLACE PACKAGE ODBVUE.odb_auth AS')
     expect(sql).toContain('odb_auth_crypto.verify_password(p_password, l_password_hash) = FALSE')
     expect(sql).toContain('IF l_presented_refresh_token_hash = l_previous_refresh_token_hash THEN')
-    expect(sql).not.toContain('Set-Cookie')
-    expect(sql).not.toContain('__Host-odb_refresh')
-    expect(sql).not.toContain("p_base_path      => 'auth/'")
+    const authSql = sql.slice(
+      sql.indexOf('CREATE OR REPLACE PACKAGE ODBVUE.odb_auth AS'),
+      sql.indexOf('CREATE OR REPLACE PACKAGE ODBVUE.odb_acl AS'),
+    )
+    expect(authSql).not.toContain('Set-Cookie')
+    expect(authSql).not.toContain('__Host-odb_refresh')
     expect(sql.indexOf('CREATE OR REPLACE PACKAGE ODBVUE.odb_settings AS')).toBeLessThan(
       sql.indexOf('CREATE OR REPLACE PACKAGE ODBVUE.odb_auth_jwt AS'),
     )
@@ -210,8 +215,8 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain('CREATE OR REPLACE PACKAGE ODBVUE.PCK_SANDBOX_BLUE AS')
     expect(sql.match(/CREATE OR REPLACE PACKAGE (?:BODY )?ODBVUE\.\w+/g)).toHaveLength(2)
 
-    // auth keeps its public URLs; cookies and headers are handled in the app package
-    expect(sql).toContain("p_base_path      => 'auth/'")
+    expect(sql).toContain("p_base_path      => 'sandbox/auth/'")
+    expect(sql).not.toContain("p_base_path      => 'auth/'")
     for (const route of ['login', 'refresh', 'logout', 'me']) {
       expect(sql).toContain(`p_pattern        => '${route}'`)
     }
@@ -243,7 +248,7 @@ describe('app-owned ORDS migrations', () => {
   })
 
   it('keeps the auth OpenAPI contract free of cookies', async () => {
-    const migration = await load('00000000000001-sandbox')
+    const migration = await load('00000000000000-bootstrap')
     const openapi = generateApplicationOpenApi(migration.applications()[0]) as {
       components: { schemas: Record<string, { properties: Record<string, unknown> }> }
     }
@@ -252,6 +257,63 @@ describe('app-owned ORDS migrations', () => {
     expect(login?.properties).toMatchObject({ accessToken: { type: 'string' } })
     expect(login?.properties).not.toHaveProperty('refreshToken')
     expect(login?.properties).not.toHaveProperty('setCookie')
+  })
+
+  it('owns all auth endpoints in pck_app with signup and email delivery wired into bootstrap', async () => {
+    const bootstrap = await load('00000000000000-bootstrap')
+    const sandbox = await load('00000000000001-sandbox')
+    const sql = bootstrap.compile().up().join('\n')
+    expect(sql).not.toContain('pck_registration')
+    expect(sql).toContain("ODBVUE.odb_settings.write('APP_PUBLIC_URL', ''")
+    expect(sql).toContain('odb_auth.signup(p_email, p_password, p_full_name, l_token)')
+    expect(sql).toContain('odb_auth.confirm_email(p_token)')
+    expect(sql).toContain('SIGNUP_PASSWORD_MISMATCH')
+    expect(sql).toContain('SIGNUP_URL_NOT_CONFIGURED')
+    expect(sql).toContain('/confirm-email#token=')
+    expect(sql).toContain('odb_emails.mail(l_address, NULL,')
+    expect(sql).toMatch(/COMMIT;\s+odb_emails.send\(l_email_id, 300\)/)
+    const publicApi = generateApplicationOpenApi(bootstrap.applications()[0]) as {
+      paths: Record<
+        string,
+        Record<
+          string,
+          {
+            security: unknown
+            requestBody?: {
+              content: { 'application/json': { schema: { properties: Record<string, unknown> } } }
+            }
+          }
+        >
+      >
+      components: { schemas: Record<string, { properties: Record<string, unknown> }> }
+    }
+    for (const [path, method] of [
+      ['/auth/login', 'post'],
+      ['/auth/refresh', 'post'],
+      ['/auth/logout', 'post'],
+      ['/auth/signup', 'post'],
+      ['/auth/confirm-email', 'post'],
+      ['/auth/me', 'get'],
+    ]) {
+      expect(publicApi.paths[path!]?.[method!]?.security).toEqual(
+        path === '/auth/me' ? [{ bearerAuth: [] }] : [],
+      )
+    }
+    expect(
+      publicApi.paths['/auth/signup']?.post?.requestBody?.content['application/json'].schema
+        .properties,
+    ).toMatchObject({
+      email: { type: 'string' },
+      fullName: { type: 'string' },
+      password: { type: 'string' },
+      passwordRepeat: { type: 'string' },
+    })
+    const document = generateApplicationsOpenApi([
+      ...bootstrap.applications(),
+      ...sandbox.applications(),
+    ]) as { paths: Record<string, unknown> }
+    expect(document.paths).toHaveProperty('/auth/signup')
+    expect(document.paths).toHaveProperty('/sandbox/auth/login')
   })
 
   it('exposes authenticated audit listing and severity actions', async () => {

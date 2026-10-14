@@ -52,6 +52,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/confirm-email': RouteRecordInfo<
+      '/confirm-email',
+      '/confirm-email',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/login': RouteRecordInfo<
       '/login',
       '/login',
@@ -257,6 +264,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/signup': RouteRecordInfo<
+      '/signup',
+      '/signup',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
   }
 
   /**
@@ -289,6 +303,14 @@ declare module 'vue-router/auto-routes' {
     'src/app/pages/about.md': {
       routes:
         | '/about'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/app/pages/confirm-email.vue': {
+      routes:
+        | '/confirm-email'
       views:
         | never
       pathParamNames:
@@ -523,6 +545,14 @@ declare module 'vue-router/auto-routes' {
     'src/modules/sandbox/pages/sandbox-dnd.vue': {
       routes:
         | '/sandbox/sandbox-dnd'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/app/pages/signup.vue': {
+      routes:
+        | '/signup'
       views:
         | never
       pathParamNames:

@@ -17,7 +17,14 @@ import { REFRESH_TOKEN_MAX_AGE_SECONDS } from './constants.js'
 import { odbAuthCrypto, dummyPasswordHash } from './crypto.js'
 import { odbAuthJwt } from './jwt.js'
 import { odbAuthPackage } from './package.js'
-import { authSessions, authUsers, authRoles, authUserRoles, authRolePermissions } from './tables.js'
+import {
+  authSessions,
+  authUsers,
+  authRoles,
+  authUserRoles,
+  authRolePermissions,
+  authConfirmations,
+} from './tables.js'
 import { authTypes } from './types.js'
 import { odbSettings } from '../settings/settings.js'
 import { authJwtSettings } from './settings.js'
@@ -28,6 +35,7 @@ export const odbAuth = {
     return [
       authUsers.toSQLUp({ schema }),
       authSessions.toSQLUp({ schema }),
+      authConfirmations.toSQLUp({ schema }),
       authorizationTablesSQL(schema),
       odbAuthCrypto.toSQLUp({ schema }),
       odbAuthJwt.toSQLUp({ schema }),
@@ -51,6 +59,16 @@ export const odbAuth = {
           'END;',
           '/',
           authorizationTablesSQL(schema, true),
+          authConfirmations
+            .toSQLUp({ schema })
+            .split(';')
+            .map((statement) => statement.trim())
+            .filter(Boolean)
+            .map(
+              (statement) =>
+                `BEGIN EXECUTE IMMEDIATE '${statement.replace(/'/g, "''")}'; EXCEPTION WHEN OTHERS THEN IF SQLCODE NOT IN (-955, -2264, -2275) THEN RAISE; END IF; END;\n/`,
+            )
+            .join('\n'),
           odbAuthJwt.toSQLUp({ schema }),
           odbAuthPackage.toSQLUp({
             schema,
@@ -115,6 +133,7 @@ export const odbAuth = {
       authUserRoles,
       authRoles,
       authSessions,
+      authConfirmations,
       authUsers,
     ]
       .map((artifact) => artifact.toSQLDown(options))
@@ -126,6 +145,21 @@ export const odbAuth = {
 
   /** Lifetime of a refresh token in seconds; use it for transport-level expiry such as cookie Max-Age. */
   refreshTokenMaxAge: REFRESH_TOKEN_MAX_AGE_SECONDS,
+
+  /** Creates an inactive account, or retries a pending signup with the same password. */
+  signup(
+    username: PlsqlRenderable,
+    password: PlsqlRenderable,
+    displayName: PlsqlRenderable,
+    confirmationToken: PlsqlRenderable,
+  ) {
+    return odbAuthPackage.signup(username, password, displayName, confirmationToken)
+  },
+
+  /** Consumes an unexpired confirmation token and enables its account. */
+  confirmEmail(token: PlsqlRenderable) {
+    return odbAuthPackage.confirmEmail(token)
+  },
 
   role: {
     has(userId: PlsqlRenderable, role: PlsqlRenderable) {

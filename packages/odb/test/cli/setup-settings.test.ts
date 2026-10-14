@@ -112,6 +112,7 @@ const settings = {
   from_name: 'Odbvue Admin',
   auth_jwt_issuer: 'odbvue',
   auth_jwt_expiration_seconds: 900,
+  app_public_url: 'http://localhost:5173/',
 }
 const bindings = {
   host: settings.host,
@@ -124,9 +125,10 @@ const bindings = {
   port_value: '587',
   jwt_secret: expect.stringMatching(/^[0-9a-f]{64}$/),
   jwt_expiration: '900',
+  app_public_url: settings.app_public_url,
 }
 
-describe('CLI SMTP and JWT settings setup', () => {
+describe('CLI SMTP, JWT, and application URL settings setup', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     state.schema = 'APP'
@@ -146,9 +148,13 @@ describe('CLI SMTP and JWT settings setup', () => {
       'from_addr',
       'from_name',
       'auth_jwt_issuer',
+      'app_public_url',
       'auth_jwt_expiration_seconds',
     ])
     expect(questions).toContainEqual(expect.objectContaining({ name: 'port', initial: 587 }))
+    expect(questions).toContainEqual(
+      expect.objectContaining({ name: 'app_public_url', initial: 'http://localhost:5173/' }),
+    )
     expect(questions).toContainEqual(
       expect.objectContaining({ name: 'password', type: 'password' }),
     )
@@ -180,6 +186,7 @@ describe('CLI SMTP and JWT settings setup', () => {
         smtp_from_name: settings.from_name,
         Auth_Jwt_Issuer: settings.auth_jwt_issuer,
         AUTH_JWT_EXPIRATION_SECONDS: settings.auth_jwt_expiration_seconds,
+        App_Public_Url: settings.app_public_url,
       }),
     )
     await expect(runSetupSettings('settings.json')).resolves.toBe(true)
@@ -202,6 +209,7 @@ describe('CLI SMTP and JWT settings setup', () => {
       'from_addr',
       'from_name',
       'auth_jwt_issuer',
+      'app_public_url',
       'auth_jwt_expiration_seconds',
     ])
     expect(state.connection.execute.mock.calls[0]![1]).toMatchObject({
@@ -235,6 +243,14 @@ describe('CLI SMTP and JWT settings setup', () => {
     ['{"auth_jwt_expiration_seconds":"900"}', 'Invalid setting: auth_jwt_expiration_seconds'],
     ['{"auth_jwt_expiration_seconds":86401}', 'Invalid setting: auth_jwt_expiration_seconds'],
     ['{"auth_jwt_expiration":900}', 'Unknown setting key'],
+    ['{"app_public_url":null}', 'Invalid setting: app_public_url'],
+    ['{"app_public_url":""}', 'Invalid setting: app_public_url'],
+    ['{"app_public_url":"javascript:alert(1)"}', 'Invalid setting: app_public_url'],
+    ['{"app_public_url":"https://example.com/?next=evil"}', 'Invalid setting: app_public_url'],
+    [
+      '{"app_public_url":"http://localhost:5173/","APP_PUBLIC_URL":"https://example.com/"}',
+      'Duplicate setting key',
+    ],
   ])('rejects an invalid file before prompting or connecting: %s', async (json, message) => {
     state.readFile.mockResolvedValue(json)
     await expect(runSetupSettings('settings.json')).rejects.toThrow(message)
@@ -274,7 +290,7 @@ describe('CLI SMTP and JWT settings setup', () => {
     expect(state.fatal).not.toHaveBeenCalled()
   })
 
-  it('writes bound SMTP and JWT values and updates the configured schema ACL in one transaction', async () => {
+  it('writes bound SMTP, JWT, and application URL values and updates the configured schema ACL in one transaction', async () => {
     state.schema = ' app '
     await expect(runSetupSettings()).resolves.toBe(true)
     const [sql, actualBindings] = state.connection.execute.mock.calls[0]!
@@ -289,6 +305,7 @@ describe('CLI SMTP and JWT settings setup', () => {
       ['AUTH_JWT_SECRET', 'jwt_secret'],
       ['AUTH_JWT_ISSUER', 'auth_jwt_issuer'],
       ['AUTH_JWT_EXPIRATION_SECONDS', 'jwt_expiration'],
+      ['APP_PUBLIC_URL', 'app_public_url'],
     ]) {
       expect(sql).toContain(`APP.odb_settings.write('${id}', :${bind}, NULL)`)
     }
@@ -302,6 +319,7 @@ describe('CLI SMTP and JWT settings setup', () => {
     expect(sql).not.toContain('dba_host_aces')
     expect(sql).not.toContain(settings.password)
     expect(sql).not.toContain(settings.username)
+    expect(sql).not.toContain(settings.app_public_url)
     expect(state.connection.execute).toHaveBeenCalledTimes(1)
     expect(state.connection.commit).toHaveBeenCalledTimes(1)
     expect(state.connection.rollback).not.toHaveBeenCalled()
@@ -377,6 +395,15 @@ describe('CLI SMTP and JWT settings setup', () => {
     { from_addr: 'a@example.com\r\nBcc: b@example.com' },
     { from_name: '' },
     { from_name: 'Admin\nInjected' },
+    { app_public_url: 'example.com' },
+    { app_public_url: 'https://example.com/#token=x' },
+    { app_public_url: 'https://user:password@example.com/' },
+    { app_public_url: 'https://example.com/ bad' },
+    { app_public_url: 'https://example.com/<bad>' },
+    { app_public_url: 'https://example.com/a&b' },
+    { app_public_url: 'https:\\\\example.com' },
+    { app_public_url: 'https://example.com/\u0000' },
+    { app_public_url: 'https://example.com/' + 'a'.repeat(2000) },
   ])('rejects invalid settings before connecting: %j', async (invalid) => {
     state.prompts.mockResolvedValue({ ...settings, ...invalid })
     await expect(runSetupSettings()).rejects.toThrow('Invalid settings')
@@ -410,6 +437,7 @@ describe('CLI SMTP and JWT settings setup', () => {
         AUTH_JWT_ISSUER: settings.auth_jwt_issuer,
         AUTH_JWT_EXPIRATION_SECONDS: settings.auth_jwt_expiration_seconds,
         AUTH_JWT_SECRET: secret,
+        APP_PUBLIC_URL: settings.app_public_url,
       }),
     )
     await runSetupSettings('settings.json')
@@ -468,6 +496,35 @@ describe('CLI SMTP and JWT settings setup', () => {
     expect(state.connection.commit).toHaveBeenCalledOnce()
     expect(state.fatal).not.toHaveBeenCalled()
   })
+
+  it('prompts only for the application URL when importing an existing complete SMTP/JWT file', async () => {
+    const { app_public_url, ...existing } = settings
+    state.readFile.mockResolvedValue(
+      JSON.stringify(
+        Object.fromEntries(
+          Object.entries(existing).map(([key, value]) => [
+            key.startsWith('auth_jwt_') ? key : `smtp_${key}`,
+            value,
+          ]),
+        ),
+      ),
+    )
+    state.prompts.mockResolvedValue({ app_public_url })
+    await expect(runSetupSettings('settings.json')).resolves.toBe(true)
+    expect(state.prompts.mock.calls[0]![0].map((question) => question.name)).toEqual([
+      'app_public_url',
+    ])
+    expect(state.connection.execute.mock.calls[0]![1]?.app_public_url).toBe(app_public_url)
+  })
+
+  it.each(['http://localhost:5173/', 'https://app.example.com/', 'https://example.com/odbvue'])(
+    'accepts a valid application base URL: %s',
+    async (app_public_url) => {
+      state.prompts.mockResolvedValue({ ...settings, app_public_url })
+      await runSetupSettings()
+      expect(state.connection.execute.mock.calls[0]![1]?.app_public_url).toBe(app_public_url)
+    },
+  )
 
   it('does not expose JWT rotation options', () => {
     const program = new Command()

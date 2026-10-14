@@ -4,6 +4,16 @@
       <v-col cols="12" sm="8" md="5" lg="4">
         <h1 class="mb-4">{{ t('auth.login') }}</h1>
         <v-ov-form :options="options" :t="t" @submit="submit" />
+        <v-btn
+          :to="{
+            path: '/signup',
+            query: route.query.redirect ? { redirect: route.query.redirect } : {},
+          }"
+          variant="text"
+          class="mt-4"
+        >
+          {{ t('auth.signup') }}
+        </v-btn>
       </v-col>
     </v-row>
   </v-container>

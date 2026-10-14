@@ -2,6 +2,32 @@ import { describe, expect, it } from 'vitest'
 import { odbAuth } from '../../../src/capabilities/auth/auth.js'
 
 describe('odbAuth framework package', () => {
+  it('creates inactive accounts with hashed single-use confirmation tokens and password-protected retries', () => {
+    const sql = odbAuth.toSQLUp({ schema: 'APP' })
+    expect(sql).toContain('CREATE TABLE APP.odb_auth_confirmations')
+    expect(sql).toContain(
+      'FOREIGN KEY (user_id) REFERENCES APP.odb_auth_users (id) ON DELETE CASCADE',
+    )
+    expect(sql).toContain('ODB_ERROR|VALIDATION_ERROR|SIGNUP_PASSWORD_INVALID')
+    expect(sql).toContain('ODB_ERROR|CONFLICT|SIGNUP_EMAIL_EXISTS')
+    expect(sql).toContain('odb_auth_crypto.verify_password(p_password, l_password_hash)')
+    expect(sql).toContain('odb_auth_crypto.hash_password(p_password)')
+    expect(sql).toContain('l_email := LOWER(TRIM(p_username))')
+    expect(sql).toContain('p_confirmation_token := odb_auth_crypto.random_token(32)')
+    expect(sql).toContain('odb_auth_crypto.hash_token(p_confirmation_token)')
+    expect(sql).toContain("SYSTIMESTAMP + NUMTODSINTERVAL(1, 'DAY')")
+    expect(sql).toContain('l_enabled = 1')
+    expect(sql).not.toContain('l_enabled = TRUE')
+    expect(sql).toContain('TRIM(p_display_name), 0)')
+    expect(sql).toContain('expires_at > CAST(SYSTIMESTAMP AS TIMESTAMP)')
+    expect(sql).toContain('DELETE FROM odb_auth_confirmations')
+    expect(sql).toContain('ODB_ERROR|VALIDATION_ERROR|CONFIRMATION_INVALID')
+    expect(odbAuth.signup('p_email', 'p_password', 'p_name', 'l_token').toSQL()).toBe(
+      'odb_auth.signup(p_email, p_password, p_name, l_token)',
+    )
+    expect(odbAuth.confirmEmail('p_token').toSQL()).toBe('odb_auth.confirm_email(p_token)')
+  })
+
   it('emits tables and auth primitives without ORDS endpoints', () => {
     const sql = odbAuth.toSQLUp({ schema: 'APP' })
     expect(sql).toContain('CREATE TABLE APP.odb_auth_users')

@@ -64,13 +64,14 @@ ov setup-settings .config/dev/settings.json
 ov ss .config/dev/settings.json
 ```
 
-This configures SMTP and JWT together. JSON keys are case-insensitive. Add these
+This configures SMTP, JWT, and the public application URL together. JSON keys are case-insensitive. Add these
 non-secret values to the existing SMTP settings file:
 
 ```json
 {
   "auth_jwt_issuer": "odbvue",
-  "auth_jwt_expiration_seconds": 900
+  "auth_jwt_expiration_seconds": 900,
+  "app_public_url": "http://localhost:5173/"
 }
 ```
 
@@ -133,14 +134,62 @@ protect against a compromised schema owner or an authorized decrypted Settings c
 
 ## HTTP Contract
 
-The sandbox migration (`apps/db/src/migrations/00000000000001-sandbox.ts`) exposes these endpoints beneath `/auth`. `odbAuth` does not register them; the application package does:
+The bootstrap migration (`apps/db/src/migrations/00000000000000-bootstrap.ts`)
+installs `pck_app`, which exposes these endpoints beneath `/auth`. `odbAuth` does
+not register them; the application package does. The sandbox retains duplicate
+login, refresh, logout, and `me` procedures under `/sandbox/auth`, without
+overwriting the application's public routes.
 
-| Endpoint             | Purpose                                                                                                     |
-| -------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `POST /auth/login`   | Accepts JSON `{ username, password }`, sets the refresh cookie, and returns `{ accessToken }`.              |
-| `POST /auth/refresh` | Rotates the refresh cookie and returns `{ accessToken }`.                                                   |
-| `POST /auth/logout`  | Revokes the browser session and expires the refresh cookie.                                                 |
-| `GET /auth/me`       | Requires bearer authentication and returns `userId`, `username`, `displayName`, `roles`, and `permissions`. |
+| Endpoint                   | Purpose                                                                                                                    |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `POST /auth/login`         | Accepts JSON `{ username, password }`, sets the refresh cookie, and returns `{ accessToken }`.                             |
+| `POST /auth/signup`        | Accepts JSON `{ email, fullName, password, passwordRepeat }`, creates an inactive account, and sends a confirmation email. |
+| `POST /auth/confirm-email` | Accepts JSON `{ token }`, consumes an unexpired confirmation token, and enables the account without creating a session.    |
+| `POST /auth/refresh`       | Rotates the refresh cookie and returns `{ accessToken }`.                                                                  |
+| `POST /auth/logout`        | Revokes the browser session and expires the refresh cookie.                                                                |
+| `GET /auth/me`             | Requires bearer authentication and returns `userId`, `username`, `displayName`, `roles`, and `permissions`.                |
+
+### Email signup
+
+Redeploy the database from the reorganized bootstrap migration; this change
+does not supply an incremental signup migration. Bootstrap installs the auth
+confirmation table and all application authentication endpoints together in
+`pck_app`, after the framework packages and settings. The signup page is available
+at `/signup`, linked from Login; there is no Google sign-in or consent dialog.
+
+Configure `APP_PUBLIC_URL` using `ov setup settings`, either through the prompt
+(default `http://localhost:5173/`) or the case-insensitive `app_public_url` key
+in the JSON settings file. Set it to the browser-facing application base URL,
+for example `https://app.example.com/` in production. Use HTTPS in production;
+the localhost prompt default is for development only. Credentials, query
+strings, and fragments are not allowed. The setting is stored in the database,
+not in the runtime YAML configuration. Existing SMTP
+settings and the SMTP host ACL must also be configured. An empty/invalid URL,
+missing SMTP configuration, or failed delivery is an error, not signup success.
+
+Signup normalizes email addresses to lowercase, requires a nonblank full name
+(up to 256 characters), and accepts passwords of 8-256 characters, including
+spaces and symbols. Both password entries are checked by the application API.
+New accounts cannot log in until confirmed and receive no roles by default.
+`odbAuth.signup` returns an opaque random token to the trusted application;
+only its hash is stored in the auth confirmation table. The queued email contains
+the link, so administrator email-queue access is also trusted.
+
+The email link expires after 24 hours. It carries the token in the URL fragment,
+not a server-visible query string. The confirmation page removes the fragment
+from browser history and requires an explicit click before posting the token;
+merely opening the link does not activate an account. Tokens are single-use.
+The user logs in normally after confirmation.
+
+Account creation and the email queue entry are committed before SMTP delivery
+(the sender runs autonomously). On delivery failure, the inactive account and
+failed email remain for diagnosis. Retrying signup with the **same email and
+password** sends a fresh link and invalidates the old one; it never replaces
+another pending account's password or name. Confirmed or administratively
+disabled accounts cannot be overwritten through signup. Signup and confirmation
+attempts use the existing database rate limiter (signup by email and caller IP,
+confirmation by caller IP). Behind a proxy, the database may see a shared IP;
+deployment-level throttling should account for that.
 
 The access token is valid for `AUTH_JWT_EXPIRATION_SECONDS` (15 minutes by default)
 and is rejected at or after its signed expiration. Refresh tokens are opaque,

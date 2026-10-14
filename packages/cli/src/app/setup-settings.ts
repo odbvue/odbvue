@@ -18,6 +18,7 @@ type SetupSettings = {
   auth_jwt_issuer: string
   auth_jwt_expiration_seconds: number
   auth_jwt_secret?: string
+  app_public_url: string
 }
 
 const hostValid = (value: unknown) =>
@@ -38,6 +39,25 @@ const nameValid = (value: unknown) =>
   value.length <= 240 &&
   [...value].every((character) => character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127)
 
+const publicUrlValid = (value: unknown): boolean => {
+  if (
+    typeof value !== 'string' ||
+    value.length > 2000 ||
+    !/^https?:\/\/[^\s<>"'&?#\\]+$/.test(value) ||
+    ![...value].every(
+      (character) => character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127,
+    )
+  )
+    return false
+  try {
+    const url = new URL(value)
+    return !!url.hostname && !url.username && !url.password
+  } catch (error) {
+    if (error instanceof TypeError) return false
+    throw error
+  }
+}
+
 const validators: Record<string, (value: unknown) => boolean> = {
   host: hostValid,
   port: portValid,
@@ -47,6 +67,7 @@ const validators: Record<string, (value: unknown) => boolean> = {
   from_name: nameValid,
   auth_jwt_issuer: (value) => authJwtSettings.issuerValid(value),
   auth_jwt_expiration_seconds: (value) => authJwtSettings.expirationValid(value),
+  app_public_url: publicUrlValid,
 }
 const fileValidators: Record<string, (value: unknown) => boolean> = {
   ...validators,
@@ -67,7 +88,9 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
       const normalized = key.toLowerCase()
       const name = normalized.startsWith('smtp_') ? normalized.slice('smtp_'.length) : normalized
       if (
-        (!normalized.startsWith('smtp_') && !normalized.startsWith('auth_jwt_')) ||
+        (!normalized.startsWith('smtp_') &&
+          !normalized.startsWith('auth_jwt_') &&
+          normalized !== 'app_public_url') ||
         !Object.hasOwn(fileValidators, name)
       ) {
         throw new Error(`Unknown setting key: ${key}`)
@@ -144,6 +167,15 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
         authJwtSettings.issuerValid(value) || 'Enter 1-255 visible ASCII characters (no spaces)',
     },
     {
+      type: 'text',
+      name: 'app_public_url',
+      message: 'Public application URL (for confirmation emails)',
+      initial: 'http://localhost:5173/',
+      validate: (value) =>
+        publicUrlValid(value) ||
+        'Enter an absolute HTTP(S) URL without credentials, query strings, or fragments',
+    },
+    {
       type: 'number',
       name: 'auth_jwt_expiration_seconds',
       message: 'JWT expiration (seconds)',
@@ -189,6 +221,7 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
       ['AUTH_JWT_SECRET', 'jwt_secret'],
       ['AUTH_JWT_ISSUER', 'auth_jwt_issuer'],
       ['AUTH_JWT_EXPIRATION_SECONDS', 'jwt_expiration'],
+      ['APP_PUBLIC_URL', 'app_public_url'],
     ] as const
   )
     .map(([id, bind]) => `  ${schema}.${odbSettings.write(odbLiteral(id), `:${bind}`).toSQL()};`)
@@ -210,6 +243,8 @@ END;`
       })
     })
   })
-  logger.success(`SMTP and JWT settings saved and host ACL updated for ${schema}.`)
+  logger.success(
+    `SMTP, JWT, and application URL settings saved and host ACL updated for ${schema}.`,
+  )
   return true
 }

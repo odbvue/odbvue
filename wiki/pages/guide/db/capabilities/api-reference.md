@@ -16,7 +16,10 @@ transaction boundaries, typed calls, and sandbox services.
 Bootstrap leaves `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`,
 `SMTP_FROM_ADDR`, and `SMTP_FROM_NAME` empty. Run `ov setup-settings` (alias `ov ss`)
 after deployment to fill them and update the SMTP host ACL. The command also
-provisions [JWT settings](./auth#jwt-configuration); `ov setup settings` is equivalent.
+provisions [JWT settings](./auth#jwt-configuration) and `APP_PUBLIC_URL` for signup
+confirmation emails; `ov setup settings` is equivalent. The application URL can
+be imported using the case-insensitive `app_public_url` JSON key or entered at
+the prompt (development default `http://localhost:5173/`).
 `SMTP_PASSWORD` is encrypted and masked by [Settings](./settings); configure its
 master-key provider before running the command.
 

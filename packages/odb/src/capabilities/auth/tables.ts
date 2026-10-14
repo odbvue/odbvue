@@ -26,6 +26,20 @@ export const authSessions = odbTable('odb_auth_sessions', (t) => ({
   .index('odb_auth_sessions_ix_user', (columns) => [columns.userId])
   .unique('odb_auth_sessions_uq_token', (columns) => [columns.refreshTokenHash])
 
+export const authConfirmations = odbTable('odb_auth_confirmations', (t) => ({
+  userId: t.guid().primaryKey(),
+  tokenHash: t.string(128).notNull(),
+  expiresAt: t.timestamp().notNull(),
+}))
+  .unique('odb_auth_confirmations_uq_token', (columns) => [columns.tokenHash])
+  .foreignKey(
+    'odb_auth_confirmations_fk_user',
+    (columns) => [columns.userId],
+    authUsers,
+    (columns) => [columns.id],
+    { onDelete: 'cascade' },
+  )
+
 export const authRoles = odbTable('odb_auth_roles', (t) => ({
   role: t.string(200).primaryKey(),
   description: t.string(2000),

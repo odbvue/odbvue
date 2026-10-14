@@ -63,27 +63,34 @@ ov setup settings .config/dev/settings.json
 JSON keys are case-insensitive (`smtp_host`, `SMTP_HOST`, and `Smtp_Host` are
 equivalent). The command also provisions [JWT configuration](./auth#jwt-configuration).
 The supported keys are the six SMTP IDs above plus `AUTH_JWT_SECRET`,
-`AUTH_JWT_ISSUER`, and `AUTH_JWT_EXPIRATION_SECONDS`. For example:
+`AUTH_JWT_ISSUER`, `AUTH_JWT_EXPIRATION_SECONDS`, and `APP_PUBLIC_URL`. For example:
 
 ```json
 {
   "smtp_host": "smtp.email.eu-stockholm-1.oci.oraclecloud.com",
   "smtp_port": 587,
   "auth_jwt_issuer": "odbvue",
-  "auth_jwt_expiration_seconds": 900
+  "auth_jwt_expiration_seconds": 900,
+  "app_public_url": "http://localhost:5173/"
 }
 ```
 
 The command applies file values and prompts only for missing settings, masking
-the password when prompted. A complete SMTP file with JWT issuer and expiration
-needs no prompts; the signing secret is optional and freshly generated if omitted.
+the password when prompted. A complete SMTP file with JWT issuer, expiration,
+and public application URL needs no prompts; the signing secret is optional and
+freshly generated if omitted. Older files without `app_public_url` prompt for
+that missing value, defaulting to `http://localhost:5173/`.
 The port and JWT expiration must be JSON numbers; the other values must be strings.
 Invalid values, unknown keys, and
 duplicate keys differing only in case are rejected before any database changes.
 Keep files containing credentials out of source control.
 
-Without a file, the command prompts for the six SMTP values, JWT issuer, and JWT
-expiration (default 900 seconds). It never prompts for or prints the signing key.
+Without a file, the command prompts for the six SMTP values, JWT issuer, JWT
+expiration (default 900 seconds), and public application URL (default
+`http://localhost:5173/`). Use the actual HTTPS frontend URL in production.
+The application URL must be an absolute HTTP(S) URL without credentials,
+query strings, or fragments, and is used in signup confirmation emails.
+It never prompts for or prints the signing key.
 It connects using
 the current environment's ADMIN wallet and credentials and uses
 `ODBVUE_ADB_SCHEMA_USERNAME` as the settings owner and ACL principal. It writes
@@ -91,7 +98,7 @@ values through `odb_settings.write` using bind variables. It calls
 [`odbAcl`](./acl) to add the `smtp` grant on the chosen host and port.
 Setup does not read previous settings or remove old host grants; manage those
 separately through the Network ACL page when needed.
-SMTP, JWT, and ACL changes commit together or roll back on failure. Cancelling a
+SMTP, JWT, application URL, and ACL changes commit together or roll back on failure. Cancelling a
 prompt changes nothing. Re-running updates all settings, including the JWT key;
 an omitted signing secret generates a new random key.
 

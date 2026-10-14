@@ -31,7 +31,16 @@ export interface AuthCredentials {
   password: string
 }
 
+export interface SignupCredentials {
+  email: string
+  fullName: string
+  password: string
+  passwordRepeat: string
+}
+
 export interface AuthEndpoints {
+  signup: string
+  confirmEmail: string
   login: string
   refresh: string
   logout: string
@@ -50,6 +59,8 @@ export interface Auth<User extends AuthUser = AuthUser> {
   ready: Readonly<Ref<boolean>>
   authenticated: ComputedRef<boolean>
   login(credentials: AuthCredentials): Promise<void>
+  signup(credentials: SignupCredentials): Promise<void>
+  confirmEmail(token: string): Promise<void>
   logout(): Promise<void>
   refresh(): Promise<boolean>
   restore(): Promise<boolean>
@@ -59,6 +70,8 @@ export interface Auth<User extends AuthUser = AuthUser> {
 }
 
 const defaultEndpoints: AuthEndpoints = {
+  signup: '/auth/signup',
+  confirmEmail: '/auth/confirm-email',
   login: '/auth/login',
   refresh: '/auth/refresh',
   logout: '/auth/logout',
@@ -131,12 +144,30 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
     }
   }
 
+  async function anonymousPost(endpoint: string, body: unknown): Promise<void> {
+    loading.value = true
+    try {
+      const response = await requireHttp().post(endpoint, body, { credentials: 'omit' })
+      if (response.error) throw response.error
+      if (response.status === null || response.status < 200 || response.status >= 300)
+        throw new Error('The authentication request failed.')
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     user: readonly(user) as Readonly<Ref<User | null>>,
     accessToken: readonly(accessToken),
     loading: readonly(loading),
     ready: readonly(ready),
     authenticated: computed(() => !!user.value && !!accessToken.value),
+    signup(credentials) {
+      return anonymousPost(endpoints.signup, credentials)
+    },
+    confirmEmail(token) {
+      return anonymousPost(endpoints.confirmEmail, { token })
+    },
     async login(credentials) {
       loading.value = true
       try {
