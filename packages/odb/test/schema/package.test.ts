@@ -14,12 +14,52 @@ import {
   compileApplicationEndpoints,
   defineService,
   emitApplicationSql,
+  odbBlock,
   odbPackage,
   odbType,
   Procedure,
   ProcedureBody,
 } from '../../src/schema/package.js'
 import { odbTable } from '../../src/schema/table.js'
+
+describe('odbBlock', () => {
+  it('renders empty blocks with the SQL*Plus terminator', () => {
+    expect(odbBlock(() => {})).toBe('BEGIN\n  NULL;\nEND;\n/')
+  })
+
+  it('shares typed declarations, queries, nested handlers and transaction statements with packages', () => {
+    const users = odbTable('users', (t) => ({ id: t.string(32).primaryKey() }))
+    const sql = odbBlock((body) => {
+      const { userId } = body.variables({ userId: users.id })
+      body.savepoint('before_seed')
+      body.query(odbQuery().selectFrom(users).select(users.id).into(userId))
+      body.block((inner) => {
+        inner.set(userId, odbLiteral("O'Brien"))
+        inner.when('NO_DATA_FOUND', (handler) => handler.rollback('before_seed'))
+      })
+      body.when('OTHERS', (handler) => {
+        handler.rollback()
+        handler.raise()
+      })
+    })
+    expect(sql).toContain('DECLARE\n  l_user_id users.id%TYPE')
+    expect(sql).toContain('SAVEPOINT before_seed;')
+    expect(sql).toContain('SELECT id INTO l_user_id FROM users;')
+    expect(sql).toContain("l_user_id := 'O''Brien';")
+    expect(sql).toContain('ROLLBACK TO before_seed;')
+    expect(sql).toMatch(/EXCEPTION\n  WHEN OTHERS THEN\n    ROLLBACK;\n    RAISE;/)
+    expect(sql).toMatch(/END;\n\/$/)
+  })
+
+  it.each(['', 'bad name', 'bad; COMMIT', 'a'.repeat(129)])(
+    'rejects invalid savepoint identifiers: %s',
+    (name) => {
+      expect(() => odbBlock((body) => body.savepoint(name))).toThrow('Savepoint name')
+      expect(() => odbBlock((body) => body.rollback(name))).toThrow('Savepoint name')
+    },
+  )
+})
+
 describe('odbPackage member typing', () => {
   it('invokes a declared procedure locally without assembling a call string', () => {
     const pkg = odbPackage('example', (builder) => {

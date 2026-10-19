@@ -36,6 +36,27 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
     'dummyPasswordHash',
   )
 
+  const readPasswordHash = pkg.privateFunc('read_password_hash', odbType.string(512), (fn) => {
+    const { userId } = fn.parameters({ in: { userId: authUsers.id } })
+    fn.body((body) => {
+      const { passwordHash } = body.variables({ passwordHash: authIdentities.passwordHash })
+      body.query(
+        odbQuery()
+          .selectFrom(authIdentities)
+          .select(authIdentities.passwordHash)
+          .into(passwordHash)
+          .where(
+            cond.and([
+              cond.eq(authIdentities.userId, userId),
+              cond.eq(authIdentities.issuer, 'password'),
+            ]),
+          ),
+      )
+      body.return(passwordHash)
+      body.when('NO_DATA_FOUND', (handler) => handler.return(null))
+    })
+  })
+
   const openSession = pkg.privateProc('open_session', (proc) => {
     const { userId, accessToken, refreshToken } = proc.parameters({
       in: { userId: authTypes.userId },
@@ -83,10 +104,11 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
       out: { confirmationToken: odbType.string(64) },
     },
     ({ params: { username, password, displayName, confirmationToken }, body }) => {
+      body.savepoint('odb_password_signup')
       const { email, userId, passwordHash, enabled, pending } = body.variables({
         email: authUsers.username,
         userId: authUsers.id,
-        passwordHash: authUsers.passwordHash,
+        passwordHash: authIdentities.passwordHash,
         enabled: authUsers.enabled,
         pending: odbType.integer(),
       })
@@ -125,11 +147,12 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
         inner.query(
           odbQuery()
             .selectFrom(authUsers)
-            .select([authUsers.id, authUsers.passwordHash, authUsers.enabled])
-            .into(userId, passwordHash, enabled)
-            .where(cond.eq(odbOracle.lower(authUsers.username), email))
+            .select([authUsers.id, authUsers.enabled])
+            .into(userId, enabled)
+            .where(cond.eq(odbOracle.lower(odbOracle.trim(authUsers.username)), email))
             .forUpdate(),
         )
+        inner.set(passwordHash, readPasswordHash.invoke(userId))
         inner.query(
           odbQuery()
             .selectFrom(authConfirmations)
@@ -141,6 +164,7 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
           cond.or([
             cond.eq(enabled, 1),
             cond.eq(pending, 0),
+            cond.isNull(passwordHash),
             cond.eq(odbAuthCrypto.verifyPassword(password, passwordHash), false),
           ]),
           (then) => then.conflict('SIGNUP_EMAIL_EXISTS'),
@@ -150,9 +174,14 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
           handler.insertInto(authUsers, {
             id: userId,
             username: email,
-            passwordHash: odbAuthCrypto.hashPassword(password),
             displayName: odbOracle.trim(displayName),
             enabled: false,
+          })
+          handler.insertInto(authIdentities, {
+            issuer: 'password',
+            subject: email,
+            userId,
+            passwordHash: odbAuthCrypto.hashPassword(password),
           })
         })
       })
@@ -172,7 +201,14 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
             expiresAt: odbOracle.plus(odbOracle.sysTimestamp(), odbOracle.interval.days(1)),
           }),
       )
-      body.when('DUP_VAL_ON_INDEX', (handler) => handler.conflict('SIGNUP_EMAIL_EXISTS'))
+      body.when('DUP_VAL_ON_INDEX', (handler) => {
+        handler.rollback('odb_password_signup')
+        handler.conflict('SIGNUP_EMAIL_EXISTS')
+      })
+      body.whenOthers((handler) => {
+        handler.rollback('odb_password_signup')
+        handler.raise()
+      })
     },
   )
 
@@ -266,13 +302,13 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
             .into(userId)
             .where(
               cond.and([
-                cond.eq(odbOracle.lower(authUsers.username), email),
+                cond.eq(odbOracle.lower(odbOracle.trim(authUsers.username)), email),
                 cond.eq(authUsers.enabled, true),
-                cond.isNotNull(authUsers.passwordHash),
               ]),
             )
             .forUpdate(),
         )
+        inner.ifThen(cond.isNull(readPasswordHash.invoke(userId)), (then) => then.return())
         inner.when('NO_DATA_FOUND', (handler) => handler.return())
       })
       body.set(resetToken, odbAuthCrypto.randomToken(odbLiteral(32)))
@@ -336,14 +372,11 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
           .selectFrom(authUsers)
           .select([authUsers.id, authUsers.username])
           .into(lockedUserId, email)
-          .where(
-            cond.and([
-              cond.eq(authUsers.id, userId),
-              cond.eq(authUsers.enabled, true),
-              cond.isNotNull(authUsers.passwordHash),
-            ]),
-          )
+          .where(cond.and([cond.eq(authUsers.id, userId), cond.eq(authUsers.enabled, true)]))
           .forUpdate(),
+      )
+      body.ifThen(cond.isNull(readPasswordHash.invoke(userId)), (then) =>
+        then.invalid('PASSWORD_RESET_INVALID'),
       )
       body.query(
         odbQuery()
@@ -357,11 +390,21 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
         odbQuery()
           .updateTable(authUsers)
           .set({
-            passwordHash: odbAuthCrypto.hashPassword(password),
             tokenVersion: plsqlExpr.add(authUsers.tokenVersion, 1),
             updatedAt: odbOracle.sysTimestamp(),
           })
           .where(cond.eq(authUsers.id, userId)),
+      )
+      body.query(
+        odbQuery()
+          .updateTable(authIdentities)
+          .set({ passwordHash: odbAuthCrypto.hashPassword(password) })
+          .where(
+            cond.and([
+              cond.eq(authIdentities.userId, userId),
+              cond.eq(authIdentities.issuer, 'password'),
+            ]),
+          ),
       )
       body.query(
         odbQuery()
@@ -389,7 +432,7 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
     ({ params: { username, password, accessToken, refreshToken }, body: statements }) => {
       const { userId, passwordHash, loginSubject } = statements.variables({
         userId: authUsers.id,
-        passwordHash: authUsers.passwordHash,
+        passwordHash: authIdentities.passwordHash,
         loginSubject: odbType.string(128),
       })
       statements.set(loginSubject, odbOracle.lower(odbOracle.trim(username)))
@@ -398,17 +441,18 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
         inner.query(
           odbQuery()
             .selectFrom(authUsers)
-            .select([authUsers.id, authUsers.passwordHash])
-            .into(userId, passwordHash)
+            .select(authUsers.id)
+            .into(userId)
             .where(
               cond.and([
-                cond.eq(odbOracle.lower(authUsers.username), odbOracle.lower(username)),
+                cond.eq(odbOracle.lower(odbOracle.trim(authUsers.username)), loginSubject),
                 cond.eq(authUsers.enabled, true),
-                cond.isNotNull(authUsers.passwordHash),
               ]),
             )
             .forUpdate(),
         )
+        inner.set(passwordHash, readPasswordHash.invoke(userId))
+        inner.ifThen(cond.isNull(passwordHash), (then) => then.set(userId, null))
         inner.when('NO_DATA_FOUND', (handler) =>
           handler.set(passwordHash, dummyPasswordHashConstant),
         )
@@ -441,7 +485,7 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
       out: { accessToken: authTypes.accessToken, refreshToken: authTypes.refreshToken },
     },
     ({ params: { subject, email, displayName, accessToken, refreshToken }, body }) => {
-      body.raw('SAVEPOINT odb_google_login;')
+      body.savepoint('odb_google_login')
       const { userId, address, existing } = body.variables({
         userId: authUsers.id,
         address: authUsers.username,
@@ -478,14 +522,13 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
               .selectFrom(authUsers)
               .select('COUNT(*)')
               .into(existing)
-              .where(cond.eq(odbOracle.lower(authUsers.username), address)),
+              .where(cond.eq(odbOracle.lower(odbOracle.trim(authUsers.username)), address)),
           )
           handler.ifThen(cond.gt(existing, 0), (then) => then.conflict('GOOGLE_EMAIL_EXISTS'))
           handler.set(userId, odbOracle.lower(odbOracle.rawToHex(odbOracle.sysGuid())))
           handler.insertInto(authUsers, {
             id: userId,
             username: address,
-            passwordHash: odbOracle.null(),
             displayName: odbOracle.substr(
               odbOracle.nvl(odbOracle.trim(displayName), address),
               1,
@@ -498,11 +541,11 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
       })
       body.call(openSession.invoke(userId, accessToken, refreshToken))
       body.when('DUP_VAL_ON_INDEX', (handler) => {
-        handler.raw('ROLLBACK TO odb_google_login;')
+        handler.rollback('odb_google_login')
         handler.conflict('GOOGLE_EMAIL_EXISTS')
       })
       body.whenOthers((handler) => {
-        handler.raw('ROLLBACK TO odb_google_login;')
+        handler.rollback('odb_google_login')
         handler.raise()
       })
     },
@@ -514,7 +557,7 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
       out: {
         sessionId: authSessions.id,
         tokenVersion: authUsers.tokenVersion,
-        passwordHash: authUsers.passwordHash,
+        passwordHash: authIdentities.passwordHash,
       },
     })
     proc.body((body) => {
@@ -528,11 +571,12 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
       body.query(
         odbQuery()
           .selectFrom(authUsers)
-          .select([authUsers.tokenVersion, authUsers.passwordHash])
-          .into(tokenVersion, passwordHash)
+          .select(authUsers.tokenVersion)
+          .into(tokenVersion)
           .where(cond.and([cond.eq(authUsers.id, userId), cond.eq(authUsers.enabled, true)]))
           .forUpdate(),
       )
+      body.set(passwordHash, readPasswordHash.invoke(userId))
       body.query(
         odbQuery()
           .selectFrom(authSessions)
@@ -563,7 +607,7 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
       out: { sessionId: authSessions.id, tokenVersion: authUsers.tokenVersion },
     },
     ({ params: { userId, refreshToken, password, sessionId, tokenVersion }, body }) => {
-      const { passwordHash } = body.variables({ passwordHash: authUsers.passwordHash })
+      const { passwordHash } = body.variables({ passwordHash: authIdentities.passwordHash })
       body.call(odbRateLimitApi.enforce(odbLiteral('AUTH_GOOGLE_LINK_USER'), userId))
       body.call(odbRateLimitApi.failure(odbLiteral('AUTH_GOOGLE_LINK_USER'), userId))
       body.call(linkSession.invoke(userId, refreshToken, sessionId, tokenVersion, passwordHash))
@@ -593,7 +637,7 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
       const current = body.variables({
         currentSession: authSessions.id,
         currentVersion: authUsers.tokenVersion,
-        passwordHash: authUsers.passwordHash,
+        passwordHash: authIdentities.passwordHash,
       })
       body.call(
         linkSession.invoke(

@@ -1,6 +1,6 @@
 # Authentication
 
-`odbAuth` is a database capability, not an HTTP service. It installs users, sessions, roles, user-role grants, and role-permission records. It hashes passwords with PBKDF2-SHA512, issues short-lived access JWTs, rotates opaque refresh tokens, and checks live grants. The package has no ORDS routes and reads no headers or cookies. Applications declare access policy through `defineService`; the generated handler manages bearer authentication and ODB error translation.
+`odbAuth` is a database capability, not an HTTP service. It installs users, login identities, sessions, roles, user-role grants, and role-permission records. It hashes passwords with PBKDF2-SHA512, issues short-lived access JWTs, rotates opaque refresh tokens, and checks live grants. The package has no ORDS routes and reads no headers or cookies. Applications declare access policy through `defineService`; the generated handler manages bearer authentication and ODB error translation.
 
 ## Capability vs service
 
@@ -49,8 +49,17 @@ export const migration = defineMigration('20260913120000_auth', { schema })
 ```
 
 `seedUser()` is idempotent. Use a real secret manager for the initial password in deployed environments.
+It seeds the account and its password identity separately; it does not put credentials
+on the user record.
 
-The runtime packages are defined through ODB's package and query builders. Installation and seeding are a separate concern: `odbAuth.upgrade()` renders idempotent DDL blocks, and seed helpers may render anonymous PL/SQL blocks. These are intentional SQL-string escape hatches, not handwritten runtime package implementations.
+The schema, runtime packages, and seed logic are defined through TypeScript table,
+package, query, and `odbBlock` builders. Seed helpers use typed declarations,
+conditions, queries, and procedure calls rather than handwritten PL/SQL blocks.
+The builders generate the SQL required by Oracle at deployment time.
+`odbBlock(build)` returns a SQL\*Plus-ready string for a migration artifact's
+`toSQLUp()` method. Its callback uses the same `variables`, `query`, `call`,
+`ifThen`, and exception-handler methods as package bodies, including
+`savepoint(name)` and `rollback(name)` for transactional seed operations.
 
 ## JWT configuration
 
@@ -245,13 +254,12 @@ flow with PKCE (S256), state, and nonce. The Login and Signup pages load
 The public client ID is not proof of identity and is not a password. No Google
 script, ID token, or client secret is needed in the frontend.
 
-| Endpoint                    | Contract                                                                                                                                                                                                               |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /auth/google/config`   | Returns `{ "enabled": true }` or `{ "enabled": false }`, without secrets.                                                                                                                                              |
-| `POST /auth/google/start`   | Accepts `{ "redirect": "/local/path" }`, requires the configured application Origin, sets a five-minute HttpOnly transaction cookie, and returns `{ "authorizationUrl": "https://accounts.google.com/..." }`.          |
-| `GET /auth/google/callback` | Accepts Google's `state`, `code`, or `error`, consumes the browser-bound transaction, and redirects with HTTP 303 to Login. On success, sets the normal refresh cookie; the frontend restores its application session. |
-| `POST /auth/google/link/start` | Requires an authenticated access token, the current refresh cookie, the configured Origin, and `{ "redirect": "/account", "password": "<current password>" }`. Starts explicit linking and returns the Google authorization URL. |
-| `GET /auth/google/link/callback` | Verifies the bound linking transaction and current session, attaches the verified identity, and redirects to Account settings without replacing the application session. |
+| Endpoint                       | Contract                                                                                                                                                                                                                                                                         |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /auth/google/config`      | Returns `{ "enabled": true }` or `{ "enabled": false }`, without secrets.                                                                                                                                                                                                        |
+| `POST /auth/google/start`      | Accepts `{ "redirect": "/local/path" }`, requires the configured application Origin, sets a five-minute HttpOnly transaction cookie, and returns `{ "authorizationUrl": "https://accounts.google.com/..." }`.                                                                    |
+| `GET /auth/google/callback`    | Accepts Google's `state`, `code`, or `error` and consumes the browser-bound transaction. Its stored purpose determines login or linking. Login success sets the normal refresh cookie and redirects to Login; linking returns to Account settings without replacing the session. |
+| `POST /auth/google/link/start` | Requires an authenticated access token, the current refresh cookie, the configured Origin, and `{ "redirect": "/account", "password": "<current password>" }`. Starts explicit linking and returns the Google authorization URL.                                                 |
 
 The callback must be exposed through the browser-facing deployment and registered
 **exactly** in the Google Cloud OAuth client's authorized redirect URIs.
@@ -269,9 +277,10 @@ and prints the registered redirect URI automatically:
   for a production same-origin proxy.
 
 Trailing slashes are normalized and the API's existing base path is retained.
-Register the separate linking callback as well: the same API base plus
-`/auth/google/link/callback` (or `/api/auth/google/link/callback` in loopback
-development). `ov ss` provisions and prints both callback URIs.
+Sign-in and linking share this one callback and the `AUTH_GOOGLE_REDIRECT_URI`
+setting. `ov ss` provisions and prints one URI, which needs only one registration
+in Google Cloud. The callback dispatches using the purpose in the consumed
+server-side transaction, never a caller-supplied purpose or user ID.
 Keep `APP_PUBLIC_URL` consistent with the application's browser
 origin. Use HTTPS in production; HTTP is allowed only for explicit loopback
 development URLs. The transaction and refresh cookies always use Secure,
@@ -282,13 +291,15 @@ HttpOnly, SameSite=Lax, Path=/, and the `__Host-` prefix.
 Code generation and TypeScript compilation do not install these changes.
 Apply the database artifacts and schema grants yourself. The bootstrap
 migration installs `odb_google`, its transaction table, the provider identity
-table, nullable local passwords, transaction purpose and session bindings, and
+table, local password identities, transaction purpose and session bindings, and
 the login and linking endpoints. Google linking is part of the TypeScript-defined
 bootstrap; redeploy the database from that bootstrap rather than applying a
 separate linking migration. The TypeScript builders generate the database
-artifacts; no handwritten linking upgrade PL/SQL is required. Re-run `ov ss` to
-provision the linking callback URI, then register both printed URIs in Google
-Cloud before connecting accounts.
+artifacts; no handwritten linking upgrade PL/SQL is required. The existing
+sign-in callback URI is also used for connecting accounts; no second setting
+or Google Cloud callback registration is needed. A legacy link callback setting,
+if present, is unused. Redeploy the updated `odb_google` and application
+artifacts before using the shared flow.
 
 `ov ss` / `ov setup settings` supports these case-insensitive JSON settings:
 
@@ -306,7 +317,7 @@ are aliases for the **database** client-ID setting; specifying more than one
 alias is rejected. A frontend `.env` entry alone does not enable Google login.
 Never put the client secret in a `VITE_*` variable.
 
-Do not supply `AUTH_GOOGLE_REDIRECT_URI` or `AUTH_GOOGLE_LINK_REDIRECT_URI`
+Do not supply `AUTH_GOOGLE_REDIRECT_URI`
 in JSON or enter them at a prompt.
 They are internal database settings written by `ov ss` after deriving the
 callbacks from the existing URLs. JSON files containing either key are
@@ -333,6 +344,26 @@ verification. Use the production Settings master-key provider for client-secret 
 
 ### Identity and session policy
 
+An application account is distinct from its login methods:
+
+| Table                 | Responsibility                                                                                                                    |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `odb_auth_users`      | Stable user ID, account email (`username`), display name, enabled state, and token version. No password hash or provider subject. |
+| `odb_auth_identities` | Account reference, issuer, subject, and an optional password hash for local credentials only.                                     |
+
+Accounts are unique by `LOWER(TRIM(username))`. Registration and password login
+use the same trim-and-lowercase normalization; Gmail-specific dot or plus-address
+rewriting is not performed. Local identities use the reserved issuer `password`
+and the normalized username as subject. There is at most one password identity
+per user. Federated identities have no password hash and are globally unique
+by `(issuer, subject)`. A user can have both a password identity and Google
+identities, all reaching the same account, roles, data, and sessions.
+
+This schema is installed by rebuilding the database with the updated bootstrap
+migration. There is no additional application migration or legacy `odbAuth.upgrade()`
+API. Rebuilding removes existing data; preserving data from an older schema requires
+a separately planned migration.
+
 Only a server-verified Google identity can reach the trusted
 `odbAuth.loginGoogle` primitive. Google tokens are verified using Google's
 RSA signing keys, the configured audience, issuer, timestamps, nonce, and
@@ -348,16 +379,25 @@ login or password recovery/reset to silently establish a password.
 
 An email collision with any existing local account is rejected; signup,
 confirmation state, password, and account enablement are not overwritten.
-There is no automatic linking or account merge. Existing password users can
-sign in with their existing authentication method, open **Account settings**,
-and choose **Connect Google** after confirming their current password.
+There is no automatic linking or account merge. On a Google email collision,
+the callback preserves the requested local destination and sends the browser
+through existing-account login to **Account settings**. The user can choose
+**Connect Google**, confirm their current password, and complete a fresh Google
+authorization. Successful linking continues to the original validated local
+destination. Cancellation or failure stays on Account settings for retry;
+**Continue without connecting** skips linking without changing identities.
+The original Google token/subject is not retained for deferred linking, and a
+matching email or a redirect query never authorizes attaching an identity.
+Password users can also start this flow directly from Account settings.
 The Google email need not match the local account email: the explicit,
 authenticated transaction authorizes linking, not email equality.
 
-Linking uses a separate, five-minute OIDC transaction bound to the initiating
+Linking uses its own five-minute OIDC transaction bound to the initiating
 user and session. It retains state, browser-cookie binding, nonce, PKCE, and
 single-use consumption. A revoked, expired, or changed session cannot complete
-the link. Login and linking transactions cannot be substituted for each other.
+the link. Both purposes return through the same callback; its purpose is read
+only from the consumed transaction. State, nonce, PKCE, browser binding, and the
+link-session checks prevent substituting a login transaction for a linking proof.
 The verified Google issuer and subject are attached to the existing user without
 changing their email, password, roles, or application session. Reconnecting the
 same identity to the same user is idempotent; an identity belonging to another

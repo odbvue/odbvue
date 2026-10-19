@@ -191,7 +191,7 @@ translation still determines the status when the procedure raises.
 Install `odbGoogle` after `odbAuth` and `odbSettings`, then install
 `odbGoogle.seedSettings()` to create missing, disabled-by-default provider
 configuration. Its `enabled()`, `publicUrl()`, `start(returnPath, authorizationUrl, browserToken)`,
-and `complete(state, code, browserToken, providerError, refreshToken, returnPath, outcome)`
+and `complete(state, code, browserToken, providerError, currentRefresh, refreshToken, returnPath, outcome, purpose)`
 helpers build calls into the transport-independent `odb_google` package.
 `publicUrl()` reads and validates `APP_PUBLIC_URL`. The `start` and `complete`
 primitives enforce attempt throttling for direct PL/SQL callers as well as HTTP
@@ -210,15 +210,18 @@ of `loginGoogle`. A password-confirmed linking transaction binds the initiating
 user and session to the verified Google identity. Linking never creates a user,
 changes profile fields or roles, or opens a replacement session. An identity
 owned by another user is rejected; reconnecting the same identity to its owner
-is idempotent. Register both login and linking callback URIs and retain all OIDC
-transaction checks.
+is idempotent. Both purposes use the single configured `AUTH_GOOGLE_REDIRECT_URI`
+and `/auth/google/callback`; retain all OIDC transaction checks.
 
 Use `odbGoogle.startLink(returnPath, userId, refreshToken, password, authorizationUrl, browserToken)`
-and `odbGoogle.completeLink(state, code, browserToken, providerError, currentRefresh, returnPath, outcome)`
-from the application transport. The user ID must come from authenticated server
+from the application transport, followed by the shared `odbGoogle.complete`.
+Its `purpose` is an OUT value from the consumed server-side transaction, not
+caller input. Login success returns refresh credentials; linking validates the
+current refresh cookie and returns an outcome without opening a session.
+The user ID must come from authenticated server
 context and the refresh token from the current HttpOnly cookie, not request-body
 identity fields. `odbAuth.linkGoogle` remains a trusted server-only primitive,
 called only after successful provider and transaction verification.
 The TypeScript-defined bootstrap installs the transaction binding columns and
-both linking endpoints. Redeploy the database from the bootstrap; there is no
+the authenticated linking start and shared callback endpoints. Redeploy the database from the bootstrap; there is no
 separate Google linking migration or handwritten linking upgrade PL/SQL.

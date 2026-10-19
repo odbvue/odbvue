@@ -250,7 +250,7 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
       try {
         const response = await requireHttp().post<GoogleLinkResponse>(
           endpoints.googleLinkStart,
-          { redirect: '/account', password: linkOptions.password },
+          { redirect: linkOptions.redirect ?? '/account', password: linkOptions.password },
           {
             credentials: 'include',
             headers: { Authorization: ['Bearer', accessToken.value].join(' ') },

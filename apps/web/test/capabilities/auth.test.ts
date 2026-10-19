@@ -37,14 +37,8 @@ describe('authentication capability', () => {
     expect(context.post).not.toHaveBeenCalled()
   })
 
-  it.each([
-    '/account',
-    '//evil.example',
-    'https://evil.example',
-    '/login',
-    '/account?google=linked',
-  ])(
-    'links with bearer auth, cookies and fixed account destination instead of %s',
+  it.each(['/account', '/sandbox', '/sandbox?tab=profile#section'])(
+    'links with bearer auth, cookies and the requested local destination %s',
     async (redirect) => {
       const { auth, post } = await linkSession()
       const user = auth.user.value
@@ -57,7 +51,7 @@ describe('authentication capability', () => {
       })
       expect(post).toHaveBeenCalledWith(
         '/auth/google/link/start',
-        { redirect: '/account', password: 'current-password' },
+        { redirect, password: 'current-password' },
         {
           credentials: 'include',
           headers: { Authorization: ['Bearer', 'original-token'].join(' ') },
@@ -69,6 +63,19 @@ describe('authentication capability', () => {
       expect(auth.loading.value).toBe(false)
     },
   )
+
+  it('defaults linking to account settings when no destination was supplied', async () => {
+    const { auth, post } = await linkSession()
+    post.mockResolvedValue(
+      response({ authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth' }),
+    )
+    await auth.startGoogleLink({ password: 'current-password' })
+    expect(post).toHaveBeenCalledWith(
+      '/auth/google/link/start',
+      { redirect: '/account', password: 'current-password' },
+      expect.objectContaining({ credentials: 'include', skipAuthRefresh: true }),
+    )
+  })
 
   it.each([
     'https://evil.example/o/oauth2/v2/auth',

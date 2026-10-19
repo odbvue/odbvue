@@ -45,7 +45,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Consume a Google transaction and establish an application session */
+        /** Complete Google sign-in or linking using the stored transaction purpose */
         get: operations["auth_google_callback"];
         put?: never;
         post?: never;
@@ -66,23 +66,6 @@ export interface paths {
         put?: never;
         /** Reauthenticate and bind Google linking to the current user and browser session */
         post: operations["auth_google_link_start"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/google/link/callback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Attach a verified Google identity without changing the current session */
-        get: operations["auth_google_link_callback"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -533,7 +516,6 @@ export interface components {
         AuthGoogleLinkStartResponse: {
             authorizationUrl: string;
         };
-        AuthGoogleLinkCallbackResponse: Record<string, never>;
         AuthLoginResponse: {
             accessToken: string;
         };
@@ -766,32 +748,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-        };
-    };
-    auth_google_link_callback: {
-        parameters: {
-            query?: {
-                state?: string;
-                code?: string;
-                error?: string;
-            };
-            header?: {
-                Cookie?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            303: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AuthGoogleLinkCallbackResponse"];
-                };
             };
         };
     };

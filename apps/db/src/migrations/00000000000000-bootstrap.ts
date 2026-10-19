@@ -21,7 +21,6 @@ import {
   odbType,
   plsqlExpr,
   type Package,
-  ODB_ERROR_NUMBER,
   PlsqlExpression,
 } from '@odbvue/odb'
 
@@ -135,7 +134,7 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
         cookie: odbType.string(4000),
       },
       out: {
-        location: odbType.string(4000),
+        location: odbType.string(32767),
         setCookie: odbType.string(4000),
         cacheControl: odbType.string(32),
         referrerPolicy: odbType.string(32),
@@ -145,48 +144,57 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
       params: { state, code, error, cookie, location, setCookie, cacheControl, referrerPolicy },
       body,
     }) => {
-      const { appUrl, refreshToken, returnPath, outcome } = body.variables({
+      const { appUrl, refreshToken, returnPath, outcome, purpose, callbackPath } = body.variables({
         appUrl: odbSettings.types.value,
         refreshToken: odbAuth.types.refreshToken,
-        returnPath: odbType.string(2048),
+        returnPath: odbType.string(32767),
         outcome: odbType.string(32),
+        purpose: odbType.string(8),
+        callbackPath: odbType.string(32),
       })
       body.set(appUrl, odbGoogle.publicUrl())
-      body.block((inner) => {
-        inner.call(
-          odbGoogle.complete(
-            state,
-            code,
-            googleCookie.read(cookie),
-            error,
-            refreshToken,
-            returnPath,
-            outcome,
-          ),
-        )
-        inner.whenOthers((handler) => {
-          handler.ifThen(
-            cond.and([
-              cond.eq(new PlsqlExpression('NUMBER', 'SQLCODE'), ODB_ERROR_NUMBER),
-              cond.regexpLike(
-                new PlsqlExpression('VARCHAR2', 'SQLERRM'),
-                'ODB_ERROR\\|CONFLICT\\|GOOGLE_EMAIL_EXISTS',
-              ),
-            ]),
-            (then) => {
-              then.set(outcome, 'conflict')
-              then.call(
-                odbAudit.warn(
-                  odbLiteral('Google sign-in: existing email requires explicit linking'),
-                ),
-              )
-            },
-            (otherwise) => otherwise.raise(),
-          )
-        })
-      })
+      body.call(
+        odbGoogle.complete(
+          state,
+          code,
+          googleCookie.read(cookie),
+          error,
+          refreshCookie.read(cookie),
+          refreshToken,
+          returnPath,
+          outcome,
+          purpose,
+        ),
+      )
       body.ifThen(
-        cond.eq(outcome, 'success'),
+        cond.eq(purpose, 'link'),
+        (link) => {
+          link.set(callbackPath, '/account?google=')
+          link.set(returnPath, odbOracle.nvl(returnPath, odbLiteral('/account')))
+          link.ifThen(cond.eq(outcome, 'success'), (then) => then.set(outcome, 'linked'))
+        },
+        (login) => {
+          login.set(callbackPath, '/login?google=')
+          login.set(returnPath, odbOracle.nvl(returnPath, odbLiteral('/')))
+          login.ifThen(cond.eq(outcome, 'conflict'), (then) => {
+            then.set(
+              returnPath,
+              plsqlExpr.concat(
+                '/account?redirect=',
+                plsqlExpr.call(
+                  'VARCHAR2',
+                  'UTL_URL.ESCAPE',
+                  returnPath,
+                  new PlsqlExpression('BOOLEAN', 'TRUE'),
+                  odbLiteral('AL32UTF8'),
+                ),
+              ),
+            )
+          })
+        },
+      )
+      body.ifThen(
+        cond.and([cond.eq(purpose, 'login'), cond.eq(outcome, 'success')]),
         (then) => then.set(setCookie, refreshCookie.set(refreshToken)),
         (otherwise) => otherwise.set(setCookie, googleCookie.expire()),
       )
@@ -194,7 +202,7 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
         location,
         plsqlExpr.concat(
           odbOracle.rtrim(appUrl, odbLiteral('/')),
-          odbLiteral('/login?google='),
+          callbackPath,
           outcome,
           odbLiteral('&redirect='),
           plsqlExpr.call(
@@ -216,7 +224,7 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
     path: '/google/callback',
     module: 'auth',
     basePath: '/auth',
-    summary: 'Consume a Google transaction and establish an application session',
+    summary: 'Complete Google sign-in or linking using the stored transaction purpose',
     responseStatus: 303,
     query: {
       state: googleCallback.parameters.state,
@@ -299,76 +307,6 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
       'Sec-Fetch-Site': googleLinkStart.parameters.fetchSite,
       'Set-Cookie': googleLinkStart.parameters.setCookie,
       'Cache-Control': googleLinkStart.parameters.cacheControl,
-    },
-  })
-
-  const googleLinkCallback = pkg.proc(
-    'google_link_callback',
-    {
-      in: {
-        state: odbType.string(128),
-        code: odbType.string(4000),
-        error: odbType.string(256),
-        cookie: odbType.string(4000),
-      },
-      out: {
-        location: odbType.string(4000),
-        cacheControl: odbType.string(32),
-        referrerPolicy: odbType.string(32),
-      },
-    },
-    ({ params: p, body }) => {
-      const { appUrl, returnPath, outcome } = body.variables({
-        appUrl: odbSettings.types.value,
-        returnPath: odbType.string(2048),
-        outcome: odbType.string(32),
-      })
-      body.set(appUrl, odbGoogle.publicUrl())
-      body.block((link) => {
-        link.call(
-          odbGoogle.completeLink(
-            p.state,
-            p.code,
-            googleCookie.read(p.cookie),
-            p.error,
-            refreshCookie.read(p.cookie),
-            returnPath,
-            outcome,
-          ),
-        )
-        link.whenOthers((handler) => {
-          handler.rollback()
-          handler.set(outcome, 'error')
-        })
-      })
-      body.ifThen(cond.eq(outcome, 'success'), (then) => then.set(outcome, 'linked'))
-      // The account destination is fixed: neither provider input nor a failed transaction can redirect elsewhere.
-      body.set(
-        p.location,
-        plsqlExpr.concat(odbOracle.rtrim(appUrl, odbLiteral('/')), '/account?google=', outcome),
-      )
-      body.set(p.cacheControl, 'no-store')
-      body.set(p.referrerPolicy, 'no-referrer')
-    },
-  )
-  defineService(googleLinkCallback, {
-    auth: 'anonymous',
-    method: 'GET',
-    path: '/google/link/callback',
-    module: 'auth',
-    basePath: '/auth',
-    responseStatus: 303,
-    summary: 'Attach a verified Google identity without changing the current session',
-    query: {
-      state: googleLinkCallback.parameters.state,
-      code: googleLinkCallback.parameters.code,
-      error: googleLinkCallback.parameters.error,
-    },
-    headers: {
-      Cookie: googleLinkCallback.parameters.cookie,
-      Location: googleLinkCallback.parameters.location,
-      'Cache-Control': googleLinkCallback.parameters.cacheControl,
-      'Referrer-Policy': googleLinkCallback.parameters.referrerPolicy,
     },
   })
 

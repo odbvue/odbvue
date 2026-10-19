@@ -4,6 +4,7 @@
       <v-col cols="12" sm="8" md="6">
         <h1 class="mb-4">{{ t('auth.account.title') }}</h1>
         <p class="mb-4">{{ auth.user.value?.username }}</p>
+        <p v-if="continuing" class="mb-4">{{ t('auth.google.link.continue') }}</p>
         <template v-if="enabled">
           <h2 class="mb-4">{{ t('auth.google.connect') }}</h2>
           <p class="mb-4">{{ t('auth.google.link.description') }}</p>
@@ -21,6 +22,15 @@
             </v-btn>
           </form>
         </template>
+        <v-btn
+          v-if="continuing"
+          class="mt-4"
+          variant="text"
+          :disabled="starting || auth.loading.value"
+          @click="router.replace(destination)"
+        >
+          {{ t('auth.google.link.skip') }}
+        </v-btn>
       </v-col>
     </v-row>
   </v-container>
@@ -29,6 +39,7 @@
 <script setup lang="ts">
 import { useAuth } from '@/capabilities/auth'
 import { useUi } from '@/capabilities/ui'
+import { resolveAuthRedirect } from '@/capabilities/routing'
 
 definePage({
   meta: {
@@ -46,6 +57,8 @@ const { t } = useI18n()
 const enabled = ref(false)
 const starting = ref(false)
 const password = ref('')
+const destination = computed(() => resolveAuthRedirect(router, route.query.redirect, '/account'))
+const continuing = computed(() => destination.value !== '/account')
 const canConnect = computed(
   () =>
     enabled.value &&
@@ -62,8 +75,13 @@ onMounted(async () => {
     const query = { ...route.query }
     delete query.google
     await router.replace({ path: route.path, query, hash: route.hash })
-    if (result === 'linked') ui.success('auth.google.link.linked')
-    else if (result === 'cancelled') ui.error('auth.google.link.cancelled')
+    if (result === 'linked') {
+      ui.success('auth.google.link.linked')
+      if (continuing.value) {
+        await router.replace(destination.value)
+        return
+      }
+    } else if (result === 'cancelled') ui.error('auth.google.link.cancelled')
     else if (result === 'conflict') ui.error('auth.google.link.conflict')
     else ui.error('auth.google.link.failed')
   }
@@ -83,14 +101,18 @@ async function connect() {
   password.value = ''
   try {
     const { authorizationUrl } = await auth.startGoogleLink({
-      redirect: '/account',
+      redirect: destination.value,
       password: currentPassword,
     })
     window.location.assign(authorizationUrl)
   } catch (error) {
     starting.value = false
     const status = error instanceof Error && 'status' in error ? error.status : undefined
-    if (status === 401 || status === 403) ui.error('auth.google.link.reauthenticate')
+    const response = error instanceof Error && 'data' in error ? error.data : undefined
+    const code =
+      response && typeof response === 'object' && 'code' in response ? response.code : undefined
+    if (code === 'GOOGLE_CONFIG_INVALID') ui.error('auth.google.link.configuration')
+    else if (status === 401 || status === 403) ui.error('auth.google.link.reauthenticate')
     else if (status === 409) ui.error('auth.google.link.conflict')
     else if (status === 429) ui.error('auth.too.many.requests')
     else ui.error('auth.google.link.failed')

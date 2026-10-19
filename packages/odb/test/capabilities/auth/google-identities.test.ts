@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { odbAuth } from '../../../src/capabilities/auth/auth.js'
+import { odbAuthPackage } from '../../../src/capabilities/auth/package.js'
 
 function procedure(sql: string, name: string): string {
   const body = sql.indexOf('PACKAGE BODY APP.odb_auth AS')
@@ -11,6 +12,15 @@ function procedure(sql: string, name: string): string {
 }
 
 describe('trusted Google identities', () => {
+  it('defines authentication control flow without raw statement nodes', () => {
+    const visit = (node: unknown): void => {
+      if (!node || typeof node !== 'object') return
+      if ('kind' in node) expect(node.kind).not.toBe('raw')
+      for (const value of Object.values(node)) visit(value)
+    }
+    visit(odbAuthPackage.application())
+  })
+
   it('stores provider subjects separately and permits accounts without local passwords', () => {
     const sql = odbAuth.toSQLUp({ schema: 'APP' })
     expect(sql).toContain('CREATE TABLE APP.odb_auth_identities')
@@ -20,15 +30,21 @@ describe('trusted Google identities', () => {
     expect(sql).toContain(
       'FOREIGN KEY (user_id) REFERENCES APP.odb_auth_users (id) ON DELETE CASCADE',
     )
-    expect(sql).not.toContain('password_hash VARCHAR2(512 CHAR) NOT NULL')
+    const users = sql.slice(
+      sql.indexOf('CREATE TABLE APP.odb_auth_users'),
+      sql.indexOf('CREATE TABLE APP.odb_auth_identities'),
+    )
+    expect(users).not.toContain('password_hash')
+    expect(users).toContain('(LOWER(TRIM(username)))')
+    expect(sql).toContain('password_hash VARCHAR2(512 CHAR)')
+    expect(sql).toContain("CASE WHEN issuer = 'password' THEN user_id END")
+    expect(sql).toContain(
+      "(issuer = 'password' AND password_hash IS NOT NULL) OR (issuer != 'password' AND password_hash IS NULL)",
+    )
     const down = odbAuth.toSQLDown({ schema: 'APP' })
     expect(down.indexOf('DROP TABLE APP.odb_auth_identities')).toBeLessThan(
       down.indexOf('DROP TABLE APP.odb_auth_users'),
     )
-    const upgrade = odbAuth.upgrade().toSQLUp({ schema: 'APP' })
-    expect(upgrade).toContain('ALTER TABLE APP.odb_auth_users MODIFY (password_hash NULL)')
-    expect(upgrade).toContain("IF l_nullable = 'N' THEN")
-    expect(upgrade).toContain("EXECUTE IMMEDIATE 'CREATE TABLE APP.odb_auth_identities")
   })
 
   it('resolves subject first and never merges or overwrites an existing account by email', () => {
@@ -36,7 +52,7 @@ describe('trusted Google identities', () => {
     const google = procedure(sql, 'login_google')
     expect(google).toContain("issuer = 'https://accounts.google.com'")
     expect(google).toContain('subject = p_subject')
-    expect(google).toContain('LOWER(username) = l_address')
+    expect(google).toContain('LOWER(TRIM(username)) = l_address')
     expect(google).toContain('GOOGLE_EMAIL_EXISTS')
     expect(google.indexOf('GOOGLE_EMAIL_EXISTS')).toBeLessThan(
       google.indexOf('INSERT INTO odb_auth_users'),
@@ -71,11 +87,35 @@ describe('trusted Google identities', () => {
   it('does not enable password login or recovery/reset for Google-only accounts', () => {
     const sql = odbAuth.toSQLUp({ schema: 'APP' })
     for (const name of ['login', 'recover_password', 'reset_password']) {
-      expect(procedure(sql, name)).toContain('password_hash IS NOT NULL')
+      expect(procedure(sql, name)).toContain('read_password_hash(l_user_id)')
     }
+    expect(procedure(sql, 'login')).toContain('IF l_password_hash IS NULL THEN')
+    expect(procedure(sql, 'login')).toContain('l_user_id := NULL')
+    expect(procedure(sql, 'recover_password')).toContain(
+      'IF read_password_hash(l_user_id) IS NULL THEN',
+    )
     expect(procedure(sql, 'login')).toContain('c_dummy_password_hash')
     expect(procedure(sql, 'recover_password')).toMatch(/WHEN NO_DATA_FOUND THEN\s+RETURN;/)
     expect(procedure(sql, 'reset_password')).toContain('PASSWORD_RESET_INVALID')
+  })
+
+  it('creates and resets only local identities without putting credentials back on accounts', () => {
+    const sql = odbAuth.toSQLUp()
+    const signup = procedure(odbAuth.toSQLUp({ schema: 'APP' }), 'signup')
+    expect(signup).toContain('INSERT INTO odb_auth_users (id, username, display_name, enabled)')
+    expect(signup).toContain(
+      'INSERT INTO odb_auth_identities (issuer, subject, user_id, password_hash)',
+    )
+    expect(signup).toContain(
+      "'password', l_email, l_user_id, odb_auth_crypto.hash_password(p_password)",
+    )
+    expect(signup).toContain('l_password_hash IS NULL')
+    expect(signup).toContain('ROLLBACK TO odb_password_signup')
+    expect(sql).toContain(
+      'UPDATE odb_auth_identities SET password_hash = odb_auth_crypto.hash_password(p_password)',
+    )
+    expect(sql).toContain("WHERE (user_id = l_user_id AND issuer = 'password')")
+    expect(sql).not.toMatch(/UPDATE odb_auth_users SET password_hash/)
   })
 
   it('reauthenticates password users without creating or rotating a session', () => {

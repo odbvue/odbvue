@@ -2,14 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { odbAuth } from '../../../src/capabilities/auth/auth.js'
 
 describe('odbAuth framework package', () => {
-  it('isolates hashed one-hour recovery tokens and installs/upgrades/drops their table', () => {
+  it('isolates hashed one-hour recovery tokens and installs/drops their table', () => {
     const sql = odbAuth.toSQLUp({ schema: 'APP' })
     expect(sql).toContain('CREATE TABLE APP.odb_auth_password_resets')
     expect(sql).toContain(
       'odb_auth_pw_resets_fk_user FOREIGN KEY (user_id) REFERENCES APP.odb_auth_users (id) ON DELETE CASCADE',
-    )
-    expect(odbAuth.upgrade().toSQLUp({ schema: 'APP' })).toContain(
-      "EXECUTE IMMEDIATE 'CREATE TABLE APP.odb_auth_password_resets",
     )
     const down = odbAuth.toSQLDown({ schema: 'APP' })
     expect(down.indexOf('DROP TABLE APP.odb_auth_password_resets')).toBeLessThan(

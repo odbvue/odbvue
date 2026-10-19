@@ -60,6 +60,7 @@ async function setup(
     routes: [
       { path: '/', component: {} },
       { path: '/login', component: {} },
+      { path: '/sandbox', component: {} },
       { path: '/account', component: {}, meta: { access: 'authenticated', navigation: false } },
     ],
   })
@@ -181,6 +182,66 @@ describe('explicit Google connection in account settings', () => {
     context.wrapper.unmount()
   })
 
+  it('carries the validated destination through a fresh explicit Google authorization', async () => {
+    const context = await setup({ location: '/account?redirect=%2Fsandbox' })
+    expect(context.wrapper.findAll('button')).toHaveLength(2)
+    await context.wrapper.find('input').setValue('current-password')
+    context.fetch.mockResolvedValueOnce(
+      json({ authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=fresh-link' }),
+    )
+    await context.wrapper.find('form').trigger('submit')
+    await flushPromises()
+    const [, options] = context.fetch.mock.calls[0]!
+    expect(JSON.parse(String(options?.body))).toEqual({
+      redirect: '/sandbox',
+      password: 'current-password',
+    })
+    expect(assign).toHaveBeenCalledWith(
+      'https://accounts.google.com/o/oauth2/v2/auth?state=fresh-link',
+    )
+    context.wrapper.unmount()
+  })
+
+  it('continues to the original destination after a successful link without replacing the session', async () => {
+    const context = await setup({ location: '/account?google=linked&redirect=%2Fsandbox' })
+    expect(context.router.currentRoute.value.fullPath).toBe('/sandbox')
+    expect(context.auth.accessToken.value).toBe('original-token')
+    expect(context.auth.user.value?.id).toBe(7)
+    expect(context.ui.notification.value?.message).toBe('auth.google.link.linked')
+    context.wrapper.unmount()
+  })
+
+  it.each(['cancelled', 'error'])('keeps the destination for retry after %s', async (outcome) => {
+    const context = await setup({ location: `/account?google=${outcome}&redirect=%2Fsandbox` })
+    expect(context.router.currentRoute.value.path).toBe('/account')
+    expect(context.router.currentRoute.value.query.redirect).toBe('/sandbox')
+    expect(context.ui.notification.value?.type).toBe('error')
+    expect(assign).not.toHaveBeenCalled()
+    context.wrapper.unmount()
+  })
+
+  it('lets users continue without adding a Google identity', async () => {
+    const context = await setup({ location: '/account?redirect=%2Fsandbox' })
+    await context.wrapper.findAll('button')[1]!.trigger('click')
+    await flushPromises()
+    expect(context.router.currentRoute.value.fullPath).toBe('/sandbox')
+    expect(context.fetch).not.toHaveBeenCalled()
+    context.wrapper.unmount()
+  })
+
+  it.each(['https://evil.example', '//evil.example', '/login', '/missing-route'])(
+    'never follows unsafe callback destination %s',
+    async (redirect) => {
+      const context = await setup({
+        location: `/account?google=linked&redirect=${encodeURIComponent(redirect)}`,
+      })
+      expect(context.router.currentRoute.value.path).toBe('/account')
+      expect(context.wrapper.findAll('button')).toHaveLength(1)
+      expect(assign).not.toHaveBeenCalled()
+      context.wrapper.unmount()
+    },
+  )
+
   it.each([
     ['linked', 'success', 'auth.google.link.linked'],
     ['cancelled', 'error', 'auth.google.link.cancelled'],
@@ -219,6 +280,20 @@ describe('explicit Google connection in account settings', () => {
     expect(context.auth.accessToken.value).toBe('original-token')
     await context.wrapper.find('input').setValue('retry-password')
     expect(context.wrapper.find('button').attributes('disabled')).toBeUndefined()
+    expect(assign).not.toHaveBeenCalled()
+    context.wrapper.unmount()
+  })
+
+  it('explains configuration errors without exposing backend details or replacing the session', async () => {
+    const context = await setup()
+    await context.wrapper.find('input').setValue('password')
+    context.fetch.mockResolvedValueOnce(json({ code: 'GOOGLE_CONFIG_INVALID' }, 422))
+    await context.wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(context.ui.notification.value?.message).toBe('auth.google.link.configuration')
+    expect(context.auth.accessToken.value).toBe('original-token')
+    expect(context.auth.user.value?.id).toBe(7)
+    expect(context.ui.loading.value).toBe(false)
     expect(assign).not.toHaveBeenCalled()
     context.wrapper.unmount()
   })

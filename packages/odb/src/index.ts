@@ -7,6 +7,7 @@ export * from './schema/attribute.js'
 export * from './schema/errors.js'
 export {
   odbPackage,
+  odbBlock,
   defineService,
   emitApplicationSql,
   odbType,

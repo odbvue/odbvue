@@ -267,7 +267,8 @@ export type StatementNode =
   | { kind: 'return'; value?: string }
   | { kind: 'null' }
   | { kind: 'commit' }
-  | { kind: 'rollback' }
+  | { kind: 'rollback'; savepoint?: string }
+  | { kind: 'savepoint'; name: string }
   | { kind: 'raise'; exception?: string }
   | { kind: 'raise-application-error'; number: number; message: string }
   | { kind: 'call'; sql: string }
@@ -577,8 +578,15 @@ export class ProcedureBody {
     return this
   }
 
-  rollback(): this {
-    this._statements.push({ kind: 'rollback' })
+  savepoint(name: string): this {
+    validateSavepointName(name)
+    this._statements.push({ kind: 'savepoint', name })
+    return this
+  }
+
+  rollback(savepoint?: string): this {
+    if (savepoint !== undefined) validateSavepointName(savepoint)
+    this._statements.push({ kind: 'rollback', savepoint })
     return this
   }
 
@@ -960,19 +968,13 @@ export class ProcedureBody {
     const dynamic = new ProcedureBody()
     build(dynamic)
     const body = dynamic.toNode()
-    const lines: string[] = []
-    emitBodyDeclarations(lines, body, '  ')
-    if (lines.length > 0) lines.unshift('DECLARE')
-    lines.push('BEGIN', ...emitStatementBlock(body.statements, '  '))
-    emitExceptionSection(lines, body.exceptionHandlers, '')
-    lines.push('END;')
     const using =
       bindings.length === 0
         ? ''
         : ` USING ${bindings.map((binding) => `${binding.direction} ${renderPlsql(binding.value)}`).join(', ')}`
     this._statements.push({
       kind: 'call',
-      sql: `EXECUTE IMMEDIATE ${renderPlsqlLiteral(lines.join('\n'))}${using}`,
+      sql: `EXECUTE IMMEDIATE ${renderPlsqlLiteral(emitAnonymousBlock(body))}${using}`,
     })
     return this
   }
@@ -2028,6 +2030,28 @@ function emitFunctionImplAt(fn: FunctionNode, indent: string): string {
   return lines.join('\n')
 }
 
+/** Build a SQL*Plus-compatible anonymous block using typed declarations and statements. */
+export function odbBlock(build: (body: ProcedureBody) => void): string {
+  const body = new ProcedureBody()
+  build(body)
+  return `${emitAnonymousBlock(body.toNode())}\n/`
+}
+
+function emitAnonymousBlock(body: ProcedureBodyNode): string {
+  const lines: string[] = []
+  emitBodyDeclarations(lines, body, '  ')
+  if (lines.length > 0) lines.unshift('DECLARE')
+  lines.push('BEGIN', ...emitStatementBlock(body.statements, '  '))
+  emitExceptionSection(lines, body.exceptionHandlers, '')
+  lines.push('END;')
+  return lines.join('\n')
+}
+
+function validateSavepointName(name: string): void {
+  if (!/^[A-Za-z][A-Za-z0-9_$#]{0,127}$/.test(name))
+    throw new Error('Savepoint name must be a valid Oracle identifier of up to 128 characters.')
+}
+
 /** Emit a block of statements at the given indent, or `NULL;` when empty. */
 function emitStatementBlock(statements: StatementNode[], indent: string): string[] {
   if (statements.length === 0) return [`${indent}NULL;`]
@@ -2059,7 +2083,9 @@ function emitStatement(stmt: StatementNode, indent: string): string[] {
     case 'commit':
       return [`${indent}COMMIT;`]
     case 'rollback':
-      return [`${indent}ROLLBACK;`]
+      return [`${indent}ROLLBACK${stmt.savepoint ? ` TO ${stmt.savepoint}` : ''};`]
+    case 'savepoint':
+      return [`${indent}SAVEPOINT ${stmt.name};`]
     case 'raise':
       return [`${indent}RAISE${stmt.exception ? ` ${stmt.exception}` : ''};`]
     case 'raise-application-error':

@@ -107,9 +107,8 @@ describe('service authorization generation', () => {
 })
 
 describe('odbAuth framework package', () => {
-  it('preserves the declared foreign keys in installs and idempotent upgrades', () => {
+  it('preserves the declared foreign keys in fresh installs', () => {
     const install = odbAuth.toSQLUp({ schema: 'APP' })
-    const upgrade = odbAuth.upgrade().toSQLUp({ schema: 'APP' })
     const constraints = [
       'ALTER TABLE APP.odb_auth_user_roles ADD CONSTRAINT odb_auth_user_roles_fk_user FOREIGN KEY (user_id) REFERENCES APP.odb_auth_users (id) ON DELETE CASCADE',
       'ALTER TABLE APP.odb_auth_user_roles ADD CONSTRAINT odb_auth_user_roles_fk_role FOREIGN KEY (role) REFERENCES APP.odb_auth_roles (role) ON DELETE CASCADE',
@@ -117,9 +116,8 @@ describe('odbAuth framework package', () => {
     ]
     for (const constraint of constraints) {
       expect(install.split(constraint)).toHaveLength(2)
-      expect(upgrade).toContain(`EXECUTE IMMEDIATE '${constraint}'`)
     }
-    expect(upgrade).toContain('IF SQLCODE NOT IN (-955, -2264, -2275) THEN RAISE;')
+    expect(odbAuth).not.toHaveProperty('upgrade')
   })
 
   it('stores normalized roles, grants and permissions with live validity and enabled-user checks', () => {
@@ -157,7 +155,7 @@ describe('odbAuth framework package', () => {
     ).toContain("APP.odb_auth.grant_permission('admin', 'settings.read')")
     expect(
       odbAuth.role.seedGrant({ username: 'admin', role: 'admin' }).toSQLUp({ schema: 'APP' }),
-    ).toContain("APP.odb_auth.grant_role(v_user_id, 'admin')")
+    ).toContain("APP.odb_auth.grant_role(l_user_id, 'admin', SYSTIMESTAMP, NULL)")
   })
   it('exposes permission helpers with unchanged SQL calls', () => {
     expect(odbAuth.permission.has('l_id', 'p_permission').toSQL()).toBe(
@@ -277,6 +275,15 @@ describe('odbAuth framework package', () => {
       .seedUser({ username: 'admin', password: 'secret', displayName: 'Admin' })
       .toSQLUp({ schema: 'APP' })
     expect(sql).toContain('MERGE INTO APP.odb_auth_users')
+    expect(sql).toContain('l_user_id VARCHAR2(32)')
+    expect(sql).not.toContain('%TYPE')
+    const accountMerge = sql.slice(
+      sql.indexOf('MERGE INTO APP.odb_auth_users'),
+      sql.indexOf('SELECT id'),
+    )
+    expect(accountMerge).not.toContain('password_hash')
+    expect(sql).toContain('MERGE INTO APP.odb_auth_identities')
+    expect(sql).toContain("target.issuer = 'password'")
     expect(sql).toContain("APP.odb_auth_crypto.hash_password('secret')")
   })
 
@@ -313,7 +320,7 @@ describe('odbAuth framework package', () => {
     expect(sql.match(/load_config\(\);/g)).toHaveLength(2)
     expect(sql).toContain('l_issuer IS NULL OR l_issuer != g_jwt_issuer')
     expect(sql).not.toContain('FROM odb_settings_store')
-    expect(odbAuth.upgrade().toSQLUp()).toContain('PROCEDURE load_config IS')
+    expect(odbAuth.toSQLUp()).toContain('PROCEDURE load_config IS')
   })
 
   it('seeds only missing JWT settings without key generation or destructive rollback', () => {

@@ -64,20 +64,27 @@ and applies the local redirect. Anonymous callback failures on `/login?google=ca
 `failed`, or `conflict` show fixed localized feedback and remove the consumed query flag
 without dropping the return destination. No frontend Google client ID is needed.
 An existing-email conflict never automatically links accounts: sign in using the existing
-method, open Account settings in the navigation drawer, and choose
-**Connect Google**. The authenticated `/account` page offers this action only when Google
+method, then the guided redirect opens Account settings with the original destination
+preserved. Choose **Connect Google**, or **Continue without connecting** to skip it.
+The authenticated `/account` page offers connecting only when Google
 is enabled and requires the current password. `auth.startGoogleLink({ redirect, password })`
-calls authenticated `POST /auth/google/link/start` with credentials included, always using
-the fixed local return destination `/account` rather than trusting a supplied redirect.
+calls authenticated `POST /auth/google/link/start` with credentials included, using
+a validated local destination (or `/account` for a connection started directly from settings).
 Only the validated Google authorization URL is opened. Password confirmation failures do
 not trigger automatic session refresh, and starting a link never changes local auth state.
-The backend must configure `AUTH_GOOGLE_LINK_REDIRECT_URI` separately, ending in
-`/auth/google/link/callback`, and allowlist that exact URI in Google OAuth settings;
-the sign-in callback URI is not reused for linking.
-The backend callback returns `/account?google=linked`, `cancelled`, or `error`;
+The backend uses `AUTH_GOOGLE_REDIRECT_URI` and `/auth/google/callback` for both
+sign-in and linking. Register that one URI in Google OAuth settings. The consumed,
+browser-bound server transaction determines the purpose; the browser cannot select it.
+Configuration failures show dedicated guidance instead of a generic linking error.
+The backend callback returns `/account?google=linked`, `cancelled`, or `error`,
+with an encoded `redirect` destination;
 identity conflicts use the generic error outcome. The page also recognizes `conflict`
 defensively, consumes the outcome once, and displays fixed localized feedback. Linking never
 logs in another user, merges accounts, or replaces the app refresh cookie.
+After successful linking the page continues to the validated destination; cancellation
+and failure keep it for retry. Linking uses fresh Google authorization, not a cached
+token from the earlier collision. Accounts and login credentials are separate:
+password and Google identities belong to the same stable application user ID.
 Pages and the [default layout](./src/app/layouts/DefaultLayout.vue)
 use `useAuth()` directly. Config supplies title/version, while preferences and UI
 use their own APIs.

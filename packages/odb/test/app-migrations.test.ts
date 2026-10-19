@@ -19,6 +19,24 @@ const migrations = {
 const load = async (file: keyof typeof migrations) => (await migrations[file]()).migration
 
 describe('app-owned ORDS migrations', () => {
+  it('guides collisions through existing-account login and preserves the destination after linking', async () => {
+    const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
+    const start = sql.indexOf('PACKAGE BODY ODBVUE.PCK_APP')
+    const callback = sql.slice(
+      sql.indexOf('PROCEDURE google_callback(', start),
+      sql.indexOf('END google_callback;', start),
+    )
+    expect(callback).toContain("IF l_outcome = 'conflict' THEN")
+    expect(callback).toContain('l_return_path VARCHAR2(32767)')
+    expect(callback).toContain("l_return_path := '/account?redirect=' || UTL_URL.ESCAPE(")
+    expect(callback).toContain("NVL(l_return_path, '/')")
+    expect(callback).toContain("IF l_outcome = 'success' THEN")
+    expect(callback).not.toContain('GOOGLE_EMAIL_EXISTS')
+    expect(callback).toContain("l_callback_path := '/account?google='")
+    expect(callback).toContain("NVL(l_return_path, '/account')")
+    expect(callback).toContain("'&redirect=' || UTL_URL.ESCAPE(")
+  })
+
   it('protects link start with bearer auth, browser origin, password and refresh-cookie binding', async () => {
     const migration = await load('00000000000000-bootstrap')
     const sql = migration.compile().up().join('\n')
@@ -50,27 +68,32 @@ describe('app-owned ORDS migrations', () => {
       >
     }
     expect(openapi.paths['/auth/google/link/start']?.post?.security).toEqual([{ bearerAuth: [] }])
-    expect(openapi.paths['/auth/google/link/callback']?.get?.security).toEqual([])
-    expect(openapi.paths['/auth/google/link/callback']?.get?.responses).toHaveProperty('303')
+    expect(openapi.paths['/auth/google/callback']?.get?.security).toEqual([])
+    expect(openapi.paths['/auth/google/callback']?.get?.responses).toHaveProperty('303')
+    expect(openapi.paths).not.toHaveProperty('/auth/google/link/callback')
   })
 
-  it('keeps link callback session-neutral on success, cancellation and failure in bootstrap', async () => {
+  it('uses one callback and only writes refresh cookies for successful login transactions', async () => {
     const migration = await load('00000000000000-bootstrap')
     const sql = migration.compile().up().join('\n')
     const callback = sql.slice(
-      sql.indexOf('PROCEDURE google_link_callback(', sql.indexOf('PACKAGE BODY ODBVUE.PCK_APP')),
-      sql.indexOf('END google_link_callback;'),
+      sql.indexOf('PROCEDURE google_callback(', sql.indexOf('PACKAGE BODY ODBVUE.PCK_APP')),
+      sql.indexOf('END google_callback;'),
     )
-    expect(callback).toContain('odb_google.complete_link(')
+    expect(callback).toContain('odb_google.complete(')
     expect(callback).toContain('__Host-odb_google=')
     expect(callback).toContain('__Host-odb_refresh=')
-    expect(callback).toContain(
-      "p_location := RTRIM(l_app_url, '/') || '/account?google=' || l_outcome",
-    )
+    expect(callback).toContain("IF l_purpose = 'link' THEN")
+    expect(callback).toContain("l_callback_path := '/account?google='")
+    expect(callback).toContain("l_callback_path := '/login?google='")
     expect(callback).toContain("l_outcome := 'linked'")
-    expect(callback).toContain("l_outcome := 'error'")
-    expect(callback).toContain('ROLLBACK;')
-    expect(callback).not.toMatch(/set_cookie|Max-Age|odb_auth[.](login|refresh|logout)\(/i)
+    expect(callback).toContain("IF (l_purpose = 'login' AND l_outcome = 'success') THEN")
+    expect(callback).toMatch(
+      /IF \(l_purpose = 'login' AND l_outcome = 'success'\) THEN\s+p_set_cookie := '__Host-odb_refresh='/,
+    )
+    expect(callback.match(/p_set_cookie := '__Host-odb_refresh='/g)).toHaveLength(1)
+    expect(callback).not.toMatch(/odb_auth[.](login|refresh|logout)\(/i)
+    expect(sql).not.toContain('PROCEDURE google_link_callback(')
   })
 
   it('installs emails and seeds six empty SMTP settings without a host ACL', async () => {
@@ -155,10 +178,14 @@ describe('app-owned ORDS migrations', () => {
   it('seeds the configured application admin credentials and role grant', async () => {
     const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
     expect(sql).toContain("ODBVUE.odb_auth_crypto.hash_password('CustomSecure123!')")
-    const grants = sql.match(/DECLARE v_user_id[\s\S]*?END;\n\//g)
+    const grants = sql
+      .match(/^DECLARE[\s\S]*?^END;\n\//gm)
+      ?.filter((block) => block.includes('.grant_role('))
     expect(grants).toHaveLength(1)
     expect(grants?.[0]).toContain("'owner@example.com'")
-    expect(grants?.[0]).toContain("ODBVUE.odb_auth.grant_role(v_user_id, 'admin')")
+    expect(grants?.[0]).toContain(
+      "ODBVUE.odb_auth.grant_role(l_user_id, 'admin', SYSTIMESTAMP, NULL)",
+    )
     expect(sql).not.toContain("'admin@odbvue.com'")
   })
 
@@ -520,11 +547,13 @@ describe('app-owned ORDS migrations', () => {
     const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
     expect(sql).toContain('CREATE TABLE ODBVUE.odb_auth_user_roles')
     expect(sql).toContain("ODBVUE.odb_auth.define_role('admin'")
-    expect(sql).toContain("ODBVUE.odb_auth.grant_role(v_user_id, 'admin')")
+    expect(sql).toContain("ODBVUE.odb_auth.grant_role(l_user_id, 'admin', SYSTIMESTAMP, NULL)")
     expect(sql).not.toContain("'test@odbvue.com'")
     expect(sql).toContain("ODBVUE.odb_auth_crypto.hash_password('CustomSecure123!')")
     expect(sql.match(/ODBVUE\.odb_auth\.grant_role\(/g)).toHaveLength(1)
-    const grants = sql.match(/DECLARE v_user_id[\s\S]*?END;\n\//g)
+    const grants = sql
+      .match(/^DECLARE[\s\S]*?^END;\n\//gm)
+      ?.filter((block) => block.includes('.grant_role('))
     expect(grants).toHaveLength(1)
     expect(grants?.[0]).toContain("'owner@example.com'")
     expect(grants?.[0]).not.toContain("'test@odbvue.com'")

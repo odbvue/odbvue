@@ -349,11 +349,6 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
       development ? undefined : new ConfigStore().getConfig().runtime?.apiUrl,
     )
     settingWrites.push(['AUTH_GOOGLE_REDIRECT_URI', 'auth_google_redirect_uri'])
-    googleBindings.auth_google_link_redirect_uri = googleBindings.auth_google_redirect_uri.replace(
-      /\/callback$/,
-      '/link/callback',
-    )
-    settingWrites.push(['AUTH_GOOGLE_LINK_REDIRECT_URI', 'auth_google_link_redirect_uri'])
     googleBindings.google_secret_meta = JSON.stringify({ secret: 'Y' })
   }
   const writes = settingWrites
@@ -393,9 +388,6 @@ END;`
   if (settings.auth_google_enabled) {
     logger.info(
       `Register this Google OAuth redirect URI: ${googleBindings.auth_google_redirect_uri}`,
-    )
-    logger.info(
-      `Register this Google OAuth linking redirect URI: ${googleBindings.auth_google_link_redirect_uri}`,
     )
   }
   logger.success(
