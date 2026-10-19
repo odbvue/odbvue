@@ -119,6 +119,15 @@ and raises; stale configuration is not extended, and subsequent calls retry.
 Configuration changes can therefore take up to 30 seconds to reach pooled sessions.
 The cache contains decrypted key material in trusted database-session memory.
 
+`require_user` rejects empty JWT segments and requires a verified signature before
+decoding the payload. Malformed base64url, invalid or duplicate-key JSON, missing
+or wrongly typed claims, and claim values that exceed database column limits
+raise the standard `UNAUTHORIZED` error (HTTP 401 in generated handlers), not
+Oracle parsing/value errors. Required claims are non-empty strings (`iss`, `sub`,
+`sid`) and integer JSON numbers (`exp`, `ver`); numeric strings are not coerced.
+Configuration-loading and session/user lookup failures remain server errors rather
+than being disguised as invalid credentials.
+
 ### Deployment boundary
 
 Changing the signing key invalidates existing access-token signatures after

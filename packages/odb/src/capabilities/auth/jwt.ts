@@ -1,14 +1,7 @@
 import { odbPackage, odbType } from '../../schema/package.js'
-import {
-  cond,
-  odbLiteral,
-  PlsqlExpression,
-  plsqlExpr,
-  renderPlsql,
-  type PlsqlRenderable,
-} from '../../schema/attribute.js'
+import { cond, odbLiteral, PlsqlExpression, plsqlExpr } from '../../schema/attribute.js'
 import { odbQuery } from '../../query/index.js'
-import { odbDbmsCrypto, odbOracle, odbUtlEncode, odbUtlRaw } from '../../oracle/index.js'
+import { odbDbmsCrypto, odbJson, odbOracle, odbUtlEncode, odbUtlRaw } from '../../oracle/index.js'
 import { odbSettings } from '../settings/settings.js'
 import { odbAudit } from '../audit/audit.js'
 import { authJwtSettings } from './settings.js'
@@ -19,16 +12,6 @@ const EPOCH_NOW = new PlsqlExpression(
   'NUMBER',
   "FLOOR((CAST(SYS_EXTRACT_UTC(SYSTIMESTAMP) AS DATE) - DATE '1970-01-01') * 86400)",
 )
-
-/** A claim read from a parsed JWT payload (no signature check). */
-function claim(payload: PlsqlRenderable, name: string, kind: 'string'): PlsqlExpression<'VARCHAR2'>
-function claim(payload: PlsqlRenderable, name: string, kind: 'number'): PlsqlExpression<'NUMBER'>
-function claim(payload: PlsqlRenderable, name: string, kind: 'string' | 'number') {
-  return new PlsqlExpression(
-    kind === 'string' ? 'VARCHAR2' : 'NUMBER',
-    `json_object_t.parse(${renderPlsql(payload)}).get_${kind}('${name}')`,
-  )
-}
 
 /** HS256 access tokens: issue them and resolve them back to an authenticated user. */
 export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => {
@@ -206,6 +189,7 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => {
           subject,
           sessionId,
           tokenVersion,
+          signatureMatches,
           active,
         } = body.variables({
           now: odbType.number(),
@@ -217,6 +201,7 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => {
           subject: authUsers.id,
           sessionId: authSessions.id,
           tokenVersion: authUsers.tokenVersion,
+          signatureMatches: odbType.boolean(),
           active: odbType.number(),
         })
         body.ifThen(cond.isNull(token), (then) => then.unauthorized())
@@ -224,43 +209,101 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => {
         body.set(dot2, odbOracle.instr(token, odbLiteral('.'), 1, 2))
         body.ifThen(
           cond.or([
-            cond.eq(dot1, 0),
-            cond.eq(dot2, 0),
+            cond.gt(odbOracle.length(token), 4000),
+            cond.lte(dot1, 1),
+            cond.lte(dot2, plsqlExpr.add(dot1, 1)),
+            cond.gte(dot2, odbOracle.length(token)),
             cond.ne(odbOracle.instr(token, odbLiteral('.'), 1, 3), 0),
+            cond.not(cond.regexpLike(token, '^[A-Za-z0-9_.-]+$', 'c')),
             cond.ne(odbOracle.substr(token, 1, plsqlExpr.subtract(dot1, 1)), JWT_HEADER),
           ]),
           (then) => then.unauthorized(),
         )
         body.call(loadConfig.invoke())
-        body.ifThen(
-          cond.ne(
+        body.set(
+          signatureMatches,
+          cond.eq(
             sign.invoke(odbOracle.substr(token, 1, plsqlExpr.subtract(dot2, 1))),
             odbOracle.substr(token, plsqlExpr.add(dot2, 1)),
           ),
+        )
+        body.ifThen(
+          cond.or([cond.isNull(signatureMatches), cond.eq(signatureMatches, false)]),
           (then) => then.unauthorized(),
         )
-        body.set(
-          payload,
-          base64urlDecode.invoke(
+        body.block((parse) => {
+          const { claims, element, validJson, encodedPayload } = parse.variables({
+            claims: odbJson.object,
+            element: odbJson.element,
+            validJson: odbType.number(),
+            encodedPayload: odbType.string(4000),
+          })
+          parse.set(
+            encodedPayload,
             odbOracle.substr(
               token,
               plsqlExpr.add(dot1, 1),
               plsqlExpr.subtract(plsqlExpr.subtract(dot2, dot1), 1),
             ),
-          ),
-        )
-        body.set(now, EPOCH_NOW)
-        body.set(issuer, claim(payload, 'iss', 'string'))
-        body.ifThen(cond.or([cond.isNull(issuer), cond.ne(issuer, jwtIssuer)]), (then) =>
-          then.unauthorized(),
-        )
-        body.set(expiresAt, claim(payload, 'exp', 'number'))
-        body.ifThen(cond.or([cond.isNull(expiresAt), cond.gte(now, expiresAt)]), (then) =>
-          then.unauthorized(),
-        )
-        body.set(subject, claim(payload, 'sub', 'string'))
-        body.set(sessionId, claim(payload, 'sid', 'string'))
-        body.set(tokenVersion, claim(payload, 'ver', 'number'))
+          )
+          parse.set(payload, base64urlDecode.invoke(encodedPayload))
+          parse.ifThen(
+            cond.or([
+              cond.isNull(payload),
+              cond.ne(base64urlEncode.invoke(odbUtlRaw.castToRaw(payload)), encodedPayload),
+            ]),
+            (then) => then.unauthorized(),
+          )
+          parse.query(
+            odbQuery()
+              .selectFrom('dual')
+              .select(
+                odbOracle.caseWhen(
+                  cond.isJson(payload, { strict: true, uniqueKeys: true }),
+                  odbLiteral(1),
+                  odbLiteral(0),
+                  'NUMBER',
+                ),
+              )
+              .into(validJson),
+          )
+          parse.ifThen(cond.ne(validJson, 1), (then) => then.unauthorized())
+          parse.set(claims, odbJson.parse(payload))
+          parse.call(odbJson.onError(claims, odbLiteral(1)))
+          for (const [name, target] of [
+            ['iss', issuer],
+            ['sub', subject],
+            ['sid', sessionId],
+          ] as const) {
+            parse.set(element, odbJson.get(claims, odbLiteral(name)))
+            parse.ifThen(
+              cond.or([cond.isNull(element), cond.eq(odbJson.isString(element), false)]),
+              (then) => then.unauthorized(),
+            )
+            parse.set(target, odbJson.getString(claims, odbLiteral(name)))
+            parse.ifThen(cond.isNull(target), (then) => then.unauthorized())
+          }
+          for (const [name, target] of [
+            ['exp', expiresAt],
+            ['ver', tokenVersion],
+          ] as const) {
+            parse.set(element, odbJson.get(claims, odbLiteral(name)))
+            parse.ifThen(
+              cond.or([cond.isNull(element), cond.eq(odbJson.isNumber(element), false)]),
+              (then) => then.unauthorized(),
+            )
+            parse.set(target, odbJson.getNumber(claims, odbLiteral(name)))
+            parse.ifThen(
+              cond.or([cond.isNull(target), cond.ne(target, odbOracle.trunc(target))]),
+              (then) => then.unauthorized(),
+            )
+          }
+          parse.set(now, EPOCH_NOW)
+          parse.ifThen(cond.ne(issuer, jwtIssuer), (then) => then.unauthorized())
+          parse.ifThen(cond.gte(now, expiresAt), (then) => then.unauthorized())
+          // Only untrusted token decoding and claims are normalized to Unauthorized.
+          parse.whenOthers((handler) => handler.unauthorized())
+        })
         const sessions = authSessions.as('s')
         const users = authUsers.as('u')
         body.query(

@@ -199,9 +199,9 @@ describe('odbAuth framework package', () => {
     expect(sql).not.toContain('DBMS_CRYPTO.PBKDF2')
     expect(sql).not.toContain('DBMS_CRYPTO.HASH(UTL_RAW.CAST_TO_RAW(l_salt ||')
     expect(sql).toContain('previous_refresh_token_hash VARCHAR2(128 CHAR)')
-    expect(sql).toContain("l_subject := json_object_t.parse(l_payload).get_string('sub')")
-    expect(sql).toContain("l_session_id := json_object_t.parse(l_payload).get_string('sid')")
-    expect(sql).toContain("l_token_version := json_object_t.parse(l_payload).get_number('ver')")
+    expect(sql).toContain("l_subject := l_claims.get_string('sub')")
+    expect(sql).toContain("l_session_id := l_claims.get_string('sid')")
+    expect(sql).toContain("l_token_version := l_claims.get_number('ver')")
   })
 
   it('implements HS256 access tokens in odb_auth_jwt without a separate JWT package', () => {
@@ -215,9 +215,59 @@ describe('odbAuth framework package', () => {
     expect(sql).toContain("'exp' VALUE l_now + g_jwt_expiration_seconds")
     expect(sql).toContain("'iss' VALUE g_jwt_issuer")
     expect(sql).toContain(
-      'IF sign(SUBSTR(p_token, 1, l_dot2 - 1)) != SUBSTR(p_token, l_dot2 + 1) THEN',
+      'l_signature_matches := sign(SUBSTR(p_token, 1, l_dot2 - 1)) = SUBSTR(p_token, l_dot2 + 1);',
     )
-    expect(sql).toContain('IF (l_expires_at IS NULL OR l_now >= l_expires_at) THEN')
+    expect(sql).toContain('IF l_now >= l_expires_at THEN')
+  })
+
+  it('rejects empty JWT segments and requires a positively verified signature before decoding', () => {
+    const sql = odbAuthJwt.toSQLUp({ schema: 'APP' })
+    const start = sql.lastIndexOf('FUNCTION require_user(')
+    const requireUser = sql.slice(start, sql.indexOf('END require_user;', start))
+    for (const check of [
+      'p_token IS NULL',
+      'LENGTH(p_token) > 4000',
+      'l_dot1 <= 1',
+      'l_dot2 <= l_dot1 + 1',
+      'l_dot2 >= LENGTH(p_token)',
+      "INSTR(p_token, '.', 1, 3) != 0",
+      "NOT (REGEXP_LIKE(p_token, '^[A-Za-z0-9_.-]+$', 'c'))",
+      '(l_signature_matches IS NULL OR l_signature_matches = FALSE)',
+    ]) {
+      expect(requireUser).toContain(check)
+      expect(requireUser.indexOf(check)).toBeLessThan(requireUser.indexOf('base64url_decode('))
+    }
+  })
+
+  it('normalizes decoding, JSON, claim-type and bounded-assignment errors only', () => {
+    const sql = odbAuthJwt.toSQLUp({ schema: 'APP' })
+    const start = sql.lastIndexOf('FUNCTION require_user(')
+    const requireUser = sql.slice(start, sql.indexOf('END require_user;', start))
+    const parseStart = requireUser.lastIndexOf('BEGIN', requireUser.indexOf('l_encoded_payload :='))
+    const handler = requireUser.indexOf('WHEN OTHERS THEN', parseStart)
+    const parseEnd = requireUser.indexOf('END;', handler)
+    const parse = requireUser.slice(parseStart, parseEnd)
+    expect(parse).toContain('l_payload := base64url_decode(l_encoded_payload)')
+    expect(parse).toContain('base64url_encode(UTL_RAW.CAST_TO_RAW(l_payload)) != l_encoded_payload')
+    expect(parse).toContain('l_payload IS JSON STRICT WITH UNIQUE KEYS')
+    expect(parse).toContain('l_claims := JSON_OBJECT_T.PARSE(l_payload)')
+    expect(parse).toContain('l_claims.on_error(1)')
+    for (const name of ['iss', 'sub', 'sid', 'exp', 'ver']) {
+      expect(parse).toContain(`l_element := l_claims.get('${name}')`)
+    }
+    expect(parse.match(/l_element\.is_string\(\) = FALSE/g)).toHaveLength(3)
+    expect(parse.match(/l_element\.is_number\(\) = FALSE/g)).toHaveLength(2)
+    for (const variable of ['issuer', 'subject', 'session_id', 'expires_at', 'token_version']) {
+      expect(parse).toContain(`l_${variable} IS NULL`)
+    }
+    expect(parse).toContain('l_expires_at != TRUNC(l_expires_at)')
+    expect(parse).toContain('l_token_version != TRUNC(l_token_version)')
+    expect(requireUser.slice(handler, parseEnd)).toMatch(
+      /^WHEN OTHERS THEN\s+raise_application_error\(-\d+, 'ODB_ERROR\|UNAUTHORIZED\|UNAUTHORIZED'\);\s*$/,
+    )
+    expect(requireUser.indexOf('load_config();')).toBeLessThan(parseStart)
+    expect(requireUser.indexOf('SELECT COUNT(*)')).toBeGreaterThan(parseEnd)
+    expect(requireUser.slice(parseEnd)).not.toContain('WHEN OTHERS')
   })
 
   it('keeps odb_auth transport-independent', () => {
@@ -318,7 +368,8 @@ describe('odbAuth framework package', () => {
     expect(load).toContain("odb_audit.error('Auth JWT: configuration loading failed')")
     expect(load).toContain('RAISE;')
     expect(sql.match(/load_config\(\);/g)).toHaveLength(2)
-    expect(sql).toContain('l_issuer IS NULL OR l_issuer != g_jwt_issuer')
+    expect(sql).toContain('IF l_issuer IS NULL THEN')
+    expect(sql).toContain('IF l_issuer != g_jwt_issuer THEN')
     expect(sql).not.toContain('FROM odb_settings_store')
     expect(odbAuth.toSQLUp()).toContain('PROCEDURE load_config IS')
   })

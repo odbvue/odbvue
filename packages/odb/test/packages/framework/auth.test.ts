@@ -123,9 +123,9 @@ describe('odbAuth framework package', () => {
     expect(sql).not.toContain('DBMS_CRYPTO.PBKDF2')
     expect(sql).not.toContain('DBMS_CRYPTO.HASH(UTL_RAW.CAST_TO_RAW(l_salt ||')
     expect(sql).toContain('previous_refresh_token_hash VARCHAR2(128 CHAR)')
-    expect(sql).toContain("l_subject := json_object_t.parse(l_payload).get_string('sub')")
-    expect(sql).toContain("l_session_id := json_object_t.parse(l_payload).get_string('sid')")
-    expect(sql).toContain("l_token_version := json_object_t.parse(l_payload).get_number('ver')")
+    expect(sql).toContain("l_subject := l_claims.get_string('sub')")
+    expect(sql).toContain("l_session_id := l_claims.get_string('sid')")
+    expect(sql).toContain("l_token_version := l_claims.get_number('ver')")
   })
 
   it('implements HS256 access tokens in odb_auth_jwt without a separate JWT package', () => {
@@ -138,9 +138,10 @@ describe('odbAuth framework package', () => {
     expect(sql).toContain("l_signing_input := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' || '.'")
     expect(sql).toContain("'exp' VALUE l_now + g_jwt_expiration_seconds")
     expect(sql).toContain(
-      'IF sign(SUBSTR(p_token, 1, l_dot2 - 1)) != SUBSTR(p_token, l_dot2 + 1) THEN',
+      'l_signature_matches := sign(SUBSTR(p_token, 1, l_dot2 - 1)) = SUBSTR(p_token, l_dot2 + 1);',
     )
-    expect(sql).toContain('IF (l_expires_at IS NULL OR l_now >= l_expires_at) THEN')
+    expect(sql).toContain('IF (l_signature_matches IS NULL OR l_signature_matches = FALSE) THEN')
+    expect(sql).toContain('IF l_now >= l_expires_at THEN')
   })
 
   it('keeps odb_auth transport-independent', () => {
