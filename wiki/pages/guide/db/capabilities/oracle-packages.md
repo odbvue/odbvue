@@ -29,6 +29,19 @@ odbOracle.trunc('p_amount', 2) // TRUNC(p_amount, 2)
 
 Pass text literals through `odbLiteral`; plain strings represent SQL expressions. `trunc` covers the numeric overload, not date truncation.
 
+Use `count()` for `COUNT(*)`, or pass an expression to count its non-null values. Compose conditional aggregates with `caseWhen`; a null fallback excludes non-matching rows:
+
+```ts
+odbOracle.count(
+  odbOracle.caseWhen(
+    cond.eq(identities.issuer, 'password'),
+    odbLiteral(1),
+    odbOracle.null(),
+    'NUMBER',
+  ),
+)
+```
+
 Prefer an existing typed wrapper over `plsqlExpr.call`. When an Oracle function is used more than once in framework code, add a shared typed wrapper. Keep generic invocation for obscure one-off constructors such as ACL-specific `XS$ACE_TYPE` and `XS$NAME_LIST`, or custom schema-qualified functions.
 
 ## `odbUtlI18n` — `UTL_I18N`

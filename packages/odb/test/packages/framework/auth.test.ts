@@ -10,9 +10,12 @@ describe('odbAuth framework package', () => {
       'SELECT google_avatar_url, CASE WHEN avatar IS NULL THEN 0 ELSE 1 END, avatar',
     )
     expect(sql).toContain('REFERENCES APP.odb_storage_files (id) ON DELETE SET NULL')
-    expect(sql).toContain("COUNT(CASE WHEN issuer = 'password' THEN 1 END)")
-    expect(sql).toContain("COUNT(CASE WHEN issuer = 'https://accounts.google.com' THEN 1 END)")
+    expect(sql).toContain("COUNT(CASE WHEN issuer = 'password' THEN 1 ELSE NULL END)")
+    expect(sql).toContain(
+      "COUNT(CASE WHEN issuer = 'https://accounts.google.com' THEN 1 ELSE NULL END)",
+    )
     expect(sql).toContain('DBMS_LOB.GETLENGTH(p_avatar) > 30000')
+    expect(sql).toContain('DBMS_LOB.GETLENGTH(p_avatar) < 31')
     expect(sql).toContain('^data:image/jpeg;base64,/9j/')
     expect(sql).toContain('PROFILE_AVATAR_INVALID')
     expect(sql).toContain('odb_lob.base64_to_blob(DBMS_LOB.SUBSTR(p_avatar, 30000, 24))')

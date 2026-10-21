@@ -1,9 +1,31 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { odbOracle } from '../../../src/oracle/standard/standard.js'
 import { odbDbmsCrypto } from '../../../src/oracle/dbms-crypto/dbms-crypto.js'
-import { odbLiteral, Param, type PlsqlExpression } from '../../../src/schema/attribute.js'
+import { cond, odbLiteral, Param, type PlsqlExpression } from '../../../src/schema/attribute.js'
 
 describe('odbOracle', () => {
+  it('counts rows or non-null expression values, including conditional aggregates', () => {
+    const count = odbOracle.count()
+    expectTypeOf(count).toEqualTypeOf<PlsqlExpression<'NUMBER'>>()
+    expect(count.type).toBe('NUMBER')
+    expect(count.toSQL()).toBe('COUNT(*)')
+    expect(odbOracle.count('issuer').toSQL()).toBe('COUNT(issuer)')
+    expect(odbOracle.count(odbLiteral(0)).toSQL()).toBe('COUNT(0)')
+    expect(odbOracle.count(odbOracle.null()).toSQL()).toBe('COUNT(NULL)')
+    const conditionalCount = odbOracle.count(
+      odbOracle.caseWhen(
+        cond.eq(new Param('p_issuer', 'VARCHAR2'), "provider's name"),
+        odbLiteral(1),
+        odbOracle.null(),
+        'NUMBER',
+      ),
+    )
+    expectTypeOf(conditionalCount).toEqualTypeOf<PlsqlExpression<'NUMBER'>>()
+    expect(conditionalCount.toSQL()).toBe(
+      "COUNT(CASE WHEN p_issuer = 'provider''s name' THEN 1 ELSE NULL END)",
+    )
+  })
+
   it('renders typed context expressions with optional literal or expression lengths', () => {
     const context = odbOracle.sysContext(odbLiteral('USERENV'), odbLiteral('CURRENT_USER'))
     expectTypeOf(context).toEqualTypeOf<PlsqlExpression<'VARCHAR2'>>()

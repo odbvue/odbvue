@@ -247,8 +247,11 @@ export const odbOracle = {
     return new PlsqlExpression('VARCHAR2', 'SQLERRM')
   },
 
-  count(): PlsqlExpression<'NUMBER'> {
-    return new PlsqlExpression('NUMBER', 'COUNT(*)')
+  /** Counts rows without an argument, or non-null values of an expression. */
+  count(value?: PlsqlRenderable): PlsqlExpression<'NUMBER'> {
+    return value === undefined
+      ? new PlsqlExpression('NUMBER', 'COUNT(*)')
+      : call('NUMBER', 'COUNT', [value])
   },
 
   /** `CHR(<code>)` -> VARCHAR2 */

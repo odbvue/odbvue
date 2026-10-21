@@ -891,7 +891,12 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
           .selectFrom(authUsers)
           .select([
             authUsers.googleAvatarUrl,
-            'CASE WHEN avatar IS NULL THEN 0 ELSE 1 END',
+            odbOracle.caseWhen(
+              cond.isNull(authUsers.avatar),
+              odbLiteral(0),
+              odbLiteral(1),
+              'NUMBER',
+            ),
             authUsers.avatar,
           ])
           .into(avatarUrl, avatarUploaded, avatarId)
@@ -901,8 +906,22 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
         odbQuery()
           .selectFrom(authIdentities)
           .select([
-            "COUNT(CASE WHEN issuer = 'password' THEN 1 END)",
-            "COUNT(CASE WHEN issuer = 'https://accounts.google.com' THEN 1 END)",
+            odbOracle.count(
+              odbOracle.caseWhen(
+                cond.eq(authIdentities.issuer, 'password'),
+                odbLiteral(1),
+                odbOracle.null(),
+                'NUMBER',
+              ),
+            ),
+            odbOracle.count(
+              odbOracle.caseWhen(
+                cond.eq(authIdentities.issuer, 'https://accounts.google.com'),
+                odbLiteral(1),
+                odbOracle.null(),
+                'NUMBER',
+              ),
+            ),
           ])
           .into(passwordConnected, googleConnected)
           .where(cond.eq(authIdentities.userId, userId)),
@@ -923,8 +942,8 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
       body.ifThen(cond.isNotNull(avatar), (validate) => {
         validate.ifThen(
           cond.or([
-            cond.gt(plsqlExpr.call('NUMBER', 'DBMS_LOB.GETLENGTH', avatar), 30000),
-            cond.lt(plsqlExpr.call('NUMBER', 'DBMS_LOB.GETLENGTH', avatar), 31),
+            cond.gt(odbDbmsLob.getLength(avatar), 30000),
+            cond.lt(odbDbmsLob.getLength(avatar), 31),
             cond.not(
               cond.regexpLike(
                 avatar,
