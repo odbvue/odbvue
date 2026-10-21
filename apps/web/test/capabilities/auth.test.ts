@@ -10,6 +10,93 @@ function response<T>(data: T | null, status = 200) {
 }
 
 describe('authentication capability', () => {
+  it('maps actual profile state without inventing provider connections', async () => {
+    const http = createHttpClient()
+    vi.spyOn(http, 'post').mockResolvedValue(response({ accessToken: 'token' }))
+    vi.spyOn(http, 'get').mockResolvedValue(
+      response({
+        userId: 7,
+        username: 'ada',
+        displayName: 'Ada Lovelace',
+        avatarUrl: 'data:image/jpeg;base64,/9j/AA==',
+        avatarUploaded: 1,
+        passwordConnected: 1,
+        googleConnected: 0,
+      }),
+    )
+    const auth = createAuth({ http })
+    await auth.restore()
+    expect(auth.user.value).toMatchObject({
+      avatarUrl: 'data:image/jpeg;base64,/9j/AA==',
+      avatarUploaded: true,
+      passwordConnected: true,
+      googleConnected: false,
+    })
+  })
+
+  it('updates and removes avatars using the authenticated identity, then reloads the profile', async () => {
+    const { auth, post } = await linkSession()
+    post.mockResolvedValue(response(null, 204))
+    for (const avatar of ['data:image/jpeg;base64,/9j/AA==', null]) {
+      await auth.updateAvatar(avatar)
+      expect(post).toHaveBeenLastCalledWith(
+        '/auth/avatar',
+        { avatar },
+        expect.objectContaining({
+          credentials: 'include',
+          skipAuthRefresh: true,
+          headers: { Authorization: ['Bearer', 'original-token'].join(' ') },
+        }),
+      )
+    }
+    expect(auth.authenticated.value).toBe(true)
+  })
+
+  it('clears identity only after a successful authenticated password change', async () => {
+    const { auth, post } = await linkSession()
+    const credentials = {
+      currentPassword: 'old-password',
+      password: 'new-password',
+      passwordRepeat: 'new-password',
+    }
+    const failure = Object.assign(new Error('Incorrect password'), {
+      status: 403,
+      request: '/auth/change-password',
+    })
+    post.mockResolvedValue({ ...response(null, 403), error: failure })
+    await expect(auth.changePassword(credentials)).rejects.toBe(failure)
+    expect(auth.authenticated.value).toBe(true)
+    expect(auth.loading.value).toBe(false)
+    post.mockResolvedValue(response(null, 204))
+    await auth.changePassword(credentials)
+    expect(post).toHaveBeenLastCalledWith(
+      '/auth/change-password',
+      credentials,
+      expect.objectContaining({
+        credentials: 'include',
+        skipAuthRefresh: true,
+        headers: { Authorization: ['Bearer', 'original-token'].join(' ') },
+      }),
+    )
+    expect(auth.user.value).toBeNull()
+    expect(auth.accessToken.value).toBeNull()
+  })
+
+  it('rejects profile updates before signing in without sending a request', async () => {
+    const http = createHttpClient()
+    const post = vi.spyOn(http, 'post')
+    const auth = createAuth({ http })
+    await expect(auth.updateAvatar(null)).rejects.toThrow('Sign in')
+    await expect(
+      auth.changePassword({
+        currentPassword: 'old-password',
+        password: 'new-password',
+        passwordRepeat: 'new-password',
+      }),
+    ).rejects.toThrow('Sign in')
+    expect(post).not.toHaveBeenCalled()
+  })
+
   async function linkSession() {
     const http = createHttpClient()
     const post = vi

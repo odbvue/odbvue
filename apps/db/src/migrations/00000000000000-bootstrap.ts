@@ -383,14 +383,35 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
         userId: odbAuth.types.userId,
         username: odbAuth.types.username,
         displayName: odbAuth.types.displayName,
+        avatarUrl: odbType.clob(),
+        avatarUploaded: odbType.integer(),
+        passwordConnected: odbType.integer(),
+        googleConnected: odbType.integer(),
         roles: odbType.json(),
         permissions: odbType.json(),
       },
     },
-    ({ params: { subject, userId, username, displayName, roles, permissions }, body }) => {
+    ({
+      params: {
+        subject,
+        userId,
+        username,
+        displayName,
+        avatarUrl,
+        avatarUploaded,
+        passwordConnected,
+        googleConnected,
+        roles,
+        permissions,
+      },
+      body,
+    }) => {
       body.set(userId, subject)
       body.call(odbAuth.readUser(userId, username, displayName))
       body.call(odbAuth.readAuthorization(userId, roles, permissions))
+      body.call(
+        odbAuth.readProfile(userId, avatarUrl, avatarUploaded, passwordConnected, googleConnected),
+      )
     },
   )
   defineService(me, {
@@ -405,6 +426,10 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
       userId: me.parameters.userId,
       username: me.parameters.username,
       displayName: me.parameters.displayName,
+      avatarUrl: me.parameters.avatarUrl,
+      avatarUploaded: me.parameters.avatarUploaded,
+      passwordConnected: me.parameters.passwordConnected,
+      googleConnected: me.parameters.googleConnected,
       roles: me.parameters.roles,
       permissions: me.parameters.permissions,
     },
@@ -605,6 +630,58 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
       password: resetPassword.parameters.password,
       passwordRepeat: resetPassword.parameters.passwordRepeat,
     },
+  })
+
+  const updateAvatar = pkg.proc(
+    'update_avatar',
+    { in: { userId: odbAuth.types.userId, avatar: odbType.clob() } },
+    ({ params: { userId, avatar }, body }) => body.call(odbAuth.updateAvatar(userId, avatar)),
+  )
+  defineService(updateAvatar, {
+    auth: 'authenticated',
+    method: 'POST',
+    module: 'auth',
+    basePath: '/auth',
+    path: '/avatar',
+    summary: 'Set a JPEG thumbnail, or remove the uploaded avatar with null',
+    context: { userId: updateAvatar.parameters.userId },
+    body: { avatar: updateAvatar.parameters.avatar },
+  })
+
+  const changePassword = pkg.proc(
+    'change_password',
+    {
+      in: {
+        userId: odbAuth.types.userId,
+        currentPassword: odbAuth.types.password,
+        password: odbAuth.types.password,
+        passwordRepeat: odbAuth.types.password,
+      },
+      out: { setCookie: odbType.string(4000) },
+    },
+    ({ params: { userId, currentPassword, password, passwordRepeat, setCookie }, body }) => {
+      body.ifThen(
+        cond.or([cond.isNull(passwordRepeat), cond.ne(password, passwordRepeat)]),
+        (then) => then.invalid('PASSWORD_CHANGE_PASSWORD_MISMATCH'),
+      )
+      body.call(odbAuth.changePassword(userId, currentPassword, password))
+      body.set(setCookie, refreshCookie.expire())
+    },
+  )
+  defineService(changePassword, {
+    auth: 'authenticated',
+    method: 'POST',
+    module: 'auth',
+    basePath: '/auth',
+    path: '/change-password',
+    summary: 'Change a local password after reauthentication and revoke all sessions',
+    context: { userId: changePassword.parameters.userId },
+    body: {
+      currentPassword: changePassword.parameters.currentPassword,
+      password: changePassword.parameters.password,
+      passwordRepeat: changePassword.parameters.passwordRepeat,
+    },
+    headers: { 'Set-Cookie': changePassword.parameters.setCookie },
   })
   return {}
 })

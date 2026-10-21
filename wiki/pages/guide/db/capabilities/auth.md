@@ -153,6 +153,36 @@ protect against a compromised schema owner or an authorized decrypted Settings c
 
 ## HTTP Contract
 
+### Profile and password changes
+
+`odbAuth.readProfile(userId, avatarUrl, avatarUploaded, passwordConnected, googleConnected)`
+reads the effective avatar and actual identity counts. The application exposes these
+through `/auth/me`; the three numeric status fields are `0` or positive counts.
+An uploaded avatar takes precedence over a Google photo. `readUser` remains unchanged.
+
+`odbAuth.updateAvatar(userId, avatar)` accepts a JPEG thumbnail data URL of at most
+30,000 characters, or `NULL` to remove the upload. The web app produces a cropped,
+metadata-free 128 x 128 JPEG from an image of at most 5 MB. Only fixed `image/jpeg`
+data URLs are stored; SVG, arbitrary remote upload URLs and active formats are rejected.
+Thumbnails are stored on the user record and returned only to the authenticated owner.
+Trusted `updateGoogleAvatar(subject, picture)` is called only after Google token verification
+and successful sign-in; only HTTPS `lh<N>.googleusercontent.com` photo URLs are accepted,
+and uploaded photos are never replaced. The optional verified `picture` claim needs no
+additional Google scope or server-side image download.
+
+`odbAuth.changePassword(userId, currentPassword, password)` rate-limits attempts per
+user and locks the enabled account before verifying its local password. It rejects
+Google-only users, checks the existing 8-256-character password policy, hashes the new
+password, increments the access-token version, revokes all refresh sessions and deletes
+outstanding password recovery tokens in the caller's transaction. It does not issue a
+replacement session or commit the change. The authenticated application service binds
+the user ID from the verified bearer token, validates repeat-password confirmation and
+expires the refresh cookie; it never accepts a caller-supplied target user.
+
+Profile columns, auth/Google runtime procedures and application services are included
+in the bootstrap migration. Rebuild and redeploy the database to install them; no
+separate incremental profile migration is supplied.
+
 The bootstrap migration (`apps/db/src/migrations/00000000000000-bootstrap.ts`)
 installs `pck_app`, which exposes these endpoints beneath `/auth`. `odbAuth` does
 not register them; the application package does. The sandbox retains duplicate

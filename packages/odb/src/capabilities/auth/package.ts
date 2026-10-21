@@ -825,10 +825,200 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
           .into(username, displayName)
           .where(cond.and([cond.eq(authUsers.id, userId), cond.eq(authUsers.enabled, true)])),
       )
+
       statements.when('NO_DATA_FOUND', (handler) => handler.notFound())
     },
   )
 
+  const updateGoogleAvatar = pkg.proc(
+    'update_google_avatar',
+    { in: { subject: authIdentities.subject, picture: odbType.string(2048) } },
+    ({ params: { subject, picture }, body }) => {
+      const { userId } = body.variables({ userId: authUsers.id })
+      body.ifThen(cond.isNull(picture), (then) => then.return())
+      body.ifThen(
+        cond.not(
+          cond.regexpLike(
+            picture,
+            '^https://lh[0-9]+[.]googleusercontent[.]com/[^[:space:][:cntrl:]]+$',
+            'c',
+          ),
+        ),
+        (then) => then.invalid('PROFILE_GOOGLE_AVATAR_INVALID'),
+      )
+      body.query(
+        odbQuery()
+          .selectFrom(authIdentities)
+          .select(authIdentities.userId)
+          .into(userId)
+          .where(
+            cond.and([
+              cond.eq(authIdentities.subject, subject),
+              cond.eq(authIdentities.issuer, 'https://accounts.google.com'),
+            ]),
+          ),
+      )
+      body.query(
+        odbQuery()
+          .updateTable(authUsers)
+          .set({ googleAvatarUrl: picture })
+          .where(cond.eq(authUsers.id, userId)),
+      )
+      body.when('NO_DATA_FOUND', (handler) => handler.notFound())
+    },
+  )
+
+  const readProfile = pkg.proc(
+    'read_profile',
+    {
+      in: { userId: authUsers.id },
+      out: {
+        avatarUrl: odbType.clob(),
+        avatarUploaded: odbType.integer(),
+        passwordConnected: odbType.integer(),
+        googleConnected: odbType.integer(),
+      },
+    },
+    ({
+      params: { userId, avatarUrl, avatarUploaded, passwordConnected, googleConnected },
+      body,
+    }) => {
+      body.query(
+        odbQuery()
+          .selectFrom(authUsers)
+          .select([
+            'COALESCE(avatar, TO_CLOB(google_avatar_url))',
+            'CASE WHEN avatar IS NULL THEN 0 ELSE 1 END',
+          ])
+          .into(avatarUrl, avatarUploaded)
+          .where(cond.and([cond.eq(authUsers.id, userId), cond.eq(authUsers.enabled, true)])),
+      )
+      body.query(
+        odbQuery()
+          .selectFrom(authIdentities)
+          .select([
+            "COUNT(CASE WHEN issuer = 'password' THEN 1 END)",
+            "COUNT(CASE WHEN issuer = 'https://accounts.google.com' THEN 1 END)",
+          ])
+          .into(passwordConnected, googleConnected)
+          .where(cond.eq(authIdentities.userId, userId)),
+      )
+      body.when('NO_DATA_FOUND', (handler) => handler.notFound())
+    },
+  )
+
+  const updateAvatar = pkg.proc(
+    'update_avatar',
+    { in: { userId: authUsers.id, avatar: odbType.clob() } },
+    ({ params: { userId, avatar }, body }) => {
+      const { lockedUserId } = body.variables({ lockedUserId: authUsers.id })
+      body.ifThen(cond.isNotNull(avatar), (validate) => {
+        validate.ifThen(
+          cond.or([
+            cond.gt(plsqlExpr.call('NUMBER', 'DBMS_LOB.GETLENGTH', avatar), 30000),
+            cond.lt(plsqlExpr.call('NUMBER', 'DBMS_LOB.GETLENGTH', avatar), 31),
+            cond.not(
+              cond.regexpLike(avatar, '^data:image/jpeg;base64,/9j/[A-Za-z0-9+/]*={0,2}$', 'c'),
+            ),
+          ]),
+          (then) => then.invalid('PROFILE_AVATAR_INVALID'),
+        )
+      })
+      body.query(
+        odbQuery()
+          .selectFrom(authUsers)
+          .select(authUsers.id)
+          .into(lockedUserId)
+          .where(cond.and([cond.eq(authUsers.id, userId), cond.eq(authUsers.enabled, true)]))
+          .forUpdate(),
+      )
+      body.query(
+        odbQuery()
+          .updateTable(authUsers)
+          .set({ avatar, updatedAt: odbOracle.sysTimestamp() })
+          .where(cond.eq(authUsers.id, userId)),
+      )
+      body.when('NO_DATA_FOUND', (handler) => handler.notFound())
+    },
+  )
+
+  const changePassword = pkg.proc(
+    'change_password',
+    {
+      in: {
+        userId: authUsers.id,
+        currentPassword: authTypes.password,
+        password: authTypes.password,
+      },
+    },
+    ({ params: { userId, currentPassword, password }, body }) => {
+      const { lockedUserId, passwordHash } = body.variables({
+        lockedUserId: authUsers.id,
+        passwordHash: authIdentities.passwordHash,
+      })
+      body.ifThen(
+        cond.or([
+          cond.isNull(password),
+          cond.lt(odbOracle.length(password), 8),
+          cond.gt(odbOracle.length(password), 256),
+        ]),
+        (then) => then.invalid('PASSWORD_CHANGE_PASSWORD_INVALID'),
+      )
+      body.call(odbRateLimitApi.enforce(odbLiteral('AUTH_PASSWORD_CHANGE_USER'), userId))
+      body.call(odbRateLimitApi.failure(odbLiteral('AUTH_PASSWORD_CHANGE_USER'), userId))
+      body.query(
+        odbQuery()
+          .selectFrom(authUsers)
+          .select(authUsers.id)
+          .into(lockedUserId)
+          .where(cond.and([cond.eq(authUsers.id, userId), cond.eq(authUsers.enabled, true)]))
+          .forUpdate(),
+      )
+      body.set(passwordHash, readPasswordHash.invoke(userId))
+      body.ifThen(cond.isNull(passwordHash), (then) => then.conflict('PASSWORD_NOT_CONNECTED'))
+      body.ifThen(
+        cond.or([
+          cond.isNull(currentPassword),
+          cond.gt(odbOracle.length(currentPassword), 256),
+          cond.eq(odbAuthCrypto.verifyPassword(currentPassword, passwordHash), false),
+        ]),
+        (then) => then.forbidden('PASSWORD_CHANGE_CURRENT_INVALID'),
+      )
+      body.query(
+        odbQuery()
+          .updateTable(authIdentities)
+          .set({ passwordHash: odbAuthCrypto.hashPassword(password) })
+          .where(
+            cond.and([
+              cond.eq(authIdentities.userId, userId),
+              cond.eq(authIdentities.issuer, 'password'),
+            ]),
+          ),
+      )
+      body.query(
+        odbQuery()
+          .updateTable(authUsers)
+          .set({
+            tokenVersion: plsqlExpr.add(authUsers.tokenVersion, 1),
+            updatedAt: odbOracle.sysTimestamp(),
+          })
+          .where(cond.eq(authUsers.id, userId)),
+      )
+      body.query(
+        odbQuery()
+          .updateTable(authSessions)
+          .set({ revokedAt: odbOracle.sysTimestamp() })
+          .where(
+            cond.and([cond.eq(authSessions.userId, userId), cond.isNull(authSessions.revokedAt)]),
+          ),
+      )
+      body.query(
+        odbQuery().deleteFrom(authPasswordResets).where(cond.eq(authPasswordResets.userId, userId)),
+      )
+      body.call(odbRateLimitApi.success(odbLiteral('AUTH_PASSWORD_CHANGE_USER'), userId))
+      body.when('NO_DATA_FOUND', (handler) => handler.unauthorized())
+    },
+  )
   const defineRole = pkg.proc(
     'define_role',
     {
@@ -1055,6 +1245,10 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
     logout,
     requireUser,
     readUser,
+    readProfile,
+    updateGoogleAvatar,
+    updateAvatar,
+    changePassword,
     defineRole,
     grantRole,
     revokeRole,

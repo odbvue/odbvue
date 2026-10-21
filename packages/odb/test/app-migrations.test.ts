@@ -19,6 +19,44 @@ const migrations = {
 const load = async (file: keyof typeof migrations) => (await migrations[file]()).migration
 
 describe('app-owned ORDS migrations', () => {
+  it('installs profile storage and runtime packages through bootstrap', async () => {
+    const migration = (await load('00000000000000-bootstrap')).compile()
+    const up = migration.up().join('\n')
+    expect(up).toContain('CREATE TABLE ODBVUE.odb_auth_users')
+    expect(up).toContain('avatar CLOB')
+    expect(up).toContain('google_avatar_url VARCHAR2(2048')
+    expect(up).toContain('CREATE OR REPLACE PACKAGE ODBVUE.odb_auth AS')
+    expect(up).toContain('CREATE OR REPLACE PACKAGE ODBVUE.odb_google AS')
+  })
+
+  it('binds profile changes to verified identity and exposes actual provider and avatar fields', async () => {
+    const migration = await load('00000000000000-bootstrap')
+    const sql = migration.compile().up().join('\n')
+    const app = migration.applications()[0]!
+    for (const name of ['update_avatar', 'change_password']) {
+      const proc = app.procedures.find((p) => p.name === name)!
+      expect(proc.service?.auth).toBe('authenticated')
+      expect(proc.service?.params?.context).toMatchObject({ userId: { name: 'p_user_id' } })
+      expect(proc.service?.params?.body).not.toHaveProperty('userId')
+    }
+    const me = app.procedures.find((p) => p.name === 'me')!
+    expect(me.service?.params?.response).toMatchObject({
+      avatarUrl: { name: 'p_avatar_url' },
+      avatarUploaded: { name: 'p_avatar_uploaded' },
+      passwordConnected: { name: 'p_password_connected' },
+      googleConnected: { name: 'p_google_connected' },
+    })
+    expect(sql).toContain("v_body_json.get_clob(''avatar'')")
+    expect(sql).toContain('odb_auth.change_password(p_user_id, p_current_password, p_password)')
+    expect(sql).toContain('PASSWORD_CHANGE_PASSWORD_MISMATCH')
+    const change = sql.slice(
+      sql.indexOf('PROCEDURE change_password(', sql.indexOf('PACKAGE BODY ODBVUE.PCK_APP')),
+    )
+    expect(change).toContain(
+      "p_set_cookie := '__Host-odb_refresh=' || '' || '; Path=/' || '; HttpOnly' || '; Secure' || '; SameSite=Lax' || '; Max-Age=0'",
+    )
+  })
+
   it('guides collisions through existing-account login and preserves the destination after linking', async () => {
     const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
     const start = sql.indexOf('PACKAGE BODY ODBVUE.PCK_APP')

@@ -153,6 +153,39 @@ export const odbAuth = {
     return odbAuthPackage.resetPassword(token, password)
   },
 
+  changePassword(
+    userId: PlsqlRenderable,
+    currentPassword: PlsqlRenderable,
+    password: PlsqlRenderable,
+  ) {
+    return odbAuthPackage.changePassword(userId, currentPassword, password)
+  },
+
+  readProfile(
+    userId: PlsqlRenderable,
+    avatarUrl: PlsqlRenderable,
+    avatarUploaded: PlsqlRenderable,
+    passwordConnected: PlsqlRenderable,
+    googleConnected: PlsqlRenderable,
+  ) {
+    return odbAuthPackage.readProfile(
+      userId,
+      avatarUrl,
+      avatarUploaded,
+      passwordConnected,
+      googleConnected,
+    )
+  },
+
+  updateAvatar(userId: PlsqlRenderable, avatar: PlsqlRenderable) {
+    return odbAuthPackage.updateAvatar(userId, avatar)
+  },
+
+  /** Server-only: the Google subject and picture must come from a verified token. */
+  updateGoogleAvatar(subject: PlsqlRenderable, picture: PlsqlRenderable) {
+    return odbAuthPackage.updateGoogleAvatar(subject, picture)
+  },
+
   role: {
     has(userId: PlsqlRenderable, role: PlsqlRenderable) {
       return odbAuthPackage.hasRole(userId, role)

@@ -2,6 +2,36 @@ import { describe, expect, it } from 'vitest'
 import { odbAuth } from '../../../src/capabilities/auth/auth.js'
 
 describe('odbAuth framework package', () => {
+  it('reads provider status from identities and prefers uploaded avatars over Google photos', () => {
+    const sql = odbAuth.toSQLUp({ schema: 'APP' })
+    expect(sql).toContain('avatar CLOB')
+    expect(sql).toContain('google_avatar_url VARCHAR2(2048')
+    expect(sql).toContain('COALESCE(avatar, TO_CLOB(google_avatar_url))')
+    expect(sql).toContain("COUNT(CASE WHEN issuer = 'password' THEN 1 END)")
+    expect(sql).toContain("COUNT(CASE WHEN issuer = 'https://accounts.google.com' THEN 1 END)")
+    expect(sql).toContain('DBMS_LOB.GETLENGTH(p_avatar) > 30000')
+    expect(sql).toContain('^data:image/jpeg;base64,/9j/')
+    expect(sql).toContain('PROFILE_AVATAR_INVALID')
+  })
+
+  it('locks the account before checking current password and revokes tokens, sessions and reset links atomically', () => {
+    const sql = odbAuth.toSQLUp()
+    const start = sql.indexOf('PROCEDURE change_password(', sql.indexOf('PACKAGE BODY'))
+    const change = sql.slice(start, sql.indexOf('END change_password;', start))
+    expect(change.indexOf('FOR UPDATE')).toBeLessThan(change.indexOf('verify_password'))
+    expect(change).toContain('verify_password(p_current_password, l_password_hash)')
+    expect(change).toContain('LENGTH(p_password) < 8')
+    expect(change).toContain('LENGTH(p_password) > 256')
+    expect(change).toContain('PASSWORD_NOT_CONNECTED')
+    expect(change).toContain('PASSWORD_CHANGE_CURRENT_INVALID')
+    expect(change).toContain("odb_rate_limit.enforce('AUTH_PASSWORD_CHANGE_USER', p_user_id)")
+    expect(change).toContain('password_hash = odb_auth_crypto.hash_password(p_password)')
+    expect(change).toContain('token_version = token_version + 1')
+    expect(change).toContain('UPDATE odb_auth_sessions SET revoked_at = SYSTIMESTAMP')
+    expect(change).toContain('DELETE FROM odb_auth_password_resets WHERE user_id = p_user_id')
+    expect(change).not.toContain('COMMIT')
+  })
+
   it('isolates hashed one-hour recovery tokens and installs/drops their table', () => {
     const sql = odbAuth.toSQLUp({ schema: 'APP' })
     expect(sql).toContain('CREATE TABLE APP.odb_auth_password_resets')

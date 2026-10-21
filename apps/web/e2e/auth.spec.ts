@@ -130,11 +130,15 @@ test('validates login, reports errors, returns to a protected page, and logs out
   await page.getByLabel('Password', { exact: true }).fill('valid-password')
   await page.getByRole('button', { name: 'Login', exact: true }).click()
   await expect(page).toHaveURL(/\/sandbox$/)
-  await expect(page.getByRole('button', { name: 'Logout', exact: true })).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Account menu for Ada Lovelace', exact: true }),
+  ).toBeVisible()
   expect(requests).toEqual(['refresh', 'login', 'login', 'me'])
 
   await page.reload()
-  await expect(page.getByRole('button', { name: 'Logout', exact: true })).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Account menu for Ada Lovelace', exact: true }),
+  ).toBeVisible()
   expect(requests).toEqual(['refresh', 'login', 'login', 'me', 'refresh', 'me'])
   const persisted = await page.evaluate(() => ({
     local: { ...localStorage },
@@ -142,6 +146,7 @@ test('validates login, reports errors, returns to a protected page, and logs out
   }))
   expect(JSON.stringify(persisted)).not.toMatch(/test-access-token|valid-password|Ada Lovelace/)
 
+  await page.getByRole('button', { name: 'Account menu for Ada Lovelace', exact: true }).click()
   await page.getByRole('button', { name: 'Logout', exact: true }).click()
   await expect(page).toHaveURL(/\/$/)
   await expect(page.getByRole('link', { name: 'Login', exact: true }).first()).toBeVisible()
@@ -188,6 +193,7 @@ test('denies role-protected pages and hides their home navigation', async ({ pag
 test('reports failed logout while clearing local identity and returning home', async ({ page }) => {
   const requests = await mockAuth(page, { restored: true, logoutFailure: true })
   await page.goto('/sandbox')
+  await page.getByRole('button', { name: 'Account menu for Ada Lovelace', exact: true }).click()
   await page.getByRole('button', { name: 'Logout', exact: true }).click()
   await expect(page).toHaveURL(/\/$/)
   await expect(page.getByRole('button', { name: 'Logout', exact: true })).toHaveCount(0)

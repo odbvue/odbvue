@@ -4,6 +4,8 @@ export const authUsers = odbTable('odb_auth_users', (t) => ({
   id: t.guid().primaryKey().defaultSysGuid(),
   username: t.string(128).notNull(),
   displayName: t.string(256),
+  avatar: t.clob(),
+  googleAvatarUrl: t.string(2048),
   enabled: t.boolean().notNull().default(true),
   tokenVersion: t.number().notNull().default(0),
   createdAt: t.timestamp().notNull().defaultSysTimestamp(),

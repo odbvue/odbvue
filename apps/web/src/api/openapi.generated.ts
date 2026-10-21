@@ -208,6 +208,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set a JPEG thumbnail, or remove the uploaded avatar with null */
+        post: operations["auth_update_avatar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/change-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change a local password after reauthentication and revoke all sessions */
+        post: operations["auth_change_password"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sandbox/auth/login": {
         parameters: {
             query?: never;
@@ -527,6 +561,10 @@ export interface components {
             userId: string;
             username: string;
             displayName: string;
+            avatarUrl: string;
+            avatarUploaded: number;
+            passwordConnected: number;
+            googleConnected: number;
             roles: unknown;
             permissions: unknown;
         };
@@ -534,6 +572,8 @@ export interface components {
         AuthConfirmEmailResponse: Record<string, never>;
         AuthRecoverPasswordResponse: Record<string, never>;
         AuthResetPasswordResponse: Record<string, never>;
+        AuthUpdateAvatarResponse: Record<string, never>;
+        AuthChangePasswordResponse: Record<string, never>;
         SandboxAuthLoginResponse: {
             accessToken: string;
         };
@@ -955,6 +995,74 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AuthResetPasswordResponse"];
                 };
+            };
+        };
+    };
+    auth_update_avatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    avatar?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthUpdateAvatarResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    auth_change_password: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    currentPassword?: string;
+                    password?: string;
+                    passwordRepeat?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthChangePasswordResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

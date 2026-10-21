@@ -14,18 +14,9 @@
       <v-divider />
       <v-list v-if="auth.ready.value">
         <template v-if="auth.authenticated.value">
-          <v-list-item
-            prepend-icon="$mdiAccount"
-            :title="displayName"
-            :subtitle="auth.user.value?.username"
-          />
-          <v-list-item to="/account" prepend-icon="$mdiAccount" :title="t('auth.account.title')" />
-          <v-list-item
-            prepend-icon="$mdiLogout"
-            :title="t('auth.logout')"
-            :disabled="auth.loading.value"
-            @click="logout"
-          />
+          <v-list-item to="/account" :title="displayName" :subtitle="t('auth.account.title')">
+            <template #prepend><AuthAvatar :user="auth.user.value" class="mr-3" /></template>
+          </v-list-item>
         </template>
         <v-list-item v-else to="/login" prepend-icon="$mdiAccount" :title="t('auth.login')" />
       </v-list>
@@ -37,15 +28,33 @@
         <v-btn v-if="!auth.authenticated.value" to="/login" prepend-icon="$mdiAccount" class="mr-2">
           {{ t('auth.login') }}
         </v-btn>
-        <v-btn
-          v-else
-          prepend-icon="$mdiLogout"
-          :loading="auth.loading.value"
-          class="mr-2"
-          @click="logout"
-        >
-          {{ t('auth.logout') }}
-        </v-btn>
+        <v-menu v-else>
+          <template #activator="{ props }">
+            <v-btn
+              v-bind="props"
+              :aria-label="t('auth.profile.menu', { name: displayName })"
+              class="mr-2"
+              :loading="auth.loading.value"
+            >
+              <AuthAvatar :user="auth.user.value" :size="28" class="mr-2" />
+              <span v-if="!mobile">{{ displayName }}</span>
+            </v-btn>
+          </template>
+          <v-list>
+            <v-list-item
+              to="/account"
+              prepend-icon="$mdiAccount"
+              :title="t('auth.account.title')"
+            />
+            <v-list-item
+              role="button"
+              prepend-icon="$mdiLogout"
+              :title="t('auth.logout')"
+              :disabled="auth.loading.value"
+              @click="logout"
+            />
+          </v-list>
+        </v-menu>
       </template>
       <v-btn v-if="mobile">
         <v-icon :icon="'$mdiDotsVertical'"></v-icon>
@@ -185,6 +194,7 @@
 
 <script setup lang="ts">
 import { useAuth } from '@/capabilities/auth'
+import AuthAvatar from '@/capabilities/auth/AuthAvatar.vue'
 import { appConfig } from '@/capabilities/config'
 import { usePreferencesStore, useUi } from '@/capabilities/ui'
 import { useNotificationMessage } from '@/capabilities/ui'

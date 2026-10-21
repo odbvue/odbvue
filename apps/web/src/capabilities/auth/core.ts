@@ -4,6 +4,11 @@ import type { HttpClient, HttpError } from '../http/core.js'
 export interface AuthUser {
   id: string | number
   username: string
+  displayName?: string
+  avatarUrl?: string | null
+  avatarUploaded?: boolean
+  passwordConnected?: boolean
+  googleConnected?: boolean
   roles?: readonly string[]
   permissions?: readonly string[]
   [key: string]: unknown
@@ -22,6 +27,10 @@ interface AuthUserResponse {
   userId: string | number
   username: string
   displayName?: string | null
+  avatarUrl?: string | null
+  avatarUploaded?: number
+  passwordConnected?: number
+  googleConnected?: number
   roles?: readonly string[] | string
   permissions?: readonly string[] | string
 }
@@ -40,6 +49,12 @@ export interface SignupCredentials {
 
 export interface ResetPasswordCredentials {
   token: string
+  password: string
+  passwordRepeat: string
+}
+
+export interface ChangePasswordCredentials {
+  currentPassword: string
   password: string
   passwordRepeat: string
 }
@@ -71,6 +86,8 @@ export interface AuthEndpoints {
   confirmEmail: string
   recoverPassword: string
   resetPassword: string
+  changePassword: string
+  avatar: string
   login: string
   refresh: string
   logout: string
@@ -96,6 +113,8 @@ export interface Auth<User extends AuthUser = AuthUser> {
   confirmEmail(token: string): Promise<void>
   recoverPassword(email: string): Promise<void>
   resetPassword(credentials: ResetPasswordCredentials): Promise<void>
+  changePassword(credentials: ChangePasswordCredentials): Promise<void>
+  updateAvatar(avatar: string | null): Promise<void>
   logout(): Promise<void>
   refresh(): Promise<boolean>
   restore(): Promise<boolean>
@@ -112,6 +131,8 @@ const defaultEndpoints: AuthEndpoints = {
   confirmEmail: '/auth/confirm-email',
   recoverPassword: '/auth/recover-password',
   resetPassword: '/auth/reset-password',
+  changePassword: '/auth/change-password',
+  avatar: '/auth/avatar',
   login: '/auth/login',
   refresh: '/auth/refresh',
   logout: '/auth/logout',
@@ -173,6 +194,12 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
       username: response.username,
       roles: authorizationNames(response.roles),
       permissions: authorizationNames(response.permissions),
+      avatarUrl: response.avatarUrl ?? null,
+      avatarUploaded: response.avatarUploaded === 1,
+      passwordConnected:
+        response.passwordConnected === undefined ? undefined : response.passwordConnected > 0,
+      googleConnected:
+        response.googleConnected === undefined ? undefined : response.googleConnected > 0,
       ...(response.displayName === undefined || response.displayName === null
         ? {}
         : { displayName: response.displayName }),
@@ -205,6 +232,25 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
       if (response.error) throw response.error
       if (response.status === null || response.status < 200 || response.status >= 300)
         throw new Error('The authentication request failed.')
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function authenticatedPost(endpoint: string, body: unknown): Promise<void> {
+    if (!ready.value || !user.value || !accessToken.value)
+      throw new Error('Sign in before updating your profile.')
+    if (loading.value) throw new Error('An authentication request is already in progress.')
+    loading.value = true
+    try {
+      const response = await requireHttp().post(endpoint, body, {
+        credentials: 'include',
+        headers: { Authorization: `Bearer ${accessToken.value}` },
+        skipAuthRefresh: true,
+      })
+      if (response.error) throw response.error
+      if (response.status === null || response.status < 200 || response.status >= 300)
+        throw new Error('The profile request failed.')
     } finally {
       loading.value = false
     }
@@ -277,6 +323,14 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
     async resetPassword(credentials) {
       await anonymousPost(endpoints.resetPassword, credentials)
       clear()
+    },
+    async changePassword(credentials) {
+      await authenticatedPost(endpoints.changePassword, credentials)
+      clear()
+    },
+    async updateAvatar(avatar) {
+      await authenticatedPost(endpoints.avatar, { avatar })
+      await this.me()
     },
     async login(credentials) {
       loading.value = true

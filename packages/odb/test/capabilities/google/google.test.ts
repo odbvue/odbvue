@@ -25,6 +25,14 @@ const routine = (name: string) => {
 }
 
 describe('Google OIDC local SQL generation', () => {
+  it('accepts only Google-hosted photos from verified claims and never overwrites an uploaded avatar', () => {
+    const verify = routine('verify_token')
+    expect(verify).toContain("'picture'")
+    expect(verify).toContain('^https://lh[0-9]+[.]googleusercontent[.]com/')
+    expect(routine('complete_transaction')).toContain(
+      'odb_auth.update_google_avatar(l_subject, l_picture)',
+    )
+  })
   it('returns an email collision as an outcome so the consumed return path survives PL/SQL OUT propagation', () => {
     const complete = routine('complete_transaction')
     const login = complete.slice(complete.indexOf('odb_auth.login_google('))

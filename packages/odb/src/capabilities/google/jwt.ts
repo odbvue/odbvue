@@ -391,7 +391,7 @@ export function defineGoogleJwt(
     })
   })
   const verify = pkg.privateProc('verify_token', (proc) => {
-    const { token, clientId, nonceHash, subject, email, displayName } = proc.parameters({
+    const { token, clientId, nonceHash, subject, email, displayName, picture } = proc.parameters({
       in: {
         token: odbType.string(8192),
         clientId: odbType.string(256),
@@ -401,6 +401,7 @@ export function defineGoogleJwt(
         subject: odbType.string(255),
         email: odbType.string(128),
         displayName: odbType.string(256),
+        picture: odbType.string(2048),
       },
     })
     proc.body((body) => {
@@ -640,6 +641,19 @@ export function defineGoogleJwt(
       body.ifThen(cond.eq(hasMember.invoke(claims, odbLiteral('name')), true), (then) =>
         then.set(displayName, requiredString.invoke(claims, odbLiteral('name'), odbLiteral(256))),
       )
+      body.set(picture, null)
+      body.ifThen(cond.eq(hasMember.invoke(claims, odbLiteral('picture')), true), (then) => {
+        const { candidate } = then.variables({ candidate: odbType.string(2048) })
+        then.set(candidate, requiredString.invoke(claims, odbLiteral('picture'), odbLiteral(2048)))
+        then.ifThen(
+          cond.regexpLike(
+            candidate,
+            '^https://lh[0-9]+[.]googleusercontent[.]com/[^[:space:][:cntrl:]]+$',
+            'c',
+          ),
+          (valid) => valid.set(picture, candidate),
+        )
+      })
       body.when('OTHERS', (handler) => {
         handler.block((log) => {
           log.auditError('GOOGLE_TOKEN_INVALID')

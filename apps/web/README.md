@@ -64,10 +64,11 @@ and applies the local redirect. Anonymous callback failures on `/login?google=ca
 `failed`, or `conflict` show fixed localized feedback and remove the consumed query flag
 without dropping the return destination. No frontend Google client ID is needed.
 An existing-email conflict never automatically links accounts: sign in using the existing
-method, then the guided redirect opens Account settings with the original destination
+method, then the guided redirect opens Profile with the original destination
 preserved. Choose **Connect Google**, or **Continue without connecting** to skip it.
-The authenticated `/account` page offers connecting only when Google
-is enabled and requires the current password. `auth.startGoogleLink({ redirect, password })`
+The authenticated `/account` profile page offers connecting only when Google
+is enabled, a local password exists, and Google is not already connected.
+It requires the current password. `auth.startGoogleLink({ redirect, password })`
 calls authenticated `POST /auth/google/link/start` with credentials included, using
 a validated local destination (or `/account` for a connection started directly from settings).
 Only the validated Google authorization URL is opened. Password confirmation failures do
@@ -98,7 +99,31 @@ Access tokens and user details remain in
 memory; the server-managed refresh cookie is `HttpOnly`, `Secure`, and `SameSite=Lax`. Existing
 preference persistence is unchanged.
 
-The default layout shows login/logout controls and the current identity. Application guards
+The default layout shows an accessible name/avatar menu containing Profile and Logout.
+The drawer links the identity directly to Profile without a duplicate Account entry.
+The profile shows read-only name/email and actual password/Google connection status from
+`GET /auth/me`; missing provider metadata is shown as unavailable, never inferred.
+Google-only accounts are directed to Google to manage their password.
+
+Users can upload JPEG/PNG/WebP files up to 5 MB. The browser crops and re-encodes a
+128 x 128 JPEG thumbnail (maximum 30,000 data-URL characters), stripping original metadata.
+Authenticated `POST /auth/avatar` stores the thumbnail; `{ avatar: null }` removes it.
+Both profile and navigation update immediately. Uploaded photos take precedence over
+Google photos captured from verified Google sign-in tokens; initials are the final fallback.
+Google photos are restricted to HTTPS `lh<N>.googleusercontent.com` URLs, loaded without
+a Referer header, and refreshed on Google sign-in. No extra Google API request/scope is needed.
+Broken or unavailable remote images fall back to initials.
+
+Authenticated `POST /auth/change-password` requires the current password, a new password
+of 8-256 characters, and matching confirmation. A successful change revokes every session
+and access-token version, removes outstanding recovery tokens, expires the refresh cookie,
+clears in-memory identity, and returns to Login with confirmation. Password verification
+failures do not refresh or clear the current session. Password fields are cleared after
+each submitted request. Profile columns, runtime procedures and services are included
+in the bootstrap migration. Rebuild and redeploy the database before deploying the new
+web app; no separate incremental profile migration is supplied.
+
+Application guards
 enforce required page `access` metadata: `public`, `authenticated`, `anonymous`, or a non-empty
 role array such as `['admin', 'editor']`. Role arrays require authentication and any listed role.
 Optional `permissions` require every listed permission and are supported only with

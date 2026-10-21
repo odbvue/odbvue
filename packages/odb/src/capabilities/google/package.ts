@@ -461,6 +461,7 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
         subject,
         email,
         displayName,
+        picture,
         accessToken,
         ip,
       } = body.variables({
@@ -474,6 +475,7 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
         subject: text(255),
         email: text(128),
         displayName: { type: 'VARCHAR2(256 CHAR)' },
+        picture: text(2048),
         accessToken: authTypes.accessToken,
         ip: text(128),
       })
@@ -563,7 +565,9 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
         exchange.ifThen(cond.eq(odbDbmsLob.isTemporary(document), 1), (then) =>
           then.call(odbDbmsLob.freeTemporary(document)),
         )
-        exchange.call(verify.invoke(idToken, clientId, nonceHash, subject, email, displayName))
+        exchange.call(
+          verify.invoke(idToken, clientId, nonceHash, subject, email, displayName, picture),
+        )
         exchange.when('OTHERS', (handler) => {
           handler.ifThen(cond.eq(odbDbmsLob.isTemporary(document), 1), (then) =>
             then.call(odbDbmsLob.freeTemporary(document)),
@@ -592,6 +596,7 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
         (otherwise) => {
           otherwise.block((login) => {
             login.call(odbAuth.loginGoogle(subject, email, displayName, accessToken, refreshToken))
+            login.call(odbAuth.updateGoogleAvatar(subject, picture))
             login.whenOthers((handler) => {
               handler.ifThen(
                 cond.and([
