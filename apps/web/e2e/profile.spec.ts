@@ -22,7 +22,8 @@ async function mockProfile(
           userId: 7,
           username: 'ada@example.com',
           displayName: 'Ada Lovelace',
-          avatarUrl: avatar ?? googlePhoto,
+          avatarUrl: googlePhoto,
+          avatarId: avatar ? 'a'.repeat(32) : null,
           avatarUploaded: avatar ? 1 : 0,
           passwordConnected: passwordConnected ? 1 : 0,
           googleConnected: googleConnected ? 1 : 0,
@@ -38,6 +39,12 @@ async function mockProfile(
         json: {
           authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=profile-link',
         },
+      })
+    } else if (path.endsWith(`/avatar/${'a'.repeat(32)}`)) {
+      expect(route.request().headers().authorization).toBe(['Bearer', 'profile-token'].join(' '))
+      await route.fulfill({
+        contentType: 'image/jpeg',
+        body: Buffer.from(avatar!.split(',')[1]!, 'base64'),
       })
     } else if (path.endsWith('/avatar')) {
       expect(route.request().headers().authorization).toBe(['Bearer', 'profile-token'].join(' '))
@@ -96,63 +103,65 @@ test('Google-only accounts do not show a misleading local password form, includi
   await expect(page.getByRole('button', { name: 'Logout', exact: true })).toBeVisible()
 })
 
-test('uploads a JPEG thumbnail, updates navigation immediately, persists on reload and removes it', async ({
-  page,
-}) => {
-  const googlePhoto = 'https://lh3.googleusercontent.com/profile-test'
-  await page.route(googlePhoto, (route) =>
-    route.fulfill({
-      contentType: 'image/png',
-      body: Buffer.from(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jfN0AAAAASUVORK5CYII=',
-        'base64',
-      ),
-    }),
-  )
-  const updates = await mockProfile(page, true, true, googlePhoto)
-  await page.goto('/account')
-  const data = await page.evaluate(() => {
-    const canvas = document.createElement('canvas')
-    canvas.width = 320
-    canvas.height = 200
-    const context = canvas.getContext('2d')!
-    context.fillStyle = '#0055aa'
-    context.fillRect(0, 0, 320, 200)
-    return canvas.toDataURL('image/png').split(',')[1]!
+for (const type of ['image/jpeg', 'image/png', 'image/webp']) {
+  test(`normalizes ${type} to a stored JPEG, updates navigation, persists on reload and removes it`, async ({
+    page,
+  }) => {
+    const googlePhoto = 'https://lh3.googleusercontent.com/profile-test'
+    await page.route(googlePhoto, (route) =>
+      route.fulfill({
+        contentType: 'image/png',
+        body: Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jfN0AAAAASUVORK5CYII=',
+          'base64',
+        ),
+      }),
+    )
+    const updates = await mockProfile(page, true, true, googlePhoto)
+    await page.goto('/account')
+    const data = await page.evaluate((mimeType) => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 320
+      canvas.height = 200
+      const context = canvas.getContext('2d')!
+      context.fillStyle = '#0055aa'
+      context.fillRect(0, 0, 320, 200)
+      return canvas.toDataURL(mimeType).split(',')[1]!
+    }, type)
+    await page.getByLabel('Choose profile photo', { exact: true }).setInputFiles({
+      name: `avatar.${type.split('/')[1]}`,
+      mimeType: type,
+      buffer: Buffer.from(data, 'base64'),
+    })
+    await expect(page.getByRole('button', { name: 'Remove uploaded photo' })).toBeVisible()
+    expect(updates).toHaveLength(1)
+    expect(updates[0]).toMatchObject({
+      avatar: expect.stringMatching(/^data:image\/jpeg;base64,\/9j\//),
+    })
+    await expect(
+      page.getByRole('button', { name: 'Account menu for Ada Lovelace' }).locator('img'),
+    ).toBeVisible()
+    const thumbnail = await page
+      .getByRole('button', { name: 'Account menu for Ada Lovelace' })
+      .locator('img')
+      .evaluate((image: HTMLImageElement) => ({
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+        source: image.src,
+      }))
+    expect(thumbnail).toMatchObject({ width: 128, height: 128 })
+    expect(thumbnail.source).toMatch(/^blob:/)
+    await page.reload()
+    await expect(page.getByRole('button', { name: 'Remove uploaded photo' })).toBeVisible()
+    await page.getByRole('button', { name: 'Remove uploaded photo' }).click()
+    await expect(page.getByRole('button', { name: 'Remove uploaded photo' })).toHaveCount(0)
+    expect(updates).toHaveLength(2)
+    expect(updates[1]).toEqual({ avatar: null })
+    await expect(
+      page.getByRole('button', { name: 'Account menu for Ada Lovelace' }).locator('img'),
+    ).toHaveAttribute('src', googlePhoto)
   })
-  await page.getByLabel('Choose profile photo', { exact: true }).setInputFiles({
-    name: 'avatar.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from(data, 'base64'),
-  })
-  await expect(page.getByRole('button', { name: 'Remove uploaded photo' })).toBeVisible()
-  expect(updates).toHaveLength(1)
-  expect(updates[0]).toMatchObject({
-    avatar: expect.stringMatching(/^data:image\/jpeg;base64,\/9j\//),
-  })
-  await expect(
-    page.getByRole('button', { name: 'Account menu for Ada Lovelace' }).locator('img'),
-  ).toBeVisible()
-  const thumbnail = await page
-    .getByRole('button', { name: 'Account menu for Ada Lovelace' })
-    .locator('img')
-    .evaluate((image: HTMLImageElement) => ({
-      width: image.naturalWidth,
-      height: image.naturalHeight,
-      size: image.src.length,
-    }))
-  expect(thumbnail).toMatchObject({ width: 128, height: 128 })
-  expect(thumbnail.size).toBeLessThanOrEqual(30000)
-  await page.reload()
-  await expect(page.getByRole('button', { name: 'Remove uploaded photo' })).toBeVisible()
-  await page.getByRole('button', { name: 'Remove uploaded photo' }).click()
-  await expect(page.getByRole('button', { name: 'Remove uploaded photo' })).toHaveCount(0)
-  expect(updates).toHaveLength(2)
-  expect(updates[1]).toEqual({ avatar: null })
-  await expect(
-    page.getByRole('button', { name: 'Account menu for Ada Lovelace' }).locator('img'),
-  ).toHaveAttribute('src', googlePhoto)
-})
+}
 
 test('still links Google with a current password and preserves the guided return destination', async ({
   page,

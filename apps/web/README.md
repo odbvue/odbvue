@@ -107,7 +107,12 @@ Google-only accounts are directed to Google to manage their password.
 
 Users can upload JPEG/PNG/WebP files up to 5 MB. The browser crops and re-encodes a
 128 x 128 JPEG thumbnail (maximum 30,000 data-URL characters), stripping original metadata.
-Authenticated `POST /auth/avatar` stores the thumbnail; `{ avatar: null }` removes it.
+Authenticated `POST /auth/avatar` decodes the thumbnail into an owner-scoped Storage BLOB;
+the user record holds only its storage key. `{ avatar: null }` removes it, and replacing
+or removing an upload deletes its previous object atomically.
+`GET /auth/me` returns `avatarId` and the Google `avatarUrl`; uploaded thumbnails are
+fetched through authenticated `GET /auth/avatar/:id` and shown using temporary blob URLs.
+Downloads are private/no-store, and blob URLs are revoked on replacement or sign-out.
 Both profile and navigation update immediately. Uploaded photos take precedence over
 Google photos captured from verified Google sign-in tokens; initials are the final fallback.
 Google photos are restricted to HTTPS `lh<N>.googleusercontent.com` URLs, loaded without

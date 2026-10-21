@@ -24,12 +24,20 @@ The test for placement: would another PL/SQL package reasonably call this withou
 
 ## Install
 
-Install it through a migration after `odbRateLimit` and `odbSettings`.
+Install it through a migration after `odbRateLimit`, `odbSettings`, `odbLob` and `odbStorage`.
 Settings requires `odbAudit`. JWT configuration is loaded from Settings at runtime;
 there is no built-in signing key, environment fallback, or package-embedded secret.
 
 ```ts
-import { defineMigration, odbAuth, odbAudit, odbRateLimit, odbSettings } from '@odbvue/odb'
+import {
+  defineMigration,
+  odbAuth,
+  odbAudit,
+  odbRateLimit,
+  odbSettings,
+  odbLob,
+  odbStorage,
+} from '@odbvue/odb'
 
 const schema = process.env.ODBVUE_ADB_SCHEMA_USERNAME ?? ''
 
@@ -37,6 +45,8 @@ export const migration = defineMigration('20260913120000_auth', { schema })
   .install(odbRateLimit)
   .install(odbAudit)
   .install(odbSettings)
+  .install(odbLob)
+  .install(odbStorage)
   .install(odbAuth)
   .install(odbAuth.seedSettings())
   .install(
@@ -155,16 +165,24 @@ protect against a compromised schema owner or an authorized decrypted Settings c
 
 ### Profile and password changes
 
-`odbAuth.readProfile(userId, avatarUrl, avatarUploaded, passwordConnected, googleConnected)`
-reads the effective avatar and actual identity counts. The application exposes these
+`odbAuth.readProfile(userId, avatarUrl, avatarUploaded, passwordConnected, googleConnected, avatarId)`
+reads the Google photo URL, uploaded storage key and actual identity counts. The application exposes these
 through `/auth/me`; the three numeric status fields are `0` or positive counts.
 An uploaded avatar takes precedence over a Google photo. `readUser` remains unchanged.
 
 `odbAuth.updateAvatar(userId, avatar)` accepts a JPEG thumbnail data URL of at most
 30,000 characters, or `NULL` to remove the upload. The web app produces a cropped,
-metadata-free 128 x 128 JPEG from an image of at most 5 MB. Only fixed `image/jpeg`
-data URLs are stored; SVG, arbitrary remote upload URLs and active formats are rejected.
-Thumbnails are stored on the user record and returned only to the authenticated owner.
+metadata-free 128 x 128 JPEG from JPEG, PNG or WebP input of at most 5 MB. The data URL
+is only an upload transport: the database validates its size, base64 shape and JPEG
+signature, decodes it and writes binary content with MIME type `image/jpeg` through
+`odbStorage`. `odb_auth_users.avatar` is a nullable storage key, not a CLOB.
+SVG, arbitrary remote upload URLs and active formats are rejected.
+Replacement and removal delete the previous object under the account lock in the same transaction.
+The storage foreign key clears the reference if the object is deleted through Storage.
+Authenticated `GET /auth/avatar/:id` serves only the enabled owner's current avatar,
+with private/no-store caching and `nosniff` headers. The web client fetches it with bearer
+authentication and displays a temporary blob URL, revoked on replacement or sign-out.
+No avatar keys are made publicly readable.
 Trusted `updateGoogleAvatar(subject, picture)` is called only after Google token verification
 and successful sign-in; only HTTPS `lh<N>.googleusercontent.com` photo URLs are accepted,
 and uploaded photos are never replaced. The optional verified `picture` claim needs no
@@ -513,7 +531,7 @@ body.call(odbAuth.logout(refreshCookie.read(cookie)))
 body.set(setCookie, refreshCookie.expire())
 ```
 
-Reuse `odbAuth.types` (`username`, `password`, `accessToken`, `refreshToken`, `userId`, `displayName`) for parameters instead of redeclaring them. Install `odbAuth` after `odbRateLimit` and `odbSettings`; login throttling uses the former and JWT configuration uses the latter.
+Reuse `odbAuth.types` (`username`, `password`, `accessToken`, `refreshToken`, `userId`, `displayName`) for parameters instead of redeclaring them. Install `odbAuth` after `odbRateLimit`, `odbSettings`, `odbLob` and `odbStorage`; login throttling uses Rate Limit, JWT configuration uses Settings, and avatars use LOB decoding and Storage.
 
 ## Authorization
 

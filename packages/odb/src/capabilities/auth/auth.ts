@@ -32,7 +32,7 @@ import { authTypes } from './types.js'
 import { odbSettings } from '../settings/settings.js'
 import { settingsStore } from '../settings/tables.js'
 import { authJwtSettings } from './settings.js'
-/** Install after `odbRateLimit` and `odbSettings` (which requires `odbAudit`). */
+/** Install after `odbRateLimit`, `odbSettings`, `odbLob` and `odbStorage`. */
 export const odbAuth = {
   toSQLUp(options: { schema?: string } = {}): string {
     const { schema } = options
@@ -167,6 +167,7 @@ export const odbAuth = {
     avatarUploaded: PlsqlRenderable,
     passwordConnected: PlsqlRenderable,
     googleConnected: PlsqlRenderable,
+    avatarId: PlsqlRenderable,
   ) {
     return odbAuthPackage.readProfile(
       userId,
@@ -174,6 +175,7 @@ export const odbAuth = {
       avatarUploaded,
       passwordConnected,
       googleConnected,
+      avatarId,
     )
   },
 

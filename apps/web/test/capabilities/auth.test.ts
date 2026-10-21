@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createAuth } from '@/capabilities/auth/core.js'
 import { createHttpClient, type HttpClient } from '@/capabilities/http/core.js'
 
@@ -10,28 +10,53 @@ function response<T>(data: T | null, status = 200) {
 }
 
 describe('authentication capability', () => {
+  afterEach(() => vi.restoreAllMocks())
+
   it('maps actual profile state without inventing provider connections', async () => {
     const http = createHttpClient()
     vi.spyOn(http, 'post').mockResolvedValue(response({ accessToken: 'token' }))
-    vi.spyOn(http, 'get').mockResolvedValue(
-      response({
-        userId: 7,
-        username: 'ada',
-        displayName: 'Ada Lovelace',
-        avatarUrl: 'data:image/jpeg;base64,/9j/AA==',
-        avatarUploaded: 1,
-        passwordConnected: 1,
-        googleConnected: 0,
-      }),
-    )
+    const avatar = new Blob(['jpeg'], { type: 'image/jpeg' })
+    const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:avatar')
+    const revokeUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const get = vi
+      .spyOn(http, 'get')
+      .mockResolvedValueOnce(
+        response({
+          userId: 7,
+          username: 'ada',
+          displayName: 'Ada Lovelace',
+          avatarUrl: 'https://lh3.googleusercontent.com/ada',
+          avatarId: 'a'.repeat(32),
+          avatarUploaded: 1,
+          passwordConnected: 1,
+          googleConnected: 0,
+        }),
+      )
+      .mockResolvedValueOnce(response(avatar))
     const auth = createAuth({ http })
     await auth.restore()
     expect(auth.user.value).toMatchObject({
-      avatarUrl: 'data:image/jpeg;base64,/9j/AA==',
+      avatarUrl: 'blob:avatar',
       avatarUploaded: true,
       passwordConnected: true,
       googleConnected: false,
     })
+    expect(get).toHaveBeenLastCalledWith(`/auth/avatar/${'a'.repeat(32)}`, {
+      responseType: 'blob',
+      headers: { Authorization: 'Bearer token' },
+    })
+    expect(createUrl).toHaveBeenCalledWith(avatar)
+    get.mockResolvedValue(
+      response({
+        userId: 7,
+        username: 'ada',
+        avatarUrl: 'https://lh3.googleusercontent.com/ada',
+        avatarUploaded: 0,
+      }),
+    )
+    await auth.me()
+    expect(auth.user.value?.avatarUrl).toBe('https://lh3.googleusercontent.com/ada')
+    expect(revokeUrl).toHaveBeenCalledWith('blob:avatar')
   })
 
   it('updates and removes avatars using the authenticated identity, then reloads the profile', async () => {
@@ -50,6 +75,81 @@ describe('authentication capability', () => {
       )
     }
     expect(auth.authenticated.value).toBe(true)
+  })
+
+  it('revokes uploaded avatar URLs on sign-out', async () => {
+    const http = createHttpClient()
+    vi.spyOn(http, 'post').mockResolvedValue(response({ accessToken: 'token' }))
+    vi.spyOn(http, 'get')
+      .mockResolvedValueOnce(
+        response({
+          userId: 7,
+          username: 'ada',
+          avatarUploaded: 1,
+          avatarId: 'b'.repeat(32),
+        }),
+      )
+      .mockResolvedValueOnce(response(new Blob(['jpeg'], { type: 'image/jpeg' })))
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:uploaded')
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const auth = createAuth({ http })
+    await auth.restore()
+    await auth.logout()
+    expect(revoke).toHaveBeenCalledWith('blob:uploaded')
+    expect(auth.user.value).toBeNull()
+  })
+
+  it('surfaces failed avatar downloads without replacing the current profile', async () => {
+    const http = createHttpClient()
+    vi.spyOn(http, 'post').mockResolvedValue(response({ accessToken: 'token' }))
+    const get = vi.spyOn(http, 'get').mockResolvedValue(response({ userId: 7, username: 'ada' }))
+    const auth = createAuth({ http })
+    await auth.restore()
+    const previous = auth.user.value
+    const error = Object.assign(new Error('Avatar not found'), {
+      status: 404,
+      request: '/auth/avatar/' + 'c'.repeat(32),
+    })
+    get
+      .mockResolvedValueOnce(
+        response({
+          userId: 7,
+          username: 'ada',
+          avatarUploaded: 1,
+          avatarId: 'c'.repeat(32),
+        }),
+      )
+      .mockResolvedValueOnce({ ...response(null, 404), error })
+    await expect(auth.me()).rejects.toBe(error)
+    expect(auth.user.value).toBe(previous)
+    expect(auth.loading.value).toBe(false)
+  })
+
+  it('does not restore an avatar or identity when a download finishes after sign-out', async () => {
+    const http = createHttpClient()
+    vi.spyOn(http, 'post').mockResolvedValue(response({ accessToken: 'token' }))
+    const get = vi.spyOn(http, 'get').mockResolvedValue(response({ userId: 7, username: 'ada' }))
+    const auth = createAuth({ http })
+    await auth.restore()
+    const download = Promise.withResolvers<ReturnType<typeof response<Blob>>>()
+    get
+      .mockResolvedValueOnce(
+        response({
+          userId: 7,
+          username: 'ada',
+          avatarUploaded: 1,
+          avatarId: 'd'.repeat(32),
+        }),
+      )
+      .mockReturnValueOnce(download.promise)
+    const pending = auth.me()
+    await vi.waitFor(() =>
+      expect(get).toHaveBeenCalledWith(`/auth/avatar/${'d'.repeat(32)}`, expect.anything()),
+    )
+    await auth.logout()
+    download.resolve(response(new Blob(['jpeg'], { type: 'image/jpeg' })))
+    await expect(pending).rejects.toThrow('no longer current')
+    expect(auth.user.value).toBeNull()
   })
 
   it('clears identity only after a successful authenticated password change', async () => {

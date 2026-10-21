@@ -7,7 +7,9 @@ import {
   PlsqlStatement,
 } from '../../schema/attribute.js'
 import { odbQuery } from '../../query/index.js'
-import { odbOracle } from '../../oracle/index.js'
+import { odbDbmsLob, odbOracle } from '../../oracle/index.js'
+import { odbLob } from '../../helpers/lob/lob.js'
+import { odbStorage } from '../storage/storage.js'
 import { odbRateLimitApi } from '../rate-limit/rate-limit.js'
 import { REFRESH_TOKEN_BYTES, REFRESH_TOKEN_DAYS } from './constants.js'
 import { odbAuthCrypto } from './crypto.js'
@@ -877,20 +879,22 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
         avatarUploaded: odbType.integer(),
         passwordConnected: odbType.integer(),
         googleConnected: odbType.integer(),
+        avatarId: authUsers.avatar,
       },
     },
     ({
-      params: { userId, avatarUrl, avatarUploaded, passwordConnected, googleConnected },
+      params: { userId, avatarUrl, avatarUploaded, passwordConnected, googleConnected, avatarId },
       body,
     }) => {
       body.query(
         odbQuery()
           .selectFrom(authUsers)
           .select([
-            'COALESCE(avatar, TO_CLOB(google_avatar_url))',
+            authUsers.googleAvatarUrl,
             'CASE WHEN avatar IS NULL THEN 0 ELSE 1 END',
+            authUsers.avatar,
           ])
-          .into(avatarUrl, avatarUploaded)
+          .into(avatarUrl, avatarUploaded, avatarId)
           .where(cond.and([cond.eq(authUsers.id, userId), cond.eq(authUsers.enabled, true)])),
       )
       body.query(
@@ -911,32 +915,63 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
     'update_avatar',
     { in: { userId: authUsers.id, avatar: odbType.clob() } },
     ({ params: { userId, avatar }, body }) => {
-      const { lockedUserId } = body.variables({ lockedUserId: authUsers.id })
+      const { previousAvatar, avatarId, content } = body.variables({
+        previousAvatar: authUsers.avatar,
+        avatarId: authUsers.avatar,
+        content: odbType.blob(),
+      })
       body.ifThen(cond.isNotNull(avatar), (validate) => {
         validate.ifThen(
           cond.or([
             cond.gt(plsqlExpr.call('NUMBER', 'DBMS_LOB.GETLENGTH', avatar), 30000),
             cond.lt(plsqlExpr.call('NUMBER', 'DBMS_LOB.GETLENGTH', avatar), 31),
             cond.not(
-              cond.regexpLike(avatar, '^data:image/jpeg;base64,/9j/[A-Za-z0-9+/]*={0,2}$', 'c'),
+              cond.regexpLike(
+                avatar,
+                '^data:image/jpeg;base64,/9j/([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$',
+                'c',
+              ),
             ),
           ]),
+          (then) => then.invalid('PROFILE_AVATAR_INVALID'),
+        )
+        validate.set(content, odbLob.base64ToBlob(odbDbmsLob.substr(avatar, 30000, 24)))
+        validate.ifThen(
+          cond.ne(odbOracle.rawToHex(odbDbmsLob.substrRaw(content, 3, 1)), 'FFD8FF'),
           (then) => then.invalid('PROFILE_AVATAR_INVALID'),
         )
       })
       body.query(
         odbQuery()
           .selectFrom(authUsers)
-          .select(authUsers.id)
-          .into(lockedUserId)
+          .select(authUsers.avatar)
+          .into(previousAvatar)
           .where(cond.and([cond.eq(authUsers.id, userId), cond.eq(authUsers.enabled, true)]))
           .forUpdate(),
       )
+      body.ifThen(cond.isNotNull(content), (then) => {
+        then.call(
+          odbStorage.write(
+            userId,
+            odbLiteral('avatar.jpg'),
+            odbLiteral('image/jpeg'),
+            content,
+            odbLiteral('{"purpose":"avatar"}'),
+            avatarId,
+          ),
+        )
+      })
       body.query(
         odbQuery()
           .updateTable(authUsers)
-          .set({ avatar, updatedAt: odbOracle.sysTimestamp() })
+          .set({ avatar: avatarId, updatedAt: odbOracle.sysTimestamp() })
           .where(cond.eq(authUsers.id, userId)),
+      )
+      body.ifThen(cond.isNotNull(previousAvatar), (then) =>
+        then.call(odbStorage.remove(userId, previousAvatar)),
+      )
+      body.ifThen(cond.eq(odbDbmsLob.isTemporary(content), 1), (then) =>
+        then.call(odbDbmsLob.freeTemporary(content)),
       )
       body.when('NO_DATA_FOUND', (handler) => handler.notFound())
     },

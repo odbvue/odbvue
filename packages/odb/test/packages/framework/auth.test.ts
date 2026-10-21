@@ -4,14 +4,31 @@ import { odbAuth } from '../../../src/capabilities/auth/auth.js'
 describe('odbAuth framework package', () => {
   it('reads provider status from identities and prefers uploaded avatars over Google photos', () => {
     const sql = odbAuth.toSQLUp({ schema: 'APP' })
-    expect(sql).toContain('avatar CLOB')
+    expect(sql).toContain('avatar CHAR(32 CHAR)')
     expect(sql).toContain('google_avatar_url VARCHAR2(2048')
-    expect(sql).toContain('COALESCE(avatar, TO_CLOB(google_avatar_url))')
+    expect(sql).toContain(
+      'SELECT google_avatar_url, CASE WHEN avatar IS NULL THEN 0 ELSE 1 END, avatar',
+    )
+    expect(sql).toContain('REFERENCES APP.odb_storage_files (id) ON DELETE SET NULL')
     expect(sql).toContain("COUNT(CASE WHEN issuer = 'password' THEN 1 END)")
     expect(sql).toContain("COUNT(CASE WHEN issuer = 'https://accounts.google.com' THEN 1 END)")
     expect(sql).toContain('DBMS_LOB.GETLENGTH(p_avatar) > 30000')
     expect(sql).toContain('^data:image/jpeg;base64,/9j/')
     expect(sql).toContain('PROFILE_AVATAR_INVALID')
+    expect(sql).toContain('odb_lob.base64_to_blob(DBMS_LOB.SUBSTR(p_avatar, 30000, 24))')
+    expect(sql).toContain("RAWTOHEX(DBMS_LOB.SUBSTR(l_content, 3, 1)) != 'FFD8FF'")
+    expect(sql).toContain("odb_storage.write(p_user_id, 'avatar.jpg', 'image/jpeg', l_content")
+    const start = sql.indexOf(
+      'PROCEDURE update_avatar(',
+      sql.indexOf('PACKAGE BODY APP.odb_auth AS'),
+    )
+    const update = sql.slice(start, sql.indexOf('END update_avatar;', start))
+    expect(update.indexOf('FOR UPDATE')).toBeLessThan(update.indexOf('odb_storage.write'))
+    expect(update.indexOf('avatar = l_avatar_id')).toBeLessThan(
+      update.indexOf('odb_storage.remove'),
+    )
+    expect(update).toContain('odb_storage.remove(p_user_id, l_previous_avatar)')
+    expect(update).not.toContain('COMMIT')
   })
 
   it('locks the account before checking current password and revokes tokens, sessions and reset links atomically', () => {

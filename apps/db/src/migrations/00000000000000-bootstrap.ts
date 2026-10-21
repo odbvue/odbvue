@@ -385,6 +385,7 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
         displayName: odbAuth.types.displayName,
         avatarUrl: odbType.clob(),
         avatarUploaded: odbType.integer(),
+        avatarId: odbStorage.types.id,
         passwordConnected: odbType.integer(),
         googleConnected: odbType.integer(),
         roles: odbType.json(),
@@ -399,6 +400,7 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
         displayName,
         avatarUrl,
         avatarUploaded,
+        avatarId,
         passwordConnected,
         googleConnected,
         roles,
@@ -410,7 +412,14 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
       body.call(odbAuth.readUser(userId, username, displayName))
       body.call(odbAuth.readAuthorization(userId, roles, permissions))
       body.call(
-        odbAuth.readProfile(userId, avatarUrl, avatarUploaded, passwordConnected, googleConnected),
+        odbAuth.readProfile(
+          userId,
+          avatarUrl,
+          avatarUploaded,
+          passwordConnected,
+          googleConnected,
+          avatarId,
+        ),
       )
     },
   )
@@ -428,6 +437,7 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
       displayName: me.parameters.displayName,
       avatarUrl: me.parameters.avatarUrl,
       avatarUploaded: me.parameters.avatarUploaded,
+      avatarId: me.parameters.avatarId,
       passwordConnected: me.parameters.passwordConnected,
       googleConnected: me.parameters.googleConnected,
       roles: me.parameters.roles,
@@ -648,6 +658,62 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
     body: { avatar: updateAvatar.parameters.avatar },
   })
 
+  const downloadAvatar = pkg.proc(
+    'download_avatar',
+    { in: { userId: odbAuth.types.userId, id: odbStorage.types.id } },
+    ({ params: { userId, id }, body }) => {
+      const {
+        avatarUrl,
+        avatarUploaded,
+        passwordConnected,
+        googleConnected,
+        avatarId,
+        fileName,
+        mimeType,
+        fileSize,
+        content,
+        meta,
+      } = body.variables({
+        avatarUrl: odbType.clob(),
+        avatarUploaded: odbType.integer(),
+        passwordConnected: odbType.integer(),
+        googleConnected: odbType.integer(),
+        avatarId: odbStorage.types.id,
+        fileName: odbStorage.types.fileName,
+        mimeType: odbStorage.types.mimeType,
+        fileSize: odbStorage.types.fileSize,
+        content: odbStorage.types.content,
+        meta: odbStorage.types.meta,
+      })
+      body.call(
+        odbAuth.readProfile(
+          userId,
+          avatarUrl,
+          avatarUploaded,
+          passwordConnected,
+          googleConnected,
+          avatarId,
+        ),
+      )
+      body.ifThen(cond.or([cond.isNull(avatarId), cond.ne(avatarId, id)]), (then) =>
+        then.notFound('PROFILE_AVATAR_NOT_FOUND'),
+      )
+      body.call(odbStorage.read(userId, id, fileName, mimeType, fileSize, content, meta))
+      body.call(odbHttp.download(content, fileName, mimeType))
+    },
+  )
+  defineService(downloadAvatar, {
+    auth: 'authenticated',
+    method: 'GET',
+    module: 'auth',
+    basePath: '/auth',
+    path: '/avatar/:id',
+    summary: "Download the authenticated owner's current avatar",
+    context: { userId: downloadAvatar.parameters.userId },
+    uri: { id: downloadAvatar.parameters.id },
+    responseMediaType: 'image/jpeg',
+  })
+
   const changePassword = pkg.proc(
     'change_password',
     {
@@ -706,13 +772,13 @@ export const migration = defineMigration('00000000000000_bootstrap', {
   .install(odbRateLimit)
   .install(odbAudit)
   .install(odbSettings)
+  .install(odbLob)
+  .install(odbStorage)
   .install(odbAuth)
   .install(odbAuth.seedSettings())
   .install(odbGoogle)
   .install(odbGoogle.seedSettings())
   .install(odbAcl)
-  .install(odbLob)
-  .install(odbStorage)
   .install(odbEmails)
   .install(
     odbSettings.seed(

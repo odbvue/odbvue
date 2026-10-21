@@ -29,6 +29,7 @@ interface AuthUserResponse {
   displayName?: string | null
   avatarUrl?: string | null
   avatarUploaded?: number
+  avatarId?: string | null
   passwordConnected?: number
   googleConnected?: number
   roles?: readonly string[] | string
@@ -174,12 +175,17 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
   const loading = ref(false)
   const ready = ref(false)
   let restorePromise: Promise<boolean> | undefined
+  let avatarObjectUrl: string | null = null
+  let profileRequest = 0
 
   function requireHttp(): Pick<HttpClient, 'get' | 'post'> {
     return 'get' in options.http ? options.http : options.http()
   }
 
   function clear(): void {
+    profileRequest++
+    if (avatarObjectUrl) URL.revokeObjectURL(avatarObjectUrl)
+    avatarObjectUrl = null
     user.value = null
     accessToken.value = null
   }
@@ -188,13 +194,29 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
     accessToken.value = tokens.accessToken
   }
 
-  function applyUser(response: AuthUserResponse): User {
+  async function applyUser(response: AuthUserResponse, request: number): Promise<User> {
+    let avatar: Blob | null = null
+    if (response.avatarUploaded === 1) {
+      if (!response.avatarId || !/^[a-f0-9]{32}$/i.test(response.avatarId))
+        throw new Error('Invalid avatar storage key.')
+      const download = await requireHttp().get<Blob>(`${endpoints.avatar}/${response.avatarId}`, {
+        responseType: 'blob',
+        headers: { Authorization: ['Bearer', accessToken.value].join(' ') },
+      })
+      if (download.error) throw download.error
+      if (!(download.data instanceof Blob) || download.data.type !== 'image/jpeg')
+        throw new Error('Unable to retrieve the profile avatar.')
+      avatar = download.data
+    }
+    if (request !== profileRequest) throw new Error('The profile request is no longer current.')
+    const previousUrl = avatarObjectUrl
+    avatarObjectUrl = avatar ? URL.createObjectURL(avatar) : null
     user.value = {
       id: response.userId,
       username: response.username,
       roles: authorizationNames(response.roles),
       permissions: authorizationNames(response.permissions),
-      avatarUrl: response.avatarUrl ?? null,
+      avatarUrl: avatarObjectUrl ?? response.avatarUrl ?? null,
       avatarUploaded: response.avatarUploaded === 1,
       passwordConnected:
         response.passwordConnected === undefined ? undefined : response.passwordConnected > 0,
@@ -204,6 +226,7 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
         ? {}
         : { displayName: response.displayName }),
     } as User
+    if (previousUrl) URL.revokeObjectURL(previousUrl)
     return user.value
   }
 
@@ -374,12 +397,13 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
       return restorePromise
     },
     async me() {
+      const request = ++profileRequest
       loading.value = true
       try {
         const response = await requireHttp().get<AuthUserResponse>(endpoints.me)
         if (!response.data)
           throw toError(response.error, 'Unable to retrieve the authenticated user.')
-        return applyUser(response.data)
+        return await applyUser(response.data, request)
       } finally {
         loading.value = false
       }
