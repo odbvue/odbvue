@@ -60,8 +60,21 @@ export interface ChangePasswordCredentials {
   passwordRepeat: string
 }
 
-export interface GoogleAuthConfig {
-  enabled: boolean
+export interface AuthProviders {
+  password: boolean
+  google: boolean
+}
+
+export interface AuthState<User extends AuthUser = AuthUser> {
+  user: User | null
+  providers: AuthProviders
+  signup: boolean
+}
+
+interface AuthStateResponse {
+  user: AuthUserResponse | null | string
+  providers: AuthProviders | string
+  signup: boolean | string
 }
 
 export interface GoogleLoginOptions {
@@ -80,7 +93,6 @@ export interface GoogleLinkOptions {
 export type GoogleLinkResponse = GoogleLoginResponse
 
 export interface AuthEndpoints {
-  googleConfig: string
   googleStart: string
   googleLinkStart: string
   signup: string
@@ -92,7 +104,7 @@ export interface AuthEndpoints {
   login: string
   refresh: string
   logout: string
-  me: string
+  state: string
 }
 
 export interface AuthOptions {
@@ -106,7 +118,8 @@ export interface Auth<User extends AuthUser = AuthUser> {
   loading: Readonly<Ref<boolean>>
   ready: Readonly<Ref<boolean>>
   authenticated: ComputedRef<boolean>
-  getGoogleConfig(): Promise<GoogleAuthConfig>
+  providers: Readonly<Ref<AuthProviders | null>>
+  signupEnabled: Readonly<Ref<boolean | null>>
   startGoogleLogin(options?: GoogleLoginOptions): Promise<GoogleLoginResponse>
   startGoogleLink(options: GoogleLinkOptions): Promise<GoogleLinkResponse>
   login(credentials: AuthCredentials): Promise<void>
@@ -119,13 +132,12 @@ export interface Auth<User extends AuthUser = AuthUser> {
   logout(): Promise<void>
   refresh(): Promise<boolean>
   restore(): Promise<boolean>
-  me(): Promise<User>
+  getState(): Promise<AuthState<User>>
   hasRole(role: string): boolean
   can(permission: string): boolean
 }
 
 const defaultEndpoints: AuthEndpoints = {
-  googleConfig: '/auth/google/config',
   googleStart: '/auth/google/start',
   googleLinkStart: '/auth/google/link/start',
   signup: '/auth/signup',
@@ -137,7 +149,7 @@ const defaultEndpoints: AuthEndpoints = {
   login: '/auth/login',
   refresh: '/auth/refresh',
   logout: '/auth/logout',
-  me: '/auth/me',
+  state: '/auth/state',
 }
 
 function toError(error: HttpError | null, fallback: string): Error {
@@ -174,6 +186,8 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
   const accessToken = ref<string | null>(null)
   const loading = ref(false)
   const ready = ref(false)
+  const providers = shallowRef<AuthProviders | null>(null)
+  const signupEnabled = ref<boolean | null>(null)
   let restorePromise: Promise<boolean> | undefined
   let avatarObjectUrl: string | null = null
   let profileRequest = 0
@@ -284,16 +298,9 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
     accessToken: readonly(accessToken),
     loading: readonly(loading),
     ready: readonly(ready),
+    providers: readonly(providers),
+    signupEnabled: readonly(signupEnabled),
     authenticated: computed(() => !!user.value && !!accessToken.value),
-    async getGoogleConfig() {
-      const response = await requireHttp().get<GoogleAuthConfig>(endpoints.googleConfig, {
-        credentials: 'omit',
-      })
-      if (response.error) throw response.error
-      if (typeof response.data?.enabled !== 'boolean')
-        throw new Error('Unable to retrieve Google sign-in configuration.')
-      return response.data
-    },
     async startGoogleLogin(loginOptions = {}) {
       loading.value = true
       try {
@@ -353,7 +360,7 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
     },
     async updateAvatar(avatar) {
       await authenticatedPost(endpoints.avatar, { avatar })
-      await this.me()
+      await this.getState()
     },
     async login(credentials) {
       loading.value = true
@@ -363,7 +370,8 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
         })
         if (!response.data) throw toError(response.error, 'Authentication failed.')
         applyTokens(response.data)
-        await this.me()
+        const state = await this.getState()
+        if (!state.user) throw new Error('Unable to retrieve the authenticated user.')
       } catch (error) {
         clear()
         throw error
@@ -387,23 +395,58 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
     restore() {
       restorePromise ??= (async () => {
         try {
-          if (!(await refresh())) return false
-          await this.me()
-          return true
+          const refreshed = await refresh()
+          const state = await this.getState()
+          if (refreshed && !state.user)
+            throw new Error('Unable to retrieve the authenticated user.')
+          return refreshed && state.user !== null
+        } catch (error) {
+          clear()
+          throw error
         } finally {
           ready.value = true
         }
       })()
       return restorePromise
     },
-    async me() {
+    async getState() {
       const request = ++profileRequest
       loading.value = true
       try {
-        const response = await requireHttp().get<AuthUserResponse>(endpoints.me)
-        if (!response.data)
-          throw toError(response.error, 'Unable to retrieve the authenticated user.')
-        return await applyUser(response.data, request)
+        const response = await requireHttp().get<AuthStateResponse>(endpoints.state, {
+          headers: accessToken.value ? { Authorization: `Bearer ${accessToken.value}` } : {},
+        })
+        if (response.error) throw response.error
+        if (!response.data) throw new Error('Unable to retrieve authentication state.')
+        const profile: AuthUserResponse | null =
+          typeof response.data.user === 'string'
+            ? JSON.parse(response.data.user)
+            : response.data.user
+        const capabilities: AuthProviders =
+          typeof response.data.providers === 'string'
+            ? JSON.parse(response.data.providers)
+            : response.data.providers
+        const signup =
+          typeof response.data.signup === 'string'
+            ? JSON.parse(response.data.signup)
+            : response.data.signup
+        if (
+          typeof capabilities?.password !== 'boolean' ||
+          typeof capabilities?.google !== 'boolean' ||
+          typeof signup !== 'boolean' ||
+          (profile !== null &&
+            (!profile ||
+              !['string', 'number'].includes(typeof profile.userId) ||
+              typeof profile.username !== 'string'))
+        )
+          throw new Error('Invalid authentication state.')
+        if (request !== profileRequest) throw new Error('The profile request is no longer current.')
+        let currentUser: User | null = null
+        if (profile === null) clear()
+        else currentUser = await applyUser(profile, request)
+        providers.value = capabilities
+        signupEnabled.value = signup
+        return { user: currentUser, providers: capabilities, signup }
       } finally {
         loading.value = false
       }

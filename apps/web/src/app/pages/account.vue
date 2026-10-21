@@ -148,7 +148,7 @@ const ui = useUi()
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-const enabled = ref<boolean>()
+const enabled = computed(() => auth.providers.value?.google)
 const starting = ref(false)
 const avatarSaving = ref(false)
 const changingPassword = ref(false)
@@ -231,7 +231,7 @@ onMounted(async () => {
       delete query.google
       await router.replace({ path: route.path, query, hash: route.hash })
       if (result === 'linked') {
-        await auth.me()
+        await auth.getState()
         ui.success('auth.google.link.linked')
         if (continuing.value) {
           await router.replace(destination.value)
@@ -241,7 +241,6 @@ onMounted(async () => {
       else if (result === 'conflict') ui.error('auth.google.link.conflict')
       else ui.error('auth.google.link.failed')
     }
-    enabled.value = (await auth.getGoogleConfig()).enabled
   } catch (error) {
     ui.error(error)
   }

@@ -46,28 +46,6 @@ const googleCookie = odbHttp.defineCookie({
 })
 
 export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (pkg) => {
-  const googleConfig = pkg.proc('google_config', {}, ({ body }) => {
-    const { enabled } = body.variables({ enabled: odbType.boolean() })
-    body.set(enabled, odbGoogle.enabled())
-    body.raw("owa_util.mime_header('application/json', FALSE);")
-    body.raw("htp.p('Cache-Control: no-store');")
-    body.raw('owa_util.http_header_close;')
-    body.ifThen(
-      cond.eq(enabled, true),
-      (then) => then.raw('htp.prn(\'{"enabled":true}\');'),
-      (otherwise) => otherwise.raw('htp.prn(\'{"enabled":false}\');'),
-    )
-  })
-  defineService(googleConfig, {
-    auth: 'anonymous',
-    method: 'GET',
-    path: '/google/config',
-    module: 'auth',
-    basePath: '/auth',
-    summary: 'Return whether Google sign-in is enabled',
-    responseMediaType: 'application/json',
-  })
-
   const googleStart = pkg.proc(
     'google_start',
     {
@@ -375,26 +353,19 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
     headers: { Cookie: logout.parameters.cookie, 'Set-Cookie': logout.parameters.setCookie },
   })
 
-  const me = pkg.proc(
-    'me',
+  const getState = pkg.proc(
+    'get_state',
     {
-      in: { subject: odbAuth.types.userId },
+      in: { authorization: odbType.string(4000) },
       out: {
-        userId: odbAuth.types.userId,
-        username: odbAuth.types.username,
-        displayName: odbAuth.types.displayName,
-        avatarUrl: odbType.clob(),
-        avatarUploaded: odbType.integer(),
-        avatarId: odbStorage.types.id,
-        passwordConnected: odbType.integer(),
-        googleConnected: odbType.integer(),
-        roles: odbType.json(),
-        permissions: odbType.json(),
+        user: odbType.json(),
+        providers: odbType.json(),
+        signup: odbType.json(),
+        cacheControl: odbType.string(32),
       },
     },
-    ({
-      params: {
-        subject,
+    ({ params: { authorization, user, providers, signup, cacheControl }, body }) => {
+      const {
         userId,
         username,
         displayName,
@@ -405,43 +376,76 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
         googleConnected,
         roles,
         permissions,
-      },
-      body,
-    }) => {
-      body.set(userId, subject)
-      body.call(odbAuth.readUser(userId, username, displayName))
-      body.call(odbAuth.readAuthorization(userId, roles, permissions))
-      body.call(
-        odbAuth.readProfile(
-          userId,
-          avatarUrl,
-          avatarUploaded,
-          passwordConnected,
-          googleConnected,
-          avatarId,
-        ),
+        googleEnabled,
+      } = body.variables({
+        userId: odbAuth.types.userId,
+        username: odbAuth.types.username,
+        displayName: odbAuth.types.displayName,
+        avatarUrl: odbType.clob(),
+        avatarUploaded: odbType.integer(),
+        avatarId: odbStorage.types.id,
+        passwordConnected: odbType.integer(),
+        googleConnected: odbType.integer(),
+        roles: odbType.json(),
+        permissions: odbType.json(),
+        googleEnabled: odbType.string(5),
+      })
+      body.set(cacheControl, 'no-store')
+      body.set(signup, 'true')
+      body.set(user, 'null')
+      body.ifThen(
+        cond.eq(odbGoogle.enabled(), true),
+        (then) => then.set(googleEnabled, odbLiteral('true')),
+        (otherwise) => otherwise.set(googleEnabled, odbLiteral('false')),
       )
+      body.raw(`SELECT JSON_OBJECT(
+        'password' VALUE 'true' FORMAT JSON,
+        'google' VALUE ${googleEnabled.toSQL()} FORMAT JSON RETURNING CLOB
+      ) INTO ${providers.toSQL()} FROM dual;`)
+      body.ifThen(cond.isNotNull(authorization), (then) => {
+        then.set(userId, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
+        then.call(odbAuth.readUser(userId, username, displayName))
+        then.call(odbAuth.readAuthorization(userId, roles, permissions))
+        then.call(
+          odbAuth.readProfile(
+            userId,
+            avatarUrl,
+            avatarUploaded,
+            passwordConnected,
+            googleConnected,
+            avatarId,
+          ),
+        )
+        then.raw(`SELECT JSON_OBJECT(
+          'userId' VALUE ${userId.toSQL()},
+          'username' VALUE ${username.toSQL()},
+          'displayName' VALUE ${displayName.toSQL()},
+          'avatarUrl' VALUE ${avatarUrl.toSQL()},
+          'avatarUploaded' VALUE ${avatarUploaded.toSQL()},
+          'avatarId' VALUE ${avatarId.toSQL()},
+          'passwordConnected' VALUE ${passwordConnected.toSQL()},
+          'googleConnected' VALUE ${googleConnected.toSQL()},
+          'roles' VALUE ${roles.toSQL()} FORMAT JSON,
+          'permissions' VALUE ${permissions.toSQL()} FORMAT JSON RETURNING CLOB
+        ) INTO ${user.toSQL()} FROM dual;`)
+      })
     },
   )
-  defineService(me, {
-    auth: 'authenticated',
+  defineService(getState, {
+    auth: 'anonymous',
     method: 'GET',
-    path: '/me',
+    path: '/state',
     module: 'auth',
     basePath: '/auth',
-    summary: 'Return the authenticated user',
-    context: { userId: me.parameters.subject },
+    summary: 'Return the current user and public authentication capabilities',
+    headers: {
+      Authorization: getState.parameters.authorization,
+      'Cache-Control': getState.parameters.cacheControl,
+    },
     response: {
-      userId: me.parameters.userId,
-      username: me.parameters.username,
-      displayName: me.parameters.displayName,
-      avatarUrl: me.parameters.avatarUrl,
-      avatarUploaded: me.parameters.avatarUploaded,
-      avatarId: me.parameters.avatarId,
-      passwordConnected: me.parameters.passwordConnected,
-      googleConnected: me.parameters.googleConnected,
-      roles: me.parameters.roles,
-      permissions: me.parameters.permissions,
+      user: getState.parameters.user,
+      providers: getState.parameters.providers,
+      signup: getState.parameters.signup,
     },
   })
 

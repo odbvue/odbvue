@@ -1,3 +1,4 @@
+import { authState } from '../../auth-state'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
@@ -41,14 +42,18 @@ async function setup(enabled = true, redirect = '/sandbox', configError = false,
   const fetch = vi.fn<typeof globalThis.fetch>()
   const auth = createAuth({ http: createHttpClient({ fetch }) })
   session.auth = auth
-  if (ready) {
-    fetch.mockResolvedValueOnce(json({}, 401))
-    await auth.restore()
-  }
-  // An invalid body avoids HTTP automatic retries while exercising visible config errors.
-  fetch.mockResolvedValueOnce(json(configError ? {} : { enabled }))
   const ui = useUi()
   ui.clear()
+  fetch
+    .mockResolvedValueOnce(json({}, 401))
+    .mockResolvedValueOnce(json(configError ? {} : authState(null, enabled)))
+  if (ready) {
+    try {
+      await auth.restore()
+    } catch (error) {
+      ui.error(error)
+    }
+  }
   const wrapper = mount(GoogleSignIn, {
     global: { plugins: [createState(), i18n, router], stubs: { VBtn: button } },
   })
@@ -84,14 +89,13 @@ describe('shared Google sign-in button', () => {
     const { wrapper, ui } = await setup(true, '/', true)
     expect(wrapper.find('button').exists()).toBe(false)
     expect(ui.notification.value?.type).toBe('error')
-    expect(ui.notification.value?.message).toContain('configuration')
+    expect(ui.notification.value?.message).toContain('authentication state')
     wrapper.unmount()
   })
 
-  it('disables starts until session restoration is ready', async () => {
+  it('hides starts until authentication capabilities are loaded', async () => {
     const { wrapper, fetch } = await setup(true, '/', false, false)
-    expect(wrapper.find('button').attributes('disabled')).toBeDefined()
-    await wrapper.findComponent(button).vm.$emit('click')
+    expect(wrapper.find('button').exists()).toBe(false)
     expect(fetch).not.toHaveBeenCalled()
     wrapper.unmount()
   })

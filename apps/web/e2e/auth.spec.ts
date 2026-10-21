@@ -8,6 +8,10 @@ test('requests recovery and resets a password only after explicit submission', a
     actions.push(action ?? '')
     if (action === 'refresh') {
       await route.fulfill({ status: 401, json: {} })
+    } else if (action === 'state') {
+      await route.fulfill({
+        json: { user: null, providers: { password: true, google: false }, signup: true },
+      })
     } else if (action === 'recover-password') {
       expect(route.request().postDataJSON()).toEqual({ email: 'ada+reset@example.com' })
       await route.fulfill({ status: 204 })
@@ -26,15 +30,15 @@ test('requests recovery and resets a password only after explicit submission', a
   await expect(page).toHaveURL(/\/recover-password$/)
   await page.getByRole('button', { name: 'Send reset link', exact: true }).click()
   await expect(page.getByText('Email is required', { exact: true })).toBeVisible()
-  expect(actions).toEqual(['refresh'])
+  expect(actions).toEqual(['refresh', 'state'])
   await page.getByLabel('Email', { exact: true }).fill('ada+reset@example.com')
   await page.getByLabel('Email', { exact: true }).press('Enter')
   await expect(page.getByText(/If an active account exists/)).toBeVisible()
-  expect(actions).toEqual(['refresh', 'recover-password'])
+  expect(actions).toEqual(['refresh', 'state', 'recover-password'])
 
   await page.goto(`/reset-password#token=${token}`)
   await expect(page).toHaveURL(/\/reset-password$/)
-  expect(actions).toEqual(['refresh', 'recover-password', 'refresh'])
+  expect(actions).toEqual(['refresh', 'state', 'recover-password', 'refresh', 'state'])
   await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute(
     'autocomplete',
     'new-password',
@@ -43,11 +47,18 @@ test('requests recovery and resets a password only after explicit submission', a
   await page.getByLabel('Repeat password', { exact: true }).fill('different')
   await page.getByRole('button', { name: 'Reset password', exact: true }).click()
   await expect(page.getByText('Passwords must match', { exact: true })).toBeVisible()
-  expect(actions).toHaveLength(3)
+  expect(actions).toHaveLength(5)
   await page.getByLabel('Repeat password', { exact: true }).fill('new secure password!')
   await page.getByLabel('Repeat password', { exact: true }).press('Enter')
   await expect(page.getByText(/Password reset. All previous sessions/)).toBeVisible()
-  expect(actions).toEqual(['refresh', 'recover-password', 'refresh', 'reset-password'])
+  expect(actions).toEqual([
+    'refresh',
+    'state',
+    'recover-password',
+    'refresh',
+    'state',
+    'reset-password',
+  ])
   const persisted = await page.evaluate(() => ({
     local: { ...localStorage },
     session: { ...sessionStorage },
@@ -80,15 +91,23 @@ async function mockAuth(
         status: session ? 200 : 401,
         json: session ? { accessToken: 'test-access-token' } : {},
       })
-    } else if (action === 'me') {
-      expect(route.request().headers().authorization).toBe('Bearer test-access-token')
+    } else if (action === 'state') {
+      expect(route.request().headers().authorization).toBe(
+        session ? 'Bearer test-access-token' : undefined,
+      )
       await route.fulfill({
         json: {
-          userId: 7,
-          username: 'ada',
-          displayName: 'Ada Lovelace',
-          roles: options.roles ?? ['admin'],
-          permissions: [],
+          providers: { password: true, google: false },
+          signup: true,
+          user: session
+            ? {
+                userId: 7,
+                username: 'ada',
+                displayName: 'Ada Lovelace',
+                roles: options.roles ?? ['admin'],
+                permissions: [],
+              }
+            : null,
         },
       })
     } else if (action === 'logout') {
@@ -119,7 +138,7 @@ test('validates login, reports errors, returns to a protected page, and logs out
   )
   await page.getByRole('button', { name: 'Login', exact: true }).click()
   await expect(page.getByText('Username is required', { exact: true })).toBeVisible()
-  expect(requests).toEqual(['refresh'])
+  expect(requests).toEqual(['refresh', 'state'])
 
   await page.getByLabel('Username').fill('ada')
   await page.getByLabel('Password', { exact: true }).fill('wrong-password')
@@ -133,13 +152,13 @@ test('validates login, reports errors, returns to a protected page, and logs out
   await expect(
     page.getByRole('button', { name: 'Account menu for Ada Lovelace', exact: true }),
   ).toBeVisible()
-  expect(requests).toEqual(['refresh', 'login', 'login', 'me'])
+  expect(requests).toEqual(['refresh', 'state', 'login', 'login', 'state'])
 
   await page.reload()
   await expect(
     page.getByRole('button', { name: 'Account menu for Ada Lovelace', exact: true }),
   ).toBeVisible()
-  expect(requests).toEqual(['refresh', 'login', 'login', 'me', 'refresh', 'me'])
+  expect(requests).toEqual(['refresh', 'state', 'login', 'login', 'state', 'refresh', 'state'])
   const persisted = await page.evaluate(() => ({
     local: { ...localStorage },
     session: { ...sessionStorage },
@@ -156,7 +175,7 @@ test('restores identity before handling an authenticated visit to login', async 
   const requests = await mockAuth(page, { restored: true })
   await page.goto('/login?redirect=%2Fsandbox')
   await expect(page).toHaveURL(/\/sandbox$/)
-  expect(requests).toEqual(['refresh', 'me'])
+  expect(requests).toEqual(['refresh', 'state'])
 })
 
 for (const field of ['Username', 'Password']) {
@@ -167,7 +186,7 @@ for (const field of ['Username', 'Password']) {
     await page.getByLabel('Password', { exact: true }).fill('valid-password')
     await page.getByLabel(field, { exact: true }).press('Enter')
     await expect(page).toHaveURL(/\/sandbox$/)
-    expect(requests).toEqual(['refresh', 'login', 'me'])
+    expect(requests).toEqual(['refresh', 'state', 'login', 'state'])
   })
 }
 
@@ -199,7 +218,7 @@ test('reports failed logout while clearing local identity and returning home', a
   await expect(page.getByRole('button', { name: 'Logout', exact: true })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Login', exact: true }).first()).toBeVisible()
   await expect(page.getByRole('alert')).toBeVisible()
-  expect(requests).toEqual(['refresh', 'me', 'logout'])
+  expect(requests).toEqual(['refresh', 'state', 'logout'])
 })
 
 test('loads app infrastructure and local shared components inside sandbox', async ({ page }) => {

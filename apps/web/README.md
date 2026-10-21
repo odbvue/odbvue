@@ -52,8 +52,9 @@ changes use route HMR. Modules share the same auth/navigation metadata rules.
 ## Authentication
 
 The [login page](./src/app/pages/login.vue) supports username/password authentication.
-Login and signup also offer Google sign-in when `GET /auth/google/config` returns
-`{ "enabled": true }`. Configuration failures display a standard UI error.
+Login and signup also offer Google sign-in when shared `GET /auth/state`
+capabilities contain `providers.google: true`. State failures surface through
+the normal restoration error flow; components make no separate config request.
 The shared Google button sanitizes the local return destination, then calls
 `auth.startGoogleLogin({ redirect })` (`POST /auth/google/start`, credentials included).
 Only the returned HTTPS `accounts.google.com/o/oauth2/v2/auth` URL can be opened.
@@ -91,7 +92,10 @@ use `useAuth()` directly. Config supplies title/version, while preferences and U
 use their own APIs.
 
 No auth state is persisted in localStorage or sessionStorage. The first router guard restores the session
-with `POST /auth/refresh`, then `GET /auth/me`. The [entry point](./src/main.ts)
+with `POST /auth/refresh`, then `GET /auth/state` even without a valid refresh
+session. State includes a nullable `user`, `providers`, and `signup`.
+`auth.getState()` reloads it; `auth.providers` and `auth.signupEnabled` expose
+shared reactive capabilities. The [entry point](./src/main.ts)
 mounts the shell while initial navigation is pending. Auth restoration is lazy and idempotent:
 concurrent guards and later navigations share the same promise instead of issuing another refresh.
 The reactive auth `ready` flag remains available to login controls; it is not a bootstrap lifecycle.
@@ -102,7 +106,7 @@ preference persistence is unchanged.
 The default layout shows an accessible name/avatar menu containing Profile and Logout.
 The drawer links the identity directly to Profile without a duplicate Account entry.
 The profile shows read-only name/email and actual password/Google connection status from
-`GET /auth/me`; missing provider metadata is shown as unavailable, never inferred.
+`GET /auth/state`; missing provider metadata is shown as unavailable, never inferred.
 Google-only accounts are directed to Google to manage their password.
 
 Users can upload JPEG/PNG/WebP files up to 5 MB. The browser crops and re-encodes a
@@ -110,7 +114,7 @@ Users can upload JPEG/PNG/WebP files up to 5 MB. The browser crops and re-encode
 Authenticated `POST /auth/avatar` decodes the thumbnail into an owner-scoped Storage BLOB;
 the user record holds only its storage key. `{ avatar: null }` removes it, and replacing
 or removing an upload deletes its previous object atomically.
-`GET /auth/me` returns `avatarId` and the Google `avatarUrl`; uploaded thumbnails are
+`GET /auth/state` returns `user.avatarId` and the Google `user.avatarUrl`; uploaded thumbnails are
 fetched through authenticated `GET /auth/avatar/:id` and shown using temporary blob URLs.
 Downloads are private/no-store, and blob URLs are revoked on replacement or sign-out.
 Both profile and navigation update immediately. Uploaded photos take precedence over

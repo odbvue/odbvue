@@ -33,8 +33,8 @@
             <v-btn :loading="auth.loading.value" prepend-icon="$mdiRefresh" @click="restore"
               >Restore</v-btn
             >
-            <v-btn :loading="callingMe" prepend-icon="$mdiAccountSearch" @click="me"
-              >Call /me</v-btn
+            <v-btn :loading="callingState" prepend-icon="$mdiAccountSearch" @click="getState"
+              >Call /state</v-btn
             >
             <v-btn
               :disabled="!auth.accessToken.value"
@@ -76,7 +76,7 @@ definePage({
 
 const events = ref<string[]>([])
 const auth = useAuth()
-const callingMe = ref(false)
+const callingState = ref(false)
 
 const loginOptions: OvFormOptions = {
   fields: [
@@ -112,15 +112,17 @@ async function restore() {
   events.value.push('POST /auth/refresh')
   await auth.restore()
 }
-async function me() {
-  callingMe.value = true
+async function getState() {
+  callingState.value = true
   try {
-    await auth.me()
-    events.value.push('GET /auth/me -> 200')
+    await auth.getState()
+    events.value.push('GET /auth/state -> 200')
   } catch (error) {
-    events.value.push(`GET /auth/me -> ${error instanceof Error ? error.message : 'network error'}`)
+    events.value.push(
+      `GET /auth/state -> ${error instanceof Error ? error.message : 'network error'}`,
+    )
   } finally {
-    callingMe.value = false
+    callingState.value = false
   }
 }
 async function logout() {

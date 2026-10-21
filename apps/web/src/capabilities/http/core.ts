@@ -144,9 +144,10 @@ async function executeRequest<T>(
 ): Promise<HttpResponse<T>> {
   const authenticatedRequest =
     !/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(request) &&
-    (configuration.openapi
-      ? requiresBearerToken(configuration.openapi, options?.method ?? 'GET', request)
-      : !isTokenEndpoint(request))
+    (new Headers(options?.headers).has('Authorization') ||
+      (configuration.openapi
+        ? requiresBearerToken(configuration.openapi, options?.method ?? 'GET', request)
+        : !isTokenEndpoint(request)))
   try {
     const startTime = performance.now()
     const headers = new Headers(options?.headers)

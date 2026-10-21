@@ -1,3 +1,4 @@
+import { authState } from '../../auth-state'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
@@ -47,8 +48,8 @@ async function setup(page = RecoverPassword, hash = '', authenticated = false) {
   if (authenticated) {
     fetch
       .mockResolvedValueOnce(json({ accessToken: 'old-access' }))
-      .mockResolvedValueOnce(json({ userId: 7, username: 'ada@example.com' }))
-  } else fetch.mockResolvedValueOnce(json({}, 401))
+      .mockResolvedValueOnce(json(authState({ userId: 7, username: 'ada@example.com' })))
+  } else fetch.mockResolvedValueOnce(json({}, 401)).mockResolvedValueOnce(json(authState()))
   const auth = createAuth({ http: createHttpClient({ fetch }) })
   session.auth = auth
   await auth.restore()
@@ -97,11 +98,11 @@ describe('password recovery pages', () => {
     fetch.mockResolvedValueOnce(new Response(null, { status: 204 }))
     wrapper.findComponent(form).vm.$emit('submit', { email: ' ada+reset@example.com ' })
     await flushPromises()
-    expect(String(fetch.mock.calls[1]![0])).toContain('/auth/recover-password')
-    expect(JSON.parse(String(fetch.mock.calls[1]![1]?.body))).toEqual({
+    expect(String(fetch.mock.calls[2]![0])).toContain('/auth/recover-password')
+    expect(JSON.parse(String(fetch.mock.calls[2]![1]?.body))).toEqual({
       email: 'ada+reset@example.com',
     })
-    expect(fetch.mock.calls[1]![1]?.credentials).toBe('omit')
+    expect(fetch.mock.calls[2]![1]?.credentials).toBe('omit')
     expect(wrapper.text()).toContain('auth.recover.sent')
     expect(wrapper.findComponent(form).exists()).toBe(false)
     expect(auth.authenticated.value).toBe(false)
@@ -160,7 +161,7 @@ describe('password recovery pages', () => {
       const { wrapper, fetch } = await setup(ResetPassword, hash)
       expect(wrapper.text()).toContain('auth.reset.invalid')
       expect(wrapper.findComponent(form).exists()).toBe(false)
-      expect(fetch).toHaveBeenCalledTimes(1)
+      expect(fetch).toHaveBeenCalledTimes(2)
       wrapper.unmount()
     },
   )
@@ -169,7 +170,7 @@ describe('password recovery pages', () => {
     const { wrapper, fetch, ui } = await setup(ResetPassword, `#token=${token}`)
     wrapper.findComponent(form).vm.$emit('submit', { ...passwords, passwordRepeat: 'different' })
     await flushPromises()
-    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledTimes(2)
     expect(ui.notification.value?.message).toBe('auth.password.mismatch')
     expect(wrapper.findComponent(form).props('data')).toEqual({ password: '', passwordRepeat: '' })
     wrapper.unmount()
@@ -222,7 +223,7 @@ describe('password recovery pages', () => {
       const values = page === RecoverPassword ? { email: 'ada@example.com' } : passwords
       wrapper.findComponent(form).vm.$emit('submit', values)
       wrapper.findComponent(form).vm.$emit('submit', values)
-      expect(fetch).toHaveBeenCalledTimes(2)
+      expect(fetch).toHaveBeenCalledTimes(3)
       finish(new Response(null, { status: 204 }))
       await flushPromises()
       expect(auth.loading.value).toBe(false)

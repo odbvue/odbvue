@@ -16,23 +16,27 @@ async function mockProfile(
         status: active ? 200 : 401,
         json: active ? { accessToken: 'profile-token' } : {},
       })
-    } else if (path.endsWith('/me')) {
+    } else if (path.endsWith('/state')) {
       await route.fulfill({
         json: {
-          userId: 7,
-          username: 'ada@example.com',
-          displayName: 'Ada Lovelace',
-          avatarUrl: googlePhoto,
-          avatarId: avatar ? 'a'.repeat(32) : null,
-          avatarUploaded: avatar ? 1 : 0,
-          passwordConnected: passwordConnected ? 1 : 0,
-          googleConnected: googleConnected ? 1 : 0,
-          roles: [],
-          permissions: [],
+          providers: { password: true, google: true },
+          signup: true,
+          user: active
+            ? {
+                userId: 7,
+                username: 'ada@example.com',
+                displayName: 'Ada Lovelace',
+                avatarUrl: googlePhoto,
+                avatarId: avatar ? 'a'.repeat(32) : null,
+                avatarUploaded: avatar ? 1 : 0,
+                passwordConnected: passwordConnected ? 1 : 0,
+                googleConnected: googleConnected ? 1 : 0,
+                roles: [],
+                permissions: [],
+              }
+            : null,
         },
       })
-    } else if (path.endsWith('/google/config')) {
-      await route.fulfill({ json: { enabled: true } })
     } else if (path.endsWith('/google/link/start')) {
       updates.push(route.request().postDataJSON())
       await route.fulfill({

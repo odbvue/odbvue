@@ -22,16 +22,8 @@ const ui = useUi()
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-const enabled = ref(false)
+const enabled = computed(() => auth.providers.value?.google === true)
 const starting = ref(false)
-
-onMounted(async () => {
-  try {
-    enabled.value = (await auth.getGoogleConfig()).enabled
-  } catch (error) {
-    ui.error(error)
-  }
-})
 
 async function start() {
   if (!enabled.value || !auth.ready.value || auth.loading.value || starting.value) return

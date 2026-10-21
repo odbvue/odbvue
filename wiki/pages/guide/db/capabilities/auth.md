@@ -15,7 +15,7 @@
 
 The application owns:
 
-- login, refresh, logout, and `me` endpoints and their shapes;
+- login, refresh, logout, and `getState` endpoints and their shapes;
 - choosing service authorization policies, reading `Cookie`, and writing `Set-Cookie`;
 - authorization policy (who may call what);
 - mapping ODB errors to HTTP responses.
@@ -167,7 +167,7 @@ protect against a compromised schema owner or an authorized decrypted Settings c
 
 `odbAuth.readProfile(userId, avatarUrl, avatarUploaded, passwordConnected, googleConnected, avatarId)`
 reads the Google photo URL, uploaded storage key and actual identity counts. The application exposes these
-through `/auth/me`; the three numeric status fields are `0` or positive counts.
+through `/auth/state`; the three numeric status fields are `0` or positive counts.
 An uploaded avatar takes precedence over a Google photo. `readUser` remains unchanged.
 
 `odbAuth.updateAvatar(userId, avatar)` accepts a JPEG thumbnail data URL of at most
@@ -207,16 +207,29 @@ not register them; the application package does. The sandbox retains duplicate
 login, refresh, logout, and `me` procedures under `/sandbox/auth`, without
 overwriting the application's public routes.
 
-| Endpoint                      | Purpose                                                                                                                                      |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /auth/login`            | Accepts JSON `{ username, password }`, sets the refresh cookie, and returns `{ accessToken }`.                                               |
-| `POST /auth/signup`           | Accepts JSON `{ email, fullName, password, passwordRepeat }`, creates an inactive account, and sends a confirmation email.                   |
-| `POST /auth/confirm-email`    | Accepts JSON `{ token }`, consumes an unexpired confirmation token, and enables the account without creating a session.                      |
-| `POST /auth/recover-password` | Accepts JSON `{ email }` and sends a reset link for an active account; unknown or disabled accounts receive the same empty success response. |
-| `POST /auth/reset-password`   | Accepts JSON `{ token, password, passwordRepeat }`, changes the password, and revokes existing sessions without logging in.                  |
-| `POST /auth/refresh`          | Rotates the refresh cookie and returns `{ accessToken }`.                                                                                    |
-| `POST /auth/logout`           | Revokes the browser session and expires the refresh cookie.                                                                                  |
-| `GET /auth/me`                | Requires bearer authentication and returns `userId`, `username`, `displayName`, `roles`, and `permissions`.                                  |
+| Endpoint                      | Purpose                                                                                                                                                                    |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /auth/login`            | Accepts JSON `{ username, password }`, sets the refresh cookie, and returns `{ accessToken }`.                                                                             |
+| `POST /auth/signup`           | Accepts JSON `{ email, fullName, password, passwordRepeat }`, creates an inactive account, and sends a confirmation email.                                                 |
+| `POST /auth/confirm-email`    | Accepts JSON `{ token }`, consumes an unexpired confirmation token, and enables the account without creating a session.                                                    |
+| `POST /auth/recover-password` | Accepts JSON `{ email }` and sends a reset link for an active account; unknown or disabled accounts receive the same empty success response.                               |
+| `POST /auth/reset-password`   | Accepts JSON `{ token, password, passwordRepeat }`, changes the password, and revokes existing sessions without logging in.                                                |
+| `POST /auth/refresh`          | Rotates the refresh cookie and returns `{ accessToken }`.                                                                                                                  |
+| `POST /auth/logout`           | Revokes the browser session and expires the refresh cookie.                                                                                                                |
+| `GET /auth/state`             | Returns `{ user, providers: { password, google }, signup }`; `user` is null without credentials and contains the profile, roles, and permissions for a valid bearer token. |
+
+The web client's `auth.getState()` loads both the current identity and public
+authentication capabilities. `auth.providers` and `auth.signupEnabled` are reactive
+refs, initially null until state has loaded. Startup restoration attempts
+`POST /auth/refresh`, then loads `/auth/state` even when no refresh session exists.
+Login and profile updates also reload state; Google buttons reuse the shared
+capabilities instead of making a separate configuration request.
+
+`/auth/state` returns 200 for anonymous callers and sets `Cache-Control: no-store`.
+A supplied invalid, expired, or malformed bearer credential still returns 401,
+allowing the client's normal refresh handling. It replaces the public `/auth/me`
+and `/auth/google/config` endpoints. Rebuild and redeploy bootstrap to install
+the updated routes; no incremental migration is supplied.
 
 ### Email signup
 
@@ -306,14 +319,14 @@ Authentication failures raise ODB errors that ORDS maps to HTTP responses, inclu
 ## Google sign-in
 
 Google authentication uses a backend-owned OpenID Connect authorization-code
-flow with PKCE (S256), state, and nonce. The Login and Signup pages load
-`GET /auth/google/config` and show **Continue with Google** only when enabled.
+flow with PKCE (S256), state, and nonce. The Login and Signup pages read shared
+`GET /auth/state` capabilities and show **Continue with Google** only when
+`providers.google` is true.
 The public client ID is not proof of identity and is not a password. No Google
 script, ID token, or client secret is needed in the frontend.
 
 | Endpoint                       | Contract                                                                                                                                                                                                                                                                         |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /auth/google/config`      | Returns `{ "enabled": true }` or `{ "enabled": false }`, without secrets.                                                                                                                                                                                                        |
 | `POST /auth/google/start`      | Accepts `{ "redirect": "/local/path" }`, requires the configured application Origin, sets a five-minute HttpOnly transaction cookie, and returns `{ "authorizationUrl": "https://accounts.google.com/..." }`.                                                                    |
 | `GET /auth/google/callback`    | Accepts Google's `state`, `code`, or `error` and consumes the browser-bound transaction. Its stored purpose determines login or linking. Login success sets the normal refresh cookie and redirects to Login; linking returns to Account settings without replacing the session. |
 | `POST /auth/google/link/start` | Requires an authenticated access token, the current refresh cookie, the configured Origin, and `{ "redirect": "/account", "password": "<current password>" }`. Starts explicit linking and returns the Google authorization URL.                                                 |
@@ -582,7 +595,7 @@ import { useAuth } from '@/capabilities/auth'
 const auth = useAuth()
 
 await auth.login({ username: 'ada', password: 'correct horse battery staple' })
-await auth.me()
+await auth.getState()
 
 if (auth.authenticated.value) {
   console.log(auth.user.value?.username)

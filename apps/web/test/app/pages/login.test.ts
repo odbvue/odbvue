@@ -1,3 +1,4 @@
+import { authState } from '../../auth-state'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
@@ -41,7 +42,8 @@ async function setup(location = '/login?redirect=/sandbox') {
     ],
   })
   await router.push(location)
-  const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(json({}, 401))
+  const fetch = vi.fn<typeof globalThis.fetch>()
+  fetch.mockResolvedValueOnce(json({}, 401)).mockResolvedValueOnce(json(authState()))
   const auth: Auth = createAuth({
     http: () => useHttp({ fetch, configuration: { getAccessToken: () => auth.accessToken.value } }),
   })
@@ -90,7 +92,7 @@ describe('login page using application auth', () => {
       redirect: '/sandbox',
       other: 'kept',
     })
-    expect(context.fetch).toHaveBeenCalledTimes(1)
+    expect(context.fetch).toHaveBeenCalledTimes(2)
     context.wrapper.unmount()
   })
 
@@ -99,7 +101,7 @@ describe('login page using application auth', () => {
     await flushPromises()
     expect(context.ui.notification.value).toBeUndefined()
     expect(context.router.currentRoute.value.query).toEqual({ redirect: '/sandbox' })
-    expect(context.fetch).toHaveBeenCalledTimes(1)
+    expect(context.fetch).toHaveBeenCalledTimes(2)
     context.wrapper.unmount()
   })
 
@@ -109,7 +111,7 @@ describe('login page using application auth', () => {
     expect(messages['auth.google.conflict']).toContain('Connect Google')
     expect(messages['auth.google.conflict']).toContain('never linked automatically')
     expect(context.auth.authenticated.value).toBe(false)
-    expect(context.fetch).toHaveBeenCalledTimes(1)
+    expect(context.fetch).toHaveBeenCalledTimes(2)
     expect(context.router.currentRoute.value.path).toBe('/login')
     context.wrapper.unmount()
   })
@@ -120,12 +122,12 @@ describe('login page using application auth', () => {
     await flushPromises()
     context.fetch
       .mockResolvedValueOnce(json({ accessToken: 'login-token' }))
-      .mockResolvedValueOnce(json({ userId: 7, username: 'ada' }))
+      .mockResolvedValueOnce(json(authState({ userId: 7, username: 'ada' })))
     await context.wrapper.findComponent(form).trigger('click')
     await flushPromises()
     expect(context.router.currentRoute.value.path).toBe('/account')
     expect(context.router.currentRoute.value.query.redirect).toBe('/sandbox')
-    expect(context.fetch).toHaveBeenCalledTimes(3)
+    expect(context.fetch).toHaveBeenCalledTimes(4)
     context.router.beforeEach(createAuthGuard(context.router, context.auth))
     await context.router.push(`/login?google=conflict&redirect=${encodeURIComponent(redirect)}`)
     expect(context.router.currentRoute.value.path).toBe('/account')
@@ -137,7 +139,9 @@ describe('login page using application auth', () => {
     const context = await setup()
     context.fetch
       .mockResolvedValueOnce(json({ accessToken: 'login-token' }))
-      .mockResolvedValueOnce(json({ userId: 7, username: 'ada', permissions: ['settings.read'] }))
+      .mockResolvedValueOnce(
+        json(authState({ userId: 7, username: 'ada', permissions: ['settings.read'] })),
+      )
 
     await context.wrapper.findComponent(form).trigger('click')
     await flushPromises()
@@ -145,7 +149,7 @@ describe('login page using application auth', () => {
     expect(context.auth.can('settings.read')).toBe(true)
     expect(context.router.currentRoute.value.path).toBe('/sandbox')
     expect(context.ui.loading.value).toBe(false)
-    const [, options] = context.fetch.mock.calls[1]!
+    const [, options] = context.fetch.mock.calls[2]!
     expect(options?.credentials).toBe('include')
     expect(JSON.parse(String(options?.body))).toEqual({ username: 'ada', password: 'password' })
     expect(JSON.stringify(localStorage)).not.toMatch(/login-token|password|ada/)
@@ -192,7 +196,7 @@ describe('login page using application auth', () => {
             finish = resolve
           }),
       )
-      .mockResolvedValueOnce(json({ userId: 7, username: 'ada' }))
+      .mockResolvedValueOnce(json(authState({ userId: 7, username: 'ada' })))
     const loginForm = context.wrapper.findComponent(form)
     expect(loginForm.props('loading')).toBeUndefined()
     expect(context.ui.loading.value).toBe(false)
@@ -201,7 +205,7 @@ describe('login page using application auth', () => {
     expect(context.auth.loading.value).toBe(true)
     expect(context.ui.loading.value).toBe(true)
     await loginForm.trigger('click')
-    expect(context.fetch).toHaveBeenCalledTimes(2)
+    expect(context.fetch).toHaveBeenCalledTimes(3)
     finish(json({ accessToken: 'login-token' }))
     await flushPromises()
     expect(loginForm.props('loading')).toBeUndefined()

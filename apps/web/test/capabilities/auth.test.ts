@@ -1,3 +1,4 @@
+import { authState } from '../auth-state'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createAuth } from '@/capabilities/auth/core.js'
 import { createHttpClient, type HttpClient } from '@/capabilities/http/core.js'
@@ -21,16 +22,18 @@ describe('authentication capability', () => {
     const get = vi
       .spyOn(http, 'get')
       .mockResolvedValueOnce(
-        response({
-          userId: 7,
-          username: 'ada',
-          displayName: 'Ada Lovelace',
-          avatarUrl: 'https://lh3.googleusercontent.com/ada',
-          avatarId: 'a'.repeat(32),
-          avatarUploaded: 1,
-          passwordConnected: 1,
-          googleConnected: 0,
-        }),
+        response(
+          authState({
+            userId: 7,
+            username: 'ada',
+            displayName: 'Ada Lovelace',
+            avatarUrl: 'https://lh3.googleusercontent.com/ada',
+            avatarId: 'a'.repeat(32),
+            avatarUploaded: 1,
+            passwordConnected: 1,
+            googleConnected: 0,
+          }),
+        ),
       )
       .mockResolvedValueOnce(response(avatar))
     const auth = createAuth({ http })
@@ -47,14 +50,16 @@ describe('authentication capability', () => {
     })
     expect(createUrl).toHaveBeenCalledWith(avatar)
     get.mockResolvedValue(
-      response({
-        userId: 7,
-        username: 'ada',
-        avatarUrl: 'https://lh3.googleusercontent.com/ada',
-        avatarUploaded: 0,
-      }),
+      response(
+        authState({
+          userId: 7,
+          username: 'ada',
+          avatarUrl: 'https://lh3.googleusercontent.com/ada',
+          avatarUploaded: 0,
+        }),
+      ),
     )
-    await auth.me()
+    await auth.getState()
     expect(auth.user.value?.avatarUrl).toBe('https://lh3.googleusercontent.com/ada')
     expect(revokeUrl).toHaveBeenCalledWith('blob:avatar')
   })
@@ -82,12 +87,14 @@ describe('authentication capability', () => {
     vi.spyOn(http, 'post').mockResolvedValue(response({ accessToken: 'token' }))
     vi.spyOn(http, 'get')
       .mockResolvedValueOnce(
-        response({
-          userId: 7,
-          username: 'ada',
-          avatarUploaded: 1,
-          avatarId: 'b'.repeat(32),
-        }),
+        response(
+          authState({
+            userId: 7,
+            username: 'ada',
+            avatarUploaded: 1,
+            avatarId: 'b'.repeat(32),
+          }),
+        ),
       )
       .mockResolvedValueOnce(response(new Blob(['jpeg'], { type: 'image/jpeg' })))
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:uploaded')
@@ -102,7 +109,9 @@ describe('authentication capability', () => {
   it('surfaces failed avatar downloads without replacing the current profile', async () => {
     const http = createHttpClient()
     vi.spyOn(http, 'post').mockResolvedValue(response({ accessToken: 'token' }))
-    const get = vi.spyOn(http, 'get').mockResolvedValue(response({ userId: 7, username: 'ada' }))
+    const get = vi
+      .spyOn(http, 'get')
+      .mockResolvedValue(response(authState({ userId: 7, username: 'ada' })))
     const auth = createAuth({ http })
     await auth.restore()
     const previous = auth.user.value
@@ -112,15 +121,17 @@ describe('authentication capability', () => {
     })
     get
       .mockResolvedValueOnce(
-        response({
-          userId: 7,
-          username: 'ada',
-          avatarUploaded: 1,
-          avatarId: 'c'.repeat(32),
-        }),
+        response(
+          authState({
+            userId: 7,
+            username: 'ada',
+            avatarUploaded: 1,
+            avatarId: 'c'.repeat(32),
+          }),
+        ),
       )
       .mockResolvedValueOnce({ ...response(null, 404), error })
-    await expect(auth.me()).rejects.toBe(error)
+    await expect(auth.getState()).rejects.toBe(error)
     expect(auth.user.value).toBe(previous)
     expect(auth.loading.value).toBe(false)
   })
@@ -128,21 +139,25 @@ describe('authentication capability', () => {
   it('does not restore an avatar or identity when a download finishes after sign-out', async () => {
     const http = createHttpClient()
     vi.spyOn(http, 'post').mockResolvedValue(response({ accessToken: 'token' }))
-    const get = vi.spyOn(http, 'get').mockResolvedValue(response({ userId: 7, username: 'ada' }))
+    const get = vi
+      .spyOn(http, 'get')
+      .mockResolvedValue(response(authState({ userId: 7, username: 'ada' })))
     const auth = createAuth({ http })
     await auth.restore()
     const download = Promise.withResolvers<ReturnType<typeof response<Blob>>>()
     get
       .mockResolvedValueOnce(
-        response({
-          userId: 7,
-          username: 'ada',
-          avatarUploaded: 1,
-          avatarId: 'd'.repeat(32),
-        }),
+        response(
+          authState({
+            userId: 7,
+            username: 'ada',
+            avatarUploaded: 1,
+            avatarId: 'd'.repeat(32),
+          }),
+        ),
       )
       .mockReturnValueOnce(download.promise)
-    const pending = auth.me()
+    const pending = auth.getState()
     await vi.waitFor(() =>
       expect(get).toHaveBeenCalledWith(`/auth/avatar/${'d'.repeat(32)}`, expect.anything()),
     )
@@ -202,7 +217,7 @@ describe('authentication capability', () => {
     const post = vi
       .spyOn(http, 'post')
       .mockResolvedValue(response({ accessToken: 'original-token' }))
-    vi.spyOn(http, 'get').mockResolvedValue(response({ userId: 7, username: 'ada' }))
+    vi.spyOn(http, 'get').mockResolvedValue(response(authState({ userId: 7, username: 'ada' })))
     const auth = createAuth({ http })
     await auth.restore()
     post.mockClear()
@@ -211,6 +226,7 @@ describe('authentication capability', () => {
 
   it('requires a ready authenticated session and current password before linking', async () => {
     const http = createHttpClient()
+    vi.spyOn(http, 'get').mockResolvedValue(response(authState()))
     const post = vi.spyOn(http, 'post').mockResolvedValue(response(null, 401))
     const auth = createAuth({ http })
     await expect(auth.startGoogleLink({ password: 'password' })).rejects.toThrow('Sign in')
@@ -300,7 +316,7 @@ describe('authentication capability', () => {
         }),
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ userId: 7, username: 'ada' }), {
+        new Response(JSON.stringify(authState({ userId: 7, username: 'ada' })), {
           headers: { 'Content-Type': 'application/json' },
         }),
       )
@@ -351,16 +367,91 @@ describe('authentication capability', () => {
     expect(auth.loading.value).toBe(false)
   })
 
-  it.each([true, false])('reads the anonymous Google configuration (%s)', async (enabled) => {
+  it.each([true, false])('reads anonymous authentication state (%s)', async (enabled) => {
     const http: Pick<HttpClient, 'get' | 'post'> = createHttpClient()
-    const get = vi.spyOn(http, 'get').mockResolvedValue(response({ enabled }))
+    const get = vi.spyOn(http, 'get').mockResolvedValue(response(authState(null, enabled)))
     const auth = createAuth({ http })
-    await expect(auth.getGoogleConfig()).resolves.toEqual({ enabled })
-    expect(get).toHaveBeenCalledWith('/auth/google/config', { credentials: 'omit' })
+    await expect(auth.getState()).resolves.toEqual(authState(null, enabled))
+    expect(get).toHaveBeenCalledWith('/auth/state', { headers: {} })
+    expect(auth.providers.value).toEqual({ password: true, google: enabled })
+    expect(auth.signupEnabled.value).toBe(true)
     expect(auth.accessToken.value).toBeNull()
   })
 
-  it('surfaces failed or malformed Google configuration rather than disabling silently', async () => {
+  it('decodes ORDS JSON fields and supports a custom state endpoint', async () => {
+    const http = createHttpClient()
+    const get = vi.spyOn(http, 'get').mockResolvedValue(
+      response({
+        user: JSON.stringify({ userId: 7, username: 'ada', roles: ['admin'] }),
+        providers: '{"password":true,"google":false}',
+        signup: 'false',
+      }),
+    )
+    const auth = createAuth({ http, endpoints: { state: '/custom/state' } })
+    await expect(auth.getState()).resolves.toMatchObject({
+      user: { id: 7, username: 'ada', roles: ['admin'] },
+      providers: { password: true, google: false },
+      signup: false,
+    })
+    expect(get).toHaveBeenCalledWith('/custom/state', { headers: {} })
+    expect(auth.signupEnabled.value).toBe(false)
+  })
+
+  it('clears an existing identity when state becomes anonymous but retains public capabilities', async () => {
+    const http = createHttpClient()
+    vi.spyOn(http, 'post').mockResolvedValue(response({ accessToken: 'token' }))
+    const get = vi
+      .spyOn(http, 'get')
+      .mockResolvedValueOnce(response(authState({ userId: 7, username: 'ada' })))
+      .mockResolvedValueOnce(response(authState(null, false)))
+    const auth = createAuth({ http })
+    await auth.login({ username: 'ada', password: 'password' })
+    await expect(auth.getState()).resolves.toEqual(authState(null, false))
+    expect(auth.user.value).toBeNull()
+    expect(auth.accessToken.value).toBeNull()
+    expect(auth.authenticated.value).toBe(false)
+    expect(auth.providers.value?.google).toBe(false)
+    expect(get).toHaveBeenCalledTimes(2)
+  })
+
+  it('refreshes expired supplied credentials on an anonymous-friendly OpenAPI operation', async () => {
+    let expired = false
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input, options) => {
+      const path = String(input)
+      let data: unknown
+      if (path.endsWith('/auth/login')) data = { accessToken: 'old-token' }
+      else if (path.endsWith('/auth/refresh')) data = { accessToken: 'fresh-token' }
+      else {
+        const token = new Headers(options?.headers).get('Authorization')
+        if (expired && token !== 'Bearer fresh-token') return new Response(null, { status: 401 })
+        data = authState({ userId: 7, username: 'ada' })
+      }
+      return new Response(JSON.stringify(data), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    })
+    const auth = createAuth({ http: () => http })
+    const http = createHttpClient({
+      fetch,
+      configuration: {
+        openapi: { paths: { '/auth/state': { get: { security: [] } } } },
+        getAccessToken: () => auth.accessToken.value,
+        refreshAccessToken: () => auth.refresh(),
+      },
+    })
+    await auth.login({ username: 'ada', password: 'password' })
+    expired = true
+    await expect(auth.getState()).resolves.toMatchObject({ user: { id: 7 } })
+    expect(auth.accessToken.value).toBe('fresh-token')
+    expect(
+      fetch.mock.calls.filter(([input]) => String(input).endsWith('/auth/refresh')),
+    ).toHaveLength(1)
+    expect(new Headers(fetch.mock.lastCall?.[1]?.headers).get('Authorization')).toBe(
+      'Bearer fresh-token',
+    )
+  })
+
+  it('surfaces failed or malformed authentication state rather than disabling silently', async () => {
     const http: Pick<HttpClient, 'get' | 'post'> = createHttpClient()
     const get = vi.spyOn(http, 'get')
     get
@@ -368,13 +459,13 @@ describe('authentication capability', () => {
         ...response(null, 503),
         error: Object.assign(new Error('Unavailable'), {
           status: 503,
-          request: '/auth/google/config',
+          request: '/auth/state',
         }),
       })
       .mockResolvedValueOnce(response({ enabled: 'false' }))
     const auth = createAuth({ http })
-    await expect(auth.getGoogleConfig()).rejects.toThrow('Unavailable')
-    await expect(auth.getGoogleConfig()).rejects.toThrow('configuration')
+    await expect(auth.getState()).rejects.toThrow('Unavailable')
+    await expect(auth.getState()).rejects.toThrow('authentication state')
   })
 
   it('starts backend-owned Google authorization with the transaction cookie', async () => {
@@ -457,7 +548,9 @@ describe('authentication capability', () => {
     const auth = createAuth({
       http: {
         post,
-        get: vi.fn<HttpGetMock>().mockResolvedValue(response({ userId: 7, username: 'ada' })),
+        get: vi
+          .fn<HttpGetMock>()
+          .mockResolvedValue(response(authState({ userId: 7, username: 'ada' }))),
       } as unknown as HttpClient,
     })
     await auth.login({ username: 'ada', password: 'password' })
@@ -472,16 +565,18 @@ describe('authentication capability', () => {
     const auth = createAuth({
       http: {
         get: vi.fn<HttpGetMock>().mockResolvedValue(
-          response({
-            userId: 7,
-            username: 'ada',
-            roles: '["admin"]',
-            permissions: ['settings.read'],
-          }),
+          response(
+            authState({
+              userId: 7,
+              username: 'ada',
+              roles: '["admin"]',
+              permissions: ['settings.read'],
+            }),
+          ),
         ),
       } as unknown as HttpClient,
     })
-    await auth.me()
+    await auth.getState()
     expect(auth.hasRole('admin')).toBe(true)
     expect(auth.can('settings.read')).toBe(true)
     expect(auth.can('settings.write')).toBe(false)
@@ -500,11 +595,13 @@ describe('authentication capability', () => {
         }),
       )
     const get = vi.fn<HttpGetMock>().mockResolvedValue(
-      response({
-        userId: 7,
-        username: 'ada',
-        displayName: 'Ada Lovelace',
-      }),
+      response(
+        authState({
+          userId: 7,
+          username: 'ada',
+          displayName: 'Ada Lovelace',
+        }),
+      ),
     )
     const http = {
       post,
@@ -522,13 +619,13 @@ describe('authentication capability', () => {
     expect(auth.authenticated.value).toBe(true)
     expect(auth.user.value?.username).toBe('ada')
     await expect(auth.refresh()).resolves.toBe(true)
-    await expect(auth.me()).resolves.toMatchObject({ id: 7, username: 'ada' })
+    await expect(auth.getState()).resolves.toMatchObject({ user: { id: 7, username: 'ada' } })
 
     expect(auth.authenticated.value).toBe(true)
     expect(auth.user.value?.username).toBe('ada')
     expect(auth.hasRole('developer')).toBe(false)
     expect(auth.can('orders.write')).toBe(false)
-    expect(http.get).toHaveBeenCalledWith('/auth/me')
+    expect(http.get).toHaveBeenCalledWith('/auth/state', expect.anything())
     expect(http.post).toHaveBeenLastCalledWith('/auth/refresh', undefined, {
       credentials: 'include',
     })
@@ -538,7 +635,7 @@ describe('authentication capability', () => {
     const auth = createAuth({
       http: {
         post: vi.fn<HttpPostMock>().mockResolvedValue(response(null, 401)),
-        get: vi.fn<HttpGetMock>(),
+        get: vi.fn<HttpGetMock>().mockResolvedValue(response(authState())),
       } as unknown as HttpClient,
     })
 
@@ -558,7 +655,7 @@ describe('authentication capability', () => {
           }),
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ userId: 7, username: 'ada' }), {
+        new Response(JSON.stringify(authState({ userId: 7, username: 'ada' })), {
           headers: { 'Content-Type': 'application/json' },
         }),
       )
@@ -593,7 +690,7 @@ describe('authentication capability', () => {
       .mockResolvedValue(new Response(null, { status: 403 }))
     const http = createHttpClient({ fetch })
     const auth = createAuth({ http })
-    vi.spyOn(auth, 'me').mockRejectedValue(error)
+    vi.spyOn(auth, 'getState').mockRejectedValue(error)
     const first = auth.restore()
     await expect(first).rejects.toBe(error)
     expect(auth.restore()).toBe(first)
@@ -606,7 +703,9 @@ describe('authentication capability', () => {
     post
       .mockResolvedValueOnce(response({ accessToken: 'access-token' }))
       .mockResolvedValueOnce(response(null, 401))
-    const get = vi.fn<HttpGetMock>().mockResolvedValue(response({ userId: 7, username: 'ada' }))
+    const get = vi
+      .fn<HttpGetMock>()
+      .mockResolvedValue(response(authState({ userId: 7, username: 'ada' })))
     const auth = createAuth({ http: { post, get } as unknown as HttpClient })
 
     await auth.login({ username: 'ada', password: 'password' })
@@ -623,11 +722,13 @@ describe('authentication capability', () => {
       }),
     )
     const get = vi.fn<HttpGetMock>().mockResolvedValue(
-      response({
-        userId: 7,
-        username: 'ada',
-        displayName: 'Ada Lovelace',
-      }),
+      response(
+        authState({
+          userId: 7,
+          username: 'ada',
+          displayName: 'Ada Lovelace',
+        }),
+      ),
     )
     const auth = createAuth({ http: { post, get } as unknown as HttpClient })
 
@@ -636,12 +737,14 @@ describe('authentication capability', () => {
     expect(auth.accessToken.value).toBe('access-token')
     expect(auth.authenticated.value).toBe(true)
     expect(auth.user.value).toMatchObject({ id: 7, username: 'ada', displayName: 'Ada Lovelace' })
-    expect(get).toHaveBeenCalledWith('/auth/me')
+    expect(get).toHaveBeenCalledWith('/auth/state', expect.anything())
   })
 
   it('restores an authenticated user using the browser refresh cookie', async () => {
     const post = vi.fn<HttpPostMock>().mockResolvedValue(response({ accessToken: 'access-token' }))
-    const get = vi.fn<HttpGetMock>().mockResolvedValue(response({ userId: 7, username: 'ada' }))
+    const get = vi
+      .fn<HttpGetMock>()
+      .mockResolvedValue(response(authState({ userId: 7, username: 'ada' })))
     const auth = createAuth({ http: { post, get } as unknown as HttpClient })
 
     await expect(auth.restore()).resolves.toBe(true)
@@ -649,7 +752,7 @@ describe('authentication capability', () => {
     expect(auth.ready.value).toBe(true)
     expect(auth.authenticated.value).toBe(true)
     expect(post).toHaveBeenCalledWith('/auth/refresh', undefined, { credentials: 'include' })
-    expect(get).toHaveBeenCalledWith('/auth/me')
+    expect(get).toHaveBeenCalledWith('/auth/state', expect.anything())
   })
 
   it('preserves the session when refresh fails without an HTTP response', async () => {
@@ -668,7 +771,9 @@ describe('authentication capability', () => {
       })
     const http = {
       post,
-      get: vi.fn<HttpGetMock>().mockResolvedValue(response({ userId: 7, username: 'ada' })),
+      get: vi
+        .fn<HttpGetMock>()
+        .mockResolvedValue(response(authState({ userId: 7, username: 'ada' }))),
     } as unknown as HttpClient
     const auth = createAuth({ http })
     await auth.login({ username: 'ada', password: 'password' })

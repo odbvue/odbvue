@@ -45,14 +45,24 @@ describe('app-owned ORDS migrations', () => {
       expect(proc.service?.params?.context).toMatchObject({ userId: { name: 'p_user_id' } })
       expect(proc.service?.params?.body).not.toHaveProperty('userId')
     }
-    const me = app.procedures.find((p) => p.name === 'me')!
-    expect(me.service?.params?.response).toMatchObject({
-      avatarUrl: { name: 'p_avatar_url' },
-      avatarUploaded: { name: 'p_avatar_uploaded' },
-      avatarId: { name: 'p_avatar_id' },
-      passwordConnected: { name: 'p_password_connected' },
-      googleConnected: { name: 'p_google_connected' },
+    const state = app.procedures.find((p) => p.name === 'get_state')!
+    expect(state.service).toMatchObject({ auth: 'anonymous', path: 'state' })
+    expect(state.service?.params?.response).toMatchObject({
+      user: { name: 'p_user' },
+      providers: { name: 'p_providers' },
+      signup: { name: 'p_signup' },
     })
+    expect(sql).toContain('IF p_authorization IS NOT NULL THEN')
+    expect(sql).toContain('l_user_id := odb_auth.require_user(')
+    expect(sql).toContain("p_user := 'null'")
+    expect(sql).toContain("'avatarId' VALUE l_avatar_id")
+    expect(sql).toContain("'googleConnected' VALUE l_google_connected")
+    expect(sql).toContain("'roles' VALUE l_roles FORMAT JSON")
+    expect(sql).toContain("'permissions' VALUE l_permissions FORMAT JSON")
+    expect(sql).toContain("'password' VALUE 'true' FORMAT JSON")
+    expect(sql).toContain('odb_google.enabled()')
+    expect(sql).toContain("p_signup := 'true'")
+    expect(sql).toContain("p_cache_control := 'no-store'")
     const download = app.procedures.find((p) => p.name === 'download_avatar')!
     expect(download.service?.auth).toBe('authenticated')
     expect(download.service?.params?.context).toMatchObject({ userId: { name: 'p_user_id' } })
@@ -446,7 +456,9 @@ describe('app-owned ORDS migrations', () => {
         >
       >
     }
-    expect(document.paths['/auth/google/config']?.get?.security).toEqual([])
+    expect(document.paths['/auth/state']?.get?.security).toEqual([])
+    expect(document.paths).not.toHaveProperty('/auth/google/config')
+    expect(document.paths).not.toHaveProperty('/auth/me')
     expect(
       document.paths['/auth/google/start']?.post?.requestBody?.content['application/json'].schema
         .properties,
@@ -507,11 +519,9 @@ describe('app-owned ORDS migrations', () => {
       ['/auth/confirm-email', 'post'],
       ['/auth/recover-password', 'post'],
       ['/auth/reset-password', 'post'],
-      ['/auth/me', 'get'],
+      ['/auth/state', 'get'],
     ]) {
-      expect(publicApi.paths[path!]?.[method!]?.security).toEqual(
-        path === '/auth/me' ? [{ bearerAuth: [] }] : [],
-      )
+      expect(publicApi.paths[path!]?.[method!]?.security).toEqual([])
     }
     expect(
       publicApi.paths['/auth/signup']?.post?.requestBody?.content['application/json'].schema

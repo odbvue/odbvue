@@ -4,23 +4,6 @@
  */
 
 export interface paths {
-    "/auth/google/config": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Return whether Google sign-in is enabled */
-        get: operations["auth_google_config"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/auth/google/start": {
         parameters: {
             query?: never;
@@ -123,15 +106,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/auth/me": {
+    "/auth/state": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Return the authenticated user */
-        get: operations["auth_me"];
+        /** Return the current user and public authentication capabilities */
+        get: operations["auth_get_state"];
         put?: never;
         post?: never;
         delete?: never;
@@ -559,7 +542,6 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        AuthGoogleConfigResponse: Record<string, never>;
         AuthGoogleStartResponse: {
             authorizationUrl: string;
         };
@@ -574,17 +556,10 @@ export interface components {
             accessToken: string;
         };
         AuthLogoutResponse: Record<string, never>;
-        AuthMeResponse: {
-            userId: string;
-            username: string;
-            displayName: string;
-            avatarUrl: string;
-            avatarUploaded: number;
-            avatarId: string;
-            passwordConnected: number;
-            googleConnected: number;
-            roles: unknown;
-            permissions: unknown;
+        AuthGetStateResponse: {
+            user: unknown;
+            providers: unknown;
+            signup: unknown;
         };
         AuthSignupResponse: Record<string, never>;
         AuthConfirmEmailResponse: Record<string, never>;
@@ -697,26 +672,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    auth_google_config: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": string;
-                };
-            };
-        };
-    };
     auth_google_start: {
         parameters: {
             query?: never;
@@ -881,10 +836,12 @@ export interface operations {
             };
         };
     };
-    auth_me: {
+    auth_get_state: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                Authorization?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -896,15 +853,8 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthMeResponse"];
+                    "application/json": components["schemas"]["AuthGetStateResponse"];
                 };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };

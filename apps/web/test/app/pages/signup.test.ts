@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { authState } from '../../auth-state'
 import { defineComponent } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -53,7 +54,8 @@ async function setup(page: typeof Signup | typeof ConfirmEmail = Signup, hash = 
     ],
   })
   await router.push(page === Signup ? '/signup?redirect=/' : `/confirm-email${hash}`)
-  const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(json({}, 401))
+  const fetch = vi.fn<typeof globalThis.fetch>()
+  fetch.mockResolvedValueOnce(json({}, 401)).mockResolvedValueOnce(json(authState()))
   const auth = createAuth({ http: createHttpClient({ fetch }) })
   session.auth = auth
   await auth.restore()
@@ -121,7 +123,7 @@ describe('signup and email confirmation', () => {
       .findComponent(form)
       .vm.$emit('submit', { ...credentials, email: ` ${credentials.email} ` })
     await flushPromises()
-    const [url, options] = fetch.mock.calls[1]!
+    const [url, options] = fetch.mock.calls[2]!
     expect(String(url)).toContain('/auth/signup')
     expect(JSON.parse(String(options?.body))).toEqual(credentials)
     expect(options?.credentials).toBe('omit')
@@ -158,7 +160,7 @@ describe('signup and email confirmation', () => {
     const { wrapper, fetch, ui } = await setup()
     wrapper.findComponent(form).vm.$emit('submit', { ...credentials, passwordRepeat: 'different' })
     await flushPromises()
-    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledTimes(2)
     expect(ui.notification.value?.message).toBe('auth.password.mismatch')
     wrapper.unmount()
   })
@@ -174,7 +176,7 @@ describe('signup and email confirmation', () => {
     )
     wrapper.findComponent(form).vm.$emit('submit', credentials)
     wrapper.findComponent(form).vm.$emit('submit', credentials)
-    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch).toHaveBeenCalledTimes(3)
     expect(ui.loading.value).toBe(true)
     finish(json({}, 422))
     await flushPromises()
@@ -189,11 +191,11 @@ describe('signup and email confirmation', () => {
     const token = 'A'.repeat(64)
     const { wrapper, fetch, router, auth } = await setup(ConfirmEmail, `#token=${token}`)
     expect(router.currentRoute.value.hash).toBe('')
-    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledTimes(2)
     fetch.mockResolvedValueOnce(new Response(null, { status: 204 }))
     await wrapper.findComponent(button).trigger('click')
     await flushPromises()
-    expect(JSON.parse(String(fetch.mock.calls[1]![1]?.body))).toEqual({ token })
+    expect(JSON.parse(String(fetch.mock.calls[2]![1]?.body))).toEqual({ token })
     expect(wrapper.text()).toContain('auth.confirm.success')
     expect(auth.authenticated.value).toBe(false)
     expect(localStorage.length).toBe(0)
@@ -206,7 +208,7 @@ describe('signup and email confirmation', () => {
     async (hash) => {
       const { wrapper, fetch } = await setup(ConfirmEmail, hash)
       expect(wrapper.text()).toContain('auth.confirm.invalid')
-      expect(fetch).toHaveBeenCalledTimes(1)
+      expect(fetch).toHaveBeenCalledTimes(2)
       wrapper.unmount()
     },
   )
