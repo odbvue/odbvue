@@ -57,6 +57,29 @@ describe('odbOracle', () => {
     expect(odbOracle.trunc(odbOracle.toNumber('p_value')).toSQL()).toBe('TRUNC(TO_NUMBER(p_value))')
   })
 
+  it('composes numeric and UTC epoch expressions for TOTP without raw statements', () => {
+    const epoch = odbOracle.utcEpochSeconds(odbOracle.sysTimestamp())
+    expectTypeOf(epoch).toEqualTypeOf<PlsqlExpression<'NUMBER'>>()
+    expect(epoch.toSQL()).toBe(
+      "(CAST(SYS_EXTRACT_UTC(SYSTIMESTAMP) AS DATE) - DATE '1970-01-01') * 86400",
+    )
+    expect(odbOracle.utcEpochSeconds(new Param('p_time', 'TIMESTAMP')).toSQL()).toBe(
+      "(CAST(SYS_EXTRACT_UTC(p_time) AS DATE) - DATE '1970-01-01') * 86400",
+    )
+    const floor = odbOracle.floor(epoch)
+    expectTypeOf(floor).toEqualTypeOf<PlsqlExpression<'NUMBER'>>()
+    expect(floor.toSQL()).toBe(`FLOOR(${epoch.toSQL()})`)
+    expect(odbOracle.floor(-1.5).toSQL()).toBe('FLOOR(-1.5)')
+    const power = odbOracle.power(2, new Param('p_exponent', 'NUMBER'))
+    expectTypeOf(power).toEqualTypeOf<PlsqlExpression<'NUMBER'>>()
+    expect(power.toSQL()).toBe('POWER(2, p_exponent)')
+    expect(odbOracle.power(2, 0).toSQL()).toBe('POWER(2, 0)')
+    const masked = odbOracle.bitAnd(new Param('p_value', 'NUMBER'), 2147483647)
+    expectTypeOf(masked).toEqualTypeOf<PlsqlExpression<'NUMBER'>>()
+    expect(masked.toSQL()).toBe('BITAND(p_value, 2147483647)')
+    expect(odbOracle.bitAnd(0, 0).toSQL()).toBe('BITAND(0, 0)')
+  })
+
   it('allows absent optional JSON paths without hiding malformed values', () => {
     expect(
       odbOracle

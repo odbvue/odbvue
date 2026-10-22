@@ -23,6 +23,9 @@ type SetupSettings = {
   auth_google_enabled: boolean
   auth_google_client_id?: string
   auth_google_client_secret?: string
+  auth_password_enabled?: boolean
+  auth_two_factor_enabled?: boolean
+  auth_signup_enabled?: boolean
 }
 
 const hostValid = (value: unknown) =>
@@ -124,6 +127,9 @@ const fileValidators: Record<string, (value: unknown) => boolean> = {
   ...validators,
   auth_jwt_secret: credentialValid,
   ...googleValidators,
+  auth_password_enabled: (value) => typeof value === 'boolean',
+  auth_two_factor_enabled: (value) => typeof value === 'boolean',
+  auth_signup_enabled: (value) => typeof value === 'boolean',
 }
 
 const settingsValid = (settings: Record<string, unknown>): settings is SetupSettings =>
@@ -155,6 +161,9 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
         (!normalized.startsWith('smtp_') &&
           !normalized.startsWith('auth_jwt_') &&
           !normalized.startsWith('auth_google_') &&
+          !['auth_password_enabled', 'auth_two_factor_enabled', 'auth_signup_enabled'].includes(
+            normalized,
+          ) &&
           !['vite_google_client_id', 'google_client_id'].includes(normalized) &&
           normalized !== 'app_public_url') ||
         !Object.hasOwn(fileValidators, name)
@@ -185,7 +194,7 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
       type: 'confirm',
       name: 'auth_google_enabled',
       message: 'Enable Google sign-in (backend authorization code flow)?',
-      initial: false,
+      initial: true,
     },
     {
       type: 'text',
@@ -330,6 +339,16 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
   ]
   const googleBindings: Record<string, string> = {
     google_enabled: settings.auth_google_enabled ? 'Y' : 'N',
+  }
+  for (const key of [
+    'auth_password_enabled',
+    'auth_two_factor_enabled',
+    'auth_signup_enabled',
+  ] as const) {
+    if (settings[key] !== undefined) {
+      settingWrites.push([key.toUpperCase(), key])
+      googleBindings[key] = settings[key] ? 'Y' : 'N'
+    }
   }
   if (settings.auth_google_enabled) {
     for (const [id, bind] of [

@@ -49,6 +49,7 @@ export const migration = defineMigration('20260913120000_auth', { schema })
   .install(odbStorage)
   .install(odbAuth)
   .install(odbAuth.seedSettings())
+  .install(odbAuth.config({ password: true, twoFactor: true, google: true, signup: true }))
   .install(
     odbAuth.seedUser({
       username: 'admin',
@@ -70,6 +71,93 @@ The builders generate the SQL required by Oracle at deployment time.
 `toSQLUp()` method. Its callback uses the same `variables`, `query`, `call`,
 `ifThen`, and exception-handler methods as package bodies, including
 `savepoint(name)` and `rollback(name)` for transactional seed operations.
+
+## Authentication policy and two-factor authentication
+
+`odbAuth.config()` is an installable, Settings-backed deployment policy. All four
+flags default to `true`; supply `false` explicitly to disable a feature:
+
+```ts
+// Install after auth/Google settings seeds and before the application package.
+.install(odbAuth.config({
+  password: true,  // Username/email and password
+  twoFactor: true, // Required TOTP for every password account
+  google: true,
+  signup: true,
+}))
+```
+
+The corresponding Settings keys are `AUTH_PASSWORD_ENABLED`,
+`AUTH_TWO_FACTOR_ENABLED`, `AUTH_GOOGLE_ENABLED`, and `AUTH_SIGNUP_ENABLED`
+(`Y`/`N`). `seedSettings()` inserts missing policy values without replacing existing
+ones; `config()` writes the requested deployment values. Runtime reads validate
+the values and enforce policy inside the database capability. Missing/invalid
+settings raise an error rather than enabling a fallback. Provider flags are not
+authorization grants and do not revoke sessions that already exist.
+
+Password login, signup, password recovery/reset, and password changes are rejected
+when password authentication is disabled. Signup additionally requires the signup
+flag; Google can still authenticate existing identities when signup is disabled,
+but cannot create new accounts. Google is available only when enabled **and**
+its client ID, secret, and callback URI are configured. State checks use masked
+settings and never decrypt the Google secret. Google continues to own its own
+second-factor policy; this application's TOTP requirement applies only to passwords.
+
+The trusted setup JSON optionally accepts `auth_password_enabled`,
+`auth_two_factor_enabled`, and `auth_signup_enabled` as booleans. Omitted values
+are preserved. Google uses the existing `auth_google_enabled` option. The sandbox
+Settings API rejects writes/removals of all `AUTH_*` keys.
+
+### Password login and enrollment
+
+`odbAuth.beginLogin(username, password, accessToken, refreshToken, challenge, setupSecret)`
+validates credentials under the account lock. With 2FA disabled it opens a session.
+Otherwise it returns a random, five-minute, single-use challenge and **no tokens**.
+An account without an authenticator, including the seeded administrator, also
+receives a 32-character Base32 setup key. The login page displays a scannable QR code,
+generated locally in the browser from the `otpauth://` URI. Manual key entry remains
+available under "Can't scan the code?", alongside an authenticator-app link.
+No external QR-code service receives the key. A QR-generation error is reported
+explicitly and opens the manual-key fallback. QR images are kept only in component
+memory and removed when enrollment is completed or cancelled.
+Pending setup is not an authenticated session.
+
+`odbAuth.verifyTwoFactor(challenge, code, accessToken, refreshToken, recoveryCodes, nextChallenge, setupSecret)`
+accepts a six-digit authenticator code. TOTP uses RFC 6238 (SHA1, 30-second steps,
+six digits, UTC, one step of clock skew in either direction). Accepted counters
+cannot be replayed, including immediately after enrollment; wait for the next
+code if necessary. Keep the database clock synchronized.
+
+Successful enrollment confirms the secret before activating it, revokes previous
+sessions, opens the new session, and returns **ten** random 128-bit recovery codes.
+The browser displays them once before continuing to the original destination.
+Save them in a password manager. Secrets, challenges, passwords, tokens, and recovery
+codes are not persisted in browser storage.
+
+TOTP secrets (including pending enrollment) use the Settings authenticated-encryption
+helper, bound to the account ID, but are stored in dedicated auth tables rather
+than publicly listable Settings entries. Configure the
+[Vault-backed master key](./settings#master-key-and-encryption) in production;
+the local database-name-derived fallback is not production secret protection.
+Only hashes of challenges and recovery codes are stored. Verification and challenge
+creation are rate-limited by account, independently of challenge replacement.
+Verification locks the account, rechecks challenge expiry and token version,
+then consumes the challenge and/or recovery code in the caller's transaction.
+
+A recovery code does **not** immediately issue tokens. It is consumed and replaced
+by a fresh restricted enrollment challenge so the user can register a replacement
+authenticator. The previous authenticator remains active until the new code is
+confirmed; confirmation invalidates all old recovery codes and sessions and
+returns ten new recovery codes. If that response is lost, restart with the old
+authenticator or another unused recovery code. Password resets/changes invalidate
+pending login/enrollment challenges, but never remove the active authenticator or
+its recovery codes. If both the authenticator and all recovery codes are lost,
+recovery requires trusted database administration; email password recovery alone
+does not bypass 2FA.
+
+The legacy `odbAuth.login()` rejects password-only authentication with
+`TWO_FACTOR_REQUIRED` while 2FA is enabled. Application and sandbox login endpoints
+use `beginLogin()` instead.
 
 ## JWT configuration
 
@@ -148,7 +236,7 @@ the cache refresh. Expiration changes affect newly issued tokens, not the `exp`
 already signed into existing tokens.
 
 The sandbox Settings API masks the key and rejects writes/removals of
-`AUTH_JWT_*`; use trusted setup or direct authorized database administration.
+all `AUTH_*` keys; use trusted setup or direct authorized database administration.
 Auth seeds `AUTH_JWT_SECRET` with `secret=Y`; Settings preserves that flag on
 subsequent writes even if replacement metadata says otherwise.
 `ODBVUE_AUTH_JWT_SECRET` and the `jwtSecret` SQL-generation option are retired.
@@ -207,19 +295,20 @@ not register them; the application package does. The sandbox retains duplicate
 login, refresh, logout, and `me` procedures under `/sandbox/auth`, without
 overwriting the application's public routes.
 
-| Endpoint                      | Purpose                                                                                                                                                                    |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /auth/login`            | Accepts JSON `{ username, password }`, sets the refresh cookie, and returns `{ accessToken }`.                                                                             |
-| `POST /auth/signup`           | Accepts JSON `{ email, fullName, password, passwordRepeat }`, creates an inactive account, and sends a confirmation email.                                                 |
-| `POST /auth/confirm-email`    | Accepts JSON `{ token }`, consumes an unexpired confirmation token, and enables the account without creating a session.                                                    |
-| `POST /auth/recover-password` | Accepts JSON `{ email }` and sends a reset link for an active account; unknown or disabled accounts receive the same empty success response.                               |
-| `POST /auth/reset-password`   | Accepts JSON `{ token, password, passwordRepeat }`, changes the password, and revokes existing sessions without logging in.                                                |
-| `POST /auth/refresh`          | Rotates the refresh cookie and returns `{ accessToken }`.                                                                                                                  |
-| `POST /auth/logout`           | Revokes the browser session and expires the refresh cookie.                                                                                                                |
-| `GET /auth/state`             | Returns `{ user, providers: { password, google }, signup }`; `user` is null without credentials and contains the profile, roles, and permissions for a valid bearer token. |
+| Endpoint                       | Purpose                                                                                                                                                                                                                                            |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /auth/login`             | Accepts `{ username, password }`; returns `{ accessToken, challenge, setupSecret }`. With 2FA enabled, only the restricted challenge (and setup key for enrollment) is populated; no refresh cookie is issued.                                     |
+| `POST /auth/two-factor/verify` | Accepts `{ challenge, code }`. Successful TOTP returns an access token, refresh cookie, and recovery-code array (ten on enrollment, otherwise empty). A recovery code instead returns a replacement enrollment challenge/setup key without tokens. |
+| `POST /auth/signup`            | Accepts JSON `{ email, fullName, password, passwordRepeat }`, creates an inactive account, and sends a confirmation email.                                                                                                                         |
+| `POST /auth/confirm-email`     | Accepts JSON `{ token }`, consumes an unexpired confirmation token, and enables the account without creating a session.                                                                                                                            |
+| `POST /auth/recover-password`  | Accepts JSON `{ email }` and sends a reset link for an active account; unknown or disabled accounts receive the same empty success response.                                                                                                       |
+| `POST /auth/reset-password`    | Accepts JSON `{ token, password, passwordRepeat }`, changes the password, and revokes existing sessions without logging in.                                                                                                                        |
+| `POST /auth/refresh`           | Rotates the refresh cookie and returns `{ accessToken }`.                                                                                                                                                                                          |
+| `POST /auth/logout`            | Revokes the browser session and expires the refresh cookie.                                                                                                                                                                                        |
+| `GET /auth/state`              | Returns `{ user, providers: { password, google }, signup, twoFactor }`; `user` is null without credentials and contains the profile, roles, and permissions for a valid bearer token.                                                              |
 
 The web client's `auth.getState()` loads both the current identity and public
-authentication capabilities. `auth.providers` and `auth.signupEnabled` are reactive
+authentication capabilities. `auth.providers`, `auth.signupEnabled`, and `auth.twoFactorEnabled` are reactive
 refs, initially null until state has loaded. Startup restoration attempts
 `POST /auth/refresh`, then loads `/auth/state` even when no refresh session exists.
 Login and profile updates also reload state; Google buttons reuse the shared
@@ -231,7 +320,8 @@ capabilities instead of making a separate configuration request.
 {
   "user": null,
   "providers": { "password": true, "google": true },
-  "signup": true
+  "signup": true,
+  "twoFactor": true
 }
 ```
 
@@ -415,13 +505,13 @@ environment must have a valid HTTPS `runtime.apiUrl`; missing or unsafe URLs
 fail before any database connection. Re-run setup after changing either base URL,
 and register each environment's exact printed callbacks in Google Cloud.
 
-Google is disabled by default (`AUTH_GOOGLE_ENABLED=N`), with an empty client ID
+Google is allowed by default (`AUTH_GOOGLE_ENABLED=Y`), but remains unavailable with an empty client ID
 and client secret. Enabled setup requires your client ID, client secret, and
 valid existing application/API URLs, stores the secret encrypted with `secret=Y`, and grants
 HTTPS network ACL access only to `oauth2.googleapis.com:443` and
 `www.googleapis.com:443`. Disabled setup preserves previously provisioned Google
 credentials. The sandbox Settings API rejects writes/removals of both
-`AUTH_JWT_*` and `AUTH_GOOGLE_*`; use trusted provisioning.
+all `AUTH_*` keys; use trusted provisioning.
 
 Google setup asks only whether to enable sign-in, the client ID, and the
 client secret. The callback is derived and HTTPS ACLs are provisioned automatically.
@@ -528,15 +618,15 @@ no-store`.
 
 ## Procedures
 
-| Procedure          | Parameters                                                             | Behavior                                                                                                                                            |
-| ------------------ | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `login`            | `p_username`, `p_password` IN; `p_access_token`, `p_refresh_token` OUT | Verifies credentials, opens a session. Raises `UNAUTHORIZED` (`INVALID_CREDENTIALS`) on failure.                                                    |
-| `refresh`          | `p_refresh_token` IN; `p_access_token`, `p_next_refresh_token` OUT     | Rotates the refresh token. Reuse of a rotated token revokes the session.                                                                            |
-| `logout`           | `p_refresh_token` IN                                                   | Revokes the session; unknown or empty tokens are ignored.                                                                                           |
-| `recover_password` | `p_username` IN; `p_reset_token` OUT                                   | Returns a one-hour token for an enabled account, otherwise NULL. The trusted application sends the email.                                           |
-| `reset_password`   | `p_token`, `p_password` IN                                             | Consumes a recovery token, changes the password, increments token version, and revokes sessions. Invalid tokens/passwords raise `VALIDATION_ERROR`. |
-| `read_user`        | `p_user_id` IN; `p_username`, `p_display_name` OUT                     | Reads an enabled user; raises `NOT_FOUND` otherwise.                                                                                                |
-| `require_user`     | `p_access_token` IN                                                    | Returns the user id behind a valid access token; raises `UNAUTHORIZED` otherwise.                                                                   |
+| Procedure          | Parameters                                                             | Behavior                                                                                                                                                  |
+| ------------------ | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `login`            | `p_username`, `p_password` IN; `p_access_token`, `p_refresh_token` OUT | Legacy password-only entry point; rejects with `TWO_FACTOR_REQUIRED` while 2FA is enabled. Use `beginLogin` and `verifyTwoFactor` for the two-stage flow. |
+| `refresh`          | `p_refresh_token` IN; `p_access_token`, `p_next_refresh_token` OUT     | Rotates the refresh token. Reuse of a rotated token revokes the session.                                                                                  |
+| `logout`           | `p_refresh_token` IN                                                   | Revokes the session; unknown or empty tokens are ignored.                                                                                                 |
+| `recover_password` | `p_username` IN; `p_reset_token` OUT                                   | Returns a one-hour token for an enabled account, otherwise NULL. The trusted application sends the email.                                                 |
+| `reset_password`   | `p_token`, `p_password` IN                                             | Consumes a recovery token, changes the password, increments token version, and revokes sessions. Invalid tokens/passwords raise `VALIDATION_ERROR`.       |
+| `read_user`        | `p_user_id` IN; `p_username`, `p_display_name` OUT                     | Reads an enabled user; raises `NOT_FOUND` otherwise.                                                                                                      |
+| `require_user`     | `p_access_token` IN                                                    | Returns the user id behind a valid access token; raises `UNAUTHORIZED` otherwise.                                                                         |
 
 Tokens are plain values. Use `odbHttp.defineCookie(...)` in the application package for refresh-token transport. Protected services automatically extract bearer tokens:
 
@@ -550,9 +640,11 @@ const refreshCookie = odbHttp.defineCookie({
   maxAge: odbAuth.refreshTokenMaxAge,
 })
 
-// login
-body.call(odbAuth.login(username, password, accessToken, refreshToken))
-body.set(setCookie, refreshCookie.set(refreshToken))
+// Password login: send the challenge/setup key to the browser when 2FA is required.
+body.call(odbAuth.beginLogin(username, password, accessToken, refreshToken, challenge, setupSecret))
+body.ifThen(cond.isNotNull(refreshToken), (authenticated) =>
+  authenticated.set(setCookie, refreshCookie.set(refreshToken)),
+)
 
 // refresh
 body.call(odbAuth.refresh(refreshCookie.read(cookie), accessToken, nextRefreshToken))
@@ -613,8 +705,12 @@ import { useAuth } from '@/capabilities/auth'
 
 const auth = useAuth()
 
-await auth.login({ username: 'ada', password: 'correct horse battery staple' })
-await auth.getState()
+const challenge = await auth.login({ username: 'ada', password: 'correct horse battery staple' })
+if (challenge) {
+  // Render enrollment when setupSecret is present; otherwise request a TOTP/recovery code.
+  // Submit the entered code with auth.verifyTwoFactor(challenge.challenge, code).
+  // Handle a replacement enrollment challenge or show returned recoveryCodes before navigating.
+}
 
 if (auth.authenticated.value) {
   console.log(auth.user.value?.username)

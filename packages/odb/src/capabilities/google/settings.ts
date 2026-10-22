@@ -1,5 +1,5 @@
 export const googleSettings = [
-  { id: 'AUTH_GOOGLE_ENABLED', value: 'N', meta: { type: 'string' } },
+  { id: 'AUTH_GOOGLE_ENABLED', value: 'Y', meta: { type: 'string' } },
   {
     id: 'AUTH_GOOGLE_CLIENT_ID',
     value: '',

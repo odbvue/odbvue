@@ -434,6 +434,29 @@ describe('ProcedureBody control flow and exceptions', () => {
     expectTypeOf(validHash).toEqualTypeOf<PlsqlBooleanExpression>()
   })
 
+  it('marks only selected JSON object fields as JSON and preserves scalar escaping', () => {
+    const object = expr.jsonObject(
+      {
+        flag: odbLiteral('true'),
+        roles: new Param('p_roles', 'CLOB'),
+        name: "O'Brien",
+        missing: null,
+      },
+      'CLOB',
+      { formatJson: ['flag', 'roles'] },
+    )
+    expectTypeOf(object).toEqualTypeOf<PlsqlExpression<'CLOB'>>()
+    expect(object.toSQL()).toBe(
+      "JSON_OBJECT('flag' VALUE 'true' FORMAT JSON, 'roles' VALUE p_roles FORMAT JSON, 'name' VALUE 'O''Brien', 'missing' VALUE NULL RETURNING CLOB)",
+    )
+    expect(expr.jsonObject({ flag: false }, 'VARCHAR2', { formatJson: [] }).toSQL()).toBe(
+      "JSON_OBJECT('flag' VALUE FALSE RETURNING VARCHAR2)",
+    )
+    expect(() => expr.jsonObject({ flag: true }, 'CLOB', { formatJson: ['missing'] })).toThrow(
+      'unknown FORMAT JSON key: missing',
+    )
+  })
+
   it('emits an IF/ELSE block with nested statements', () => {
     const sql = bodyLines((proc) => {
       const { result } = proc.parameters({ out: { result: odbType.string() } })

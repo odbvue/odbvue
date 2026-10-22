@@ -9,7 +9,14 @@
           </v-alert>
           <p class="mb-4">{{ t('auth.signup.check.email') }}</p>
         </template>
-        <v-ov-form v-else :options="options" :data="data" :t="t" @submit="submit" />
+        <v-ov-form
+          v-else-if="auth.signupEnabled.value"
+          :options="options"
+          :data="data"
+          :t="t"
+          @submit="submit"
+        />
+        <v-alert v-else type="info">{{ t('auth.signup.disabled') }}</v-alert>
         <VOvGoogleSignIn v-if="!submitted" />
         <v-btn :to="loginLink" variant="text" class="mt-4">{{ t('auth.login') }}</v-btn>
       </v-col>

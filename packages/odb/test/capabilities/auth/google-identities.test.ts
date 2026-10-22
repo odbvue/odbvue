@@ -86,15 +86,22 @@ describe('trusted Google identities', () => {
 
   it('does not enable password login or recovery/reset for Google-only accounts', () => {
     const sql = odbAuth.toSQLUp({ schema: 'APP' })
-    for (const name of ['login', 'recover_password', 'reset_password']) {
+    for (const name of ['recover_password', 'reset_password']) {
       expect(procedure(sql, name)).toContain('read_password_hash(l_user_id)')
     }
-    expect(procedure(sql, 'login')).toContain('IF l_password_hash IS NULL THEN')
-    expect(procedure(sql, 'login')).toContain('l_user_id := NULL')
+    expect(procedure(sql, 'login')).toContain(
+      'verify_credentials(p_username, p_password, l_user_id)',
+    )
+    expect(procedure(sql, 'begin_login')).toContain(
+      'verify_credentials(p_username, p_password, l_user_id)',
+    )
+    expect(procedure(sql, 'verify_credentials')).toContain('read_password_hash(p_user_id)')
+    expect(procedure(sql, 'verify_credentials')).toContain('IF l_password_hash IS NULL THEN')
+    expect(procedure(sql, 'verify_credentials')).toContain('p_user_id := NULL')
     expect(procedure(sql, 'recover_password')).toContain(
       'IF read_password_hash(l_user_id) IS NULL THEN',
     )
-    expect(procedure(sql, 'login')).toContain('c_dummy_password_hash')
+    expect(procedure(sql, 'verify_credentials')).toContain('c_dummy_password_hash')
     expect(procedure(sql, 'recover_password')).toMatch(/WHEN NO_DATA_FOUND THEN\s+RETURN;/)
     expect(procedure(sql, 'reset_password')).toContain('PASSWORD_RESET_INVALID')
   })

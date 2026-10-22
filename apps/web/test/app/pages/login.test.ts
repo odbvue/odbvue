@@ -11,6 +11,8 @@ import { useUi } from '@/capabilities/ui'
 import Login from '@/app/pages/login.vue'
 import messages from '@/app/i18n/en.json'
 import { createAuthGuard } from '@/capabilities/routing/auth'
+import { appConfig } from '@/capabilities/config'
+import QRCode from 'qrcode'
 
 const session = vi.hoisted((): { auth?: Auth } => ({}))
 vi.mock('@/capabilities/auth', async (importOriginal) => {
@@ -60,6 +62,14 @@ async function setup(location = '/login?redirect=/sandbox') {
         VContainer: { template: '<div><slot /></div>' },
         VRow: { template: '<div><slot /></div>' },
         VCol: { template: '<div><slot /></div>' },
+        VBtn: { template: '<button type="button"><slot /></button>' },
+        VAlert: { template: '<div><slot /></div>' },
+        VTextField: {
+          props: ['modelValue', 'readonly'],
+          emits: ['update:modelValue'],
+          template:
+            '<input :value="modelValue" :readonly="readonly" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+        },
       },
     },
   })
@@ -75,6 +85,148 @@ describe('login page using application auth', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+  })
+
+  it('enrolls an authenticator, displays recovery codes once, then preserves the original redirect', async () => {
+    const encode = vi.spyOn(QRCode, 'toString')
+    const context = await setup()
+    const challenge = 'A'.repeat(64)
+    const secret = 'A'.repeat(32)
+    const codes = Array.from({ length: 10 }, (_, index) => String(index).padStart(32, '0'))
+    context.fetch.mockResolvedValueOnce(json({ accessToken: null, challenge, setupSecret: secret }))
+    await context.wrapper.findComponent(form).trigger('click')
+    await flushPromises()
+    expect(context.auth.authenticated.value).toBe(false)
+    expect(context.router.currentRoute.value.path).toBe('/login')
+    expect(context.wrapper.find('input[readonly]').element).toHaveProperty('value', secret)
+    expect(encode).toHaveBeenCalledOnce()
+    const [uri, options] = encode.mock.calls[0]!
+    const payload = new URL(String(uri))
+    expect(payload.protocol).toBe('otpauth:')
+    expect(payload.hostname).toBe('totp')
+    expect(decodeURIComponent(payload.pathname.slice(1))).toBe(`${appConfig.title ?? 'OdbVue'}:ada`)
+    expect(Object.fromEntries(payload.searchParams)).toEqual({
+      secret,
+      issuer: appConfig.title ?? 'OdbVue',
+      algorithm: 'SHA1',
+      digits: '6',
+      period: '30',
+    })
+    expect(options).toMatchObject({ type: 'svg', width: 256, margin: 4, errorCorrectionLevel: 'M' })
+    const image = context.wrapper.find('img')
+    expect(image.attributes('src')).toMatch(/^data:image\/svg\+xml;charset=utf-8,/)
+    const svg = decodeURIComponent(image.attributes('src')!.split(',')[1]!)
+    expect(svg).toContain('<svg')
+    expect(svg).toContain('<path')
+    expect(context.wrapper.find('details').attributes('open')).toBeUndefined()
+    expect(context.fetch).toHaveBeenCalledTimes(3)
+    context.fetch
+      .mockResolvedValueOnce(json({ accessToken: 'verified-token', recoveryCodes: codes }))
+      .mockResolvedValueOnce(json(authState({ userId: 7, username: 'ada' })))
+    await context.wrapper.find('input[autocomplete="one-time-code"]').setValue('123456')
+    await context.wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(context.auth.authenticated.value).toBe(true)
+    expect(context.wrapper.findAll('li code')).toHaveLength(10)
+    expect(context.router.currentRoute.value.path).toBe('/login')
+    expect(context.wrapper.find('input[readonly]').exists()).toBe(false)
+    expect(context.wrapper.find('img').exists()).toBe(false)
+    expect(JSON.stringify(localStorage)).not.toMatch(/verified-token|123456|AAAAAAAA/)
+    expect(sessionStorage.length).toBe(0)
+    const acknowledge = context.wrapper.find('button')
+    await acknowledge.trigger('click')
+    await flushPromises()
+    expect(context.router.currentRoute.value.path).toBe('/sandbox')
+    expect(context.wrapper.findAll('li code')).toHaveLength(0)
+    context.wrapper.unmount()
+  })
+
+  it('reports QR-generation errors and opens the manual setup key fallback', async () => {
+    vi.spyOn(QRCode, 'toString').mockImplementationOnce(() =>
+      Promise.reject(new Error('Encoding failed')),
+    )
+    const context = await setup()
+    const secret = 'C'.repeat(32)
+    context.fetch.mockResolvedValueOnce(
+      json({ accessToken: null, challenge: 'C'.repeat(64), setupSecret: secret }),
+    )
+    await context.wrapper.findComponent(form).trigger('click')
+    await flushPromises()
+    expect(context.ui.notification.value?.message).toBe('auth.two.factor.qr.failed')
+    expect(context.wrapper.find('img').exists()).toBe(false)
+    expect(context.wrapper.find('details').attributes('open')).toBeDefined()
+    expect(context.wrapper.find('input[readonly]').element).toHaveProperty('value', secret)
+    expect(context.auth.authenticated.value).toBe(false)
+    expect(context.fetch).toHaveBeenCalledTimes(3)
+    context.wrapper.unmount()
+  })
+
+  it('discards a pending QR image when enrollment is cancelled', async () => {
+    let resolve!: (svg: string) => void
+    const encoding = new Promise<string>((done) => {
+      resolve = done
+    })
+    vi.spyOn(QRCode, 'toString').mockImplementationOnce(() => encoding)
+    const context = await setup()
+    context.fetch.mockResolvedValueOnce(
+      json({
+        accessToken: null,
+        challenge: 'D'.repeat(64),
+        setupSecret: 'D'.repeat(32),
+      }),
+    )
+    await context.wrapper.findComponent(form).trigger('click')
+    await flushPromises()
+    await context.wrapper.find('form').findAll('button')[1]!.trigger('click')
+    resolve('<svg xmlns="http://www.w3.org/2000/svg"></svg>')
+    await flushPromises()
+    expect(context.wrapper.find('img').exists()).toBe(false)
+    expect(context.wrapper.find('input[readonly]').exists()).toBe(false)
+    expect(context.wrapper.findComponent(form).exists()).toBe(true)
+    expect(context.auth.authenticated.value).toBe(false)
+    expect(context.ui.notification.value).toBeUndefined()
+    context.wrapper.unmount()
+  })
+
+  it('retains the restricted challenge on an invalid code and allows starting over', async () => {
+    const encode = vi.spyOn(QRCode, 'toString')
+    const context = await setup()
+    const challenge = 'B'.repeat(64)
+    context.fetch.mockResolvedValueOnce(json({ accessToken: null, challenge, setupSecret: null }))
+    await context.wrapper.findComponent(form).trigger('click')
+    await flushPromises()
+    expect(encode).not.toHaveBeenCalled()
+    expect(context.wrapper.find('img').exists()).toBe(false)
+    context.fetch.mockResolvedValueOnce(json({}, 401))
+    await context.wrapper.find('input[autocomplete="one-time-code"]').setValue('000000')
+    await context.wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(context.ui.notification.value?.message).toBe('auth.two.factor.invalid')
+    expect(context.auth.authenticated.value).toBe(false)
+    expect(context.wrapper.find('form').exists()).toBe(true)
+    const cancel = context.wrapper.find('form').findAll('button')[1]!
+    await cancel.trigger('click')
+    expect(context.wrapper.findComponent(form).exists()).toBe(true)
+    expect(context.wrapper.find('input[autocomplete="one-time-code"]').exists()).toBe(false)
+    context.wrapper.unmount()
+  })
+
+  it('hides password and sign-up controls when disabled by server policy', async () => {
+    const context = await setup()
+    context.fetch.mockResolvedValueOnce(
+      json({
+        user: null,
+        providers: { password: false, google: true },
+        signup: false,
+        twoFactor: true,
+      }),
+    )
+    await context.auth.getState()
+    await flushPromises()
+    expect(context.wrapper.findComponent(form).exists()).toBe(false)
+    expect(context.wrapper.text()).not.toContain(messages['auth.signup'])
+    expect(context.wrapper.text()).not.toContain(messages['auth.recover.title'])
+    context.wrapper.unmount()
   })
 
   it.each([

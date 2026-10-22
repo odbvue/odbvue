@@ -151,6 +151,27 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
     state.connection.execute.mockResolvedValue({})
   })
 
+  it('writes optional auth policy overrides through trusted setup and preserves omitted flags', async () => {
+    state.readFile.mockResolvedValue(
+      JSON.stringify({
+        auth_password_enabled: false,
+        auth_two_factor_enabled: false,
+        auth_signup_enabled: true,
+      }),
+    )
+    await runSetupSettings('settings.json')
+    const [sql, values] = state.connection.execute.mock.calls[0]!
+    for (const key of ['password', 'two_factor', 'signup'])
+      expect(sql).toContain(
+        `APP.odb_settings.write('AUTH_${key.toUpperCase()}_ENABLED', :auth_${key}_enabled`,
+      )
+    expect(values).toMatchObject({
+      auth_password_enabled: 'N',
+      auth_two_factor_enabled: 'N',
+      auth_signup_enabled: 'Y',
+    })
+  })
+
   it('prompts with the requested defaults and masks the password', async () => {
     await runSetupSettings()
     const [questions] = state.prompts.mock.calls[0]!
@@ -597,7 +618,7 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
       state.prompts.mockResolvedValue({ auth_google_enabled: false })
       await runSetupSettings('settings.json')
       expect(state.prompts.mock.calls[0]![0]).toEqual([
-        expect.objectContaining({ name: 'auth_google_enabled', type: 'confirm', initial: false }),
+        expect.objectContaining({ name: 'auth_google_enabled', type: 'confirm', initial: true }),
       ])
       expect(state.connection.execute.mock.calls[0]![0]).not.toContain('AUTH_GOOGLE_CLIENT_SECRET')
     })

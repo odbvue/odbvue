@@ -99,7 +99,7 @@
         ><h2 class="text-h6">{{ t('auth.profile.security') }}</h2></v-card-title
       >
       <v-card-text>
-        <template v-if="auth.user.value?.passwordConnected">
+        <template v-if="auth.user.value?.passwordConnected && auth.providers.value?.password">
           <h3 class="text-subtitle-1 mb-2">{{ t('auth.profile.password.change') }}</h3>
           <p class="mb-4">{{ t('auth.profile.password.description') }}</p>
           <v-ov-form
@@ -110,6 +110,11 @@
             @submit="changePassword"
           />
         </template>
+        <p
+          v-else-if="auth.user.value?.passwordConnected && auth.providers.value?.password === false"
+        >
+          {{ t('auth.password.disabled') }}
+        </p>
         <p v-else>
           {{
             t(

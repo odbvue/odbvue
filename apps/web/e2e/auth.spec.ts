@@ -1,5 +1,79 @@
 import { expect, test, type Page } from '@playwright/test'
 
+test('enrolls an authenticator and requires saving recovery codes before redirecting', async ({
+  page,
+}) => {
+  const challenge = 'A'.repeat(64)
+  const setupSecret = 'B'.repeat(32)
+  const recoveryCodes = Array.from({ length: 10 }, (_, index) => String(index).padStart(32, '0'))
+  let authenticated = false
+  const actions: string[] = []
+  await page.route('**/auth/**', async (route) => {
+    const action = new URL(route.request().url()).pathname.split('/').at(-1)
+    actions.push(action ?? '')
+    if (action === 'refresh') await route.fulfill({ status: 401, json: {} })
+    else if (action === 'state')
+      await route.fulfill({
+        json: {
+          user: authenticated
+            ? { userId: 7, username: 'ada', displayName: 'Ada', roles: ['admin'], permissions: [] }
+            : null,
+          providers: { password: true, google: false },
+          signup: true,
+          twoFactor: true,
+        },
+      })
+    else if (action === 'login')
+      await route.fulfill({ json: { accessToken: null, challenge, setupSecret } })
+    else if (action === 'verify') {
+      expect(route.request().postDataJSON()).toEqual({ challenge, code: '123456' })
+      authenticated = true
+      await route.fulfill({ json: { accessToken: 'verified-token', recoveryCodes } })
+    } else await route.abort()
+  })
+  await page.goto('/login?redirect=%2Fsandbox')
+  await page.getByLabel('Username').fill('ada')
+  await page.getByLabel('Password', { exact: true }).fill('valid-password')
+  await page.getByRole('button', { name: 'Login', exact: true }).click()
+  await expect(
+    page.getByRole('heading', { name: 'Two-factor authentication', exact: true }),
+  ).toBeVisible()
+  const qr = page.getByRole('img', { name: 'Authenticator setup QR code', exact: true })
+  await expect(qr).toBeVisible()
+  await expect(qr).toHaveAttribute('src', /^data:image\/svg\+xml;charset=utf-8,/)
+  await expect
+    .poll(() =>
+      qr.evaluate(
+        (image) =>
+          image instanceof HTMLImageElement &&
+          image.complete &&
+          image.naturalWidth === 256 &&
+          image.naturalHeight === 256,
+      ),
+    )
+    .toBe(true)
+  await expect(page.getByLabel('Authenticator setup key')).not.toBeVisible()
+  await page.getByText("Can't scan the code? Enter the setup key manually", { exact: true }).click()
+  await expect(page.getByLabel('Authenticator setup key')).toBeVisible()
+  await expect(page.getByLabel('Authenticator setup key')).toHaveValue(setupSecret)
+  await expect(page).toHaveURL(/\/login\?redirect=/)
+  expect(actions).toEqual(['refresh', 'state', 'login'])
+  await page.getByLabel('Authenticator or recovery code').fill('123456')
+  await page.getByRole('button', { name: 'Verify', exact: true }).click()
+  await expect(page.locator('li code')).toHaveCount(10)
+  await expect(page.getByText(recoveryCodes[0]!, { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Authenticator setup key')).toHaveCount(0)
+  await expect(qr).toHaveCount(0)
+  await expect(page).toHaveURL(/\/login\?redirect=/)
+  const persisted = await page.evaluate(() =>
+    JSON.stringify({ ...localStorage, ...sessionStorage }),
+  )
+  expect(persisted).not.toMatch(/verified-token|BBBBBBBBBBBBBBBB|0000000000000000/)
+  await page.getByRole('button', { name: 'I have saved my recovery codes', exact: true }).click()
+  await expect(page).toHaveURL(/\/sandbox$/)
+  expect(actions).toEqual(['refresh', 'state', 'login', 'verify', 'state'])
+})
+
 test('requests recovery and resets a password only after explicit submission', async ({ page }) => {
   const token = 'A'.repeat(64)
   const actions: string[] = []
@@ -10,7 +84,12 @@ test('requests recovery and resets a password only after explicit submission', a
       await route.fulfill({ status: 401, json: {} })
     } else if (action === 'state') {
       await route.fulfill({
-        json: { user: null, providers: { password: true, google: false }, signup: true },
+        json: {
+          user: null,
+          providers: { password: true, google: false },
+          signup: true,
+          twoFactor: true,
+        },
       })
     } else if (action === 'recover-password') {
       expect(route.request().postDataJSON()).toEqual({ email: 'ada+reset@example.com' })
@@ -99,6 +178,7 @@ async function mockAuth(
         json: {
           providers: { password: true, google: false },
           signup: true,
+          twoFactor: true,
           user: session
             ? {
                 userId: 7,

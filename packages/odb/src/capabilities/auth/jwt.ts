@@ -1,5 +1,5 @@
 import { odbPackage, odbType } from '../../schema/package.js'
-import { cond, odbLiteral, PlsqlExpression, plsqlExpr } from '../../schema/attribute.js'
+import { cond, odbLiteral, plsqlExpr } from '../../schema/attribute.js'
 import { odbQuery } from '../../query/index.js'
 import { odbDbmsCrypto, odbJson, odbOracle, odbUtlEncode, odbUtlRaw } from '../../oracle/index.js'
 import { odbSettings } from '../settings/settings.js'
@@ -8,10 +8,7 @@ import { authJwtSettings } from './settings.js'
 import { authSessions, authUsers } from './tables.js'
 
 const JWT_HEADER = Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url')
-const EPOCH_NOW = new PlsqlExpression(
-  'NUMBER',
-  "FLOOR((CAST(SYS_EXTRACT_UTC(SYSTIMESTAMP) AS DATE) - DATE '1970-01-01') * 86400)",
-)
+const EPOCH_NOW = odbOracle.floor(odbOracle.utcEpochSeconds(odbOracle.sysTimestamp()))
 
 /** HS256 access tokens: issue them and resolve them back to an authenticated user. */
 export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => {

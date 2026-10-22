@@ -32,12 +32,26 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
     'login',
     {
       in: { username: odbAuth.types.username, password: odbAuth.types.password },
-      out: { accessToken: odbAuth.types.accessToken, setCookie: odbType.string() },
+      out: {
+        accessToken: odbAuth.types.accessToken,
+        setCookie: odbType.string(),
+        challenge: odbType.string(64),
+        setupSecret: odbType.string(32),
+        cacheControl: odbType.string(32),
+      },
     },
-    ({ params: { username, password, accessToken, setCookie }, body }) => {
+    ({
+      params: { username, password, accessToken, setCookie, challenge, setupSecret, cacheControl },
+      body,
+    }) => {
       const { refreshToken } = body.variables({ refreshToken: odbAuth.types.refreshToken })
-      body.call(odbAuth.login(username, password, accessToken, refreshToken))
-      body.set(setCookie, refreshCookie.set(refreshToken))
+      body.call(
+        odbAuth.beginLogin(username, password, accessToken, refreshToken, challenge, setupSecret),
+      )
+      body.ifThen(cond.isNotNull(refreshToken), (authenticated) =>
+        authenticated.set(setCookie, refreshCookie.set(refreshToken)),
+      )
+      body.set(cacheControl, 'no-store')
     },
   )
   defineService(login, {
@@ -48,8 +62,82 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
     basePath: '/sandbox/auth',
     summary: 'Authenticate using username and password',
     body: { username: login.parameters.username, password: login.parameters.password },
-    response: { accessToken: login.parameters.accessToken },
-    headers: { 'Set-Cookie': login.parameters.setCookie },
+    response: {
+      accessToken: login.parameters.accessToken,
+      challenge: login.parameters.challenge,
+      setupSecret: login.parameters.setupSecret,
+    },
+    headers: {
+      'Set-Cookie': login.parameters.setCookie,
+      'Cache-Control': login.parameters.cacheControl,
+    },
+  })
+
+  const verifyTwoFactor = pkg.proc(
+    'verify_two_factor',
+    {
+      in: { challenge: odbType.string(64), code: odbType.string(128) },
+      out: {
+        accessToken: odbAuth.types.accessToken,
+        setCookie: odbType.string(),
+        recoveryCodes: odbType.json(),
+        cacheControl: odbType.string(32),
+        nextChallenge: odbType.string(64),
+        setupSecret: odbType.string(32),
+      },
+    },
+    ({
+      params: {
+        challenge,
+        code,
+        accessToken,
+        setCookie,
+        recoveryCodes,
+        cacheControl,
+        nextChallenge,
+        setupSecret,
+      },
+      body,
+    }) => {
+      const { refreshToken } = body.variables({ refreshToken: odbAuth.types.refreshToken })
+      body.call(
+        odbAuth.verifyTwoFactor(
+          challenge,
+          code,
+          accessToken,
+          refreshToken,
+          recoveryCodes,
+          nextChallenge,
+          setupSecret,
+        ),
+      )
+      body.ifThen(cond.isNotNull(refreshToken), (authenticated) =>
+        authenticated.set(setCookie, refreshCookie.set(refreshToken)),
+      )
+      body.set(cacheControl, 'no-store')
+    },
+  )
+  defineService(verifyTwoFactor, {
+    auth: 'anonymous',
+    method: 'POST',
+    path: '/two-factor/verify',
+    module: 'sandbox_auth',
+    basePath: '/sandbox/auth',
+    summary: 'Complete authenticator enrollment or verify a TOTP or single-use recovery code',
+    body: {
+      challenge: verifyTwoFactor.parameters.challenge,
+      code: verifyTwoFactor.parameters.code,
+    },
+    response: {
+      accessToken: verifyTwoFactor.parameters.accessToken,
+      recoveryCodes: verifyTwoFactor.parameters.recoveryCodes,
+      challenge: verifyTwoFactor.parameters.nextChallenge,
+      setupSecret: verifyTwoFactor.parameters.setupSecret,
+    },
+    headers: {
+      'Set-Cookie': verifyTwoFactor.parameters.setCookie,
+      'Cache-Control': verifyTwoFactor.parameters.cacheControl,
+    },
   })
 
   const refresh = pkg.proc(
@@ -178,7 +266,7 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
       },
     },
     ({ params: { id, value }, body }) => {
-      body.ifThen(cond.regexpLike(odbOracle.upper(id), '^AUTH_(JWT|GOOGLE)_'), (then) =>
+      body.ifThen(cond.regexpLike(odbOracle.upper(id), '^AUTH_'), (then) =>
         then.forbidden('AUTH_SETTINGS_REQUIRE_TRUSTED_SETUP'),
       )
       body.call(odbSettings.write(id, value))
@@ -197,7 +285,7 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
     'remove_setting',
     { in: { id: odbSettings.types.id } },
     ({ params: { id }, body }) => {
-      body.ifThen(cond.regexpLike(odbOracle.upper(id), '^AUTH_(JWT|GOOGLE)_'), (then) =>
+      body.ifThen(cond.regexpLike(odbOracle.upper(id), '^AUTH_'), (then) =>
         then.forbidden('AUTH_SETTINGS_REQUIRE_TRUSTED_SETUP'),
       )
       body.call(odbSettings.remove(id))

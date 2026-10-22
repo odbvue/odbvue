@@ -21,6 +21,7 @@ async function mockProfile(
         json: {
           providers: { password: true, google: true },
           signup: true,
+          twoFactor: true,
           user: active
             ? {
                 userId: 7,

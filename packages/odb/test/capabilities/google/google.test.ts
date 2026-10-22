@@ -192,7 +192,7 @@ describe('Google OIDC local SQL generation', () => {
     }
     expect(seed.match(/IF l_count = 0 THEN/g)).toHaveLength(4)
     expect(seed).not.toContain('WALLET')
-    expect(seed).toContain("'AUTH_GOOGLE_ENABLED', 'N'")
+    expect(seed).toContain("'AUTH_GOOGLE_ENABLED', 'Y'")
     expect(seed).toContain("'AUTH_GOOGLE_CLIENT_ID', ''")
     expect(seed).toContain("'AUTH_GOOGLE_CLIENT_SECRET', ''")
     expect(seed).not.toContain('AUTH_GOOGLE_LINK_REDIRECT_URI')
@@ -202,10 +202,12 @@ describe('Google OIDC local SQL generation', () => {
     expect(odbGoogle.seedSettings().toSQLDown()).toBe('')
   })
 
-  it('keeps enabled independent of secrets and validates configuration on actual use', () => {
+  it('checks masked credential presence for availability and validates configuration on actual use', () => {
     const enabled = routine('enabled')
     expect(enabled).toContain('AUTH_GOOGLE_ENABLED')
-    expect(enabled).not.toMatch(/CLIENT_SECRET|CLIENT_ID|REDIRECT_URI/)
+    for (const name of ['CLIENT_SECRET', 'CLIENT_ID', 'REDIRECT_URI'])
+      expect(enabled).toContain(`odb_settings.read_masked('AUTH_GOOGLE_${name}'`)
+    expect(enabled).not.toContain('decrypt')
     expect(sql).not.toMatch(/p_wallet|l_wallet|AUTH_GOOGLE_WALLET_PATH/)
     expect(enabled).toContain('GOOGLE_CONFIG_INVALID')
     const config = routine('load_config')

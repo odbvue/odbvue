@@ -6,10 +6,11 @@
         <v-alert v-if="submitted" type="success" variant="tonal" class="mb-4">
           {{ t('auth.recover.sent') }}
         </v-alert>
-        <template v-else>
+        <template v-else-if="auth.providers.value?.password">
           <p class="mb-4">{{ t('auth.recover.description') }}</p>
           <v-ov-form :options="options" :data="data" :t="t" @submit="submit" />
         </template>
+        <v-alert v-else type="info">{{ t('auth.password.disabled') }}</v-alert>
         <v-btn to="/login" variant="text" class="mt-4">{{ t('auth.login') }}</v-btn>
       </v-col>
     </v-row>

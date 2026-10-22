@@ -22,6 +22,128 @@ export function dummyPasswordHash(): string {
 
 /** Password and opaque token primitives used by `odb_auth`. */
 export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => {
+  const totpCode = pkg.func('totp_code', odbType.string(6), (fn) => {
+    const { secret, counter } = fn.parameters({
+      in: { secret: odbType.string(40), counter: odbType.number() },
+    })
+    fn.body((body) => {
+      const { digest, offset, binary } = body.variables({
+        digest: odbType.string(40),
+        offset: odbType.number(),
+        binary: odbType.number(),
+      })
+      body.set(
+        digest,
+        odbOracle.rawToHex(
+          odbDbmsCrypto.mac(
+            odbOracle.hexToRaw(
+              odbOracle.lpad(
+                odbOracle.toChar(counter, odbLiteral('FMXXXXXXXXXXXXXXXX')),
+                16,
+                odbLiteral('0'),
+              ),
+            ),
+            odbDbmsCrypto.HMAC_SH1,
+            odbOracle.hexToRaw(secret),
+          ),
+        ),
+      )
+      body.set(
+        offset,
+        plsqlExpr.add(
+          plsqlExpr.multiply(odbOracle.toNumber(odbOracle.substr(digest, -1), odbLiteral('X')), 2),
+          1,
+        ),
+      )
+      body.set(
+        binary,
+        odbOracle.bitAnd(
+          odbOracle.toNumber(odbOracle.substr(digest, offset, 8), odbLiteral('XXXXXXXX')),
+          2147483647,
+        ),
+      )
+      body.return(
+        odbOracle.lpad(
+          odbOracle.toChar(odbOracle.mod(binary, 1000000), odbLiteral('FM000000')),
+          6,
+          odbLiteral('0'),
+        ),
+      )
+    })
+  })
+  const base32Secret = pkg.func('base32_secret', odbType.string(32), (fn) => {
+    const { secret } = fn.parameters({ in: { secret: odbType.string(40) } })
+    fn.body((body) => {
+      const { result, block } = body.variables({
+        result: odbType.string(32),
+        block: odbType.number(),
+      })
+      body.forRange('chunk', 0, 3, (chunk, loop) => {
+        loop.set(
+          block,
+          odbOracle.toNumber(
+            odbOracle.substr(secret, plsqlExpr.add(plsqlExpr.multiply(chunk, 10), 1), 10),
+            odbLiteral('XXXXXXXXXX'),
+          ),
+        )
+        loop.forRange('symbol', 0, 7, (symbol, inner) => {
+          inner.set(
+            result,
+            plsqlExpr.concat(
+              result,
+              odbOracle.substr(
+                odbLiteral('ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'),
+                plsqlExpr.add(
+                  odbOracle.mod(
+                    odbOracle.trunc(
+                      plsqlExpr.divide(
+                        block,
+                        odbOracle.power(2, plsqlExpr.subtract(35, plsqlExpr.multiply(symbol, 5))),
+                      ),
+                    ),
+                    32,
+                  ),
+                  1,
+                ),
+                1,
+              ),
+            ),
+          )
+        })
+      })
+      body.return(result)
+    })
+  })
+  const verifyTotp = pkg.func('verify_totp', odbType.number(), (fn) => {
+    const { secret, code, lastCounter } = fn.parameters({
+      in: { secret: odbType.string(40), code: odbType.string(128), lastCounter: odbType.number() },
+    })
+    fn.body((body) => {
+      const { counter, candidate } = body.variables({
+        counter: odbType.number(),
+        candidate: odbType.number(),
+      })
+      body.ifThen(
+        cond.or([cond.isNull(code), cond.not(cond.regexpLike(code, '^[0-9]{6}$'))]),
+        (invalid) => invalid.return(-1),
+      )
+      body.set(
+        counter,
+        odbOracle.floor(plsqlExpr.divide(odbOracle.utcEpochSeconds(odbOracle.sysTimestamp()), 30)),
+      )
+      body.forRange('drift', -1, 1, (drift, loop) => {
+        loop.set(candidate, plsqlExpr.add(counter, drift))
+        loop.ifThen(
+          cond.and([
+            cond.gt(candidate, lastCounter),
+            cond.eq(totpCode.invoke(secret, candidate), code),
+          ]),
+          (valid) => valid.return(candidate),
+        )
+      })
+      body.return(-1)
+    })
+  })
   const deriveKey = pkg.privateFunc('derive_key', odbType.raw(PASSWORD_HASH_BYTES), (fn) => {
     const { passwordRaw, salt, iterations } = fn.parameters({
       in: {
@@ -53,6 +175,9 @@ export const odbAuthCrypto = odbPackage('odb_auth_crypto', (pkg) => {
   })
 
   return {
+    totpCode,
+    base32Secret,
+    verifyTotp,
     hashPassword: pkg.func('hash_password', odbType.string(512), (fn) => {
       const { password } = fn.parameters({ in: { password: odbType.string() } })
       fn.body((body) => {

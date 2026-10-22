@@ -27,13 +27,70 @@ import {
   authConfirmations,
   authPasswordResets,
   authIdentities,
+  authFactors,
+  authChallenges,
+  authRecoveryCodes,
 } from './tables.js'
 import { authTypes } from './types.js'
 import { odbSettings } from '../settings/settings.js'
 import { settingsStore } from '../settings/tables.js'
-import { authJwtSettings } from './settings.js'
+import {
+  authJwtSettings,
+  authPolicySettings,
+  type AuthConfig,
+  type AuthFeature,
+} from './settings.js'
 /** Install after `odbRateLimit`, `odbSettings`, `odbLob` and `odbStorage`. */
 export const odbAuth = {
+  /** Deployment policy stored in Settings; omitted flags are enabled. */
+  config(options: AuthConfig = {}) {
+    return odbSettings.seed(
+      ...authPolicySettings.map(([key, id]) => {
+        if (options[key] !== undefined && typeof options[key] !== 'boolean')
+          throw new Error(`odbAuth.config(): ${key} must be a boolean.`)
+        return { id, value: options[key] === false ? 'N' : 'Y', meta: { type: 'string' } }
+      }),
+    )
+  },
+  enabled(feature: AuthFeature) {
+    return odbAuthPackage.enabled(odbLiteral(feature))
+  },
+  beginLogin(
+    username: PlsqlRenderable,
+    password: PlsqlRenderable,
+    accessToken: PlsqlRenderable,
+    refreshToken: PlsqlRenderable,
+    challenge: PlsqlRenderable,
+    setupSecret: PlsqlRenderable,
+  ) {
+    return odbAuthPackage.beginLogin(
+      username,
+      password,
+      accessToken,
+      refreshToken,
+      challenge,
+      setupSecret,
+    )
+  },
+  verifyTwoFactor(
+    challenge: PlsqlRenderable,
+    code: PlsqlRenderable,
+    accessToken: PlsqlRenderable,
+    refreshToken: PlsqlRenderable,
+    recoveryCodes: PlsqlRenderable,
+    nextChallenge: PlsqlRenderable,
+    setupSecret: PlsqlRenderable,
+  ) {
+    return odbAuthPackage.verifyTwoFactor(
+      challenge,
+      code,
+      accessToken,
+      refreshToken,
+      recoveryCodes,
+      nextChallenge,
+      setupSecret,
+    )
+  },
   toSQLUp(options: { schema?: string } = {}): string {
     const { schema } = options
     return [
@@ -42,6 +99,7 @@ export const odbAuth = {
       authSessions.toSQLUp({ schema }),
       authConfirmations.toSQLUp({ schema }),
       authPasswordResets.toSQLUp({ schema }),
+      ...[authFactors, authChallenges, authRecoveryCodes].map((table) => table.toSQLUp({ schema })),
       ...[authRoles, authUserRoles, authRolePermissions].map((table) => table.toSQLUp({ schema })),
       odbAuthCrypto.toSQLUp({ schema }),
       odbAuthJwt.toSQLUp({ schema }),
@@ -51,9 +109,10 @@ export const odbAuth = {
       }),
     ].join('\n')
   },
-  /** Seed missing JWT configuration only; provisioning supplies the secret later. */
+  /** Seed missing configuration only; provisioning supplies the JWT secret later. */
   seedSettings() {
     const settings = [
+      ...authPolicySettings.map(([, id]) => ({ id, value: 'Y', meta: { type: 'string' } })),
       {
         id: 'AUTH_JWT_SECRET',
         value: '',
@@ -115,6 +174,9 @@ export const odbAuth = {
       authSessions,
       authConfirmations,
       authPasswordResets,
+      authRecoveryCodes,
+      authChallenges,
+      authFactors,
       authIdentities,
       authUsers,
     ]

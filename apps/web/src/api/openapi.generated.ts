@@ -72,6 +72,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/two-factor/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete authenticator enrollment or verify a TOTP or single-use recovery code */
+        post: operations["auth_verify_two_factor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/refresh": {
         parameters: {
             query?: never;
@@ -253,6 +270,23 @@ export interface paths {
         put?: never;
         /** Authenticate using username and password */
         post: operations["sandbox_auth_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sandbox/auth/two-factor/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete authenticator enrollment or verify a TOTP or single-use recovery code */
+        post: operations["sandbox_auth_verify_two_factor"];
         delete?: never;
         options?: never;
         head?: never;
@@ -551,6 +585,14 @@ export interface components {
         };
         AuthLoginResponse: {
             accessToken: string;
+            challenge: string;
+            setupSecret: string;
+        };
+        AuthVerifyTwoFactorResponse: {
+            accessToken: string;
+            recoveryCodes: unknown;
+            challenge: string;
+            setupSecret: string;
         };
         AuthRefreshResponse: {
             accessToken: string;
@@ -560,6 +602,7 @@ export interface components {
             user: unknown;
             providers: unknown;
             signup: unknown;
+            twoFactor: unknown;
         };
         AuthSignupResponse: Record<string, never>;
         AuthConfirmEmailResponse: Record<string, never>;
@@ -570,6 +613,14 @@ export interface components {
         AuthChangePasswordResponse: Record<string, never>;
         SandboxAuthLoginResponse: {
             accessToken: string;
+            challenge: string;
+            setupSecret: string;
+        };
+        SandboxAuthVerifyTwoFactorResponse: {
+            accessToken: string;
+            recoveryCodes: unknown;
+            challenge: string;
+            setupSecret: string;
         };
         SandboxAuthRefreshResponse: {
             accessToken: string;
@@ -788,6 +839,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthLoginResponse"];
+                };
+            };
+        };
+    };
+    auth_verify_two_factor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    challenge?: string;
+                    code?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthVerifyTwoFactorResponse"];
                 };
             };
         };
@@ -1087,6 +1165,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SandboxAuthLoginResponse"];
+                };
+            };
+        };
+    };
+    sandbox_auth_verify_two_factor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    challenge?: string;
+                    code?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxAuthVerifyTwoFactorResponse"];
                 };
             };
         };

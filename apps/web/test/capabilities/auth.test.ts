@@ -385,6 +385,7 @@ describe('authentication capability', () => {
         user: JSON.stringify({ userId: 7, username: 'ada', roles: ['admin'] }),
         providers: '{"password":true,"google":false}',
         signup: 'false',
+        twoFactor: 'true',
       }),
     )
     const auth = createAuth({ http, endpoints: { state: '/custom/state' } })
@@ -392,6 +393,7 @@ describe('authentication capability', () => {
       user: { id: 7, username: 'ada', roles: ['admin'] },
       providers: { password: true, google: false },
       signup: false,
+      twoFactor: true,
     })
     expect(get).toHaveBeenCalledWith('/custom/state', { headers: {} })
     expect(auth.signupEnabled.value).toBe(false)

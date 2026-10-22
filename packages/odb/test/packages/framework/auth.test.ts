@@ -110,8 +110,8 @@ describe('odbAuth framework package', () => {
     expect(reset).not.toContain('enabled = 1,')
     expect(reset).not.toContain('create_access_token')
     const login = sql.slice(
-      sql.indexOf('PROCEDURE login(', start),
-      sql.indexOf('PROCEDURE refresh(', start),
+      sql.lastIndexOf('PROCEDURE verify_credentials('),
+      sql.indexOf('END verify_credentials;', sql.lastIndexOf('PROCEDURE verify_credentials(')),
     )
     expect(login).toContain('FOR UPDATE')
     expect(login.indexOf('FOR UPDATE')).toBeLessThan(login.indexOf('verify_password'))

@@ -18,6 +18,7 @@ import {
   odbLiteral,
   odbOracle,
   odbPackage,
+  odbQuery,
   odbType,
   plsqlExpr,
   type Package,
@@ -292,12 +293,26 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
     'login',
     {
       in: { username: odbAuth.types.username, password: odbAuth.types.password },
-      out: { accessToken: odbAuth.types.accessToken, setCookie: odbType.string() },
+      out: {
+        accessToken: odbAuth.types.accessToken,
+        setCookie: odbType.string(),
+        challenge: odbType.string(64),
+        setupSecret: odbType.string(32),
+        cacheControl: odbType.string(32),
+      },
     },
-    ({ params: { username, password, accessToken, setCookie }, body }) => {
+    ({
+      params: { username, password, accessToken, setCookie, challenge, setupSecret, cacheControl },
+      body,
+    }) => {
       const { refreshToken } = body.variables({ refreshToken: odbAuth.types.refreshToken })
-      body.call(odbAuth.login(username, password, accessToken, refreshToken))
-      body.set(setCookie, refreshCookie.set(refreshToken))
+      body.call(
+        odbAuth.beginLogin(username, password, accessToken, refreshToken, challenge, setupSecret),
+      )
+      body.ifThen(cond.isNotNull(refreshToken), (authenticated) =>
+        authenticated.set(setCookie, refreshCookie.set(refreshToken)),
+      )
+      body.set(cacheControl, 'no-store')
     },
   )
   defineService(login, {
@@ -308,8 +323,82 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
     basePath: '/auth',
     summary: 'Authenticate using username and password',
     body: { username: login.parameters.username, password: login.parameters.password },
-    response: { accessToken: login.parameters.accessToken },
-    headers: { 'Set-Cookie': login.parameters.setCookie },
+    response: {
+      accessToken: login.parameters.accessToken,
+      challenge: login.parameters.challenge,
+      setupSecret: login.parameters.setupSecret,
+    },
+    headers: {
+      'Set-Cookie': login.parameters.setCookie,
+      'Cache-Control': login.parameters.cacheControl,
+    },
+  })
+
+  const verifyTwoFactor = pkg.proc(
+    'verify_two_factor',
+    {
+      in: { challenge: odbType.string(64), code: odbType.string(128) },
+      out: {
+        accessToken: odbAuth.types.accessToken,
+        setCookie: odbType.string(),
+        recoveryCodes: odbType.json(),
+        cacheControl: odbType.string(32),
+        nextChallenge: odbType.string(64),
+        setupSecret: odbType.string(32),
+      },
+    },
+    ({
+      params: {
+        challenge,
+        code,
+        accessToken,
+        setCookie,
+        recoveryCodes,
+        cacheControl,
+        nextChallenge,
+        setupSecret,
+      },
+      body,
+    }) => {
+      const { refreshToken } = body.variables({ refreshToken: odbAuth.types.refreshToken })
+      body.call(
+        odbAuth.verifyTwoFactor(
+          challenge,
+          code,
+          accessToken,
+          refreshToken,
+          recoveryCodes,
+          nextChallenge,
+          setupSecret,
+        ),
+      )
+      body.ifThen(cond.isNotNull(refreshToken), (authenticated) =>
+        authenticated.set(setCookie, refreshCookie.set(refreshToken)),
+      )
+      body.set(cacheControl, 'no-store')
+    },
+  )
+  defineService(verifyTwoFactor, {
+    auth: 'anonymous',
+    method: 'POST',
+    path: '/two-factor/verify',
+    module: 'auth',
+    basePath: '/auth',
+    summary: 'Complete authenticator enrollment or verify a TOTP or single-use recovery code',
+    body: {
+      challenge: verifyTwoFactor.parameters.challenge,
+      code: verifyTwoFactor.parameters.code,
+    },
+    response: {
+      accessToken: verifyTwoFactor.parameters.accessToken,
+      recoveryCodes: verifyTwoFactor.parameters.recoveryCodes,
+      challenge: verifyTwoFactor.parameters.nextChallenge,
+      setupSecret: verifyTwoFactor.parameters.setupSecret,
+    },
+    headers: {
+      'Set-Cookie': verifyTwoFactor.parameters.setCookie,
+      'Cache-Control': verifyTwoFactor.parameters.cacheControl,
+    },
   })
 
   const refresh = pkg.proc(
@@ -361,10 +450,11 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
         user: odbType.json(),
         providers: odbType.json(),
         signup: odbType.json(),
+        twoFactor: odbType.json(),
         cacheControl: odbType.string(32),
       },
     },
-    ({ params: { authorization, user, providers, signup, cacheControl }, body }) => {
+    ({ params: { authorization, user, providers, signup, twoFactor, cacheControl }, body }) => {
       const {
         userId,
         username,
@@ -377,6 +467,7 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
         roles,
         permissions,
         googleEnabled,
+        passwordEnabled,
       } = body.variables({
         userId: odbAuth.types.userId,
         username: odbAuth.types.username,
@@ -389,19 +480,43 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
         roles: odbType.json(),
         permissions: odbType.json(),
         googleEnabled: odbType.string(5),
+        passwordEnabled: odbType.string(5),
       })
       body.set(cacheControl, 'no-store')
-      body.set(signup, 'true')
+      body.ifThen(
+        cond.eq(odbAuth.enabled('password'), true),
+        (yes) => yes.set(passwordEnabled, 'true'),
+        (no) => no.set(passwordEnabled, 'false'),
+      )
+      body.ifThen(
+        cond.and([
+          cond.eq(odbAuth.enabled('signup'), true),
+          cond.eq(odbAuth.enabled('password'), true),
+        ]),
+        (yes) => yes.set(signup, 'true'),
+        (no) => no.set(signup, 'false'),
+      )
+      body.ifThen(
+        cond.eq(odbAuth.enabled('twoFactor'), true),
+        (yes) => yes.set(twoFactor, 'true'),
+        (no) => no.set(twoFactor, 'false'),
+      )
       body.set(user, 'null')
       body.ifThen(
         cond.eq(odbGoogle.enabled(), true),
         (then) => then.set(googleEnabled, odbLiteral('true')),
         (otherwise) => otherwise.set(googleEnabled, odbLiteral('false')),
       )
-      body.raw(`SELECT JSON_OBJECT(
-        'password' VALUE 'true' FORMAT JSON,
-        'google' VALUE ${googleEnabled.toSQL()} FORMAT JSON RETURNING CLOB
-      ) INTO ${providers.toSQL()} FROM dual;`)
+      body.query(
+        odbQuery()
+          .selectFrom('dual')
+          .select(
+            plsqlExpr.jsonObject({ password: passwordEnabled, google: googleEnabled }, 'CLOB', {
+              formatJson: ['password', 'google'],
+            }),
+          )
+          .into(providers),
+      )
       body.ifThen(cond.isNotNull(authorization), (then) => {
         then.set(userId, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
         then.call(odbAuth.readUser(userId, username, displayName))
@@ -416,18 +531,29 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
             avatarId,
           ),
         )
-        then.raw(`SELECT JSON_OBJECT(
-          'userId' VALUE ${userId.toSQL()},
-          'username' VALUE ${username.toSQL()},
-          'displayName' VALUE ${displayName.toSQL()},
-          'avatarUrl' VALUE ${avatarUrl.toSQL()},
-          'avatarUploaded' VALUE ${avatarUploaded.toSQL()},
-          'avatarId' VALUE ${avatarId.toSQL()},
-          'passwordConnected' VALUE ${passwordConnected.toSQL()},
-          'googleConnected' VALUE ${googleConnected.toSQL()},
-          'roles' VALUE ${roles.toSQL()} FORMAT JSON,
-          'permissions' VALUE ${permissions.toSQL()} FORMAT JSON RETURNING CLOB
-        ) INTO ${user.toSQL()} FROM dual;`)
+        then.query(
+          odbQuery()
+            .selectFrom('dual')
+            .select(
+              plsqlExpr.jsonObject(
+                {
+                  userId,
+                  username,
+                  displayName,
+                  avatarUrl,
+                  avatarUploaded,
+                  avatarId,
+                  passwordConnected,
+                  googleConnected,
+                  roles,
+                  permissions,
+                },
+                'CLOB',
+                { formatJson: ['roles', 'permissions'] },
+              ),
+            )
+            .into(user),
+        )
       })
     },
   )
@@ -447,6 +573,7 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
       user: getState.parameters.user,
       providers: getState.parameters.providers,
       signup: getState.parameters.signup,
+      twoFactor: getState.parameters.twoFactor,
     },
   })
 
@@ -783,6 +910,7 @@ export const migration = defineMigration('00000000000000_bootstrap', {
   .install(odbAuth.seedSettings())
   .install(odbGoogle)
   .install(odbGoogle.seedSettings())
+  .install(odbAuth.config())
   .install(odbAcl)
   .install(odbEmails)
   .install(

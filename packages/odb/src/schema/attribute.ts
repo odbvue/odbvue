@@ -249,9 +249,16 @@ export const plsqlExpr = {
   jsonObject<T extends PlsqlType | string = 'CLOB'>(
     values: Record<string, PlsqlExpressionValue>,
     type: T = 'CLOB' as T,
+    options: { formatJson?: readonly string[] } = {},
   ): PlsqlExpression<T> {
+    const formatJson = new Set(options.formatJson)
+    for (const key of formatJson) {
+      if (!Object.hasOwn(values, key))
+        throw new Error(`plsqlExpr.jsonObject: unknown FORMAT JSON key: ${key}`)
+    }
     const entries = Object.entries(values).map(
-      ([key, value]) => `${renderExpressionValue(key)} VALUE ${renderExpressionValue(value)}`,
+      ([key, value]) =>
+        `${renderExpressionValue(key)} VALUE ${renderExpressionValue(value)}${formatJson.has(key) ? ' FORMAT JSON' : ''}`,
     )
     return new PlsqlExpression(type, `JSON_OBJECT(${entries.join(', ')} RETURNING ${type})`)
   },

@@ -26,7 +26,7 @@ export const odbGoogle = {
       .map((artifact) => artifact.toSQLDown(options))
       .join('\n')
   },
-  /** Missing-only provisioning; never replace a configured credential or enable Google. */
+  /** Missing-only provisioning; Google is available only after credentials are configured. */
   seedSettings() {
     return {
       toSQLUp({ schema }: { schema?: string } = {}): string {

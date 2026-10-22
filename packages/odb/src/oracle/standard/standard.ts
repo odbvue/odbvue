@@ -185,6 +185,32 @@ export const odbOracle = {
     return call('NUMBER', 'CEIL', [value])
   },
 
+  floor(value: PlsqlRenderable | number): PlsqlExpression<'NUMBER'> {
+    return call('NUMBER', 'FLOOR', [value])
+  },
+
+  power(
+    base: PlsqlRenderable | number,
+    exponent: PlsqlRenderable | number,
+  ): PlsqlExpression<'NUMBER'> {
+    return call('NUMBER', 'POWER', [base, exponent])
+  },
+
+  bitAnd(
+    left: PlsqlRenderable | number,
+    right: PlsqlRenderable | number,
+  ): PlsqlExpression<'NUMBER'> {
+    return call('NUMBER', 'BITAND', [left, right])
+  },
+
+  /** UTC seconds since the Unix epoch, discarding timestamp subseconds. */
+  utcEpochSeconds(value: PlsqlRenderable): PlsqlExpression<'NUMBER'> {
+    return new PlsqlExpression(
+      'NUMBER',
+      `(CAST(SYS_EXTRACT_UTC(${renderPlsql(value)}) AS DATE) - DATE '1970-01-01') * 86400`,
+    )
+  },
+
   /** Numeric `TRUNC(<value>[, <places>])` -> NUMBER; not the date overload. */
   trunc(
     value: PlsqlRenderable | number,

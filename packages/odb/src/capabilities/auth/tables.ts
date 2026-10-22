@@ -87,6 +87,51 @@ export const authPasswordResets = odbTable('odb_auth_password_resets', (t) => ({
     { onDelete: 'cascade' },
   )
 
+export const authFactors = odbTable('odb_auth_factors', (t) => ({
+  userId: t.guid().primaryKey(),
+  secret: t.clob().notNull(),
+  lastCounter: t.number().notNull().default(-1),
+})).foreignKey(
+  'odb_auth_factors_fk_user',
+  (c) => [c.userId],
+  authUsers,
+  (c) => [c.id],
+  {
+    onDelete: 'cascade',
+  },
+)
+
+export const authChallenges = odbTable('odb_auth_challenges', (t) => ({
+  tokenHash: t.string(128).primaryKey(),
+  userId: t.guid().notNull(),
+  tokenVersion: t.number().notNull(),
+  secret: t.clob(),
+  expiresAt: t.timestamp().notNull(),
+}))
+  .unique('odb_auth_challenges_uq_user', (c) => [c.userId])
+  .foreignKey(
+    'odb_auth_challenges_fk_user',
+    (c) => [c.userId],
+    authUsers,
+    (c) => [c.id],
+    {
+      onDelete: 'cascade',
+    },
+  )
+
+export const authRecoveryCodes = odbTable('odb_auth_recovery_codes', (t) => ({
+  userId: t.guid().primaryKey(),
+  codeHash: t.string(128).primaryKey(),
+})).foreignKey(
+  'odb_auth_recovery_codes_fk_user',
+  (c) => [c.userId],
+  authUsers,
+  (c) => [c.id],
+  {
+    onDelete: 'cascade',
+  },
+)
+
 export const authRoles = odbTable('odb_auth_roles', (t) => ({
   role: t.string(200).primaryKey(),
   description: t.string(2000),

@@ -1,3 +1,13 @@
+export const authPolicySettings = [
+  ['password', 'AUTH_PASSWORD_ENABLED'],
+  ['twoFactor', 'AUTH_TWO_FACTOR_ENABLED'],
+  ['google', 'AUTH_GOOGLE_ENABLED'],
+  ['signup', 'AUTH_SIGNUP_ENABLED'],
+] as const
+
+export type AuthFeature = (typeof authPolicySettings)[number][0]
+export type AuthConfig = Partial<Record<AuthFeature, boolean>>
+
 export const authJwtSettings = {
   defaultIssuer: 'odbvue',
   defaultExpirationSeconds: 900,

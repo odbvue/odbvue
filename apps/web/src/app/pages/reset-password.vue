@@ -9,7 +9,14 @@
         <v-alert v-else-if="invalid" type="error" variant="tonal" class="mb-4">
           {{ t('auth.reset.invalid') }}
         </v-alert>
-        <v-ov-form v-else :options="options" :data="data" :t="t" @submit="submit" />
+        <v-ov-form
+          v-else-if="auth.providers.value?.password"
+          :options="options"
+          :data="data"
+          :t="t"
+          @submit="submit"
+        />
+        <v-alert v-else type="info">{{ t('auth.password.disabled') }}</v-alert>
         <v-btn to="/login" variant="text" class="mt-4">{{ t('auth.login') }}</v-btn>
         <v-btn v-if="invalid" to="/recover-password" variant="text" class="mt-4">
           {{ t('auth.recover.action') }}

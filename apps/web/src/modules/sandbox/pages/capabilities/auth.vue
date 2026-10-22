@@ -28,8 +28,13 @@
               />
             </v-list>
           </v-card-text>
-          <v-ov-form :options="loginOptions" :loading="auth.loading.value" @submit="login" />
           <v-card-actions>
+            <v-btn
+              v-if="!auth.authenticated.value"
+              :to="{ path: '/login', query: { redirect: route.fullPath } }"
+            >
+              Login
+            </v-btn>
             <v-btn :loading="auth.loading.value" prepend-icon="$mdiRefresh" @click="restore"
               >Restore</v-btn
             >
@@ -62,7 +67,6 @@
 
 <script setup lang="ts">
 import { useAuth } from '@/capabilities/auth'
-import type { OvFormData, OvFormOptions } from '@/components'
 import { ref } from 'vue'
 
 definePage({
@@ -77,37 +81,7 @@ definePage({
 const events = ref<string[]>([])
 const auth = useAuth()
 const callingState = ref(false)
-
-const loginOptions: OvFormOptions = {
-  fields: [
-    {
-      type: 'text',
-      name: 'username',
-      label: 'Username',
-      rules: [{ type: 'required', params: true, message: 'Username is required' }],
-    },
-    {
-      type: 'password',
-      name: 'password',
-      label: 'Password',
-      rules: [{ type: 'required', params: true, message: 'Password is required' }],
-    },
-  ],
-  actions: [{ name: 'login', format: { text: 'Login', color: 'primary' } }],
-  actionSubmit: 'login',
-  focusFirst: true,
-}
-
-async function login(data: OvFormData) {
-  events.value.push('POST /auth/login')
-  try {
-    await auth.login({ username: String(data.username), password: String(data.password) })
-  } catch (error) {
-    events.value.push(
-      `POST /auth/login -> ${error instanceof Error ? error.message : 'network error'}`,
-    )
-  }
-}
+const route = useRoute()
 async function restore() {
   events.value.push('POST /auth/refresh')
   await auth.restore()

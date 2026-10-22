@@ -19,6 +19,18 @@ const migrations = {
 const load = async (file: keyof typeof migrations) => (await migrations[file]()).migration
 
 describe('app-owned ORDS migrations', () => {
+  it('generates authentication state using typed queries without raw statement nodes', async () => {
+    const { appPackage } = await migrations['00000000000000-bootstrap']()
+    expect(JSON.stringify(appPackage.application())).not.toContain('"kind":"raw"')
+    const sql = appPackage.toSQLUp()
+    expect(sql).toContain(
+      "SELECT JSON_OBJECT('password' VALUE l_password_enabled FORMAT JSON, 'google' VALUE l_google_enabled FORMAT JSON RETURNING CLOB) INTO p_providers FROM dual;",
+    )
+    expect(sql).toContain(
+      "'roles' VALUE l_roles FORMAT JSON, 'permissions' VALUE l_permissions FORMAT JSON RETURNING CLOB) INTO p_user FROM dual;",
+    )
+  })
+
   it('installs profile storage and runtime packages through bootstrap', async () => {
     const migration = (await load('00000000000000-bootstrap')).compile()
     const up = migration.up().join('\n')
@@ -59,7 +71,7 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain("'googleConnected' VALUE l_google_connected")
     expect(sql).toContain("'roles' VALUE l_roles FORMAT JSON")
     expect(sql).toContain("'permissions' VALUE l_permissions FORMAT JSON")
-    expect(sql).toContain("'password' VALUE 'true' FORMAT JSON")
+    expect(sql).toContain("'password' VALUE l_password_enabled FORMAT JSON")
     expect(sql).toContain('odb_google.enabled()')
     expect(sql).toContain("p_signup := 'true'")
     expect(sql).toContain("p_cache_control := 'no-store'")
@@ -104,7 +116,7 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain('p_user => v_output_1')
     expect(sql).toContain('p_providers => v_output_2')
     expect(sql).toContain('p_signup => v_output_3')
-    expect(sql).toContain("htp.p(''Cache-Control: '' || v_output_4)")
+    expect(sql).toContain("htp.p(''Cache-Control: '' || v_output_5)")
     expect(sql).toContain('v_json_amount := 8000')
     expect(sql).toContain(
       'DBMS_LOB.READ(v_json_response, v_json_amount, v_json_offset, v_json_chunk)',
@@ -397,7 +409,9 @@ describe('app-owned ORDS migrations', () => {
     for (const route of ['login', 'refresh', 'logout', 'me']) {
       expect(sql).toContain(`p_pattern        => '${route}'`)
     }
-    expect(sql).toContain('odb_auth.login(p_username, p_password, p_access_token, l_refresh_token)')
+    expect(sql).toContain(
+      'odb_auth.begin_login(p_username, p_password, p_access_token, l_refresh_token, p_challenge, p_setup_secret)',
+    )
     expect(sql).toContain("p_set_cookie := '__Host-odb_refresh=' || l_refresh_token")
     expect(sql).toContain(
       "odb_auth.refresh(REGEXP_SUBSTR(p_cookie, '(^|;[[:space:]]*)__Host-odb_refresh=([^;]*)'",
@@ -419,7 +433,7 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain('odb_settings.write(p_id, p_value, NULL)')
     expect(sql).toContain('odb_settings.remove(p_id)')
     expect(sql.match(/AUTH_SETTINGS_REQUIRE_TRUSTED_SETUP/g)).toHaveLength(2)
-    expect(sql).toContain("REGEXP_LIKE(UPPER(p_id), '^AUTH_(JWT|GOOGLE)_')")
+    expect(sql).toContain("REGEXP_LIKE(UPPER(p_id), '^AUTH_')")
     expect(sql).not.toContain("ODBVUE.odb_settings.write('SANDBOX_DEMO'")
     expect(sql).not.toContain('odb_settings_store')
   })

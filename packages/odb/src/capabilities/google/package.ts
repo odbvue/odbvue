@@ -116,7 +116,18 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
         cond.or([cond.isNull(value), cond.and([cond.ne(value, 'Y'), cond.ne(value, 'N')])]),
         (then) => then.invalid('GOOGLE_CONFIG_INVALID'),
       )
-      body.return(cond.eq(value, 'Y'))
+      body.ifThen(cond.eq(value, 'N'), (disabled) => disabled.return(false))
+      for (const id of [
+        'AUTH_GOOGLE_CLIENT_ID',
+        'AUTH_GOOGLE_CLIENT_SECRET',
+        'AUTH_GOOGLE_REDIRECT_URI',
+      ]) {
+        body.call(odbSettings.readMasked(odbLiteral(id), value, meta))
+        body.ifThen(cond.isNull(odbOracle.trim(value)), (unconfigured) =>
+          unconfigured.return(false),
+        )
+      }
+      body.return(true)
     })
   })
 

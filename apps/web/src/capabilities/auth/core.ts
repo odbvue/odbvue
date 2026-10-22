@@ -23,6 +23,21 @@ interface AuthTokens {
   accessToken: string
 }
 
+export interface AuthChallenge {
+  challenge: string
+  setupSecret: string | null
+}
+
+interface LoginResponse {
+  accessToken: string | null
+  challenge?: string | null
+  setupSecret?: string | null
+}
+
+interface TwoFactorResponse extends LoginResponse {
+  recoveryCodes: readonly string[] | string
+}
+
 interface AuthUserResponse {
   userId: string | number
   username: string
@@ -69,12 +84,14 @@ export interface AuthState<User extends AuthUser = AuthUser> {
   user: User | null
   providers: AuthProviders
   signup: boolean
+  twoFactor: boolean
 }
 
 interface AuthStateResponse {
   user: AuthUserResponse | null | string
   providers: AuthProviders | string
   signup: boolean | string
+  twoFactor: boolean | string
 }
 
 export interface GoogleLoginOptions {
@@ -102,6 +119,7 @@ export interface AuthEndpoints {
   changePassword: string
   avatar: string
   login: string
+  verifyTwoFactor: string
   refresh: string
   logout: string
   state: string
@@ -120,9 +138,14 @@ export interface Auth<User extends AuthUser = AuthUser> {
   authenticated: ComputedRef<boolean>
   providers: Readonly<Ref<AuthProviders | null>>
   signupEnabled: Readonly<Ref<boolean | null>>
+  twoFactorEnabled: Readonly<Ref<boolean | null>>
   startGoogleLogin(options?: GoogleLoginOptions): Promise<GoogleLoginResponse>
   startGoogleLink(options: GoogleLinkOptions): Promise<GoogleLinkResponse>
-  login(credentials: AuthCredentials): Promise<void>
+  login(credentials: AuthCredentials): Promise<AuthChallenge | void>
+  verifyTwoFactor(
+    challenge: string,
+    code: string,
+  ): Promise<{ recoveryCodes: readonly string[] } | AuthChallenge>
   signup(credentials: SignupCredentials): Promise<void>
   confirmEmail(token: string): Promise<void>
   recoverPassword(email: string): Promise<void>
@@ -147,6 +170,7 @@ const defaultEndpoints: AuthEndpoints = {
   changePassword: '/auth/change-password',
   avatar: '/auth/avatar',
   login: '/auth/login',
+  verifyTwoFactor: '/auth/two-factor/verify',
   refresh: '/auth/refresh',
   logout: '/auth/logout',
   state: '/auth/state',
@@ -188,6 +212,7 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
   const ready = ref(false)
   const providers = shallowRef<AuthProviders | null>(null)
   const signupEnabled = ref<boolean | null>(null)
+  const twoFactorEnabled = ref<boolean | null>(null)
   let restorePromise: Promise<boolean> | undefined
   let avatarObjectUrl: string | null = null
   let profileRequest = 0
@@ -205,6 +230,8 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
   }
 
   function applyTokens(tokens: AuthTokens): void {
+    if (typeof tokens.accessToken !== 'string' || !tokens.accessToken)
+      throw new Error('Invalid authentication token response.')
     accessToken.value = tokens.accessToken
   }
 
@@ -300,6 +327,7 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
     ready: readonly(ready),
     providers: readonly(providers),
     signupEnabled: readonly(signupEnabled),
+    twoFactorEnabled: readonly(twoFactorEnabled),
     authenticated: computed(() => !!user.value && !!accessToken.value),
     async startGoogleLogin(loginOptions = {}) {
       loading.value = true
@@ -365,13 +393,71 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
     async login(credentials) {
       loading.value = true
       try {
-        const response = await requireHttp().post<AuthTokens>(endpoints.login, credentials, {
+        const response = await requireHttp().post<LoginResponse>(endpoints.login, credentials, {
           credentials: 'include',
         })
+        if (response.error) throw response.error
         if (!response.data) throw toError(response.error, 'Authentication failed.')
-        applyTokens(response.data)
+        if (response.data.challenge) {
+          const { challenge, setupSecret, accessToken: token } = response.data
+          if (
+            token ||
+            !/^[A-F0-9]{64}$/.test(challenge) ||
+            (setupSecret != null && !/^[A-Z2-7]{32}$/.test(setupSecret))
+          )
+            throw new Error('Invalid authentication challenge.')
+          clear()
+          return { challenge, setupSecret: setupSecret ?? null }
+        }
+        if (!response.data.accessToken) throw new Error('Missing authentication token.')
+        applyTokens({ accessToken: response.data.accessToken })
         const state = await this.getState()
         if (!state.user) throw new Error('Unable to retrieve the authenticated user.')
+      } catch (error) {
+        clear()
+        throw error
+      } finally {
+        loading.value = false
+      }
+    },
+    async verifyTwoFactor(challenge, code) {
+      loading.value = true
+      try {
+        const response = await requireHttp().post<TwoFactorResponse>(
+          endpoints.verifyTwoFactor,
+          { challenge, code },
+          { credentials: 'include', skipAuthRefresh: true },
+        )
+        if (response.error) throw response.error
+        if (!response.data) throw new Error('Two-factor verification failed.')
+        if (response.data.challenge) {
+          const { challenge: nextChallenge, setupSecret, accessToken: token } = response.data
+          if (
+            token ||
+            !/^[A-F0-9]{64}$/.test(nextChallenge) ||
+            typeof setupSecret !== 'string' ||
+            !/^[A-Z2-7]{32}$/.test(setupSecret)
+          )
+            throw new Error('Invalid authenticator recovery challenge.')
+          clear()
+          return { challenge: nextChallenge, setupSecret }
+        }
+        const codes: unknown =
+          typeof response.data.recoveryCodes === 'string'
+            ? JSON.parse(response.data.recoveryCodes)
+            : response.data.recoveryCodes
+        if (
+          !Array.isArray(codes) ||
+          ![0, 10].includes(codes.length) ||
+          !codes.every((value) => typeof value === 'string' && /^[A-F0-9]{32}$/.test(value)) ||
+          new Set(codes).size !== codes.length
+        )
+          throw new Error('Invalid recovery code response.')
+        if (!response.data.accessToken) throw new Error('Missing authentication token.')
+        applyTokens({ accessToken: response.data.accessToken })
+        const state = await this.getState()
+        if (!state.user) throw new Error('Unable to retrieve the authenticated user.')
+        return { recoveryCodes: codes }
       } catch (error) {
         clear()
         throw error
@@ -430,10 +516,15 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
           typeof response.data.signup === 'string'
             ? JSON.parse(response.data.signup)
             : response.data.signup
+        const twoFactor =
+          typeof response.data.twoFactor === 'string'
+            ? JSON.parse(response.data.twoFactor)
+            : response.data.twoFactor
         if (
           typeof capabilities?.password !== 'boolean' ||
           typeof capabilities?.google !== 'boolean' ||
           typeof signup !== 'boolean' ||
+          typeof twoFactor !== 'boolean' ||
           (profile !== null &&
             (!profile ||
               !['string', 'number'].includes(typeof profile.userId) ||
@@ -446,7 +537,8 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
         else currentUser = await applyUser(profile, request)
         providers.value = capabilities
         signupEnabled.value = signup
-        return { user: currentUser, providers: capabilities, signup }
+        twoFactorEnabled.value = twoFactor
+        return { user: currentUser, providers: capabilities, signup, twoFactor }
       } finally {
         loading.value = false
       }
