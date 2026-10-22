@@ -213,17 +213,18 @@ export function generateApplicationsOpenApi(
             : {}),
           [String(endpoint.responseStatus ?? 200)]: {
             description: 'Successful response',
-            content: endpoint.responseMediaType
-              ? {
-                  [endpoint.responseMediaType]: {
-                    schema: { type: 'string', format: 'binary' },
+            content:
+              endpoint.responseMediaType && endpoint.responseMediaType !== 'application/json'
+                ? {
+                    [endpoint.responseMediaType]: {
+                      schema: { type: 'string', format: 'binary' },
+                    },
+                  }
+                : {
+                    'application/json': {
+                      schema: { $ref: `#/components/schemas/${responseName}` },
+                    },
                   },
-                }
-              : {
-                  'application/json': {
-                    schema: { $ref: `#/components/schemas/${responseName}` },
-                  },
-                },
           },
         },
       }

@@ -144,6 +144,8 @@ describe('odbAuth framework package', () => {
     )
     expect(sql).toContain('SELECT DISTINCT rp.permission')
     expect(sql).toContain('l_permission_array.append(permission_row.permission)')
+    expect(sql).toContain('p_permissions := l_permission_array.to_clob();')
+    expect(sql).not.toContain("p_permissions := 'l_permission_array.to_clob()';")
     expect(odbAuth.role.has('l_id', 'p_role').toSQL()).toBe('odb_auth.has_role(l_id, p_role)')
     expect(odbAuth.permission.require('l_id', 'p_permission').toSQL()).toBe(
       'odb_auth.require_permission(l_id, p_permission)',

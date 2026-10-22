@@ -81,6 +81,40 @@ describe('app-owned ORDS migrations', () => {
     )
   })
 
+  it('uses SQL numeric types for state flags passed to JSON_OBJECT on Oracle 19c', async () => {
+    const { appPackage } = await migrations['00000000000000-bootstrap']()
+    const sql = appPackage.toSQLUp()
+    const state = sql.slice(
+      sql.indexOf('PROCEDURE get_state(', sql.indexOf('PACKAGE BODY')),
+      sql.indexOf('END get_state;'),
+    )
+    for (const flag of ['avatar_uploaded', 'password_connected', 'google_connected']) {
+      expect(state).toContain(`l_${flag} NUMBER;`)
+      expect(state).not.toContain(`l_${flag} PLS_INTEGER;`)
+      expect(state).toContain(`VALUE l_${flag}`)
+    }
+  })
+
+  it('streams state JSON natively instead of registering string response binds', async () => {
+    const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
+    expect(sql).toContain("'user'' VALUE v_output_1 FORMAT JSON")
+    expect(sql).toContain("'providers'' VALUE v_output_2 FORMAT JSON")
+    expect(sql).toContain("'signup'' VALUE v_output_3 FORMAT JSON")
+    expect(sql).toContain('RETURNING CLOB STRICT) RETURNING CLOB ASCII) INTO v_json_response')
+    expect(sql).toContain('p_user => v_output_1')
+    expect(sql).toContain('p_providers => v_output_2')
+    expect(sql).toContain('p_signup => v_output_3')
+    expect(sql).toContain("htp.p(''Cache-Control: '' || v_output_4)")
+    expect(sql).toContain('v_json_amount := 8000')
+    expect(sql).toContain(
+      'DBMS_LOB.READ(v_json_response, v_json_amount, v_json_offset, v_json_chunk)',
+    )
+    expect(sql).toContain('v_json_offset := v_json_offset + v_json_amount')
+    expect(sql).not.toContain("p_name               => 'user'")
+    expect(sql).not.toContain("p_name               => 'providers'")
+    expect(sql).not.toContain("p_name               => 'signup'")
+  })
+
   it('guides collisions through existing-account login and preserves the destination after linking', async () => {
     const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
     const start = sql.indexOf('PACKAGE BODY ODBVUE.PCK_APP')

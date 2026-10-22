@@ -333,7 +333,7 @@ export type ServiceNode = {
   method?: OrdsHttpMethod
   path?: string
   summary?: string
-  /** Media type for a binary response streamed directly by the procedure instead of JSON outputs. */
+  /** Streamed media type. `application/json` with JSON-typed outputs emits native JSON fields. */
   responseMediaType?: string
   responseStatus?: number
   module?: string

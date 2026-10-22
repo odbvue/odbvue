@@ -1281,7 +1281,7 @@ export const odbAuthPackage = odbPackage('odb_auth', (pkg) => {
           )
         },
       )
-      body.set(permissions, `${permissionArray.toSQL()}.to_clob()`)
+      body.set(permissions, new PlsqlExpression('CLOB', `${permissionArray.toSQL()}.to_clob()`))
     },
   )
 

@@ -225,11 +225,30 @@ refs, initially null until state has loaded. Startup restoration attempts
 Login and profile updates also reload state; Google buttons reuse the shared
 capabilities instead of making a separate configuration request.
 
+`/auth/state` emits native JSON objects and booleans, not JSON strings:
+
+```json
+{
+  "user": null,
+  "providers": { "password": true, "google": true },
+  "signup": true
+}
+```
+
+The service declares `responseMediaType: 'application/json'` with JSON-typed
+response fields. Its generated PL/SQL handler validates and streams the JSON,
+preserving `Cache-Control: no-store`. SQL query handlers can use `"{}name"`
+aliases for embedded JSON; PL/SQL OUT parameters need explicit JSON output.
+
 `/auth/state` returns 200 for anonymous callers and sets `Cache-Control: no-store`.
 A supplied invalid, expired, or malformed bearer credential still returns 401,
 allowing the client's normal refresh handling. It replaces the public `/auth/me`
 and `/auth/google/config` endpoints. Rebuild and redeploy bootstrap to install
 the updated routes; no incremental migration is supplied.
+
+The state procedure uses SQL `NUMBER` locals for profile flags passed to
+`JSON_OBJECT`. Oracle 19c rejects PL/SQL `PLS_INTEGER` inputs to JSON generation
+with `ORA-40654`, leaving the package body invalid and the endpoint returning 500.
 
 ### Email signup
 

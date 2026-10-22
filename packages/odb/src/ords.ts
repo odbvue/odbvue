@@ -306,25 +306,58 @@ export class OrdsEndpoint {
     return this._basePath ?? `${this.module}/`
   }
 
+  private get nativeJsonResponse(): boolean {
+    const outputs = this._params.filter((p) => this.paramSourceType(p) === 'RESPONSE')
+    return (
+      this._responseMediaType === 'application/json' &&
+      outputs.length > 0 &&
+      outputs.every((p) => p.direction === 'OUT' && p.odbType === 'json')
+    )
+  }
+
+  private nativeOutputName(param: OrdsParam): string | undefined {
+    if (!this.nativeJsonResponse || param.direction !== 'OUT') return undefined
+    const transport = this.paramSourceType(param)
+    return transport === 'RESPONSE' || transport === 'HEADER'
+      ? `v_output_${this._params.indexOf(param)}`
+      : undefined
+  }
+
   private get handlerSource(): string {
     const binaryBody = this._params.some(
       (param) => this.paramSourceType(param) === 'BODY' && param.odbType === 'blob',
     )
     const args = this._params
       .map((p) =>
-        p.plsqlArg.toUpperCase() === this._contextUserId
-          ? `${p.plsqlArg.toLowerCase()} => v_auth_user_id`
-          : this.paramSourceType(p) === 'BODY' && p.odbType === 'blob'
-            ? `${p.plsqlArg.toLowerCase()} => v_binary_body`
-            : p.plsqlArg.toUpperCase() === 'P_BODY'
-              ? `${p.plsqlArg.toLowerCase()} => :body`
-              : this.paramSourceType(p) === 'BODY'
-                ? `${p.plsqlArg.toLowerCase()} => ${jsonValueExpression(p)}`
-                : `${p.plsqlArg.toLowerCase()} => :${p.bindVariable}`,
+        this.nativeOutputName(p)
+          ? `${p.plsqlArg.toLowerCase()} => ${this.nativeOutputName(p)}`
+          : p.plsqlArg.toUpperCase() === this._contextUserId
+            ? `${p.plsqlArg.toLowerCase()} => v_auth_user_id`
+            : this.paramSourceType(p) === 'BODY' && p.odbType === 'blob'
+              ? `${p.plsqlArg.toLowerCase()} => v_binary_body`
+              : p.plsqlArg.toUpperCase() === 'P_BODY'
+                ? `${p.plsqlArg.toLowerCase()} => :body`
+                : this.paramSourceType(p) === 'BODY'
+                  ? `${p.plsqlArg.toLowerCase()} => ${jsonValueExpression(p)}`
+                  : `${p.plsqlArg.toLowerCase()} => :${p.bindVariable}`,
       )
       .join(', ')
     const protectedEndpoint = this._auth !== undefined && this._auth !== 'anonymous'
     const declarations = [
+      ...this._params.flatMap((p) => {
+        const name = this.nativeOutputName(p)
+        return name
+          ? [`${name} ${this.paramSourceType(p) === 'RESPONSE' ? 'CLOB' : 'VARCHAR2(32767)'};`]
+          : []
+      }),
+      ...(this.nativeJsonResponse
+        ? [
+            'v_json_response CLOB;',
+            'v_json_chunk VARCHAR2(32767);',
+            'v_json_offset PLS_INTEGER := 1;',
+            'v_json_amount PLS_INTEGER;',
+          ]
+        : []),
       ...(binaryBody ? ['v_binary_body BLOB := :body;'] : []),
       ...(this._params.some(
         (param) => this.paramSourceType(param) === 'BODY' && param.odbType !== 'blob',
@@ -360,7 +393,32 @@ export class OrdsEndpoint {
     const normalizeBody = binaryBody
       ? 'IF v_binary_body IS NULL THEN DBMS_LOB.CREATETEMPORARY(v_binary_body, TRUE, DBMS_LOB.CALL); END IF; '
       : ''
-    const call = `${normalizeBody}${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args});${this._responseStatus === undefined ? '' : ` :status_code := ${this._responseStatus};`}`
+    const jsonResponse = this.nativeJsonResponse
+      ? [
+          // ASCII escaping avoids HTP buffer overflows on large multibyte JSON strings.
+          `SELECT JSON_SERIALIZE(JSON_OBJECT(${this._params
+            .filter((p) => this.paramSourceType(p) === 'RESPONSE')
+            .map((p) => `${sqlStr(p.name)} VALUE ${this.nativeOutputName(p)} FORMAT JSON`)
+            .join(
+              ', ',
+            )} RETURNING CLOB STRICT) RETURNING CLOB ASCII) INTO v_json_response FROM dual;`,
+          "owa_util.mime_header('application/json', FALSE);",
+          ...this._params
+            .filter((p) => p.direction === 'OUT' && this.paramSourceType(p) === 'HEADER')
+            .map(
+              (p) =>
+                `IF ${this.nativeOutputName(p)} IS NOT NULL THEN htp.p(${sqlStr(`${p.name}: `)} || ${this.nativeOutputName(p)}); END IF;`,
+            ),
+          'owa_util.http_header_close;',
+          'WHILE v_json_offset <= DBMS_LOB.GETLENGTH(v_json_response) LOOP',
+          'v_json_amount := 8000;',
+          'DBMS_LOB.READ(v_json_response, v_json_amount, v_json_offset, v_json_chunk);',
+          'htp.prn(v_json_chunk);',
+          'v_json_offset := v_json_offset + v_json_amount;',
+          'END LOOP;',
+        ].join(' ')
+      : ''
+    const call = `${normalizeBody}${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args});${this._responseStatus === undefined ? '' : ` :status_code := ${this._responseStatus};`}${jsonResponse ? ` ${jsonResponse}` : ''}`
     const envelope = "'ODB_HTTP\\|([4-5][0-9]{2})\\|([A-Z][A-Z0-9_]{0,99})'"
     const status = `REGEXP_SUBSTR(SQLERRM, ${envelope}, 1, 1, NULL, 1)`
     const code = `REGEXP_SUBSTR(SQLERRM, ${envelope}, 1, 1, NULL, 2)`
@@ -473,6 +531,7 @@ export class OrdsEndpoint {
         : []),
       ...this._params.flatMap((p) => {
         if (p.plsqlArg.toUpperCase() === this._contextUserId) return []
+        if (this.nativeOutputName(p)) return []
         if (p.plsqlArg.toUpperCase() === 'P_BODY' || this.paramSourceType(p) === 'BODY') return []
         return [
           '',

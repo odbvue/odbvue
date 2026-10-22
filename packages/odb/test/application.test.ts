@@ -77,6 +77,56 @@ describe('ODB application contract', () => {
     expect(document.paths['/redirects/callback']?.get.responses).not.toHaveProperty('200')
   })
 
+  it('preserves structured OpenAPI responses for native JSON output', () => {
+    const native = odbPackage('PCK_NATIVE', (pkg) => {
+      const state = pkg.proc(
+        'get_state',
+        { out: { user: odbType.json(), signup: odbType.json() } },
+        ({ params: { user, signup }, body }) => {
+          body.set(user, 'null')
+          body.set(signup, 'true')
+        },
+      )
+      defineService(state, {
+        auth: 'anonymous',
+        method: 'GET',
+        path: '/state',
+        responseMediaType: 'application/json',
+        response: { user: state.parameters.user, signup: state.parameters.signup },
+      })
+    })
+    const document = generateApplicationOpenApi(native.application())
+    expect(document).toMatchObject({
+      paths: {
+        '/native/state': {
+          get: {
+            responses: {
+              '200': {
+                content: {
+                  'application/json': {
+                    schema: { $ref: '#/components/schemas/NativeGetStateResponse' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      components: {
+        schemas: {
+          NativeGetStateResponse: {
+            type: 'object',
+            required: ['user', 'signup'],
+            properties: {
+              user: { 'x-odb-type': 'json' },
+              signup: { 'x-odb-type': 'json' },
+            },
+          },
+        },
+      },
+    })
+  })
+
   it('documents a single BLOB body and rejects mixed binary/JSON or GET bodies', () => {
     const binary = odbPackage('PCK_FILES', (pkg) => {
       const upload = pkg.proc(
