@@ -30,6 +30,12 @@ export const odbAcl = {
   removeSmtp(host: PlsqlRenderable, port: Port = 587) {
     return odbAclPackage.removeSmtp(host, portArg(port))
   },
+  addLdap(host: PlsqlRenderable, port: Port = 636) {
+    return odbAclPackage.addLdap(host, portArg(port))
+  },
+  removeLdap(host: PlsqlRenderable, port: Port = 636) {
+    return odbAclPackage.removeLdap(host, portArg(port))
+  },
   list(items: PlsqlRenderable) {
     return odbAclPackage.list(items)
   },

@@ -62,7 +62,7 @@
         </template>
         <template v-else>
           <v-ov-form
-            v-if="auth.providers.value?.password"
+            v-if="auth.providers.value?.password || auth.providers.value?.ldap"
             :options="options"
             :t="t"
             @submit="submit"

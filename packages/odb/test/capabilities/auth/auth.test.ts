@@ -379,7 +379,7 @@ describe('odbAuth framework package', () => {
   it('seeds only missing auth policy and JWT settings without key generation or destructive rollback', () => {
     const seed = odbAuth.seedSettings()
     const sql = seed.toSQLUp({ schema: 'APP' })
-    expect(sql.match(/IF l_count = 0 THEN/g)).toHaveLength(7)
+    expect(sql.match(/IF l_count = 0 THEN/g)).toHaveLength(17)
     expect(sql).toContain("FROM APP.odb_settings_store WHERE id = 'AUTH_JWT_SECRET'")
     expect(sql).toContain(
       `APP.odb_settings.write('AUTH_JWT_SECRET', '', '{"label":"JWT signing secret","type":"string","secret":"Y"}')`,

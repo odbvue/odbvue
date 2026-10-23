@@ -8,7 +8,7 @@ type PromptQuestion = {
   name: string
   type: string
   initial?: string | number | boolean
-  validate?: (value: number | string) => boolean | string
+  validate?: (value: number | string | boolean) => boolean | string
 }
 
 const require = createRequire(import.meta.url)
@@ -170,6 +170,230 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
       auth_two_factor_enabled: 'N',
       auth_signup_enabled: 'Y',
     })
+  })
+
+  const ldapFileBase = Object.fromEntries(
+    Object.entries(settings).map(([key, value]) => [
+      key.startsWith('auth_') || key === 'app_public_url' ? key : `smtp_${key}`,
+      value,
+    ]),
+  )
+  const ldapSettings = {
+    auth_ldap_enabled: true,
+    auth_ldap_tls_enabled: true,
+    auth_ldap_host: 'directory.example.com',
+    auth_ldap_port: 636,
+    auth_ldap_base_dn: 'dc=example,dc=com',
+    auth_ldap_login_attribute: 'uid',
+    auth_ldap_bind_dn: 'cn=reader,dc=example,dc=com',
+    auth_ldap_bind_password: "reader'password",
+    auth_ldap_wallet_path: 'file:/wallet/ldap',
+    auth_ldap_wallet_password: "wallet'password",
+  }
+
+  it('provisions LDAP through bound secret settings and an exact-port ACL in one transaction', async () => {
+    state.readFile.mockResolvedValue(
+      JSON.stringify({
+        ...ldapFileBase,
+        ...ldapSettings,
+      }),
+    )
+    await runSetupSettings('settings.json')
+    const [sql, values] = state.connection.execute.mock.calls[0]!
+    expect(state.prompts).not.toHaveBeenCalled()
+    expect(sql).toContain('APP.odb_acl.add_ldap(:auth_ldap_host, :ldap_port)')
+    for (const key of Object.keys(ldapSettings)) {
+      expect(sql).toContain(`APP.odb_settings.write('${key.toUpperCase()}', :${key}`)
+      expect(sql.split(`APP.odb_settings.write('${key.toUpperCase()}'`)).toHaveLength(2)
+    }
+    expect(sql).toContain(':auth_ldap_bind_password, :ldap_secret_meta)')
+    expect(sql).toContain(':auth_ldap_wallet_password, :ldap_secret_meta)')
+    expect(values).toMatchObject({
+      ...ldapSettings,
+      auth_ldap_enabled: 'Y',
+      auth_ldap_tls_enabled: 'Y',
+      auth_ldap_port: '636',
+      ldap_port: 636,
+      ldap_secret_meta: '{"secret":"Y"}',
+    })
+    expect(sql).not.toContain(ldapSettings.auth_ldap_bind_password)
+    expect(sql).not.toContain(ldapSettings.auth_ldap_wallet_password)
+    expect(state.connection.commit).toHaveBeenCalledOnce()
+    expect(state.connection.execute).toHaveBeenCalledOnce()
+  })
+
+  it('preserves LDAP policy and grants when file settings omit LDAP', async () => {
+    state.readFile.mockResolvedValue(JSON.stringify(ldapFileBase))
+    await runSetupSettings('settings.json')
+    const [sql] = state.connection.execute.mock.calls[0]!
+    expect(sql).not.toContain('AUTH_LDAP_')
+    expect(sql).not.toContain('add_ldap')
+  })
+
+  it.each([
+    [false, 389, 'N'],
+    [true, 636, 'Y'],
+  ] as const)(
+    'writes explicit TLS=%s with the configured port %i',
+    async (tlsEnabled, port, stored) => {
+      state.readFile.mockResolvedValue(
+        JSON.stringify({
+          ...ldapFileBase,
+          ...ldapSettings,
+          auth_ldap_tls_enabled: tlsEnabled,
+          auth_ldap_port: port,
+        }),
+      )
+      await runSetupSettings('settings.json')
+      const [sql, values] = state.connection.execute.mock.calls[0]!
+      expect(sql).toContain(
+        "APP.odb_settings.write('AUTH_LDAP_TLS_ENABLED', :auth_ldap_tls_enabled, NULL)",
+      )
+      expect(values).toMatchObject({
+        auth_ldap_tls_enabled: stored,
+        auth_ldap_port: String(port),
+        ldap_port: port,
+      })
+      expect(state.prompts).not.toHaveBeenCalled()
+      if (tlsEnabled) expect(state.warn).not.toHaveBeenCalled()
+      else
+        expect(state.warn).toHaveBeenCalledWith(
+          expect.stringContaining('passwords may be sent unencrypted'),
+        )
+    },
+  )
+
+  it('preserves the saved TLS mode when the file omits the optional flag', async () => {
+    const { auth_ldap_tls_enabled: _tlsEnabled, ...directorySettings } = ldapSettings
+    state.readFile.mockResolvedValue(JSON.stringify({ ...ldapFileBase, ...directorySettings }))
+    await runSetupSettings('settings.json')
+    expect(state.prompts).not.toHaveBeenCalled()
+    const [sql, values] = state.connection.execute.mock.calls[0]!
+    expect(sql).not.toContain('AUTH_LDAP_TLS_ENABLED')
+    expect(values).not.toHaveProperty('auth_ldap_tls_enabled')
+  })
+
+  it('disables LDAP without removing saved credentials or grants', async () => {
+    state.readFile.mockResolvedValue(JSON.stringify({ ...ldapFileBase, auth_ldap_enabled: false }))
+    await runSetupSettings('settings.json')
+    const [sql, values] = state.connection.execute.mock.calls[0]!
+    expect(values).toMatchObject({ auth_ldap_enabled: 'N' })
+    expect(sql).not.toContain('AUTH_LDAP_BIND_PASSWORD')
+    expect(sql).not.toContain('add_ldap')
+    expect(sql).not.toContain('remove_ldap')
+  })
+
+  it.each([
+    ['auth_ldap_enabled', 'Y'],
+    ['auth_ldap_tls_enabled', 'false'],
+    ['auth_ldap_tls_enabled', 'N'],
+    ['auth_ldap_tls_enabled', 0],
+    ['auth_ldap_tls_enabled', null],
+    ['auth_ldap_host', 'ldaps://directory.example.com'],
+    ['auth_ldap_port', 636.5],
+    ['auth_ldap_port', 0],
+    ['auth_ldap_port', 65536],
+    ['auth_ldap_login_attribute', 'uid)(objectClass=*'],
+    ['auth_ldap_bind_password', ''],
+    ['auth_ldap_wallet_path', '/wallet/ldap'],
+  ])('rejects invalid LDAP setting %s before connecting', async (key, value) => {
+    state.readFile.mockResolvedValue(
+      JSON.stringify({
+        ...ldapFileBase,
+        ...ldapSettings,
+        [key]: value,
+      }),
+    )
+    await expect(runSetupSettings('settings.json')).rejects.toThrow('Invalid setting')
+    expect(state.connected).not.toHaveBeenCalled()
+    expect(state.connection.execute).not.toHaveBeenCalled()
+  })
+
+  it('prompts for missing LDAP credentials using masked inputs and supports auto-login wallets', async () => {
+    const { auth_ldap_bind_password, ...partial } = ldapSettings
+    state.readFile.mockResolvedValue(
+      JSON.stringify({
+        ...ldapFileBase,
+        ...partial,
+        auth_ldap_wallet_password: '',
+      }),
+    )
+    state.prompts.mockResolvedValue({ auth_ldap_bind_password })
+    await runSetupSettings('settings.json')
+    expect(state.prompts.mock.calls[0]![0]).toEqual([
+      expect.objectContaining({ name: 'auth_ldap_bind_password', type: 'password' }),
+    ])
+    expect(state.connection.execute.mock.calls[0]![1]).toMatchObject({
+      auth_ldap_wallet_password: '',
+    })
+  })
+
+  it.each([true, false])('accepts empty wallet settings with LDAP enabled=%s', async (enabled) => {
+    state.readFile.mockResolvedValue(
+      JSON.stringify({
+        ...ldapFileBase,
+        ...ldapSettings,
+        auth_ldap_enabled: enabled,
+        auth_ldap_wallet_path: '',
+        auth_ldap_wallet_password: '',
+      }),
+    )
+    await expect(runSetupSettings('settings.json')).resolves.toBe(true)
+    expect(state.prompts).not.toHaveBeenCalled()
+    expect(state.connection.execute.mock.calls[0]![1]).toMatchObject({
+      auth_ldap_wallet_path: '',
+      auth_ldap_wallet_password: '',
+    })
+  })
+
+  it.each([true, false])(
+    'preserves omitted optional wallet settings with LDAP enabled=%s',
+    async (enabled) => {
+      const directorySettings = Object.fromEntries(
+        Object.entries(ldapSettings).filter(([key]) => !key.startsWith('auth_ldap_wallet_')),
+      )
+      state.readFile.mockResolvedValue(
+        JSON.stringify({
+          ...ldapFileBase,
+          ...directorySettings,
+          auth_ldap_enabled: enabled,
+        }),
+      )
+      await expect(runSetupSettings('settings.json')).resolves.toBe(true)
+      expect(state.prompts).not.toHaveBeenCalled()
+      const [sql, values] = state.connection.execute.mock.calls[0]!
+      expect(sql).not.toContain('AUTH_LDAP_WALLET_')
+      expect(values).not.toHaveProperty('auth_ldap_wallet_path')
+      expect(values).not.toHaveProperty('auth_ldap_wallet_password')
+    },
+  )
+
+  it('offers LDAP interactively even when Google is disabled', async () => {
+    state.prompts.mockImplementation(async (questions) => {
+      const answers: Record<string, unknown> = {
+        ...settings,
+        ...ldapSettings,
+        auth_ldap_wallet_path: '',
+        auth_ldap_wallet_password: '',
+      }
+      return Object.fromEntries(questions.map(({ name }) => [name, answers[name]]))
+    })
+    await runSetupSettings()
+    expect(state.prompts.mock.calls[1]![0]).toEqual([
+      expect.objectContaining({ name: 'auth_ldap_enabled', initial: false }),
+    ])
+    expect(state.connection.execute.mock.calls[0]![0]).toContain('APP.odb_acl.add_ldap(')
+    const modeQuestion = state.prompts.mock.calls[2]![0].find(
+      (candidate) => candidate.name === 'auth_ldap_tls_enabled',
+    )!
+    expect(modeQuestion.type).toBe('confirm')
+    expect(modeQuestion.initial).toBe(false)
+    expect(modeQuestion.validate?.(false)).toBe(true)
+    for (const name of ['auth_ldap_wallet_path', 'auth_ldap_wallet_password']) {
+      const question = state.prompts.mock.calls[2]![0].find((candidate) => candidate.name === name)!
+      expect(question.initial).toBe('')
+      expect(question.validate?.('')).toBe(true)
+    }
   })
 
   it('prompts with the requested defaults and masks the password', async () => {
@@ -369,6 +593,7 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
 
   it('accepts Enter on the real number prompt without typing the displayed default', async () => {
     state.prompts.mockImplementation(async (questions) => {
+      if (questions[0]?.name === 'auth_ldap_enabled') return { auth_ldap_enabled: false }
       const portQuestion = questions.find((question) => question.name === 'port')!
       const stdin = new PassThrough()
       const stdout = new PassThrough()

@@ -572,6 +572,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sandbox/acl/ldap/{host}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Grant application LDAP host access */
+        put: operations["sandbox_add_ldap_acl"];
+        post?: never;
+        /** Remove application LDAP host access */
+        delete: operations["sandbox_remove_ldap_acl"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -714,6 +732,8 @@ export interface components {
         SandboxRemoveHttpAclResponse: Record<string, never>;
         SandboxAddSmtpAclResponse: Record<string, never>;
         SandboxRemoveSmtpAclResponse: Record<string, never>;
+        SandboxAddLdapAclResponse: Record<string, never>;
+        SandboxRemoveLdapAclResponse: Record<string, never>;
     };
     responses: never;
     parameters: never;
@@ -1984,6 +2004,82 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SandboxRemoveSmtpAclResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient authorization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    sandbox_add_ldap_acl: {
+        parameters: {
+            query?: {
+                port?: number;
+            };
+            header?: never;
+            path: {
+                host: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxAddLdapAclResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient authorization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    sandbox_remove_ldap_acl: {
+        parameters: {
+            query?: {
+                port?: number;
+            };
+            header?: never;
+            path: {
+                host: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxRemoveLdapAclResponse"];
                 };
             };
             /** @description Authentication required */

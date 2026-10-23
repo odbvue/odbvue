@@ -33,6 +33,8 @@ describe('Network ACL capability', () => {
     expect(odbAcl.removeHttp('p_host').toSQL()).toBe('odb_acl.remove_http(p_host, 443)')
     expect(odbAcl.addSmtp('p_host').toSQL()).toBe('odb_acl.add_smtp(p_host, 587)')
     expect(odbAcl.removeSmtp('p_host').toSQL()).toBe('odb_acl.remove_smtp(p_host, 587)')
+    expect(odbAcl.addLdap('p_host').toSQL()).toBe('odb_acl.add_ldap(p_host, 636)')
+    expect(odbAcl.removeLdap('p_host', 1636).toSQL()).toBe('odb_acl.remove_ldap(p_host, 1636)')
     expect(odbAcl.addHttp(odbLiteral('api.example.com'), 8443).toSQL()).toBe(
       "odb_acl.add_http('api.example.com', 8443)",
     )
@@ -48,7 +50,8 @@ describe('Network ACL capability', () => {
     )
     expect(sql).toContain('lower_port => p_port, upper_port => p_port')
     expect(sql).toContain('host => LOWER(p_host)')
-    expect(sql).not.toContain("'connect'")
+    expect(sql).toContain("NVL(p_port, 636), 'connect', FALSE")
+    expect(sql).toContain("NVL(p_port, 636), 'connect', TRUE")
     expect(sql).not.toContain("'resolve'")
     expect(sql).not.toContain('p_principal')
     expect(sql).not.toContain('COMMIT')
@@ -105,17 +108,24 @@ describe('Sandbox ACL services', () => {
   })
   afterAll(() => vi.unstubAllEnvs())
 
-  it('exposes all five operations only to administrators', () => {
+  it('exposes all seven operations only to administrators', () => {
     const endpoints = compileApplicationEndpoints(sandbox.application())
       .map((endpoint) => endpoint.toNode())
       .filter((endpoint) => endpoint.pattern.startsWith('acl'))
-    expect(endpoints).toHaveLength(5)
+    expect(endpoints).toHaveLength(7)
     for (const endpoint of endpoints) {
       expect(endpoint.auth).toEqual({ roles: ['admin'] })
     }
     const sql = sandbox.toSQLUp()
     expect(sql).toContain('odb_acl.list(p_items)')
-    for (const operation of ['add_http', 'remove_http', 'add_smtp', 'remove_smtp']) {
+    for (const operation of [
+      'add_http',
+      'remove_http',
+      'add_smtp',
+      'remove_smtp',
+      'add_ldap',
+      'remove_ldap',
+    ]) {
       expect(sql).toContain(`odb_acl.${operation}(p_host, p_port)`)
     }
   })
@@ -134,7 +144,7 @@ describe('Sandbox ACL services', () => {
       'upperPort',
       'privilege',
     ])
-    for (const protocol of ['http', 'smtp']) {
+    for (const protocol of ['http', 'smtp', 'ldap']) {
       const path = document.paths[`/sandbox/acl/${protocol}/{host}`]!
       for (const method of ['put', 'delete']) {
         expect(path[method]!.parameters).toContainEqual(

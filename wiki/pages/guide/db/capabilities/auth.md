@@ -27,6 +27,8 @@ The test for placement: would another PL/SQL package reasonably call this withou
 Install it through a migration after `odbRateLimit`, `odbSettings`, `odbLob` and `odbStorage`.
 Settings requires `odbAudit`. JWT configuration is loaded from Settings at runtime;
 there is no built-in signing key, environment fallback, or package-embedded secret.
+The schema also needs a direct `EXECUTE ON SYS.DBMS_LDAP` grant before compiling
+auth, even when LDAP is disabled; bootstrap provisions it.
 
 ```ts
 import {
@@ -74,8 +76,8 @@ The builders generate the SQL required by Oracle at deployment time.
 
 ## Authentication policy and two-factor authentication
 
-`odbAuth.config()` is an installable, Settings-backed deployment policy. All four
-flags default to `true`; supply `false` explicitly to disable a feature:
+`odbAuth.config()` is an installable, Settings-backed deployment policy. LDAP
+defaults to `false`; the other four flags default to `true`:
 
 ```ts
 // Install after auth/Google settings seeds and before the application package.
@@ -84,11 +86,13 @@ flags default to `true`; supply `false` explicitly to disable a feature:
   twoFactor: true, // Required TOTP for every password account
   google: true,
   signup: true,
+  ldap: false,     // Opt-in LDAPS; searched before local password identities
 }))
 ```
 
 The corresponding Settings keys are `AUTH_PASSWORD_ENABLED`,
-`AUTH_TWO_FACTOR_ENABLED`, `AUTH_GOOGLE_ENABLED`, and `AUTH_SIGNUP_ENABLED`
+`AUTH_TWO_FACTOR_ENABLED`, `AUTH_GOOGLE_ENABLED`, `AUTH_SIGNUP_ENABLED`,
+and `AUTH_LDAP_ENABLED`
 (`Y`/`N`). `seedSettings()` inserts missing policy values without replacing existing
 ones; `config()` writes the requested deployment values. Runtime reads validate
 the values and enforce policy inside the database capability. Missing/invalid
@@ -101,12 +105,128 @@ flag; Google can still authenticate existing identities when signup is disabled,
 but cannot create new accounts. Google is available only when enabled **and**
 its client ID, secret, and callback URI are configured. State checks use masked
 settings and never decrypt the Google secret. Google continues to own its own
-second-factor policy; this application's TOTP requirement applies only to passwords.
+second-factor policy; this application's TOTP requirement applies to local and LDAP
+username/password logins.
 
 The trusted setup JSON optionally accepts `auth_password_enabled`,
 `auth_two_factor_enabled`, and `auth_signup_enabled` as booleans. Omitted values
 are preserved. Google uses the existing `auth_google_enabled` option. The sandbox
 Settings API rejects writes/removals of all `AUTH_*` keys.
+
+### LDAP and LDAPS sign-in
+
+Enable with `odbAuth.config({ ldap: true })` after configuring the directory, or
+with `ov ss` / `ov setup-settings`. LDAP is disabled by default and is not inferred
+from a saved hostname. The existing username/password form and `/auth/login`
+endpoint are used; users do not choose a provider. `/auth/state` includes a
+`providers.ldap` boolean, so the form remains available when local passwords are
+disabled.
+
+`odbAuth.seedSettings()` inserts the following missing settings without overwriting
+existing values:
+
+| Setting                     | Default       | Purpose                                                    |
+| --------------------------- | ------------- | ---------------------------------------------------------- |
+| `AUTH_LDAP_ENABLED`         | `N`           | Enable LDAP-first credential verification                  |
+| `AUTH_LDAP_TLS_ENABLED`     | `N`           | `Y` requires verified LDAPS; `N` skips `OPEN_SSL`          |
+| `AUTH_LDAP_HOST`            | empty         | Hostname only, without `ldaps://` or a path                |
+| `AUTH_LDAP_PORT`            | `389`         | Explicit port; normally 389 for LDAP, 636 for LDAPS        |
+| `AUTH_LDAP_BASE_DN`         | empty         | Subtree search base                                        |
+| `AUTH_LDAP_LOGIN_ATTRIBUTE` | `uid`         | Login attribute, e.g. `uid` or `sAMAccountName`            |
+| `AUTH_LDAP_BIND_DN`         | empty         | Read-only service account used to search                   |
+| `AUTH_LDAP_BIND_PASSWORD`   | empty, secret | Service account password                                   |
+| `AUTH_LDAP_WALLET_PATH`     | empty         | Optional database-side Oracle wallet location (`file:...`) |
+| `AUTH_LDAP_WALLET_PASSWORD` | empty, secret | Optional wallet password                                   |
+
+Both passwords use encrypted Settings metadata (`secret: 'Y'`), masked CLI
+prompts, and SQL bind variables. Never put real credentials in migrations or
+commit a settings JSON file containing them. Both wallet fields may be empty or
+omitted from setup JSON. Omitted fields preserve existing saved values; empty
+strings clear them.
+
+**Transport is explicit, not inferred from the port.** The trusted setup JSON
+accepts `"auth_ldap_tls_enabled": false` (the seeded default) for ordinary LDAP
+without `OPEN_SSL`. This can transmit both service-account and user passwords
+without encryption; use it only for trusted test environments. Set
+`"auth_ldap_tls_enabled": true` and the correct port (normally 636) for LDAPS:
+`DBMS_LDAP.open_ssl(..., 2)` then requires server-authenticated TLS before any bind.
+TLS errors never trigger plaintext fallback. StartTLS and unauthenticated TLS
+are not supported. Stored mode values must be `Y` or `N`; missing/invalid
+configuration fails explicitly rather than selecting a transport.
+
+On **Autonomous Database**, Oracle ignores `SSLWRL` and `SSLWALLETPASSWD` and uses
+the database-managed outbound trust wallet. Leave both settings empty or omit
+them; no application-managed wallet is required. The directory certificate must
+be trusted by that managed wallet. Public-endpoint Autonomous Database connections
+require a hostname (not an IP address) and port 636. See Oracle's
+[DBMS_LDAP package notes](https://docs.oracle.com/en/cloud/paas/autonomous-database/serverless/adbsb/autonomous-plsql-packages.html#GUID-644A5423-25D0-46C0-B4A7-279A4ECB09D6).
+
+On **standard Oracle Database**, server-authenticated LDAPS may require an explicit
+database-side wallet containing the directory's trusted CA chain, and its password
+unless a supported auto-login wallet is used. Accepting empty setup values does
+not bypass the database's TLS requirements; missing trust fails explicitly at login.
+
+Interactive `ov ss` offers LDAP disabled by default. A trusted JSON settings file
+may specify `AUTH_LDAP_ENABLED: true` and the keys above (case-insensitive; the port
+is a JSON number). Missing required enabled-directory fields prompt, with defaults
+`389` and `uid`. Choose port 636 explicitly when enabling LDAPS. Optional wallet
+and TLS-mode fields do not prompt in file mode. Omitted LDAP enable and TLS flags
+preserve their saved values; they do not silently disable an existing TLS configuration.
+Disabling preserves saved credentials and grants. SMTP/JWT/application setup
+requirements remain unchanged.
+
+Setup adds the exact-host/port `connect` grant through
+`odbAcl.addLdap(host, port)` in the same transaction as the settings writes.
+Oracle's LDAP client requires `connect`, not the HTTP/SMTP-specific privileges.
+This is broader than a protocol-specific grant, but remains restricted to the
+configured host and port. The admin-only sandbox ACL page also supports LDAP
+grant/removal. Changing settings never removes old ACL grants automatically.
+
+The server normalizes the submitted username as for local login, escapes LDAP
+filter assertion values per RFC 4515, and performs a ten-second bounded subtree
+search using the service account. The outcomes are deliberately distinct:
+
+- **Zero entries:** try the existing local password flow, only if password auth
+  is enabled.
+- **Exactly one entry:** bind as that entry with the submitted password. Wrong
+  credentials never fall back to a local identity.
+- **Multiple entries, directory/TLS/search/configuration failures:** fail explicitly;
+  never treat an unavailable directory as "user not found."
+
+Empty passwords are rejected before LDAP access, preventing anonymous binds.
+Rate limiting applies before contacting the directory. LDAP handles/results are
+released and the package's exception mode is restored for pooled database sessions.
+The search timeout does not impose a deadline on DNS, TLS, or bind operations.
+
+A successful first bind creates an enabled account and a separate `ldap` identity
+keyed by the returned DN (maximum 255 characters); no LDAP password is stored.
+Automatic registration requires the signup flag. Existing local/Google username
+collisions are rejected (`LDAP_USERNAME_EXISTS`), not linked or merged. Existing
+LDAP accounts must still be locally enabled. All successful LDAP credential checks
+continue through the same TOTP enrollment/challenge policy as local passwords.
+Local password recovery/change does not manage directory credentials.
+
+This is a single-directory integration. Changing the configured directory or
+renaming/reusing DNs requires deliberate identity migration; do not repoint an
+installation with existing LDAP identities to another directory. Directory
+password changes and disablement are checked at the next credential login, not
+on every access/refresh token use; revoke local sessions when immediate removal
+is required.
+
+The public `ldap.forumsys.com` directory is not a seeded default. Its commonly
+published LDAP credentials do not establish that port 636 supports LDAPS or that
+its certificate is trusted by your Oracle wallet. For public test credentials on
+port 389, explicitly select `"auth_ldap_tls_enabled": false`. Never send production
+credentials to a public test directory. Production directories should use LDAPS.
+
+These bootstrap changes target fresh deployment. Editing an applied bootstrap
+migration does not upgrade an existing database: provision the direct grant,
+replace the auth/ACL and application packages, and seed missing settings through
+your deployment process before enabling LDAP. Regenerate the deployed OpenAPI
+manifest and web types after deployment.
+When upgrading the earlier TLS-only implementation, explicitly provision
+`AUTH_LDAP_TLS_ENABLED = Y` to preserve LDAPS, or `N` to opt into ordinary LDAP.
+`ov ss` writes this setting when the JSON includes `auth_ldap_tls_enabled`.
 
 ### Password login and enrollment
 

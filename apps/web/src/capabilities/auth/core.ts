@@ -78,6 +78,7 @@ export interface ChangePasswordCredentials {
 export interface AuthProviders {
   password: boolean
   google: boolean
+  ldap?: boolean
 }
 
 export interface AuthState<User extends AuthUser = AuthUser> {
@@ -523,6 +524,7 @@ export function createAuth<User extends AuthUser = AuthUser>(options: AuthOption
         if (
           typeof capabilities?.password !== 'boolean' ||
           typeof capabilities?.google !== 'boolean' ||
+          (capabilities.ldap !== undefined && typeof capabilities.ldap !== 'boolean') ||
           typeof signup !== 'boolean' ||
           typeof twoFactor !== 'boolean' ||
           (profile !== null &&

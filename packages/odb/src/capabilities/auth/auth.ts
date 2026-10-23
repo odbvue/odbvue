@@ -36,19 +36,24 @@ import { odbSettings } from '../settings/settings.js'
 import { settingsStore } from '../settings/tables.js'
 import {
   authJwtSettings,
+  authLdapSettings,
   authPolicySettings,
   type AuthConfig,
   type AuthFeature,
 } from './settings.js'
 /** Install after `odbRateLimit`, `odbSettings`, `odbLob` and `odbStorage`. */
 export const odbAuth = {
-  /** Deployment policy stored in Settings; omitted flags are enabled. */
+  /** Deployment policy stored in Settings; LDAP is opt-in, other omitted flags are enabled. */
   config(options: AuthConfig = {}) {
     return odbSettings.seed(
       ...authPolicySettings.map(([key, id]) => {
         if (options[key] !== undefined && typeof options[key] !== 'boolean')
           throw new Error(`odbAuth.config(): ${key} must be a boolean.`)
-        return { id, value: options[key] === false ? 'N' : 'Y', meta: { type: 'string' } }
+        return {
+          id,
+          value: (options[key] ?? key !== 'ldap') ? 'Y' : 'N',
+          meta: { type: 'string' },
+        }
       }),
     )
   },
@@ -112,7 +117,20 @@ export const odbAuth = {
   /** Seed missing configuration only; provisioning supplies the JWT secret later. */
   seedSettings() {
     const settings = [
-      ...authPolicySettings.map(([, id]) => ({ id, value: 'Y', meta: { type: 'string' } })),
+      ...authPolicySettings.map(([key, id]) => ({
+        id,
+        value: key === 'ldap' ? 'N' : 'Y',
+        meta: { type: 'string' },
+      })),
+      ...authLdapSettings.map((setting) => ({
+        id: setting.id,
+        value: setting.value,
+        meta: {
+          label: setting.label,
+          type: 'type' in setting ? setting.type : 'string',
+          ...('secret' in setting ? { secret: setting.secret } : {}),
+        },
+      })),
       {
         id: 'AUTH_JWT_SECRET',
         value: '',

@@ -531,7 +531,7 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
     summary: 'List application HTTP and SMTP host grants',
     response: { items: listAcl.parameters.items },
   })
-  for (const protocol of ['http', 'smtp'] as const) {
+  for (const protocol of ['http', 'smtp', 'ldap'] as const) {
     for (const action of ['add', 'remove'] as const) {
       const operation = pkg.proc(
         `${action}_${protocol}_acl`,
@@ -542,9 +542,13 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
               ? action === 'add'
                 ? odbAcl.addHttp
                 : odbAcl.removeHttp
-              : action === 'add'
-                ? odbAcl.addSmtp
-                : odbAcl.removeSmtp
+              : protocol === 'smtp'
+                ? action === 'add'
+                  ? odbAcl.addSmtp
+                  : odbAcl.removeSmtp
+                : action === 'add'
+                  ? odbAcl.addLdap
+                  : odbAcl.removeLdap
           body.call(call(host, port))
         },
       )

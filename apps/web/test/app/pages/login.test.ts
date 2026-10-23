@@ -87,6 +87,33 @@ describe('login page using application auth', () => {
     vi.unstubAllGlobals()
   })
 
+  it('shows the ordinary credential form for LDAP-only deployments without local recovery', async () => {
+    const context = await setup()
+    context.fetch.mockResolvedValueOnce(
+      json({
+        ...authState(),
+        providers: { password: false, google: false, ldap: true },
+        signup: false,
+      }),
+    )
+    await context.auth.getState()
+    await flushPromises()
+    expect(context.wrapper.findComponent(form).exists()).toBe(true)
+    expect(context.wrapper.text()).not.toContain(messages['auth.recover.title'])
+    context.fetch.mockResolvedValueOnce(
+      json({
+        accessToken: null,
+        challenge: 'A'.repeat(64),
+        setupSecret: null,
+      }),
+    )
+    await context.wrapper.findComponent(form).trigger('click')
+    await flushPromises()
+    expect(context.fetch.mock.calls.at(-1)?.[0]).toContain('/auth/login')
+    expect(context.wrapper.find('form').exists()).toBe(true)
+    context.wrapper.unmount()
+  })
+
   it('enrolls an authenticator, displays recovery codes once, then preserves the original redirect', async () => {
     const encode = vi.spyOn(QRCode, 'toString')
     const context = await setup()

@@ -468,6 +468,7 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
         permissions,
         googleEnabled,
         passwordEnabled,
+        ldapEnabled,
       } = body.variables({
         userId: odbAuth.types.userId,
         username: odbAuth.types.username,
@@ -481,8 +482,14 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
         permissions: odbType.json(),
         googleEnabled: odbType.string(5),
         passwordEnabled: odbType.string(5),
+        ldapEnabled: odbType.string(5),
       })
       body.set(cacheControl, 'no-store')
+      body.ifThen(
+        cond.eq(odbAuth.enabled('ldap'), true),
+        (yes) => yes.set(ldapEnabled, 'true'),
+        (no) => no.set(ldapEnabled, 'false'),
+      )
       body.ifThen(
         cond.eq(odbAuth.enabled('password'), true),
         (yes) => yes.set(passwordEnabled, 'true'),
@@ -511,9 +518,13 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
         odbQuery()
           .selectFrom('dual')
           .select(
-            plsqlExpr.jsonObject({ password: passwordEnabled, google: googleEnabled }, 'CLOB', {
-              formatJson: ['password', 'google'],
-            }),
+            plsqlExpr.jsonObject(
+              { password: passwordEnabled, google: googleEnabled, ldap: ldapEnabled },
+              'CLOB',
+              {
+                formatJson: ['password', 'google', 'ldap'],
+              },
+            ),
           )
           .into(providers),
       )
@@ -886,6 +897,7 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
 
 export const schema = odbSchema(schemaName, schemaPassword, (definition) => {
   definition.grant('EXECUTE ON DBMS_CRYPTO')
+  definition.grant('EXECUTE ON SYS.DBMS_LDAP')
   definition.grant('EXECUTE ON UTL_ENCODE')
   definition.grant('EXECUTE ON UTL_I18N')
   definition.grant('EXECUTE ON UTL_INADDR')

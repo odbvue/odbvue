@@ -27,7 +27,7 @@ export const odbAclPackage = odbPackage('odb_acl', (pkg) => {
       in: {
         host: aclTypes.host,
         port: aclTypes.port,
-        privilege: odbType.string(4),
+        privilege: odbType.string(7),
         removing: odbType.boolean(),
       },
     })
@@ -105,6 +105,8 @@ export const odbAclPackage = odbPackage('odb_acl', (pkg) => {
     removeHttp: ['remove_http', 'http', 443, true],
     addSmtp: ['add_smtp', 'smtp', 587, false],
     removeSmtp: ['remove_smtp', 'smtp', 587, true],
+    addLdap: ['add_ldap', 'connect', 636, false],
+    removeLdap: ['remove_ldap', 'connect', 636, true],
   } as const
   const define = (key: keyof typeof procedures) => {
     const [name, privilege, defaultPort, removing] = procedures[key]
@@ -126,6 +128,8 @@ export const odbAclPackage = odbPackage('odb_acl', (pkg) => {
   const removeHttp = define('removeHttp')
   const addSmtp = define('addSmtp')
   const removeSmtp = define('removeSmtp')
+  const addLdap = define('addLdap')
+  const removeLdap = define('removeLdap')
   const list = pkg.proc(
     'list',
     { out: { items: odbType.resultset() } },
@@ -147,6 +151,7 @@ export const odbAclPackage = odbPackage('odb_acl', (pkg) => {
               cond.or([
                 cond.eq(odbOracle.lower(hostAces.privilege), 'http'),
                 cond.eq(odbOracle.lower(hostAces.privilege), 'smtp'),
+                cond.eq(odbOracle.lower(hostAces.privilege), 'connect'),
               ]),
             ]),
           )
@@ -156,5 +161,5 @@ export const odbAclPackage = odbPackage('odb_acl', (pkg) => {
           .orderBy(hostAces.privilege),
       ),
   )
-  return { addHttp, removeHttp, addSmtp, removeSmtp, list }
+  return { addHttp, removeHttp, addSmtp, removeSmtp, addLdap, removeLdap, list }
 })

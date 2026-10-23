@@ -26,6 +26,16 @@ type SetupSettings = {
   auth_password_enabled?: boolean
   auth_two_factor_enabled?: boolean
   auth_signup_enabled?: boolean
+  auth_ldap_enabled?: boolean
+  auth_ldap_tls_enabled?: boolean
+  auth_ldap_host?: string
+  auth_ldap_port?: number
+  auth_ldap_base_dn?: string
+  auth_ldap_login_attribute?: string
+  auth_ldap_bind_dn?: string
+  auth_ldap_bind_password?: string
+  auth_ldap_wallet_path?: string
+  auth_ldap_wallet_password?: string
 }
 
 const hostValid = (value: unknown) =>
@@ -111,6 +121,43 @@ const googleValidators: Record<string, (value: unknown) => boolean> = {
   auth_google_client_id: googleClientIdValid,
   auth_google_client_secret: credentialValid,
 }
+const ldapFields = {
+  auth_ldap_tls_enabled: {
+    label: 'Require LDAPS? (without TLS, LDAP passwords may be sent unencrypted)',
+    optional: true,
+    initial: false,
+    validate: (value: unknown) => typeof value === 'boolean',
+  },
+  auth_ldap_host: { label: 'LDAP hostname', validate: hostValid },
+  auth_ldap_port: {
+    label: 'LDAP port (389 for LDAP, 636 for LDAPS)',
+    validate: portValid,
+    initial: 389,
+  },
+  auth_ldap_base_dn: { label: 'LDAP search base DN', validate: credentialValid },
+  auth_ldap_login_attribute: {
+    label: 'LDAP login attribute (uid or sAMAccountName)',
+    validate: (value: unknown) =>
+      typeof value === 'string' && /^[A-Za-z][A-Za-z0-9-]{0,127}$/.test(value),
+    initial: 'uid',
+  },
+  auth_ldap_bind_dn: { label: 'LDAP search account DN', validate: credentialValid },
+  auth_ldap_bind_password: { label: 'LDAP search account password', validate: credentialValid },
+  auth_ldap_wallet_path: {
+    label: 'LDAPS Oracle wallet path (optional; empty for database-managed trust)',
+    optional: true,
+    initial: '',
+    validate: (value: unknown) =>
+      value === '' ||
+      (credentialValid(value) && typeof value === 'string' && /^file:.+/.test(value)),
+  },
+  auth_ldap_wallet_password: {
+    label: 'LDAPS wallet password (optional)',
+    optional: true,
+    initial: '',
+    validate: (value: unknown) => typeof value === 'string' && value.length <= 2000,
+  },
+} as const
 
 const validators: Record<string, (value: unknown) => boolean> = {
   host: hostValid,
@@ -130,6 +177,8 @@ const fileValidators: Record<string, (value: unknown) => boolean> = {
   auth_password_enabled: (value) => typeof value === 'boolean',
   auth_two_factor_enabled: (value) => typeof value === 'boolean',
   auth_signup_enabled: (value) => typeof value === 'boolean',
+  auth_ldap_enabled: (value) => typeof value === 'boolean',
+  ...Object.fromEntries(Object.entries(ldapFields).map(([key, field]) => [key, field.validate])),
 }
 
 const settingsValid = (settings: Record<string, unknown>): settings is SetupSettings =>
@@ -161,6 +210,7 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
         (!normalized.startsWith('smtp_') &&
           !normalized.startsWith('auth_jwt_') &&
           !normalized.startsWith('auth_google_') &&
+          !normalized.startsWith('auth_ldap_') &&
           !['auth_password_enabled', 'auth_two_factor_enabled', 'auth_signup_enabled'].includes(
             normalized,
           ) &&
@@ -311,6 +361,57 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
       )
     }
   }
+  if (!cancelled && file === undefined) {
+    Object.assign(
+      settings,
+      await prompts(
+        [
+          {
+            type: 'confirm',
+            name: 'auth_ldap_enabled',
+            message: 'Enable LDAP sign-in (LDAP first, local only when not found)?',
+            initial: false,
+          },
+        ],
+        {
+          onCancel: () => {
+            cancelled = true
+          },
+        },
+      ),
+    )
+  }
+  if (!cancelled && settings.auth_ldap_enabled === true) {
+    const ldapQuestions: PromptObject[] = Object.entries(ldapFields)
+      .filter(
+        ([key, field]) =>
+          !Object.hasOwn(settings, key) && !(file !== undefined && 'optional' in field),
+      )
+      .map(([name, field]) => ({
+        type:
+          name === 'auth_ldap_tls_enabled'
+            ? 'confirm'
+            : name.endsWith('_password')
+              ? 'password'
+              : name.endsWith('_port')
+                ? 'number'
+                : 'text',
+        name,
+        message: field.label,
+        ...('initial' in field ? { initial: field.initial } : {}),
+        validate: (value: unknown) => field.validate(value) || `Invalid ${field.label}`,
+      }))
+    if (ldapQuestions.length) {
+      Object.assign(
+        settings,
+        await prompts(ldapQuestions, {
+          onCancel: () => {
+            cancelled = true
+          },
+        }),
+      )
+    }
+  }
 
   if (cancelled) {
     logger.info('Settings setup cancelled. No settings or ACLs were changed.')
@@ -318,6 +419,16 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
   }
   if (!settingsValid(settings)) {
     throw new Error('Invalid settings; no settings or ACLs were changed')
+  }
+  if (
+    settings.auth_ldap_enabled &&
+    !Object.entries(ldapFields).every(
+      ([key, field]) =>
+        ('optional' in field && settings[key as keyof SetupSettings] === undefined) ||
+        field.validate(settings[key as keyof SetupSettings]),
+    )
+  ) {
+    throw new Error('Invalid LDAP settings; no settings or ACLs were changed')
   }
 
   const schema = new SecretsStore().get('ODBVUE_ADB_SCHEMA_USERNAME')?.trim().toUpperCase()
@@ -344,10 +455,24 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
     'auth_password_enabled',
     'auth_two_factor_enabled',
     'auth_signup_enabled',
+    'auth_ldap_enabled',
   ] as const) {
     if (settings[key] !== undefined) {
       settingWrites.push([key.toUpperCase(), key])
       googleBindings[key] = settings[key] ? 'Y' : 'N'
+    }
+  }
+  for (const key of Object.keys(ldapFields) as Array<keyof typeof ldapFields>) {
+    if (settings[key] !== undefined) {
+      const value = settings[key]
+      googleBindings[key] = typeof value === 'boolean' ? (value ? 'Y' : 'N') : String(value)
+      settingWrites.push([
+        key.toUpperCase(),
+        key,
+        key.endsWith('_password') ? ':ldap_secret_meta' : undefined,
+      ])
+      if (key.endsWith('_password'))
+        googleBindings.ldap_secret_meta = JSON.stringify({ secret: 'Y' })
     }
   }
   if (settings.auth_google_enabled) {
@@ -386,6 +511,7 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
 ${writes}
   ${schema}.${odbAcl.addSmtp(':host', ':port').toSQL()};
 ${googleAcl}
+${settings.auth_ldap_enabled ? `  ${schema}.${odbAcl.addLdap(':auth_ldap_host', ':ldap_port').toSQL()};` : ''}
 END;`
 
   await withConnection(buildConnectionConfig(false), async (_connection, executor) => {
@@ -398,6 +524,7 @@ END;`
       await tx.run(sql, {
         ...values,
         ...googleBindings,
+        ...(settings.auth_ldap_enabled ? { ldap_port: settings.auth_ldap_port } : {}),
         port_value: String(settings.port),
         jwt_secret: auth_jwt_secret ?? randomBytes(32).toString('hex'),
         jwt_expiration: String(auth_jwt_expiration_seconds),
@@ -409,8 +536,13 @@ END;`
       `Register this Google OAuth redirect URI: ${googleBindings.auth_google_redirect_uri}`,
     )
   }
+  if (settings.auth_ldap_enabled && settings.auth_ldap_tls_enabled === false) {
+    logger.warn(
+      'LDAP TLS is disabled: directory passwords may be sent unencrypted. Use LDAPS in production.',
+    )
+  }
   logger.success(
-    `SMTP, JWT, application URL, and Google settings saved and host ACLs updated for ${schema}.`,
+    `SMTP, JWT, application URL, Google, and LDAP settings saved and host ACLs updated for ${schema}.`,
   )
   return true
 }

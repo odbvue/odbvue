@@ -1,6 +1,6 @@
 # Network ACL
 
-`odbAcl` installs the definer-rights `odb_acl` package. It manages HTTP and SMTP
+`odbAcl` installs the definer-rights `odb_acl` package. It manages HTTP, SMTP and LDAPS
 host grants for its owning application schema, even when called by the CLI's
 administrator connection. It does not accept an arbitrary principal.
 
@@ -28,7 +28,7 @@ Role-based grants are insufficient for definer-rights PL/SQL.
 This is a privileged capability: the schema can administer network ACLs and read
 the ACL dictionary. Do not grant untrusted database users execute access to
 `odb_acl`. HTTP authorization belongs to the application; the sandbox exposes
-all five operations only to the `admin` role.
+all seven operations only to the `admin` role.
 
 ## Calls
 
@@ -39,14 +39,21 @@ body.call(odbAcl.addHttp(host)) // exact port 443, privilege 'http'
 body.call(odbAcl.removeHttp(host)) // exact port 443
 body.call(odbAcl.addSmtp(host)) // exact port 587, privilege 'smtp'
 body.call(odbAcl.removeSmtp(host)) // exact port 587
+body.call(odbAcl.addLdap(host)) // exact port 636, privilege 'connect'
+body.call(odbAcl.removeLdap(host)) // exact port 636
 body.call(odbAcl.addSmtp(host, port)) // explicit exact port
 body.call(odbAcl.list(items)) // OUT SYS_REFCURSOR
 ```
 
-Omitting the port or passing SQL `NULL` selects 443 for HTTP and 587 for SMTP.
+Omitting the port or passing SQL `NULL` selects 443 for HTTP, 587 for SMTP and 636 for LDAPS.
 HTTP covers HTTPS too; no additional `connect` or `resolve` grant is added.
 587 is the SMTP submission default; use an explicit port for providers using
 25, 465, or another port. These grants do not configure TLS or credentials.
+`DBMS_LDAP` requires Oracle's `connect` privilege; there is no LDAP-specific ACL
+privilege. LDAP grants therefore allow TCP connections to that exact host/port.
+They do not select the authentication transport. The helper defaults to 636;
+pass port 389 explicitly for ordinary LDAP. Configure `AUTH_LDAP_TLS_ENABLED`
+and any required wallet separately; see [LDAP and LDAPS sign-in](./auth#ldap-and-ldaps-sign-in).
 
 Hostnames and IPv4 addresses must be at most 255 characters, without URLs,
 wildcards, or whitespace. Hosts are normalized to lowercase. Ports must be
@@ -54,7 +61,7 @@ integers from 1 through 65535. Invalid input raises an ODB validation error.
 Adding an existing privilege is idempotent using Oracle's duplicate-ACE handling;
 removing a missing matching grant is a no-op.
 
-`list` returns the owner's non-inverted database-principal HTTP/SMTP grants,
+`list` returns the owner's non-inverted database-principal HTTP/SMTP/connect grants,
 ordered by `host`, `lowerPort`, `upperPort`, and `privilege`. Port bounds are
 nullable for existing all-port grants. Existing range grants are also listed;
 the simplified mutation API only manages exact-port grants. Denies, role grants,
@@ -76,8 +83,10 @@ not embedded Oracle ACL administration SQL.
 
 ## Sandbox and upgrades
 
-The sandbox Network ACL page lists grants and adds/removes exact-port HTTP or
-SMTP grants through admin-only `/sandbox/acl` services.
+The sandbox Network ACL page lists grants and adds/removes exact-port HTTP, SMTP
+or LDAP grants through admin-only `/sandbox/acl` services. The LDAP selection maps
+to the dictionary's `connect` privilege; pre-existing connect grants are not
+necessarily LDAP-specific.
 
 Bootstrap provisions the direct prerequisite privileges through `definition.grant`
 and installs `odbAcl`; the existing `pck_sandbox` package exposes its

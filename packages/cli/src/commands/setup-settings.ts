@@ -8,7 +8,7 @@ export const registerSetupSettingsCommand = (program: Command) => {
     .command('setup-settings')
     .alias('ss')
     .description(
-      'Configure SMTP, JWT, application URL, and optional Google sign-in settings and network ACLs',
+      'Configure SMTP, JWT, application URL, Google/LDAP sign-in settings and network ACLs',
     )
     .argument(
       '[file]',
@@ -32,6 +32,22 @@ Never store the client secret in frontend config.
 Only enabled Google setup grants HTTPS ACLs for www.googleapis.com and
 oauth2.googleapis.com on port 443. Disabling preserves saved Google credentials.
 SMTP/JWT/application settings remain required. Existing JWT generation is unchanged.
+AUTH_LDAP_ENABLED accepts true/false; omitted file values preserve the current policy.
+Interactive setup offers LDAP disabled by default. When enabled, supply AUTH_LDAP_HOST,
+AUTH_LDAP_PORT (default 389), AUTH_LDAP_BASE_DN, AUTH_LDAP_LOGIN_ATTRIBUTE (uid),
+AUTH_LDAP_BIND_DN and AUTH_LDAP_BIND_PASSWORD.
+AUTH_LDAP_TLS_ENABLED accepts true/false and is seeded false. Set true for verified
+LDAPS and choose the correct port (normally 636). False skips OPEN_SSL: passwords
+may be sent unencrypted. Use TLS for production. There is no automatic downgrade,
+StartTLS, or transport inference from the port. Omitted file values preserve the saved mode.
+AUTH_LDAP_WALLET_PATH (file:...) and AUTH_LDAP_WALLET_PASSWORD are optional and
+may be empty or omitted. Autonomous Database ignores them and uses its managed
+outbound trust wallet; standard Oracle may require an explicit trusted wallet.
+Passwords are masked and stored as encrypted secret settings. When TLS is enabled,
+server certificate authentication is required. Setup grants exact-host/port connect
+access through odb_acl.add_ldap.
+Only a successful LDAP search with zero entries allows local password fallback.
+Wrong LDAP passwords, ambiguous searches, and directory/TLS errors never fall back.
 `,
     )
     .action(async (file?: string) => {

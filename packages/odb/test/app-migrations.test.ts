@@ -24,7 +24,7 @@ describe('app-owned ORDS migrations', () => {
     expect(JSON.stringify(appPackage.application())).not.toContain('"kind":"raw"')
     const sql = appPackage.toSQLUp()
     expect(sql).toContain(
-      "SELECT JSON_OBJECT('password' VALUE l_password_enabled FORMAT JSON, 'google' VALUE l_google_enabled FORMAT JSON RETURNING CLOB) INTO p_providers FROM dual;",
+      "SELECT JSON_OBJECT('password' VALUE l_password_enabled FORMAT JSON, 'google' VALUE l_google_enabled FORMAT JSON, 'ldap' VALUE l_ldap_enabled FORMAT JSON RETURNING CLOB) INTO p_providers FROM dual;",
     )
     expect(sql).toContain(
       "'roles' VALUE l_roles FORMAT JSON, 'permissions' VALUE l_permissions FORMAT JSON RETURNING CLOB) INTO p_user FROM dual;",

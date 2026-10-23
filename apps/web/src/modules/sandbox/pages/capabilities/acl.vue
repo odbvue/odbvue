@@ -2,7 +2,7 @@
   <v-container>
     <h3>Network ACL</h3>
     <p class="text-medium-emphasis">
-      Manage application-schema HTTP and SMTP grants through pck_sandbox → odb_acl.
+      Manage application-schema HTTP, SMTP and LDAPS grants through pck_sandbox → odb_acl.
     </p>
     <v-alert
       v-if="!canManage"
@@ -36,7 +36,7 @@
               min="1"
               max="65535"
               :placeholder="String(defaultPort)"
-              :hint="`Defaults to ${defaultPort}. Only the ${protocol} privilege is granted.`"
+              :hint="`Defaults to ${defaultPort}. Only the ${protocol === 'ldap' ? 'connect' : protocol} privilege is granted.`"
               persistent-hint
             />
           </v-card-text>
@@ -59,7 +59,7 @@
         </v-card>
       </v-col>
       <v-col cols="12" md="7">
-        <v-card title="HTTP and SMTP grants">
+        <v-card title="HTTP, SMTP and LDAPS grants">
           <v-table density="compact">
             <thead>
               <tr>
@@ -126,11 +126,11 @@ type Action = 'add' | 'remove' | 'list'
 const auth = useAuth()
 const http = useHttp()
 const canManage = computed(() => auth.authenticated.value && auth.hasRole('admin'))
-const protocols = ['http', 'smtp'] as const
-const protocol = ref<'http' | 'smtp'>('http')
+const protocols = ['http', 'smtp', 'ldap'] as const
+const protocol = ref<'http' | 'smtp' | 'ldap'>('http')
 const host = ref('')
 const port = ref<number | string>()
-const defaultPort = computed(() => (protocol.value === 'http' ? 443 : 587))
+const defaultPort = computed(() => ({ http: 443, smtp: 587, ldap: 636 })[protocol.value])
 const selectedPort = computed(() =>
   port.value === undefined || port.value === '' ? defaultPort.value : Number(port.value),
 )
@@ -203,12 +203,13 @@ const change = (action: 'add' | 'remove') =>
 const selectable = (item: Item) =>
   item.lowerPort != null &&
   item.lowerPort === item.upperPort &&
-  (item.privilege === 'http' || item.privilege === 'smtp')
+  (item.privilege === 'http' || item.privilege === 'smtp' || item.privilege === 'connect')
 
 function pick(item: Item) {
-  if (!selectable(item) || (item.privilege !== 'http' && item.privilege !== 'smtp')) return
+  if (!selectable(item)) return
   host.value = item.host
-  protocol.value = item.privilege
+  protocol.value =
+    item.privilege === 'connect' ? 'ldap' : item.privilege === 'http' ? 'http' : 'smtp'
   port.value = item.lowerPort ?? undefined
 }
 </script>

@@ -27,14 +27,16 @@ describe('auth policy and two-factor SQL', () => {
     )
   })
 
-  it('defaults all policy flags to true and permits explicit deployment overrides', () => {
+  it('defaults LDAP off and other policy flags on, and permits deployment overrides', () => {
     const defaults = odbAuth.config().toSQLUp({ schema: 'APP' })
     for (const name of ['PASSWORD', 'TWO_FACTOR', 'GOOGLE', 'SIGNUP'])
       expect(defaults).toContain(`APP.odb_settings.write('AUTH_${name}_ENABLED', 'Y'`)
     const overrides = odbAuth
       .config({ password: false, twoFactor: false, google: false, signup: false })
       .toSQLUp()
-    expect(overrides.match(/_ENABLED', 'N'/g)).toHaveLength(4)
+    expect(overrides.match(/_ENABLED', 'N'/g)).toHaveLength(5)
+    expect(defaults).toContain("AUTH_LDAP_ENABLED', 'N'")
+    expect(odbAuth.config({ ldap: true }).toSQLUp()).toContain("AUTH_LDAP_ENABLED', 'Y'")
     expect(() => odbAuth.config({ password: 'true' } as never)).toThrow('must be a boolean')
     expect(odbAuth.enabled('twoFactor').toSQL()).toBe("odb_auth.enabled('twoFactor')")
     expect(sql).toContain('AUTH_CONFIG_INVALID')

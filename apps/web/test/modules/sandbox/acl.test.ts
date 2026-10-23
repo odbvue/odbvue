@@ -72,6 +72,7 @@ describe('sandbox Network ACL page', () => {
   it.each([
     ['http', 443],
     ['smtp', 587],
+    ['ldap', 636],
   ] as const)('uses the default %s port %i and refreshes after adding', async (protocol, port) => {
     const wrapper = setup()
     await wrapper.get('select').setValue(protocol)

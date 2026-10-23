@@ -186,6 +186,16 @@ translation still determines the status when the procedure raises.
 
 `odbAuth` installs the `odb_auth` PL/SQL package, user and session tables, and JWT support. It provides `login`, `refresh`, `logout`, `read_user`, and `require_user` as transport-independent database operations; the application package exposes them over HTTP and owns headers, cookies, and routes. See the [Authentication capability](./auth) for installation and client integration.
 
+`odbAuth.config({ ldap: true })` enables LDAP-first username/password verification
+over LDAP or server-authenticated LDAPS, with local fallback only for a successful
+zero-entry search. `odbAuth.seedSettings()` supplies disabled/empty directory
+settings. `ov ss` provisions credentials and exact-port access through
+`odbAcl.addLdap` / `removeLdap` (default 636, Oracle `connect` privilege).
+`AUTH_LDAP_TLS_ENABLED` is seeded `N` (ordinary LDAP); set it to `Y` through
+`"auth_ldap_tls_enabled": true` for verified LDAPS. The default application port
+is 389; set 636 explicitly for LDAPS. TLS failures never downgrade to plaintext.
+See [LDAP and LDAPS sign-in](./auth#ldap-and-ldaps-sign-in) for transport, wallet requirements and collision policy.
+
 ## Google OpenID Connect
 
 Install `odbGoogle` after `odbAuth` and `odbSettings`, then install
