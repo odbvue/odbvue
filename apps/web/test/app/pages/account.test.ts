@@ -64,7 +64,10 @@ async function setup(
         }),
   }
   const fetch = vi.fn<typeof globalThis.fetch>()
-  const auth = createAuth({ http: createHttpClient({ fetch }) })
+  const auth = createAuth({
+    http: createHttpClient({ fetch }),
+    onOperation: (operation) => useUi().loading.start(operation),
+  })
   session.auth = auth
   if (options.ready !== false) {
     if (options.authenticated === false)
@@ -109,7 +112,8 @@ async function setup(
         VChip: container,
         VDivider: true,
         VFileInput: true,
-        AuthAvatar: true,
+        VAvatar: container,
+        VImg: true,
         VOvForm: passwordForm,
       },
     },
@@ -342,7 +346,7 @@ describe('explicit Google connection in account settings', () => {
     await context.wrapper.find('form').trigger('submit')
     await flushPromises()
     expect(context.ui.notification.value?.message).toBe(message)
-    expect(context.ui.loading.value).toBe(false)
+    expect(context.ui.loading.active.value).toBe(false)
     expect(context.auth.authenticated.value).toBe(true)
     expect(context.auth.accessToken.value).toBe('original-token')
     await context.wrapper.get('form input[type="password"]').setValue('retry-password')
@@ -360,7 +364,7 @@ describe('explicit Google connection in account settings', () => {
     expect(context.ui.notification.value?.message).toBe('auth.google.link.configuration')
     expect(context.auth.accessToken.value).toBe('original-token')
     expect(context.auth.user.value?.id).toBe(7)
-    expect(context.ui.loading.value).toBe(false)
+    expect(context.ui.loading.active.value).toBe(false)
     expect(assign).not.toHaveBeenCalled()
     context.wrapper.unmount()
   })
@@ -378,7 +382,7 @@ describe('explicit Google connection in account settings', () => {
       expect(context.ui.notification.value?.message).toBe('auth.google.link.failed')
       expect(context.auth.accessToken.value).toBe('original-token')
       expect(context.auth.user.value?.id).toBe(7)
-      expect(context.auth.loading.value).toBe(false)
+      expect(context.ui.loading.has('auth')).toBe(false)
       expect(assign).not.toHaveBeenCalled()
       context.wrapper.unmount()
     },

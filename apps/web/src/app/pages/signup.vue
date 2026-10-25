@@ -100,7 +100,8 @@ const options: OvFormOptions = {
 }
 
 async function submit(values: OvFormData) {
-  if (auth.loading.value || !auth.ready.value || submitted.value) return
+  if (ui.loading.has('auth') || ui.loading.has('overlay') || !auth.ready.value || submitted.value)
+    return
   ui.clear()
   const email = String(values.email ?? '').trim()
   const fullName = String(values.fullName ?? '').trim()
@@ -110,7 +111,7 @@ async function submit(values: OvFormData) {
     ui.error('auth.password.mismatch')
     return
   }
-  ui.startLoading()
+  const stopLoading = ui.loading.start('overlay.auth.signup')
   try {
     await auth.signup({ email, fullName, password, passwordRepeat })
     submitted.value = true
@@ -121,7 +122,7 @@ async function submit(values: OvFormData) {
     else ui.error(error)
   } finally {
     data.value = { email, fullName, password: '', passwordRepeat: '' }
-    ui.stopLoading()
+    stopLoading()
   }
 }
 </script>

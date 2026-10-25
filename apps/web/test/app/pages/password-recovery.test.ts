@@ -50,7 +50,10 @@ async function setup(page = RecoverPassword, hash = '', authenticated = false) {
       .mockResolvedValueOnce(json({ accessToken: 'old-access' }))
       .mockResolvedValueOnce(json(authState({ userId: 7, username: 'ada@example.com' })))
   } else fetch.mockResolvedValueOnce(json({}, 401)).mockResolvedValueOnce(json(authState()))
-  const auth = createAuth({ http: createHttpClient({ fetch }) })
+  const auth = createAuth({
+    http: createHttpClient({ fetch }),
+    onOperation: (operation) => useUi().loading.start(operation),
+  })
   session.auth = auth
   await auth.restore()
   const ui = useUi()
@@ -106,7 +109,7 @@ describe('password recovery pages', () => {
     expect(wrapper.text()).toContain('auth.recover.sent')
     expect(wrapper.findComponent(form).exists()).toBe(false)
     expect(auth.authenticated.value).toBe(false)
-    expect(ui.loading.value).toBe(false)
+    expect(ui.loading.active.value).toBe(false)
     wrapper.unmount()
   })
 
@@ -119,7 +122,7 @@ describe('password recovery pages', () => {
       await flushPromises()
       expect(wrapper.findComponent(form).exists()).toBe(true)
       expect(ui.notification.value?.type).toBe('error')
-      expect(ui.loading.value).toBe(false)
+      expect(ui.loading.active.value).toBe(false)
       fetch.mockResolvedValueOnce(new Response(null, { status: 204 }))
       wrapper.findComponent(form).vm.$emit('submit', { email: 'ada@example.com' })
       await flushPromises()
@@ -200,7 +203,7 @@ describe('password recovery pages', () => {
     expect(wrapper.findComponent(form).props('data')).toEqual({ password: '', passwordRepeat: '' })
     expect(ui.notification.value?.type).toBe('error')
     if (message) expect(ui.notification.value?.message).toBe(message)
-    expect(ui.loading.value).toBe(false)
+    expect(ui.loading.active.value).toBe(false)
     fetch.mockResolvedValueOnce(new Response(null, { status: 204 }))
     wrapper.findComponent(form).vm.$emit('submit', passwords)
     await flushPromises()
@@ -212,7 +215,7 @@ describe('password recovery pages', () => {
   it.each([RecoverPassword, ResetPassword])(
     'prevents duplicate submissions while loading',
     async (page) => {
-      const { wrapper, fetch, auth } = await setup(page, `#token=${token}`)
+      const { wrapper, fetch, ui } = await setup(page, `#token=${token}`)
       let finish!: (response: Response) => void
       fetch.mockImplementationOnce(
         () =>
@@ -226,7 +229,7 @@ describe('password recovery pages', () => {
       expect(fetch).toHaveBeenCalledTimes(3)
       finish(new Response(null, { status: 204 }))
       await flushPromises()
-      expect(auth.loading.value).toBe(false)
+      expect(ui.loading.has('auth')).toBe(false)
       wrapper.unmount()
     },
   )

@@ -77,7 +77,14 @@ onMounted(async () => {
 })
 
 async function submit(values: OvFormData) {
-  if (auth.loading.value || !auth.ready.value || invalid.value || completed.value) return
+  if (
+    ui.loading.has('auth') ||
+    ui.loading.has('overlay') ||
+    !auth.ready.value ||
+    invalid.value ||
+    completed.value
+  )
+    return
   ui.clear()
   const password = String(values.password ?? '')
   const passwordRepeat = String(values.passwordRepeat ?? '')
@@ -86,7 +93,7 @@ async function submit(values: OvFormData) {
     data.value = { password: '', passwordRepeat: '' }
     return
   }
-  ui.startLoading()
+  const stopLoading = ui.loading.start('overlay.auth.resetPassword')
   try {
     await auth.resetPassword({ token: token.value, password, passwordRepeat })
     completed.value = true
@@ -107,7 +114,7 @@ async function submit(values: OvFormData) {
     else ui.error(error)
   } finally {
     data.value = { password: '', passwordRepeat: '' }
-    ui.stopLoading()
+    stopLoading()
   }
 }
 </script>

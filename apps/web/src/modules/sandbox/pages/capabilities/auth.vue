@@ -35,7 +35,10 @@
             >
               Login
             </v-btn>
-            <v-btn :loading="auth.loading.value" prepend-icon="$mdiRefresh" @click="restore"
+            <v-btn
+              :loading="ui.loading.has('auth.refresh')"
+              prepend-icon="$mdiRefresh"
+              @click="restore"
               >Restore</v-btn
             >
             <v-btn :loading="callingState" prepend-icon="$mdiAccountSearch" @click="getState"
@@ -43,7 +46,7 @@
             >
             <v-btn
               :disabled="!auth.accessToken.value"
-              :loading="auth.loading.value"
+              :loading="ui.loading.has('auth.logout')"
               color="error"
               prepend-icon="$mdiLogout"
               @click="logout"
@@ -67,6 +70,7 @@
 
 <script setup lang="ts">
 import { useAuth } from '@/capabilities/auth'
+import { useUi } from '@/capabilities/ui'
 import { ref } from 'vue'
 
 definePage({
@@ -80,6 +84,7 @@ definePage({
 
 const events = ref<string[]>([])
 const auth = useAuth()
+const ui = useUi()
 const callingState = ref(false)
 const route = useRoute()
 async function restore() {

@@ -11,7 +11,7 @@
         </v-alert>
         <template v-else>
           <p class="mb-4">{{ t('auth.confirm.description') }}</p>
-          <v-btn color="primary" :disabled="auth.loading.value" @click="confirm">
+          <v-btn color="primary" :disabled="ui.loading.has('auth')" @click="confirm">
             {{ t('auth.confirm.action') }}
           </v-btn>
         </template>
@@ -44,9 +44,16 @@ onMounted(async () => {
 })
 
 async function confirm() {
-  if (auth.loading.value || !auth.ready.value || invalid.value || confirmed.value) return
+  if (
+    ui.loading.has('auth') ||
+    ui.loading.has('overlay') ||
+    !auth.ready.value ||
+    invalid.value ||
+    confirmed.value
+  )
+    return
   ui.clear()
-  ui.startLoading()
+  const stopLoading = ui.loading.start('overlay.auth.confirmEmail')
   try {
     await auth.confirmEmail(token.value)
     confirmed.value = true
@@ -59,7 +66,7 @@ async function confirm() {
     } else if (status === 429) ui.error('auth.signup.too.many.requests')
     else ui.error(error)
   } finally {
-    ui.stopLoading()
+    stopLoading()
   }
 }
 </script>

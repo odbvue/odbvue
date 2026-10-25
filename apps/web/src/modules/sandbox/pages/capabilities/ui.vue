@@ -88,8 +88,8 @@
             <v-btn color="warning" @click="ui.warning('Warning message')">Warning</v-btn>
             <v-btn color="error" @click="ui.error('Error message')">Error</v-btn>
             <v-btn color="primary" @click="ui.snack('Snackbar message')">Snackbar</v-btn>
-            <v-btn @click="ui.startLoading()">Start loading</v-btn>
-            <v-btn @click="ui.stopLoading()">Stop loading</v-btn>
+            <v-btn @click="startLoading">Start loading</v-btn>
+            <v-btn @click="finishLoading">Stop loading</v-btn>
             <v-btn @click="ui.clear()">Clear</v-btn>
           </v-card-text>
         </v-card>
@@ -101,7 +101,7 @@
 <script setup lang="ts">
 import { appConfig } from '@/capabilities/config'
 import { usePreferencesStore, useUi } from '@/capabilities/ui'
-import { computed } from 'vue'
+import { computed, onBeforeUnmount } from 'vue'
 
 definePage({
   meta: {
@@ -113,6 +113,15 @@ definePage({
 
 const preferences = usePreferencesStore()
 const ui = useUi()
+let stopLoading: (() => void) | undefined
+function startLoading() {
+  stopLoading ??= ui.loading.start('sandbox.demo')
+}
+function finishLoading() {
+  stopLoading?.()
+  stopLoading = undefined
+}
+onBeforeUnmount(finishLoading)
 const iconAliases = computed(() => Object.keys(appConfig.ui?.icons ?? {}))
 
 function formatConfiguration(value: unknown): string {

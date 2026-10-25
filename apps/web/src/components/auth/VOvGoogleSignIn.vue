@@ -4,7 +4,7 @@
     class="mt-4"
     block
     variant="outlined"
-    :disabled="!auth.ready.value || auth.loading.value || starting"
+    :disabled="!auth.ready.value || ui.loading.has('auth') || starting"
     @click="start"
   >
     {{ t('auth.google.continue') }}
@@ -26,10 +26,10 @@ const enabled = computed(() => auth.providers.value?.google === true)
 const starting = ref(false)
 
 async function start() {
-  if (!enabled.value || !auth.ready.value || auth.loading.value || starting.value) return
+  if (!enabled.value || !auth.ready.value || ui.loading.has('auth') || starting.value) return
   starting.value = true
   ui.clear()
-  ui.startLoading()
+  const stopLoading = ui.loading.start('overlay.auth.googleLogin')
   try {
     const redirect = resolveAuthRedirect(
       router,
@@ -43,7 +43,7 @@ async function start() {
     starting.value = false
     ui.error(error)
   } finally {
-    ui.stopLoading()
+    stopLoading()
   }
 }
 </script>

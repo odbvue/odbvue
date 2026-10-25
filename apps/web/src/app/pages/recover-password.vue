@@ -54,9 +54,10 @@ const options: OvFormOptions = {
 }
 
 async function submit(values: OvFormData) {
-  if (auth.loading.value || !auth.ready.value || submitted.value) return
+  if (ui.loading.has('auth') || ui.loading.has('overlay') || !auth.ready.value || submitted.value)
+    return
   ui.clear()
-  ui.startLoading()
+  const stopLoading = ui.loading.start('overlay.auth.recoverPassword')
   const email = String(values.email ?? '').trim()
   try {
     await auth.recoverPassword(email)
@@ -67,7 +68,7 @@ async function submit(values: OvFormData) {
     else ui.error(error)
   } finally {
     data.value = { email }
-    ui.stopLoading()
+    stopLoading()
   }
 }
 </script>

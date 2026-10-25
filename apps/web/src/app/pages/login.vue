@@ -48,14 +48,14 @@
               :label="t('auth.two.factor.code')"
               autocomplete="one-time-code"
               :maxlength="32"
-              :disabled="auth.loading.value"
+              :disabled="ui.loading.has('auth')"
               required
               autofocus
             />
-            <v-btn type="submit" color="primary" :disabled="auth.loading.value">
+            <v-btn type="submit" color="primary" :disabled="ui.loading.has('auth')">
               {{ t('auth.two.factor.verify') }}
             </v-btn>
-            <v-btn variant="text" :disabled="auth.loading.value" @click="cancel">
+            <v-btn variant="text" :disabled="ui.loading.has('auth')" @click="cancel">
               {{ t('auth.two.factor.cancel') }}
             </v-btn>
           </form>
@@ -199,9 +199,9 @@ const options: OvFormOptions = {
 }
 
 async function submit(data: OvFormData) {
-  if (auth.loading.value || !auth.ready.value) return
+  if (ui.loading.has('auth') || ui.loading.has('overlay') || !auth.ready.value) return
   ui.clear()
-  ui.startLoading()
+  const stopLoading = ui.loading.start('overlay.auth.login')
   try {
     const challenge = await auth.login({
       username: String(data.username),
@@ -220,15 +220,15 @@ async function submit(data: OvFormData) {
     else ui.error(error)
     return
   } finally {
-    ui.stopLoading()
+    stopLoading()
   }
   await finish()
 }
 
 async function verify() {
-  if (!pending.value || auth.loading.value) return
+  if (!pending.value || ui.loading.has('auth') || ui.loading.has('overlay')) return
   ui.clear()
-  ui.startLoading()
+  const stopLoading = ui.loading.start('overlay.auth.verifyTwoFactor')
   try {
     const result = await auth.verifyTwoFactor(
       pending.value.challenge,
@@ -249,7 +249,7 @@ async function verify() {
     else ui.error(error)
   } finally {
     verificationCode.value = ''
-    ui.stopLoading()
+    stopLoading()
   }
 }
 

@@ -1,6 +1,7 @@
-import { defineStore, acceptHMRUpdate, storeToRefs } from 'pinia'
+import { defineStore, acceptHMRUpdate, storeToRefs, type Pinia } from 'pinia'
 import { ref, computed, readonly } from 'vue'
 import { pinia } from '../state'
+import { createLoading } from './loading'
 
 export interface AlertOptions {
   timeout?: number
@@ -16,7 +17,7 @@ export interface UiNotification {
 }
 
 const useUiStore = defineStore('ui', () => {
-  const loading = ref(false)
+  const loading = createLoading()
   const notification = ref<UiNotification | undefined>(undefined)
   const snackbar = computed(() => notification.value?.presentation === 'snackbar')
   const activeAlertTimeout = ref<number | undefined>(undefined)
@@ -57,22 +58,16 @@ const useUiStore = defineStore('ui', () => {
     scheduleAlertClear(options.timeout ?? 0)
   }
 
-  function startLoading() {
-    loading.value = true
-  }
-
-  function stopLoading() {
-    loading.value = false
-  }
-
   return {
-    loading,
+    loadingCounts: loading.counts,
+    loadingActive: loading.active,
+    isLoading: loading.has,
+    startLoading: loading.start,
+    runLoading: loading.run,
     notification,
     snackbar,
     clearAll,
     show,
-    startLoading,
-    stopLoading,
   }
 })
 
@@ -81,12 +76,17 @@ function messageFrom(error: unknown): string {
 }
 
 /** Provides OdbVue's application-facing feedback API. */
-export function useUi() {
-  const store = useUiStore(pinia)
-  const { loading, notification, snackbar } = storeToRefs(store)
+export function useUi(state: Pinia = pinia) {
+  const store = useUiStore(state)
+  const { loadingActive, notification, snackbar } = storeToRefs(store)
 
   return {
-    loading: readonly(loading),
+    loading: {
+      active: readonly(loadingActive),
+      has: store.isLoading,
+      start: store.startLoading,
+      run: store.runLoading,
+    },
     notification: readonly(notification),
     snackbar: readonly(snackbar),
     clear: store.clearAll,
@@ -100,8 +100,6 @@ export function useUi() {
       store.show('error', messageFrom(error), 'alert', options),
     snack: (message: string, options?: AlertOptions) =>
       store.show('info', message, 'snackbar', options),
-    startLoading: store.startLoading,
-    stopLoading: store.stopLoading,
   }
 }
 

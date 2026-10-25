@@ -13,6 +13,12 @@ function sourceFiles(directory: string): string[] {
 }
 
 describe('application and capability source boundaries', () => {
+  it('keeps Vue components out of capabilities', () => {
+    expect(
+      sourceFiles(resolve(sourceRoot, 'capabilities')).filter((file) => file.endsWith('.vue')),
+    ).toEqual([])
+  })
+
   it('keeps the generated backend contract separate from capabilities', () => {
     expect(readdirSync(resolve(sourceRoot, 'api'))).toEqual(['openapi.generated.ts'])
     expect(existsSync(resolve(sourceRoot, 'capabilities', 'api'))).toBe(false)

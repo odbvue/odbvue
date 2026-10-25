@@ -7,7 +7,19 @@
     <v-card variant="outlined" class="mb-6">
       <v-card-text>
         <div class="d-flex align-center ga-4 mb-6">
-          <AuthAvatar :user="auth.user.value" :size="80" />
+          <v-avatar color="primary" :size="80">
+            <v-img
+              v-if="auth.user.value?.avatarUrl"
+              :src="auth.user.value.avatarUrl"
+              alt=""
+              referrerpolicy="no-referrer"
+            >
+              <template #error
+                ><span>{{ initials }}</span></template
+              >
+            </v-img>
+            <span v-else>{{ initials }}</span>
+          </v-avatar>
           <div>
             <h2 class="text-h5">{{ auth.user.value?.displayName || auth.user.value?.username }}</h2>
             <p class="text-body-2 text-medium-emphasis">{{ auth.user.value?.username }}</p>
@@ -141,8 +153,7 @@
 <script setup lang="ts">
 import type { OvFormData, OvFormOptions } from '@/components'
 import { useAuth } from '@/capabilities/auth'
-import AuthAvatar from '@/capabilities/auth/AuthAvatar.vue'
-import { createAvatar } from '@/capabilities/auth/avatar'
+import { avatarInitials, createAvatar } from '@/capabilities/auth/avatar'
 import { useUi } from '@/capabilities/ui'
 import { resolveAuthRedirect } from '@/capabilities/routing'
 
@@ -150,6 +161,7 @@ definePage({ meta: { title: 'Profile', access: 'authenticated', navigation: fals
 
 const auth = useAuth()
 const ui = useUi()
+const initials = computed(() => avatarInitials(auth.user.value))
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
@@ -162,7 +174,7 @@ const file = shallowRef<File | File[] | null>(null)
 const passwordData = ref<OvFormData>({ currentPassword: '', password: '', passwordRepeat: '' })
 const passwordFormKey = ref(0)
 const busy = computed(
-  () => starting.value || avatarSaving.value || changingPassword.value || auth.loading.value,
+  () => starting.value || avatarSaving.value || changingPassword.value || ui.loading.has('auth'),
 )
 const destination = computed(() => resolveAuthRedirect(router, route.query.redirect, '/account'))
 const continuing = computed(() => destination.value !== '/account')
@@ -313,7 +325,7 @@ async function connect() {
   if (!canConnect.value) return
   starting.value = true
   ui.clear()
-  ui.startLoading()
+  const stopLoading = ui.loading.start('overlay.auth.googleLink')
   const currentPassword = linkPassword.value
   linkPassword.value = ''
   try {
@@ -334,7 +346,7 @@ async function connect() {
     else if (status === 429) ui.error('auth.too.many.requests')
     else ui.error('auth.google.link.failed')
   } finally {
-    ui.stopLoading()
+    stopLoading()
   }
 }
 </script>

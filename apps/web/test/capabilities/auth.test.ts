@@ -1,7 +1,13 @@
 import { authState } from '../auth-state'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createAuth } from '@/capabilities/auth/core.js'
+import { createAuth as createCoreAuth, type AuthOptions } from '@/capabilities/auth/core.js'
 import { createHttpClient, type HttpClient } from '@/capabilities/http/core.js'
+import { createLoading } from '@/capabilities/ui/loading'
+
+const loading = createLoading()
+function createAuth(options: AuthOptions) {
+  return createCoreAuth({ ...options, onOperation: (operation) => loading.start(operation) })
+}
 
 type HttpPostMock = (url: string, body?: unknown) => Promise<unknown>
 type HttpGetMock = (url: string) => Promise<unknown>
@@ -12,6 +18,73 @@ function response<T>(data: T | null, status = 200) {
 
 describe('authentication capability', () => {
   afterEach(() => vi.restoreAllMocks())
+
+  it('keeps login active through nested profile work and an overlapping refresh', async () => {
+    const http = createHttpClient()
+    const profile = Promise.withResolvers<ReturnType<typeof response>>()
+    const refresh = Promise.withResolvers<ReturnType<typeof response>>()
+    vi.spyOn(http, 'post')
+      .mockResolvedValueOnce(response({ accessToken: 'login-token' }))
+      .mockReturnValueOnce(refresh.promise)
+    const get = vi.spyOn(http, 'get').mockReturnValue(profile.promise)
+    const auth = createAuth({ http })
+    const login = auth.login({ username: 'ada', password: 'password' })
+    await vi.waitFor(() => expect(get).toHaveBeenCalledOnce())
+    expect(loading.has('auth.login')).toBe(true)
+    expect(loading.has('auth.profile')).toBe(true)
+    const refreshing = auth.refresh()
+    refresh.resolve(response({ accessToken: 'fresh-token' }))
+    await refreshing
+    expect(loading.has('auth.refresh')).toBe(false)
+    expect(loading.has('auth.login')).toBe(true)
+    profile.resolve(response(authState({ userId: 7, username: 'ada' })))
+    await login
+    expect(loading.active.value).toBe(false)
+    expect(auth.authenticated.value).toBe(true)
+    expect(auth).not.toHaveProperty('loading')
+  })
+
+  it('keeps avatar mutation guarded through profile reload independently of presentation state', async () => {
+    const { auth, post } = await linkSession()
+    const http = createHttpClient()
+    // A separate session with deliberately disabled presentation tracking must retain its guards.
+    vi.spyOn(http, 'post').mockResolvedValue(response({ accessToken: 'token' }))
+    const get = vi
+      .spyOn(http, 'get')
+      .mockResolvedValue(response(authState({ userId: 7, username: 'ada' })))
+    const isolated = createCoreAuth({ http })
+    await isolated.restore()
+    const profile = Promise.withResolvers<ReturnType<typeof response>>()
+    get.mockReturnValueOnce(profile.promise)
+    const avatar = isolated.updateAvatar(null)
+    await vi.waitFor(() => expect(get).toHaveBeenCalledTimes(2))
+    await expect(isolated.startGoogleLink({ password: 'password' })).rejects.toThrow(
+      'already in progress',
+    )
+    await expect(isolated.updateAvatar(null)).rejects.toThrow('already in progress')
+    profile.resolve(response(authState({ userId: 7, username: 'ada' })))
+    await avatar
+
+    const first = Promise.withResolvers<ReturnType<typeof response>>()
+    const second = Promise.withResolvers<ReturnType<typeof response>>()
+    post.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    const signup = auth.signup({
+      email: 'ada@example.com',
+      fullName: 'Ada',
+      password: 'password',
+      passwordRepeat: 'password',
+    })
+    const recover = auth.recoverPassword('ada@example.com')
+    first.resolve(response(null, 204))
+    await signup
+    expect(loading.has('auth.recoverPassword')).toBe(true)
+    await expect(auth.startGoogleLink({ password: 'password' })).rejects.toThrow(
+      'already in progress',
+    )
+    second.resolve(response(null, 204))
+    await recover
+    expect(loading.active.value).toBe(false)
+  })
 
   it('maps actual profile state without inventing provider connections', async () => {
     const http = createHttpClient()
@@ -133,7 +206,7 @@ describe('authentication capability', () => {
       .mockResolvedValueOnce({ ...response(null, 404), error })
     await expect(auth.getState()).rejects.toBe(error)
     expect(auth.user.value).toBe(previous)
-    expect(auth.loading.value).toBe(false)
+    expect(loading.active.value).toBe(false)
   })
 
   it('does not restore an avatar or identity when a download finishes after sign-out', async () => {
@@ -181,7 +254,7 @@ describe('authentication capability', () => {
     post.mockResolvedValue({ ...response(null, 403), error: failure })
     await expect(auth.changePassword(credentials)).rejects.toBe(failure)
     expect(auth.authenticated.value).toBe(true)
-    expect(auth.loading.value).toBe(false)
+    expect(loading.active.value).toBe(false)
     post.mockResolvedValue(response(null, 204))
     await auth.changePassword(credentials)
     expect(post).toHaveBeenLastCalledWith(
@@ -263,7 +336,7 @@ describe('authentication capability', () => {
       )
       expect(auth.user.value).toBe(user)
       expect(auth.accessToken.value).toBe('original-token')
-      expect(auth.loading.value).toBe(false)
+      expect(loading.active.value).toBe(false)
     },
   )
 
@@ -299,7 +372,7 @@ describe('authentication capability', () => {
       await expect(auth.startGoogleLink({ password: 'password' })).rejects.toThrow()
       expect(auth.accessToken.value).toBe('original-token')
       expect(auth.user.value?.id).toBe(7)
-      expect(auth.loading.value).toBe(false)
+      expect(loading.active.value).toBe(false)
     },
   )
 
@@ -330,7 +403,7 @@ describe('authentication capability', () => {
     expect(fetch).toHaveBeenCalledTimes(1)
     expect(auth.accessToken.value).toBe('original-token')
     expect(auth.authenticated.value).toBe(true)
-    expect(auth.loading.value).toBe(false)
+    expect(loading.active.value).toBe(false)
   })
 
   it.each([403, 409, 429, 500])('preserves auth after link HTTP %s', async (status) => {
@@ -345,7 +418,7 @@ describe('authentication capability', () => {
     await expect(auth.startGoogleLink({ password: 'password' })).rejects.toThrow('Link rejected')
     expect(auth.accessToken.value).toBe('original-token')
     expect(auth.authenticated.value).toBe(true)
-    expect(auth.loading.value).toBe(false)
+    expect(loading.active.value).toBe(false)
   })
 
   it('rejects duplicate link starts and preserves auth after a network failure', async () => {
@@ -364,7 +437,7 @@ describe('authentication capability', () => {
     await expect(first).rejects.toThrow('Offline')
     expect(auth.authenticated.value).toBe(true)
     expect(auth.accessToken.value).toBe('original-token')
-    expect(auth.loading.value).toBe(false)
+    expect(loading.active.value).toBe(false)
   })
 
   it.each([true, false])('reads anonymous authentication state (%s)', async (enabled) => {
@@ -485,7 +558,7 @@ describe('authentication capability', () => {
     )
     expect(auth.accessToken.value).toBeNull()
     expect(auth.user.value).toBeNull()
-    expect(auth.loading.value).toBe(false)
+    expect(loading.active.value).toBe(false)
   })
 
   it.each([
@@ -503,7 +576,7 @@ describe('authentication capability', () => {
     vi.spyOn(http, 'post').mockResolvedValue(response({ authorizationUrl }))
     const auth = createAuth({ http })
     await expect(auth.startGoogleLogin()).rejects.toThrow()
-    expect(auth.loading.value).toBe(false)
+    expect(loading.active.value).toBe(false)
     expect(auth.accessToken.value).toBeNull()
   })
 
@@ -522,7 +595,7 @@ describe('authentication capability', () => {
     const auth = createAuth({ http })
     await expect(auth.startGoogleLogin()).rejects.toThrow('Too many requests')
     await expect(auth.startGoogleLogin()).rejects.toThrow('Unable to start Google sign-in')
-    expect(auth.loading.value).toBe(false)
+    expect(loading.active.value).toBe(false)
   })
 
   it('clears issued tokens if identity hydration fails during login', async () => {
@@ -539,7 +612,7 @@ describe('authentication capability', () => {
     await expect(auth.login({ username: 'ada', password: 'password' })).rejects.toThrow('Forbidden')
     expect(auth.accessToken.value).toBeNull()
     expect(auth.user.value).toBeNull()
-    expect(auth.loading.value).toBe(false)
+    expect(loading.active.value).toBe(false)
   })
 
   it('surfaces logout errors and clears the local session', async () => {
@@ -560,7 +633,7 @@ describe('authentication capability', () => {
     await expect(auth.logout()).rejects.toThrow('Logout failed')
     expect(auth.accessToken.value).toBeNull()
     expect(auth.user.value).toBeNull()
-    expect(auth.loading.value).toBe(false)
+    expect(loading.active.value).toBe(false)
   })
 
   it('hydrates roles and permissions from JSON text or decoded arrays', async () => {

@@ -20,6 +20,16 @@ The main `apps\web\src\app\App.vue` wraps pages in the selected application layo
 
 Modify default layout to have app layout with navigation drawer, app bar and footer.
 
+For signed-in users, the navigation drawer and app-bar account menu provide
+separate Profile and Logout entries. The drawer displays a non-clickable avatar
+and full name above these menu items. Avatars use Vuetify's standard `v-avatar`
+and `v-img`, with initials when no image is available or the image fails to load.
+The profile page uses the same Vuetify components;
+capabilities contain no Vue components.
+
+Logout is disabled during authentication activity, closes the navigation drawer,
+and returns to the home page. Anonymous users see Login instead.
+
 ::: details `apps\web\src\app\layouts\DefaultLayout.vue`
 
 ```vue

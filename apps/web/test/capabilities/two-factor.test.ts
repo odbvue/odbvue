@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createAuth } from '@/capabilities/auth/core'
+import { createAuth as createCoreAuth, type AuthOptions } from '@/capabilities/auth/core'
+import { createLoading } from '@/capabilities/ui/loading'
 import { createHttpClient } from '@/capabilities/http/core'
 import { authState } from '../auth-state'
 
@@ -7,6 +8,10 @@ const challenge = 'A'.repeat(64)
 const setupSecret = 'ABCDEFGHIJKLMNOP234567ABCDEFGHIJKLMNOP'.slice(0, 32)
 const codes = Array.from({ length: 10 }, (_, index) => String(index).padStart(32, '0'))
 const credentials = { username: 'ada', password: 'password' }
+const loading = createLoading()
+function createAuth(options: AuthOptions) {
+  return createCoreAuth({ ...options, onOperation: (operation) => loading.start(operation) })
+}
 
 function response<T>(data: T) {
   return { data, error: null, status: 200, headers: null }
@@ -31,7 +36,7 @@ describe('two-factor authentication client', () => {
       expect(auth.accessToken.value).toBeNull()
       expect(auth.user.value).toBeNull()
       expect(auth.authenticated.value).toBe(false)
-      expect(auth.loading.value).toBe(false)
+      expect(loading.active.value).toBe(false)
       expect(get).not.toHaveBeenCalled()
       expect(post).toHaveBeenCalledWith('/auth/login', credentials, { credentials: 'include' })
     },
@@ -67,7 +72,7 @@ describe('two-factor authentication client', () => {
       expect(get).toHaveBeenCalledOnce()
       expect(auth.authenticated.value).toBe(true)
       expect(auth.accessToken.value).toBe('verified-token')
-      expect(auth.loading.value).toBe(false)
+      expect(loading.active.value).toBe(false)
     },
   )
 
@@ -114,7 +119,7 @@ describe('two-factor authentication client', () => {
     await expect(auth.verifyTwoFactor(challenge, '123456')).rejects.toThrow()
     expect(auth.authenticated.value).toBe(false)
     expect(auth.accessToken.value).toBeNull()
-    expect(auth.loading.value).toBe(false)
+    expect(loading.active.value).toBe(false)
   })
 
   it.each([401, 403, 429])(
@@ -128,7 +133,7 @@ describe('two-factor authentication client', () => {
       post.mockResolvedValue({ data: null, error, status, headers: null })
       await expect(auth.verifyTwoFactor(challenge, '123456')).rejects.toBe(error)
       expect(auth.authenticated.value).toBe(false)
-      expect(auth.loading.value).toBe(false)
+      expect(loading.active.value).toBe(false)
     },
   )
 })

@@ -56,7 +56,10 @@ async function setup(page: typeof Signup | typeof ConfirmEmail = Signup, hash = 
   await router.push(page === Signup ? '/signup?redirect=/' : `/confirm-email${hash}`)
   const fetch = vi.fn<typeof globalThis.fetch>()
   fetch.mockResolvedValueOnce(json({}, 401)).mockResolvedValueOnce(json(authState()))
-  const auth = createAuth({ http: createHttpClient({ fetch }) })
+  const auth = createAuth({
+    http: createHttpClient({ fetch }),
+    onOperation: (operation) => useUi().loading.start(operation),
+  })
   session.auth = auth
   await auth.restore()
   const ui = useUi()
@@ -131,7 +134,7 @@ describe('signup and email confirmation', () => {
     expect(auth.accessToken.value).toBeNull()
     expect(wrapper.findComponent(form).exists()).toBe(false)
     expect(wrapper.text()).toContain('auth.signup.check.email')
-    expect(ui.loading.value).toBe(false)
+    expect(ui.loading.active.value).toBe(false)
     expect(localStorage.length).toBe(0)
     expect(sessionStorage.length).toBe(0)
     wrapper.unmount()
@@ -152,7 +155,7 @@ describe('signup and email confirmation', () => {
       password: '',
       passwordRepeat: '',
     })
-    expect(ui.loading.value).toBe(false)
+    expect(ui.loading.active.value).toBe(false)
     wrapper.unmount()
   })
 
@@ -166,7 +169,7 @@ describe('signup and email confirmation', () => {
   })
 
   it('prevents duplicate submissions and does not show success on delivery failure', async () => {
-    const { wrapper, fetch, ui, auth } = await setup()
+    const { wrapper, fetch, ui } = await setup()
     let finish!: (response: Response) => void
     fetch.mockImplementationOnce(
       () =>
@@ -177,13 +180,13 @@ describe('signup and email confirmation', () => {
     wrapper.findComponent(form).vm.$emit('submit', credentials)
     wrapper.findComponent(form).vm.$emit('submit', credentials)
     expect(fetch).toHaveBeenCalledTimes(3)
-    expect(ui.loading.value).toBe(true)
+    expect(ui.loading.has('overlay.auth.signup')).toBe(true)
     finish(json({}, 422))
     await flushPromises()
     expect(wrapper.findComponent(form).exists()).toBe(true)
     expect(ui.notification.value?.type).toBe('error')
-    expect(auth.loading.value).toBe(false)
-    expect(ui.loading.value).toBe(false)
+    expect(ui.loading.has('auth')).toBe(false)
+    expect(ui.loading.active.value).toBe(false)
     wrapper.unmount()
   })
 
@@ -220,7 +223,7 @@ describe('signup and email confirmation', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('auth.confirm.invalid')
     expect(auth.authenticated.value).toBe(false)
-    expect(ui.loading.value).toBe(false)
+    expect(ui.loading.active.value).toBe(false)
     wrapper.unmount()
   })
 })

@@ -82,10 +82,24 @@ describe('auth and HTTP module boundaries', () => {
     vi.stubGlobal('fetch', fetch)
     const { auth } = await import('@/capabilities/auth/index.js')
     const { http } = await import('@/capabilities/http/index.js')
+    const { app, useApp } = await import('@/capabilities')
+    const { pinia } = await import('@/capabilities/state')
+    const { isReadonly } = await import('vue')
 
-    await auth.login({ username: 'ada', password: 'password' })
+    expect(useApp()).toBe(app)
+    expect(app.auth).toBe(auth)
+    expect(app.http).toBe(http)
+    expect(isReadonly(app.auth.user)).toBe(true)
+    expect(isReadonly(app.ui.loading.active)).toBe(true)
+
+    const login = app.auth.login({ username: 'ada', password: 'password' })
+    expect(app.ui.loading.has('auth.login')).toBe(true)
+    expect(app.ui.loading.has('overlay')).toBe(false)
+    await login
     expect(auth.authenticated.value).toBe(true)
     expect(auth.user.value?.username).toBe('ada')
+    expect(pinia.state.value.auth?.user).toMatchObject({ username: 'ada' })
+    expect(app.ui.loading.active.value).toBe(false)
     requiredToken = 'fresh-token'
     const results = await Promise.all([http.get('/protected'), http.get('/protected')])
     expect(results.map((result) => result.data)).toEqual([{ ok: true }, { ok: true }])

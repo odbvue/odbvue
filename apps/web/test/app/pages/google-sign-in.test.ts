@@ -40,7 +40,10 @@ async function setup(enabled = true, redirect = '/sandbox', configError = false,
   })
   await router.push({ path: '/login', query: { redirect } })
   const fetch = vi.fn<typeof globalThis.fetch>()
-  const auth = createAuth({ http: createHttpClient({ fetch }) })
+  const auth = createAuth({
+    http: createHttpClient({ fetch }),
+    onOperation: (operation) => useUi().loading.start(operation),
+  })
   session.auth = auth
   const ui = useUi()
   ui.clear()
@@ -123,7 +126,7 @@ describe('shared Google sign-in button', () => {
   })
 
   it('blocks duplicate starts while the backend request is pending', async () => {
-    const { wrapper, fetch, auth } = await setup()
+    const { wrapper, fetch } = await setup()
     let finish!: (response: Response) => void
     fetch.mockImplementationOnce(
       () =>
@@ -135,7 +138,7 @@ describe('shared Google sign-in button', () => {
     wrapper.findComponent(button).vm.$emit('click')
     await flushPromises()
     expect(fetch).toHaveBeenCalledTimes(1)
-    expect(auth.loading.value).toBe(true)
+    expect(useUi().loading.has('auth.googleLogin')).toBe(true)
     finish(json({ authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth' }))
     await flushPromises()
     expect(assign).toHaveBeenCalledTimes(1)
@@ -149,13 +152,13 @@ describe('shared Google sign-in button', () => {
     await flushPromises()
     expect(assign).not.toHaveBeenCalled()
     expect(ui.notification.value?.message).toBe('Invalid Google authorization URL.')
-    expect(ui.loading.value).toBe(false)
+    expect(ui.loading.active.value).toBe(false)
     expect(wrapper.find('button').attributes('disabled')).toBeUndefined()
     fetch.mockResolvedValueOnce(json({}, 503))
     await wrapper.find('button').trigger('click')
     await flushPromises()
     expect(ui.notification.value?.type).toBe('error')
-    expect(ui.loading.value).toBe(false)
+    expect(ui.loading.active.value).toBe(false)
     wrapper.unmount()
   })
 })

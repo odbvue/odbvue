@@ -14,9 +14,25 @@
       <v-divider />
       <v-list v-if="auth.ready.value">
         <template v-if="auth.authenticated.value">
-          <v-list-item to="/account" :title="displayName" :subtitle="t('auth.account.title')">
-            <template #prepend><AuthAvatar :user="auth.user.value" class="mr-3" /></template>
-          </v-list-item>
+          <div class="d-flex align-center px-4 py-3">
+            <v-avatar color="primary" :size="32" class="mr-3">
+              <v-img v-if="avatarUrl" :src="avatarUrl" alt="" referrerpolicy="no-referrer">
+                <template #error
+                  ><span>{{ initials }}</span></template
+                >
+              </v-img>
+              <span v-else>{{ initials }}</span>
+            </v-avatar>
+            <span class="text-subtitle-1">{{ displayName }}</span>
+          </div>
+          <v-list-item to="/account" prepend-icon="$mdiAccount" :title="t('auth.account.title')" />
+          <v-list-item
+            role="button"
+            prepend-icon="$mdiLogout"
+            :title="t('auth.logout')"
+            :disabled="ui.loading.has('auth')"
+            @click="logout"
+          />
         </template>
         <v-list-item v-else to="/login" prepend-icon="$mdiAccount" :title="t('auth.login')" />
       </v-list>
@@ -34,23 +50,37 @@
               v-bind="props"
               :aria-label="t('auth.profile.menu', { name: displayName })"
               class="mr-2"
-              :loading="auth.loading.value"
+              :loading="ui.loading.has('auth')"
             >
-              <AuthAvatar :user="auth.user.value" :size="28" class="mr-2" />
+              <v-avatar color="primary" :size="28" class="mr-2">
+                <v-img v-if="avatarUrl" :src="avatarUrl" alt="" referrerpolicy="no-referrer">
+                  <template #error
+                    ><span>{{ initials }}</span></template
+                  >
+                </v-img>
+                <span v-else>{{ initials }}</span>
+              </v-avatar>
               <span v-if="!mobile">{{ displayName }}</span>
             </v-btn>
           </template>
           <v-list>
-            <v-list-item
-              to="/account"
-              prepend-icon="$mdiAccount"
-              :title="t('auth.account.title')"
-            />
+            <v-list-item to="/account" :title="t('auth.account.title')">
+              <template #prepend>
+                <v-avatar color="primary" :size="32" class="mr-3">
+                  <v-img v-if="avatarUrl" :src="avatarUrl" alt="" referrerpolicy="no-referrer">
+                    <template #error
+                      ><span>{{ initials }}</span></template
+                    >
+                  </v-img>
+                  <span v-else>{{ initials }}</span>
+                </v-avatar>
+              </template>
+            </v-list-item>
             <v-list-item
               role="button"
               prepend-icon="$mdiLogout"
               :title="t('auth.logout')"
-              :disabled="auth.loading.value"
+              :disabled="ui.loading.has('auth')"
               @click="logout"
             />
           </v-list>
@@ -136,7 +166,7 @@
         data-cy="theme-toggle"
       ></v-btn>
       <v-progress-linear
-        :active="ui.loading.value || auth.loading.value"
+        :active="ui.loading.active.value"
         indeterminate
         absolute
         location="bottom"
@@ -166,7 +196,7 @@
           </v-btn>
         </template>
       </v-snackbar>
-      <v-overlay :model-value="ui.loading.value" contained></v-overlay>
+      <v-overlay :model-value="ui.loading.active.value" contained persistent></v-overlay>
     </v-main>
     <v-footer app>
       <v-row>
@@ -193,16 +223,17 @@
 </template>
 
 <script setup lang="ts">
-import { useAuth } from '@/capabilities/auth'
-import AuthAvatar from '@/capabilities/auth/AuthAvatar.vue'
+import { useApp } from '@/capabilities'
+import { avatarInitials } from '@/capabilities/auth/avatar'
 import { appConfig } from '@/capabilities/config'
-import { usePreferencesStore, useUi } from '@/capabilities/ui'
+import { usePreferencesStore } from '@/capabilities/ui'
 import { useNotificationMessage } from '@/capabilities/ui'
 
 const drawer = ref(false)
 const preferences = usePreferencesStore()
-const ui = useUi()
-const auth = useAuth()
+const { ui, auth } = useApp()
+const avatarUrl = computed(() => auth.user.value?.avatarUrl)
+const initials = computed(() => avatarInitials(auth.user.value))
 const notificationMessage = useNotificationMessage(() => ui.notification.value?.message)
 const routing = useRouting()
 const navigationPages = computed(() =>
