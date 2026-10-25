@@ -25,7 +25,7 @@
             </v-avatar>
             <span class="text-subtitle-1">{{ displayName }}</span>
           </div>
-          <v-list-item to="/account" prepend-icon="$mdiAccount" :title="t('auth.account.title')" />
+          <v-list-item to="/settings" prepend-icon="$mdiCog" :title="t('settings.title')" />
           <v-list-item
             role="button"
             prepend-icon="$mdiLogout"
@@ -64,18 +64,7 @@
             </v-btn>
           </template>
           <v-list>
-            <v-list-item to="/account" :title="t('auth.account.title')">
-              <template #prepend>
-                <v-avatar color="primary" :size="32" class="mr-3">
-                  <v-img v-if="avatarUrl" :src="avatarUrl" alt="" referrerpolicy="no-referrer">
-                    <template #error
-                      ><span>{{ initials }}</span></template
-                    >
-                  </v-img>
-                  <span v-else>{{ initials }}</span>
-                </v-avatar>
-              </template>
-            </v-list-item>
+            <v-list-item to="/settings" prepend-icon="$mdiCog" :title="t('settings.title')" />
             <v-list-item
               role="button"
               prepend-icon="$mdiLogout"
@@ -237,7 +226,7 @@ const initials = computed(() => avatarInitials(auth.user.value))
 const notificationMessage = useNotificationMessage(() => ui.notification.value?.message)
 const routing = useRouting()
 const navigationPages = computed(() =>
-  routing.pages.value.filter((page) => page.module === undefined),
+  routing.pages.value.filter((page) => page.module === undefined && page.path !== '/settings'),
 )
 const displayName = computed(() =>
   typeof auth.user.value?.displayName === 'string'

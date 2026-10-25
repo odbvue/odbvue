@@ -74,21 +74,111 @@ async function mockProfile(
   return updates
 }
 
-test('opens profile through the identity menu and distinguishes local and Google sign-in', async ({
+test('opens Settings through the identity menu and distinguishes local and Google sign-in', async ({
   page,
 }) => {
   await mockProfile(page)
   await page.goto('/')
+  await expect(page.getByRole('button', { name: 'Account menu for Ada Lovelace' })).toBeVisible()
+  await expect(page.getByRole('main').locator('a[href="/settings"]')).toHaveCount(0)
+  await expect(page.getByRole('main').locator('a[href="/about"]')).toBeVisible()
   await page.getByRole('button', { name: 'Account menu for Ada Lovelace' }).click()
-  await expect(page.getByRole('button', { name: 'Logout', exact: true })).toBeVisible()
-  await page.getByRole('link', { name: 'Profile', exact: true }).click()
-  await expect(page).toHaveURL(/\/account$/)
-  await expect(page.getByRole('heading', { name: 'Profile', exact: true })).toBeVisible()
-  await expect(page.getByLabel('Full name', { exact: true })).toHaveValue('Ada Lovelace')
-  await expect(page.getByLabel('Email', { exact: true })).toHaveValue('ada@example.com')
+  const menu = page.locator('.v-menu .v-list')
+  await expect(menu.getByRole('button', { name: 'Logout', exact: true })).toBeVisible()
+  await menu.getByRole('link', { name: /Settings$/ }).click()
+  await expect(page).toHaveURL(/\/settings\/account$/)
+  await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Account', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('tab', { name: 'Account', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
+  await expect(page.locator('.v-breadcrumbs')).toContainText('Settings')
+  await expect(page.locator('.v-breadcrumbs')).toContainText('Account')
+  await expect(page.getByRole('tab')).toHaveCount(1)
+  await expect(page.getByRole('heading', { name: 'Ada Lovelace', exact: true })).toBeVisible()
+  await expect(page.getByText('ada@example.com', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Choose profile photo', { exact: true })).toHaveCount(0)
+  await expect(page.getByLabel('Current password', { exact: true })).toHaveCount(0)
   await expect(page.getByText('Connected', { exact: true })).toHaveCount(2)
   await expect(page.getByRole('button', { name: 'Connect Google', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Change password', exact: true })).toBeVisible()
+})
+
+test('redirects the settings entry and legacy account links without dropping query or hash', async ({
+  page,
+}) => {
+  await mockProfile(page, true, false)
+  for (const path of ['/settings', '/account']) {
+    await page.goto(`${path}?redirect=%2F&other=kept#security`)
+    await expect(page).toHaveURL(
+      (url) =>
+        url.pathname === '/settings/account' &&
+        url.searchParams.get('redirect') === '/' &&
+        url.searchParams.get('other') === 'kept' &&
+        url.hash === '#security',
+    )
+    await expect(page.getByLabel('Current password', { exact: true })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Account', exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+  }
+})
+
+test('continues to handle Google callbacks from legacy account URLs', async ({ page }) => {
+  await mockProfile(page)
+  await page.goto('/account?google=linked&redirect=%2F')
+  await expect(page).toHaveURL(/\/$/)
+  await expect(
+    page.getByText('Google is now connected to your account.', { exact: true }),
+  ).toBeVisible()
+})
+
+test('protects account settings and preserves the destination through login', async ({ page }) => {
+  await page.route('**/auth/**', async (route) => {
+    if (new URL(route.request().url()).pathname.endsWith('/state')) {
+      await route.fulfill({
+        json: {
+          user: null,
+          providers: { password: true, google: true },
+          signup: true,
+          twoFactor: true,
+        },
+      })
+    } else await route.fulfill({ status: 401, json: {} })
+  })
+  await page.goto('/settings')
+  await expect(page).toHaveURL(/\/login\?redirect=\/settings\/account$/)
+  await expect(page.getByRole('heading', { name: 'Account', exact: true })).toHaveCount(0)
+})
+
+test('reveals and closes editing forms on mobile without crowding the overview', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const updates = await mockProfile(page, true, false)
+  await page.goto('/settings/account')
+  await expect(page.getByLabel('Current password', { exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Change photo', exact: true }).click()
+  await expect(page.getByLabel('Choose profile photo', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Close', exact: true }).click()
+  await expect(page.getByLabel('Choose profile photo', { exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Change password', exact: true }).click()
+  await page.getByLabel('Current password', { exact: true }).fill('private-password')
+  await page.getByRole('button', { name: 'Close', exact: true }).click()
+  await page.getByRole('button', { name: 'Change password', exact: true }).click()
+  await expect(page.getByLabel('Current password', { exact: true })).toHaveValue('')
+  await page.getByRole('button', { name: 'Close', exact: true }).click()
+  await page.getByRole('button', { name: 'Connect Google', exact: true }).click()
+  await page.getByLabel('Current password', { exact: true }).fill('private-password')
+  await page.getByRole('button', { name: 'Close', exact: true }).click()
+  await page.getByRole('button', { name: 'Connect Google', exact: true }).click()
+  await expect(page.getByLabel('Current password', { exact: true })).toHaveValue('')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  )
+  expect(updates).toHaveLength(0)
 })
 
 test('Google-only accounts do not show a misleading local password form, including on mobile', async ({
@@ -96,7 +186,7 @@ test('Google-only accounts do not show a misleading local password form, includi
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await mockProfile(page, false)
-  await page.goto('/account')
+  await page.goto('/settings/account')
   await expect(page.getByText('Not connected', { exact: true })).toBeVisible()
   await expect(page.getByText(/This account uses Google sign-in/)).toBeVisible()
   await expect(page.getByLabel('Current password', { exact: true })).toHaveCount(0)
@@ -123,7 +213,7 @@ for (const type of ['image/jpeg', 'image/png', 'image/webp']) {
       }),
     )
     const updates = await mockProfile(page, true, true, googlePhoto)
-    await page.goto('/account')
+    await page.goto('/settings/account')
     const data = await page.evaluate((mimeType) => {
       const canvas = document.createElement('canvas')
       canvas.width = 320
@@ -133,6 +223,7 @@ for (const type of ['image/jpeg', 'image/png', 'image/webp']) {
       context.fillRect(0, 0, 320, 200)
       return canvas.toDataURL(mimeType).split(',')[1]!
     }, type)
+    await page.getByRole('button', { name: 'Change photo', exact: true }).click()
     await page.getByLabel('Choose profile photo', { exact: true }).setInputFiles({
       name: `avatar.${type.split('/')[1]}`,
       mimeType: type,
@@ -157,6 +248,7 @@ for (const type of ['image/jpeg', 'image/png', 'image/webp']) {
     expect(thumbnail).toMatchObject({ width: 128, height: 128 })
     expect(thumbnail.source).toMatch(/^blob:/)
     await page.reload()
+    await page.getByRole('button', { name: 'Change photo', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Remove uploaded photo' })).toBeVisible()
     await page.getByRole('button', { name: 'Remove uploaded photo' }).click()
     await expect(page.getByRole('button', { name: 'Remove uploaded photo' })).toHaveCount(0)
@@ -175,13 +267,13 @@ test('still links Google with a current password and preserves the guided return
   await page.route('https://accounts.google.com/**', (route) =>
     route.fulfill({ contentType: 'text/html', body: '<h1>Google authorization</h1>' }),
   )
-  await page.goto('/account?redirect=/')
+  await page.goto('/settings/account?redirect=/')
   await expect(page.getByText('Not connected', { exact: true })).toBeVisible()
   await page.getByLabel('Current password', { exact: true }).first().fill('current-password')
   await page.getByRole('button', { name: 'Connect Google', exact: true }).click()
   await expect(page).toHaveURL('https://accounts.google.com/o/oauth2/v2/auth?state=profile-link')
   expect(updates).toEqual([{ redirect: '/', password: 'current-password' }])
-  await page.goto('/account?google=linked&redirect=/')
+  await page.goto('/settings/account?google=linked&redirect=/')
   await expect(page).toHaveURL(/\/$/)
   await expect(
     page.getByText('Google is now connected to your account.', { exact: true }),
@@ -192,7 +284,8 @@ test('validates password changes, retains the session on failure and returns to 
   page,
 }) => {
   const updates = await mockProfile(page)
-  await page.goto('/account')
+  await page.goto('/settings/account')
+  await page.getByRole('button', { name: 'Change password', exact: true }).click()
   await page.getByLabel('Current password', { exact: true }).fill('wrong-password')
   await page.getByLabel('New password', { exact: true }).fill('new-password')
   await page.getByLabel('Repeat password', { exact: true }).fill('different-password')
@@ -204,7 +297,7 @@ test('validates password changes, retains the session on failure and returns to 
   await expect(
     page.getByText('Your current password is incorrect. Please try again.', { exact: true }),
   ).toBeVisible()
-  await expect(page).toHaveURL(/\/account$/)
+  await expect(page).toHaveURL(/\/settings\/account$/)
   await expect(page.getByLabel('Current password', { exact: true })).toHaveValue('')
   await page.getByLabel('Current password', { exact: true }).fill('current-password')
   await page.getByLabel('New password', { exact: true }).fill('new-password')

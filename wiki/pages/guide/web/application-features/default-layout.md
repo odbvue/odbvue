@@ -21,10 +21,19 @@ The main `apps\web\src\app\App.vue` wraps pages in the selected application layo
 Modify default layout to have app layout with navigation drawer, app bar and footer.
 
 For signed-in users, the navigation drawer and app-bar account menu provide
-separate Profile and Logout entries. The drawer displays a non-clickable avatar
+separate Settings and Logout entries. Settings uses a cog icon in both menus;
+the app-bar menu activator retains the user's avatar. The drawer displays a non-clickable avatar
 and full name above these menu items. Avatars use Vuetify's standard `v-avatar`
 and `v-img`, with initials when no image is available or the image fails to load.
-The profile page uses the same Vuetify components;
+Settings opens `/settings`, which defaults to the Account section at
+`/settings/account`. Settings is available from the identity menu and drawer,
+not as a home-page widget. Account is the only implemented section; Appearance
+(`/settings/appearance`), Language & region (`/settings/language`) and Notifications
+(`/settings/notifications`) can be added as sibling pages later. These unimplemented
+sections are not shown as navigation links. Legacy `/account` links redirect to
+the new Account page while retaining query parameters and the hash.
+The active Account tab labels its content, without a duplicate Account heading below it.
+The Account page uses the same Vuetify components;
 capabilities contain no Vue components.
 
 Logout is disabled during authentication activity, closes the navigation drawer,

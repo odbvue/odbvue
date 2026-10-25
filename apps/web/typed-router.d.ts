@@ -285,6 +285,28 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/settings': RouteRecordInfo<
+      '/settings',
+      '/settings',
+      Record<never, never>,
+      Record<never, never>,
+      | '/settings/'
+      | '/settings/account'
+    >,
+    '/settings/': RouteRecordInfo<
+      '/settings/',
+      '/settings',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/settings/account': RouteRecordInfo<
+      '/settings/account',
+      '/settings/account',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/signup': RouteRecordInfo<
       '/signup',
       '/signup',
@@ -590,6 +612,32 @@ declare module 'vue-router/auto-routes' {
     'src/modules/sandbox/pages/sandbox-dnd.vue': {
       routes:
         | '/sandbox/sandbox-dnd'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/app/pages/settings.vue': {
+      routes:
+        | '/settings'
+        | '/settings/'
+        | '/settings/account'
+      views:
+        | 'default'
+      pathParamNames:
+        | never
+    }
+    'src/app/pages/settings/index.vue': {
+      routes:
+        | '/settings/'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/app/pages/settings/account.vue': {
+      routes:
+        | '/settings/account'
       views:
         | never
       pathParamNames:

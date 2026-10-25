@@ -9,7 +9,7 @@ import { createAuthGuard } from '@/capabilities/routing/auth'
 import { createState } from '@/capabilities/state'
 import { i18n } from '@/capabilities/i18n'
 import { useUi } from '@/capabilities/ui'
-import Account from '@/app/pages/account.vue'
+import Account from '@/app/pages/settings/account.vue'
 
 const session = vi.hoisted((): { auth?: Auth } => ({}))
 vi.mock('@/capabilities/auth', async (importOriginal) => {
@@ -33,6 +33,11 @@ const passwordForm = defineComponent({
   template: '<div data-testid="password-form" />',
 })
 const container = { template: '<div><slot /></div>' }
+
+async function openGoogle(wrapper: ReturnType<typeof mount>) {
+  const action = wrapper.findAll('button').find((item) => item.text() === 'auth.google.connect')
+  if (action && !wrapper.find('form').exists()) await action.trigger('click')
+}
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -90,10 +95,14 @@ async function setup(
       { path: '/', component: {} },
       { path: '/login', component: {} },
       { path: '/sandbox', component: {} },
-      { path: '/account', component: {}, meta: { access: 'authenticated', navigation: false } },
+      {
+        path: '/settings/account',
+        component: {},
+        meta: { access: 'authenticated', navigation: false },
+      },
     ],
   })
-  await router.push(options.location ?? '/account')
+  await router.push(options.location ?? '/settings/account')
   const ui = useUi()
   ui.clear()
   const wrapper = mount(Account, {
@@ -149,14 +158,18 @@ describe('explicit Google connection in account settings', () => {
   it('uses the authenticated page guard and returns anonymous visitors through login', async () => {
     const context = await setup({ authenticated: false })
     expect(page).toHaveBeenCalledWith({
-      meta: { title: 'Profile', access: 'authenticated', navigation: false },
+      meta: { title: 'Account', access: 'authenticated', navigation: true },
     })
-    context.router.addRoute({ path: '/account', component: {}, meta: page.mock.calls[0]![0].meta })
+    context.router.addRoute({
+      path: '/settings/account',
+      component: {},
+      meta: page.mock.calls[0]![0].meta,
+    })
     context.router.beforeEach(createAuthGuard(context.router, context.auth))
     await context.router.push('/')
-    await context.router.push('/account')
+    await context.router.push('/settings/account')
     expect(context.router.currentRoute.value.path).toBe('/login')
-    expect(context.router.currentRoute.value.query.redirect).toBe('/account')
+    expect(context.router.currentRoute.value.query.redirect).toBe('/settings/account')
     context.wrapper.unmount()
   })
 
@@ -164,8 +177,8 @@ describe('explicit Google connection in account settings', () => {
     const context = await setup()
     context.router.beforeEach(createAuthGuard(context.router, context.auth))
     await context.router.push('/')
-    await context.router.push('/account')
-    expect(context.router.currentRoute.value.path).toBe('/account')
+    await context.router.push('/settings/account')
+    expect(context.router.currentRoute.value.path).toBe('/settings/account')
     context.wrapper.unmount()
   })
 
@@ -182,9 +195,7 @@ describe('explicit Google connection in account settings', () => {
     async (options) => {
       const context = await setup(options)
       expect(context.wrapper.find('form').exists()).toBe(false)
-      expect(context.wrapper.findComponent(passwordForm).exists()).toBe(
-        options.passwordConnected !== false && options.providerMetadata !== false,
-      )
+      expect(context.wrapper.findComponent(passwordForm).exists()).toBe(false)
       if (options.googleConnected)
         expect(context.wrapper.text()).toContain('auth.profile.google.connected')
       if (options.passwordConnected === false)
@@ -203,7 +214,10 @@ describe('explicit Google connection in account settings', () => {
       if (options.ready === false || options.authenticated === false) {
         expect(context.wrapper.find('form').exists()).toBe(false)
       } else {
-        expect(context.wrapper.get('form button').attributes('disabled')).toBeDefined()
+        await openGoogle(context.wrapper)
+        expect(
+          context.wrapper.get('form button[type="submit"]').attributes('disabled'),
+        ).toBeDefined()
         await context.wrapper.get('form').trigger('submit')
       }
       expect(context.fetch).not.toHaveBeenCalled()
@@ -212,7 +226,8 @@ describe('explicit Google connection in account settings', () => {
   )
 
   it('submits only the fixed account destination, clears password, and blocks duplicate starts', async () => {
-    const context = await setup({ location: '/account?redirect=https://evil.example' })
+    const context = await setup({ location: '/settings/account?redirect=https://evil.example' })
+    await openGoogle(context.wrapper)
     await context.wrapper.get('form input[type="password"]').setValue('current-password')
     let finish!: (response: Response) => void
     context.fetch.mockImplementationOnce(
@@ -227,10 +242,10 @@ describe('explicit Google connection in account settings', () => {
     expect(context.wrapper.get<HTMLInputElement>('form input[type="password"]').element.value).toBe(
       '',
     )
-    expect(context.wrapper.get('form button').attributes('disabled')).toBeDefined()
+    expect(context.wrapper.get('form button[type="submit"]').attributes('disabled')).toBeDefined()
     const [, options] = context.fetch.mock.calls[0]!
     expect(JSON.parse(String(options?.body))).toEqual({
-      redirect: '/account',
+      redirect: '/settings/account',
       password: 'current-password',
     })
     expect(new Headers(options?.headers).get('Authorization')).toBe(
@@ -243,13 +258,13 @@ describe('explicit Google connection in account settings', () => {
     expect(assign).toHaveBeenCalledWith(authorizationUrl)
     expect(context.auth.accessToken.value).toBe('original-token')
     expect(context.auth.user.value?.id).toBe(7)
-    expect(context.wrapper.get('form button').attributes('disabled')).toBeDefined()
+    expect(context.wrapper.get('form button[type="submit"]').attributes('disabled')).toBeDefined()
     context.wrapper.unmount()
   })
 
   it('carries the validated destination through a fresh explicit Google authorization', async () => {
-    const context = await setup({ location: '/account?redirect=%2Fsandbox' })
-    expect(context.wrapper.findAll('button')).toHaveLength(2)
+    const context = await setup({ location: '/settings/account?redirect=%2Fsandbox' })
+    expect(context.wrapper.find('form').exists()).toBe(true)
     await context.wrapper.get('form input[type="password"]').setValue('current-password')
     context.fetch.mockResolvedValueOnce(
       json({ authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=fresh-link' }),
@@ -268,7 +283,7 @@ describe('explicit Google connection in account settings', () => {
   })
 
   it('continues to the original destination after a successful link without replacing the session', async () => {
-    const context = await setup({ location: '/account?google=linked&redirect=%2Fsandbox' })
+    const context = await setup({ location: '/settings/account?google=linked&redirect=%2Fsandbox' })
     expect(context.router.currentRoute.value.fullPath).toBe('/sandbox')
     expect(context.auth.accessToken.value).toBe('original-token')
     expect(context.auth.user.value?.id).toBe(7)
@@ -279,8 +294,10 @@ describe('explicit Google connection in account settings', () => {
   })
 
   it.each(['cancelled', 'error'])('keeps the destination for retry after %s', async (outcome) => {
-    const context = await setup({ location: `/account?google=${outcome}&redirect=%2Fsandbox` })
-    expect(context.router.currentRoute.value.path).toBe('/account')
+    const context = await setup({
+      location: `/settings/account?google=${outcome}&redirect=%2Fsandbox`,
+    })
+    expect(context.router.currentRoute.value.path).toBe('/settings/account')
     expect(context.router.currentRoute.value.query.redirect).toBe('/sandbox')
     expect(context.ui.notification.value?.type).toBe('error')
     expect(assign).not.toHaveBeenCalled()
@@ -288,8 +305,11 @@ describe('explicit Google connection in account settings', () => {
   })
 
   it('lets users continue without adding a Google identity', async () => {
-    const context = await setup({ location: '/account?redirect=%2Fsandbox' })
-    await context.wrapper.get('button[type="button"]').trigger('click')
+    const context = await setup({ location: '/settings/account?redirect=%2Fsandbox' })
+    await context.wrapper
+      .findAll('button')
+      .find((item) => item.text() === 'auth.google.link.skip')!
+      .trigger('click')
     await flushPromises()
     expect(context.router.currentRoute.value.fullPath).toBe('/sandbox')
     expect(context.fetch).not.toHaveBeenCalled()
@@ -300,11 +320,11 @@ describe('explicit Google connection in account settings', () => {
     'never follows unsafe callback destination %s',
     async (redirect) => {
       const context = await setup({
-        location: `/account?google=linked&redirect=${encodeURIComponent(redirect)}`,
+        location: `/settings/account?google=linked&redirect=${encodeURIComponent(redirect)}`,
       })
-      expect(context.router.currentRoute.value.path).toBe('/account')
+      expect(context.router.currentRoute.value.path).toBe('/settings/account')
       expect(context.wrapper.find('form').exists()).toBe(false)
-      expect(context.wrapper.find('button[type="button"]').exists()).toBe(false)
+      expect(context.wrapper.text()).not.toContain('auth.google.link.skip')
       expect(assign).not.toHaveBeenCalled()
       context.wrapper.unmount()
     },
@@ -318,7 +338,7 @@ describe('explicit Google connection in account settings', () => {
     ['untrusted detail', 'error', 'auth.google.link.failed'],
   ])('consumes outcome %s without changing sessions', async (outcome, type, message) => {
     const context = await setup({
-      location: `/account?google=${encodeURIComponent(outcome)}&other=kept#section`,
+      location: `/settings/account?google=${encodeURIComponent(outcome)}&other=kept#section`,
     })
     expect(context.ui.notification.value).toMatchObject({ type, message })
     expect(context.router.currentRoute.value.query).toEqual({ other: 'kept' })
@@ -341,6 +361,7 @@ describe('explicit Google connection in account settings', () => {
     [500, 'auth.google.link.failed'],
   ])('shows HTTP %s feedback, preserves auth and permits retry', async (status, message) => {
     const context = await setup()
+    await openGoogle(context.wrapper)
     await context.wrapper.get('form input[type="password"]').setValue('password')
     context.fetch.mockResolvedValueOnce(json({}, status))
     await context.wrapper.find('form').trigger('submit')
@@ -350,13 +371,14 @@ describe('explicit Google connection in account settings', () => {
     expect(context.auth.authenticated.value).toBe(true)
     expect(context.auth.accessToken.value).toBe('original-token')
     await context.wrapper.get('form input[type="password"]').setValue('retry-password')
-    expect(context.wrapper.get('form button').attributes('disabled')).toBeUndefined()
+    expect(context.wrapper.get('form button[type="submit"]').attributes('disabled')).toBeUndefined()
     expect(assign).not.toHaveBeenCalled()
     context.wrapper.unmount()
   })
 
   it('explains configuration errors without exposing backend details or replacing the session', async () => {
     const context = await setup()
+    await openGoogle(context.wrapper)
     await context.wrapper.get('form input[type="password"]').setValue('password')
     context.fetch.mockResolvedValueOnce(json({ code: 'GOOGLE_CONFIG_INVALID' }, 422))
     await context.wrapper.find('form').trigger('submit')
@@ -373,6 +395,7 @@ describe('explicit Google connection in account settings', () => {
     'preserves session after %s failure and never navigates',
     async (failure) => {
       const context = await setup()
+      await openGoogle(context.wrapper)
       if (failure === 'unsafe')
         context.fetch.mockResolvedValueOnce(json({ authorizationUrl: 'https://evil.example' }))
       else context.fetch.mockRejectedValueOnce(new Error('Offline'))
@@ -387,4 +410,50 @@ describe('explicit Google connection in account settings', () => {
       context.wrapper.unmount()
     },
   )
+
+  it('shows one identity summary and keeps editing controls collapsed initially', async () => {
+    const context = await setup()
+    expect(context.wrapper.findAll('h2').map((heading) => heading.text())).toEqual([
+      'Ada Lovelace',
+      'auth.profile.security',
+    ])
+    expect(context.wrapper.text().match(/Ada Lovelace/g)).toHaveLength(1)
+    expect(context.wrapper.findAll('p').filter((item) => item.text() === 'ada')).toHaveLength(1)
+    expect(context.wrapper.find('input').exists()).toBe(false)
+    expect(context.wrapper.findComponent(passwordForm).exists()).toBe(false)
+    expect(context.wrapper.find('#profile-photo').exists()).toBe(false)
+    expect(context.wrapper.find('form').exists()).toBe(false)
+    context.wrapper.unmount()
+  })
+
+  it('reveals photo and password controls and clears password data when closed', async () => {
+    const context = await setup()
+    const photo = context.wrapper.get('[aria-controls="profile-photo"]')
+    await photo.trigger('click')
+    expect(photo.attributes('aria-expanded')).toBe('true')
+    expect(context.wrapper.find('#profile-photo').exists()).toBe(true)
+    await photo.trigger('click')
+    expect(context.wrapper.find('#profile-photo').exists()).toBe(false)
+    const password = context.wrapper.get('[aria-controls="profile-password"]')
+    await password.trigger('click')
+    expect(context.wrapper.findComponent(passwordForm).exists()).toBe(true)
+    const data = context.wrapper.getComponent(passwordForm).props('data')
+    data.currentPassword = 'private-password'
+    await password.trigger('click')
+    expect(context.wrapper.findComponent(passwordForm).exists()).toBe(false)
+    await password.trigger('click')
+    expect(context.wrapper.getComponent(passwordForm).props('data').currentPassword).toBe('')
+    context.wrapper.unmount()
+  })
+
+  it('clears the Google password when closing and reopening the form', async () => {
+    const context = await setup()
+    await openGoogle(context.wrapper)
+    await context.wrapper.get('form input').setValue('private-password')
+    await context.wrapper.get('form button[type="button"]').trigger('click')
+    expect(context.wrapper.find('form').exists()).toBe(false)
+    await openGoogle(context.wrapper)
+    expect(context.wrapper.get<HTMLInputElement>('form input').element.value).toBe('')
+    context.wrapper.unmount()
+  })
 })

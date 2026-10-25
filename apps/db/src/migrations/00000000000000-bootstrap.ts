@@ -148,8 +148,8 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
       body.ifThen(
         cond.eq(purpose, 'link'),
         (link) => {
-          link.set(callbackPath, '/account?google=')
-          link.set(returnPath, odbOracle.nvl(returnPath, odbLiteral('/account')))
+          link.set(callbackPath, '/settings/account?google=')
+          link.set(returnPath, odbOracle.nvl(returnPath, odbLiteral('/settings/account')))
           link.ifThen(cond.eq(outcome, 'success'), (then) => then.set(outcome, 'linked'))
         },
         (login) => {
@@ -159,7 +159,7 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
             then.set(
               returnPath,
               plsqlExpr.concat(
-                '/account?redirect=',
+                '/settings/account?redirect=',
                 plsqlExpr.call(
                   'VARCHAR2',
                   'UTL_URL.ESCAPE',

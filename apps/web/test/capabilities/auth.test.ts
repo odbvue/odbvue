@@ -313,7 +313,7 @@ describe('authentication capability', () => {
     expect(context.post).not.toHaveBeenCalled()
   })
 
-  it.each(['/account', '/sandbox', '/sandbox?tab=profile#section'])(
+  it.each(['/settings/account', '/sandbox', '/sandbox?tab=profile#section'])(
     'links with bearer auth, cookies and the requested local destination %s',
     async (redirect) => {
       const { auth, post } = await linkSession()
@@ -348,7 +348,7 @@ describe('authentication capability', () => {
     await auth.startGoogleLink({ password: 'current-password' })
     expect(post).toHaveBeenCalledWith(
       '/auth/google/link/start',
-      { redirect: '/account', password: 'current-password' },
+      { redirect: '/settings/account', password: 'current-password' },
       expect.objectContaining({ credentials: 'include', skipAuthRefresh: true }),
     )
   })

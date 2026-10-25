@@ -40,7 +40,11 @@ async function setup(location = '/login?redirect=/sandbox') {
       { path: '/', component: {} },
       { path: '/login', component: {} },
       { path: '/sandbox', component: {} },
-      { path: '/account', component: {}, meta: { access: 'authenticated', navigation: false } },
+      {
+        path: '/settings/account',
+        component: {},
+        meta: { access: 'authenticated', navigation: false },
+      },
     ],
   })
   await router.push(location)
@@ -297,7 +301,7 @@ describe('login page using application auth', () => {
   })
 
   it('takes an authenticated collision through Connect Google before the original destination', async () => {
-    const redirect = '/account?redirect=%2Fsandbox'
+    const redirect = '/settings/account?redirect=%2Fsandbox'
     const context = await setup(`/login?google=conflict&redirect=${encodeURIComponent(redirect)}`)
     await flushPromises()
     context.fetch
@@ -305,12 +309,12 @@ describe('login page using application auth', () => {
       .mockResolvedValueOnce(json(authState({ userId: 7, username: 'ada' })))
     await context.wrapper.findComponent(form).trigger('click')
     await flushPromises()
-    expect(context.router.currentRoute.value.path).toBe('/account')
+    expect(context.router.currentRoute.value.path).toBe('/settings/account')
     expect(context.router.currentRoute.value.query.redirect).toBe('/sandbox')
     expect(context.fetch).toHaveBeenCalledTimes(4)
     context.router.beforeEach(createAuthGuard(context.router, context.auth))
     await context.router.push(`/login?google=conflict&redirect=${encodeURIComponent(redirect)}`)
-    expect(context.router.currentRoute.value.path).toBe('/account')
+    expect(context.router.currentRoute.value.path).toBe('/settings/account')
     expect(context.router.currentRoute.value.query.redirect).toBe('/sandbox')
     context.wrapper.unmount()
   })

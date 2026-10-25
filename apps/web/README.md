@@ -65,20 +65,20 @@ and applies the local redirect. Anonymous callback failures on `/login?google=ca
 `failed`, or `conflict` show fixed localized feedback and remove the consumed query flag
 without dropping the return destination. No frontend Google client ID is needed.
 An existing-email conflict never automatically links accounts: sign in using the existing
-method, then the guided redirect opens Profile with the original destination
+method, then the guided redirect opens Settings > Account with the original destination
 preserved. Choose **Connect Google**, or **Continue without connecting** to skip it.
-The authenticated `/account` profile page offers connecting only when Google
+The authenticated `/settings/account` page offers connecting only when Google
 is enabled, a local password exists, and Google is not already connected.
 It requires the current password. `auth.startGoogleLink({ redirect, password })`
 calls authenticated `POST /auth/google/link/start` with credentials included, using
-a validated local destination (or `/account` for a connection started directly from settings).
+a validated local destination (or `/settings/account` for a connection started directly from settings).
 Only the validated Google authorization URL is opened. Password confirmation failures do
 not trigger automatic session refresh, and starting a link never changes local auth state.
 The backend uses `AUTH_GOOGLE_REDIRECT_URI` and `/auth/google/callback` for both
 sign-in and linking. Register that one URI in Google OAuth settings. The consumed,
 browser-bound server transaction determines the purpose; the browser cannot select it.
 Configuration failures show dedicated guidance instead of a generic linking error.
-The backend callback returns `/account?google=linked`, `cancelled`, or `error`,
+The backend callback returns `/settings/account?google=linked`, `cancelled`, or `error`,
 with an encoded `redirect` destination;
 identity conflicts use the generic error outcome. The page also recognizes `conflict`
 defensively, consumes the outcome once, and displays fixed localized feedback. Linking never
@@ -103,9 +103,14 @@ Access tokens and user details remain in
 memory; the server-managed refresh cookie is `HttpOnly`, `Secure`, and `SameSite=Lax`. Existing
 preference persistence is unchanged.
 
-The default layout shows an accessible name/avatar menu containing Profile and Logout.
-The drawer links the identity directly to Profile without a duplicate Account entry.
-The profile shows read-only name/email and actual password/Google connection status from
+The default layout shows an accessible name/avatar menu containing Settings and Logout.
+The drawer shows a static identity summary above separate Settings and Logout entries.
+Settings (`/settings`) opens Account (`/settings/account`) by default. Account is currently
+the only settings section; future sections will use `/settings/appearance`,
+`/settings/language`, and `/settings/notifications` when implemented. Legacy `/account`
+links redirect to Account while retaining query parameters and the URL hash, including
+Google callbacks from existing database deployments.
+The Account page shows the name/email once and actual password/Google connection status from
 `GET /auth/state`; missing provider metadata is shown as unavailable, never inferred.
 Google-only accounts are directed to Google to manage their password.
 

@@ -74,10 +74,10 @@ async function setup(authenticated = true, avatarUrl: string | null = null, read
     history: createMemoryHistory(),
     routes: [
       { path: '/', component: {} },
-      { path: '/account', component: {} },
+      { path: '/settings/account', component: {} },
     ],
   })
-  await router.push('/account')
+  await router.push('/settings/account')
   const wrapper = mount(DefaultLayout, {
     global: {
       plugins: [
@@ -87,7 +87,7 @@ async function setup(authenticated = true, avatarUrl: string | null = null, read
           locale: 'en',
           messages: {
             en: {
-              'auth.account.title': 'Profile',
+              'settings.title': 'Settings',
               'auth.logout': 'Logout',
               'auth.login': 'Login',
               'auth.profile.menu': 'Account menu for {name}',
@@ -152,14 +152,14 @@ describe('default layout account navigation', () => {
     },
   )
 
-  it('shows a static avatar and full name above separate Profile and Logout drawer entries', async () => {
+  it('shows a static avatar and full name above separate Settings and Logout drawer entries', async () => {
     const { wrapper } = await setup()
     const entries = wrapper
       .findAllComponents(listItem)
       .filter((entry) => entry.element.closest('aside'))
-    expect(entries.map((entry) => entry.props('title'))).toEqual(['Profile', 'Logout'])
-    expect(entries[0]!.props('to')).toBe('/account')
-    expect(entries[0]!.props('prependIcon')).toBe('$mdiAccount')
+    expect(entries.map((entry) => entry.props('title'))).toEqual(['Settings', 'Logout'])
+    expect(entries[0]!.props('to')).toBe('/settings')
+    expect(entries[0]!.props('prependIcon')).toBe('$mdiCog')
     expect(entries[0]!.findComponent(avatar).exists()).toBe(false)
     const drawerAvatar = wrapper
       .findAllComponents(avatar)
@@ -173,8 +173,16 @@ describe('default layout account navigation', () => {
         .findAllComponents(listItem)
         .map((entry) => entry.props('title'))
         .filter(Boolean),
-    ).toEqual(['Profile', 'Logout', 'Profile', 'Logout'])
-    expect(wrapper.findAllComponents(avatar)).toHaveLength(3)
+    ).toEqual(['Settings', 'Logout', 'Settings', 'Logout'])
+    const settingsEntries = wrapper
+      .findAllComponents(listItem)
+      .filter((entry) => entry.props('to') === '/settings')
+    expect(settingsEntries).toHaveLength(2)
+    for (const entry of settingsEntries) {
+      expect(entry.props('prependIcon')).toBe('$mdiCog')
+      expect(entry.findComponent(avatar).exists()).toBe(false)
+    }
+    expect(wrapper.findAllComponents(avatar)).toHaveLength(2)
     wrapper.unmount()
   })
 
@@ -182,7 +190,7 @@ describe('default layout account navigation', () => {
     const url = 'https://example.test/avatar.jpg'
     const { wrapper } = await setup(true, url)
     const images = wrapper.findAllComponents(image)
-    expect(images).toHaveLength(3)
+    expect(images).toHaveLength(2)
     for (const img of images) {
       expect(img.props()).toMatchObject({ src: url, alt: '', referrerpolicy: 'no-referrer' })
       expect(img.text()).toBe('AL')

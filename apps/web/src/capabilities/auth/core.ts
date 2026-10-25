@@ -375,7 +375,7 @@ export function createAuthRuntime<User extends AuthUser = AuthUser>(options: Aut
       try {
         const response = await requireHttp().post<GoogleLinkResponse>(
           endpoints.googleLinkStart,
-          { redirect: linkOptions.redirect ?? '/account', password: linkOptions.password },
+          { redirect: linkOptions.redirect ?? '/settings/account', password: linkOptions.password },
           {
             credentials: 'include',
             headers: { Authorization: ['Bearer', accessToken.value].join(' ') },

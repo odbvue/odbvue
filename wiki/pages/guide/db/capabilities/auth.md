@@ -373,6 +373,15 @@ protect against a compromised schema owner or an authorized decrypted Settings c
 
 ### Profile and password changes
 
+The web application's identity menu opens **Settings** at `/settings`, which
+defaults to **Account** at `/settings/account`. The breadcrumb is **Settings > Account**.
+Legacy `/account` URLs redirect there with their query and hash intact.
+Account shows the user's identity once, followed by a
+**Sign-in & security** section with provider statuses. Photo upload, password
+change and Google connection forms open on demand; guided Google linking opens
+its form automatically and preserves the return destination. Closing either
+password-entry form clears its entered values.
+
 `odbAuth.readProfile(userId, avatarUrl, avatarUploaded, passwordConnected, googleConnected, avatarId)`
 reads the Google photo URL, uploaded storage key and actual identity counts. The application exposes these
 through `/auth/state`; the three numeric status fields are `0` or positive counts.
@@ -558,7 +567,7 @@ script, ID token, or client secret is needed in the frontend.
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `POST /auth/google/start`      | Accepts `{ "redirect": "/local/path" }`, requires the configured application Origin, sets a five-minute HttpOnly transaction cookie, and returns `{ "authorizationUrl": "https://accounts.google.com/..." }`.                                                                    |
 | `GET /auth/google/callback`    | Accepts Google's `state`, `code`, or `error` and consumes the browser-bound transaction. Its stored purpose determines login or linking. Login success sets the normal refresh cookie and redirects to Login; linking returns to Account settings without replacing the session. |
-| `POST /auth/google/link/start` | Requires an authenticated access token, the current refresh cookie, the configured Origin, and `{ "redirect": "/account", "password": "<current password>" }`. Starts explicit linking and returns the Google authorization URL.                                                 |
+| `POST /auth/google/link/start` | Requires an authenticated access token, the current refresh cookie, the configured Origin, and `{ "redirect": "/settings/account", "password": "<current password>" }`. Starts explicit linking and returns the Google authorization URL.                                                 |
 
 The callback must be exposed through the browser-facing deployment and registered
 **exactly** in the Google Cloud OAuth client's authorized redirect URIs.
