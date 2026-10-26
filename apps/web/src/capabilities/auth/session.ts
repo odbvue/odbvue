@@ -7,23 +7,29 @@ export function createSession<User extends AuthUser>(
   loadConfig: () => Promise<void>,
 ): Pick<Auth<User>, 'login' | 'refresh' | 'logout' | 'restore'> {
   let restorePromise: Promise<boolean> | undefined
+  let refreshPromise: Promise<boolean> | undefined
   const { http, endpoints, beginOperation, applyToken, clear, refreshUser } = context
 
-  async function refresh(): Promise<boolean> {
-    const finish = beginOperation('auth.refresh')
-    try {
-      const response = await http().post<{ accessToken: string }>(endpoints.refresh, undefined, {
-        credentials: 'include',
-      })
-      if (response.data) {
-        applyToken(response.data.accessToken)
-        return true
+  function refresh(): Promise<boolean> {
+    refreshPromise ??= (async () => {
+      const finish = beginOperation('auth.refresh')
+      try {
+        const response = await http().post<{ accessToken: string }>(endpoints.refresh, undefined, {
+          credentials: 'include',
+        })
+        if (response.data) {
+          applyToken(response.data.accessToken)
+          return true
+        }
+        if (response.status === 401 || response.status === 403) clear()
+        return false
+      } finally {
+        finish()
       }
-      if (response.status === 401 || response.status === 403) clear()
-      return false
-    } finally {
-      finish()
-    }
+    })().finally(() => {
+      refreshPromise = undefined
+    })
+    return refreshPromise
   }
 
   return {

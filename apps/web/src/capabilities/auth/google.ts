@@ -17,6 +17,7 @@ function validateAuthorization(response: GoogleLoginResponse | null): GoogleLogi
 export function createGoogle<User extends AuthUser>(
   context: AuthContext<User>,
 ): Auth<User>['google'] {
+  let linking = false
   return {
     async login(options = {}) {
       const finish = context.beginOperation('auth.googleLogin')
@@ -35,7 +36,9 @@ export function createGoogle<User extends AuthUser>(
     async link(options) {
       context.requireSession('Sign in before connecting Google.')
       if (!options.password) throw new Error('Current password is required.')
+      if (linking) throw new Error('A Google linking request is already in progress.')
       const finish = context.beginOperation('auth.googleLink')
+      linking = true
       try {
         const response = await context.http().post<GoogleLoginResponse>(
           context.endpoints.googleLinkStart,
@@ -51,6 +54,7 @@ export function createGoogle<User extends AuthUser>(
           throw new Error('Unable to connect Google.')
         return validateAuthorization(response.data)
       } finally {
+        linking = false
         finish()
       }
     },

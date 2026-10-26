@@ -277,9 +277,9 @@ describe('authentication capability', () => {
     expect(get.mock.calls.map(([url]) => url)).toEqual(['/auth/me', '/auth/me'])
   })
 
-  it('keeps mutation guards through profile reload without presentation tracking', async () => {
+  it('allows Google linking during profile reload without presentation tracking', async () => {
     const http = createHttpClient()
-    vi.spyOn(http, 'post').mockResolvedValue(response({ accessToken: 'token' }))
+    const post = vi.spyOn(http, 'post').mockResolvedValue(response({ accessToken: 'token' }))
     vi.spyOn(http, 'put').mockResolvedValue(response(null, 204))
     const get = vi
       .spyOn(http, 'get')
@@ -290,8 +290,8 @@ describe('authentication capability', () => {
     get.mockReturnValueOnce(profile.promise)
     const avatar = auth.profile.updateAvatar(null)
     await vi.waitFor(() => expect(get).toHaveBeenCalledTimes(3))
-    await expect(auth.google.link({ password: 'password' })).rejects.toThrow('already in progress')
-    await expect(auth.profile.updateAvatar(null)).rejects.toThrow('already in progress')
+    post.mockResolvedValueOnce(response({ authorizationUrl }))
+    await expect(auth.google.link({ password: 'password' })).resolves.toEqual({ authorizationUrl })
     profile.resolve(response(ada))
     await avatar
   })
@@ -418,7 +418,7 @@ describe('authentication capability', () => {
     expect(loading.active.value).toBe(false)
   })
 
-  it('tracks overlapping anonymous requests separately and guards profile mutation', async () => {
+  it('observes overlapping requests without locking unrelated authenticated operations', async () => {
     const { auth, post } = await session()
     const first = Promise.withResolvers<ReturnType<typeof response>>()
     const second = Promise.withResolvers<ReturnType<typeof response>>()
@@ -428,7 +428,12 @@ describe('authentication capability', () => {
     first.resolve(response(null, 204))
     await signup
     expect(loading.has('auth.recoverPassword')).toBe(true)
-    await expect(auth.google.link({ password: 'pw' })).rejects.toThrow('already in progress')
+    await auth.profile.updateAvatar(null)
+    post.mockResolvedValueOnce(response({ authorizationUrl }))
+    await expect(auth.google.link({ password: 'pw' })).resolves.toEqual({ authorizationUrl })
+    expect(loading.has('auth.recoverPassword')).toBe(true)
+    expect(loading.has('auth.avatar')).toBe(false)
+    expect(loading.has('auth.googleLink')).toBe(false)
     second.resolve(response(null, 204))
     await recover
     expect(loading.active.value).toBe(false)
@@ -515,6 +520,8 @@ describe('authentication capability', () => {
     await expect(first).rejects.toThrow('Offline')
     expect(auth.authenticated.value).toBe(true)
     expect(loading.active.value).toBe(false)
+    post.mockResolvedValueOnce(response({ authorizationUrl }))
+    await expect(auth.google.link({ password: 'pw' })).resolves.toEqual({ authorizationUrl })
   })
 
   it('does not refresh or switch sessions after Google link password rejection', async () => {
@@ -560,6 +567,44 @@ describe('authentication capability', () => {
     await expect(auth.google.link({ password: 'pw' })).rejects.toThrow('Link rejected')
     expect(auth.accessToken.value).toBe('token')
     expect(loading.active.value).toBe(false)
+  })
+
+  it.each([200, 401, 503])(
+    'shares concurrent refresh requests and permits a later refresh after HTTP %s',
+    async (status) => {
+      const { auth, post } = await session()
+      const request = Promise.withResolvers<ReturnType<typeof response>>()
+      post.mockReturnValueOnce(request.promise)
+      const first = auth.refresh()
+      expect(auth.refresh()).toBe(first)
+      expect(post).toHaveBeenCalledExactlyOnceWith('/auth/refresh', undefined, {
+        credentials: 'include',
+      })
+      expect(loading.has('auth.refresh')).toBe(true)
+      await auth.profile.updateAvatar(null)
+      expect(loading.has('auth.refresh')).toBe(true)
+      request.resolve(response(status === 200 ? { accessToken: 'next-token' } : null, status))
+      await expect(first).resolves.toBe(status === 200)
+      expect(loading.active.value).toBe(false)
+      post.mockResolvedValueOnce(response({ accessToken: 'later-token' }))
+      await expect(auth.refresh()).resolves.toBe(true)
+      expect(post).toHaveBeenCalledTimes(2)
+      expect(auth.accessToken.value).toBe('later-token')
+    },
+  )
+
+  it('releases refresh deduplication and loading observation after a rejected request', async () => {
+    const { auth, post } = await session()
+    const request = Promise.withResolvers<ReturnType<typeof response>>()
+    post.mockReturnValueOnce(request.promise)
+    const first = auth.refresh()
+    expect(auth.refresh()).toBe(first)
+    request.reject(new Error('Offline'))
+    await expect(first).rejects.toThrow('Offline')
+    expect(loading.active.value).toBe(false)
+    post.mockResolvedValueOnce(response({ accessToken: 'later-token' }))
+    await expect(auth.refresh()).resolves.toBe(true)
+    expect(post).toHaveBeenCalledTimes(2)
   })
 
   it.each([401, 403])('clears identity on invalid refresh cookie (%s)', async (status) => {

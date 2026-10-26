@@ -105,6 +105,9 @@ and `POST /auth/password/reset`. Signup confirmation uses `auth.confirmSignup()`
 The [entry point](./src/main.ts)
 mounts the shell while initial navigation is pending. Auth restoration is lazy and idempotent:
 concurrent guards and later navigations share the same promise instead of issuing another refresh.
+Overlapping `auth.refresh()` calls also share one in-flight request; later calls can refresh again.
+Auth operation observation feeds loading indicators only, not a global concurrency lock.
+Google linking separately rejects overlapping link starts.
 The reactive auth `ready` flag remains available to login controls; it is not a bootstrap lifecycle.
 Access tokens and user details remain in
 memory; the server-managed refresh cookie is `HttpOnly`, `Secure`, and `SameSite=Lax`. Existing

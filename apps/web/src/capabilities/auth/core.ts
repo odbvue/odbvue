@@ -39,15 +39,8 @@ export function createAuthRuntime<User extends AuthUser = AuthUser>(options: Aut
   const endpoints = { ...defaultEndpoints, ...options.endpoints }
   const accessToken = ref<string | null>(null)
   const ready = ref(false)
-  let activeRequests = 0
-
   function beginOperation(operation: string): () => void {
-    const finish = options.onOperation?.(operation)
-    activeRequests++
-    return () => {
-      activeRequests--
-      finish?.()
-    }
+    return options.onOperation?.(operation) ?? (() => {})
   }
 
   const http = () => ('get' in options.http ? options.http : options.http())
@@ -71,7 +64,6 @@ export function createAuthRuntime<User extends AuthUser = AuthUser>(options: Aut
 
   function requireSession(message: string): void {
     if (!ready.value || !user.value || !accessToken.value) throw new Error(message)
-    if (activeRequests > 0) throw new Error('An authentication request is already in progress.')
   }
 
   const context: AuthContext<User> = {
