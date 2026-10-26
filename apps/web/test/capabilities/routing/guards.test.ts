@@ -1,4 +1,4 @@
-import { authState } from '../../auth-state'
+import { authConfig } from '../../auth-state'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from 'vue'
 import { createMemoryHistory, createRouter, type RouteRecordRaw } from 'vue-router'
@@ -51,7 +51,7 @@ function setup(config: AppConfig = {}, pageRoutes = routes) {
   const app = createApp({})
   const router = createRouter({ history: createMemoryHistory(), routes: pageRoutes })
   const fetch = vi.fn<typeof globalThis.fetch>()
-  fetch.mockResolvedValueOnce(json({}, 401)).mockResolvedValueOnce(json(authState()))
+  fetch.mockResolvedValueOnce(json(authConfig())).mockResolvedValueOnce(json({}, 401))
   const auth = createAuth({ http: useHttp({ fetch }) })
   const ui = useUi()
   ui.clear()
@@ -75,7 +75,7 @@ async function login(context: ReturnType<typeof setup>, roles: string[] = []) {
   await context.auth.restore()
   context.fetch
     .mockResolvedValueOnce(json({ accessToken: 'token' }))
-    .mockResolvedValueOnce(json(authState({ userId: 7, username: 'ada', roles })))
+    .mockResolvedValueOnce(json({ userId: 7, username: 'ada', roles }))
   await context.auth.login({ username: 'ada', password: 'password' })
 }
 
@@ -126,11 +126,12 @@ describe('application router guards', () => {
     const context = setup()
     context.fetch.mockReset()
     context.fetch
+      .mockResolvedValueOnce(json(authConfig()))
       .mockResolvedValueOnce(json({ accessToken: 'restored-token' }))
-      .mockResolvedValueOnce(json(authState({ userId: 7, username: 'ada', roles: ['admin'] })))
+      .mockResolvedValueOnce(json({ userId: 7, username: 'ada', roles: ['admin'] }))
     await context.router.push('/admin')
     expect(context.router.currentRoute.value.path).toBe('/admin')
-    expect(context.fetch).toHaveBeenCalledTimes(2)
+    expect(context.fetch).toHaveBeenCalledTimes(3)
     expect(context.auth.ready.value).toBe(true)
     expect(context.routing.pages.value.some((page) => page.path === '/admin')).toBe(true)
     context.dispose()
@@ -181,9 +182,9 @@ describe('application router guards', () => {
     expect(context.router.currentRoute.value.path).toBe('/')
     expect(context.routing.pages.value.some((page) => page.path === '/settings')).toBe(false)
     context.fetch.mockResolvedValueOnce(
-      json(authState({ userId: 7, username: 'ada', permissions: ['settings.read'] })),
+      json({ userId: 7, username: 'ada', permissions: ['settings.read'] }),
     )
-    await context.auth.getState()
+    await context.auth.refreshUser()
     await context.router.push('/settings/details')
     expect(context.router.currentRoute.value.path).toBe('/settings/details')
     expect(context.routing.pages.value.some((page) => page.path === '/settings')).toBe(true)
@@ -192,10 +193,8 @@ describe('application router guards', () => {
       '/settings',
       '/settings/details',
     ])
-    context.fetch.mockResolvedValueOnce(
-      json(authState({ userId: 7, username: 'ada', permissions: [] })),
-    )
-    await context.auth.getState()
+    context.fetch.mockResolvedValueOnce(json({ userId: 7, username: 'ada', permissions: [] }))
+    await context.auth.refreshUser()
     expect(context.routing.pages.value.some((page) => page.path === '/settings')).toBe(false)
     expect(context.routing.breadcrumbs.value.map((item) => item.href)).toEqual(['/'])
     context.dispose()

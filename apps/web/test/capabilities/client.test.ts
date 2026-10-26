@@ -1,4 +1,4 @@
-import { authState } from '../auth-state'
+import { authConfig } from '../auth-state'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 type CaptureError = typeof import('@/capabilities/errors').captureError
@@ -74,9 +74,10 @@ describe('auth and HTTP module boundaries', () => {
       if (path.endsWith('/auth/login')) return json({ accessToken: 'login-token' })
       if (path.endsWith('/auth/refresh')) return json({ accessToken: 'fresh-token' })
       if (path.endsWith('/auth/logout')) return json({})
+      if (path.endsWith('/auth/config')) return json(authConfig())
       if (new Headers(init?.headers).get('Authorization') !== `Bearer ${requiredToken}`)
         return json({}, 401)
-      if (path.endsWith('/auth/state')) return json(authState({ userId: 7, username: 'ada' }))
+      if (path.endsWith('/auth/me')) return json({ userId: 7, username: 'ada' })
       return json({ ok: true })
     })
     vi.stubGlobal('fetch', fetch)
@@ -90,6 +91,11 @@ describe('auth and HTTP module boundaries', () => {
     expect(app.auth).toBe(auth)
     expect(app.http).toBe(http)
     expect(isReadonly(app.auth.user)).toBe(true)
+    expect(isReadonly(app.auth.config)).toBe(true)
+    expect(app.auth.google.login).toBeTypeOf('function')
+    expect(app.auth.password.change).toBeTypeOf('function')
+    expect(app.auth.twoFactor.verify).toBeTypeOf('function')
+    expect(app.auth.profile.updateAvatar).toBeTypeOf('function')
     expect(isReadonly(app.ui.loading.active)).toBe(true)
 
     const login = app.auth.login({ username: 'ada', password: 'password' })

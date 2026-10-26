@@ -1,4 +1,4 @@
-import { authState } from '../../auth-state'
+import { authConfig } from '../../auth-state'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
@@ -75,18 +75,17 @@ async function setup(
   })
   session.auth = auth
   if (options.ready !== false) {
-    if (options.authenticated === false)
-      fetch.mockResolvedValueOnce(json({}, 401)).mockResolvedValueOnce(json(authState()))
+    fetch.mockResolvedValueOnce(json(authConfig(options.enabled ?? true)))
+    if (options.authenticated === false) fetch.mockResolvedValueOnce(json({}, 401))
     else
       fetch
         .mockResolvedValueOnce(json({ accessToken: 'original-token' }))
-        .mockResolvedValueOnce(json(authState(user, options.enabled ?? true)))
+        .mockResolvedValueOnce(json(user))
     await auth.restore()
   }
   fetch.mockImplementation(async (request) => {
     const url = request instanceof Request ? request.url : String(request)
-    if (url.endsWith('/auth/state'))
-      return json(authState({ ...user, googleConnected: 1 }, options.enabled ?? true))
+    if (url.endsWith('/auth/me')) return json({ ...user, googleConnected: 1 })
     throw new Error(`Unexpected account request: ${url}`)
   })
   const router = createRouter({
@@ -288,7 +287,7 @@ describe('explicit Google connection in account settings', () => {
     expect(context.auth.accessToken.value).toBe('original-token')
     expect(context.auth.user.value?.id).toBe(7)
     expect(context.auth.user.value?.googleConnected).toBe(true)
-    expect(context.initialRequests.filter((url) => url.endsWith('/auth/state'))).toHaveLength(2)
+    expect(context.initialRequests.filter((url) => url.endsWith('/auth/me'))).toHaveLength(2)
     expect(context.ui.notification.value?.message).toBe('auth.google.link.linked')
     context.wrapper.unmount()
   })
@@ -345,7 +344,7 @@ describe('explicit Google connection in account settings', () => {
     expect(context.router.currentRoute.value.hash).toBe('#section')
     expect(context.auth.accessToken.value).toBe('original-token')
     expect(context.auth.user.value?.id).toBe(7)
-    expect(context.initialRequests.filter((url) => url.endsWith('/auth/state'))).toHaveLength(
+    expect(context.initialRequests.filter((url) => url.endsWith('/auth/me'))).toHaveLength(
       outcome === 'linked' ? 2 : 1,
     )
     expect(context.fetch).not.toHaveBeenCalled()

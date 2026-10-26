@@ -52,11 +52,11 @@ changes use route HMR. Modules share the same auth/navigation metadata rules.
 ## Authentication
 
 The [login page](./src/app/pages/login.vue) supports username/password authentication.
-Login and signup also offer Google sign-in when shared `GET /auth/state`
-capabilities contain `providers.google: true`. State failures surface through
+Login and signup also offer Google sign-in when shared `GET /auth/config`
+capabilities contain `google: true`. Configuration failures surface through
 the normal restoration error flow; components make no separate config request.
 The shared Google button sanitizes the local return destination, then calls
-`auth.startGoogleLogin({ redirect })` (`POST /auth/google/start`, credentials included).
+`auth.google.login({ redirect })` (`POST /auth/google/start`, credentials included).
 Only the returned HTTPS `accounts.google.com/o/oauth2/v2/auth` URL can be opened.
 The backend owns OIDC authorization-code exchange and the HttpOnly transaction cookie;
 the web app never constructs OAuth requests, loads Google scripts, or stores Google tokens.
@@ -69,7 +69,7 @@ method, then the guided redirect opens Settings > Account with the original dest
 preserved. Choose **Connect Google**, or **Continue without connecting** to skip it.
 The authenticated `/settings/account` page offers connecting only when Google
 is enabled, a local password exists, and Google is not already connected.
-It requires the current password. `auth.startGoogleLink({ redirect, password })`
+It requires the current password. `auth.google.link({ redirect, password })`
 calls authenticated `POST /auth/google/link/start` with credentials included, using
 a validated local destination (or `/settings/account` for a connection started directly from settings).
 Only the validated Google authorization URL is opened. Password confirmation failures do
@@ -92,10 +92,17 @@ use `useAuth()` directly. Config supplies title/version, while preferences and U
 use their own APIs.
 
 No auth state is persisted in localStorage or sessionStorage. The first router guard restores the session
-with `POST /auth/refresh`, then `GET /auth/state` even without a valid refresh
-session. State includes a nullable `user`, `providers`, and `signup`.
-`auth.getState()` reloads it; `auth.providers` and `auth.signupEnabled` expose
-shared reactive capabilities. The [entry point](./src/main.ts)
+with `POST /auth/refresh` alongside anonymous `GET /auth/config`, then authenticated
+`GET /auth/me` when refresh succeeds. Configuration is the flat boolean object
+`{ password, ldap, google, signup, twoFactor }`, exposed through the readonly
+`auth.config` ref (null until loaded) and retained across logout.
+`auth.refreshUser()` reloads the direct user response from `/auth/me`.
+Two-factor challenges use `auth.twoFactor.verify()`. Recovery and reset use
+`auth.password.recover()` and `auth.password.reset()` with `POST /auth/password/recover`
+and `POST /auth/password/reset`. Signup confirmation uses `auth.confirmSignup()` with
+`POST /auth/signup/confirm`. Browser routes such as `/confirm-email` and
+`/reset-password` are unchanged; no legacy auth API aliases are exposed.
+The [entry point](./src/main.ts)
 mounts the shell while initial navigation is pending. Auth restoration is lazy and idempotent:
 concurrent guards and later navigations share the same promise instead of issuing another refresh.
 The reactive auth `ready` flag remains available to login controls; it is not a bootstrap lifecycle.
@@ -111,15 +118,15 @@ the only settings section; future sections will use `/settings/appearance`,
 links redirect to Account while retaining query parameters and the URL hash, including
 Google callbacks from existing database deployments.
 The Account page shows the name/email once and actual password/Google connection status from
-`GET /auth/state`; missing provider metadata is shown as unavailable, never inferred.
+`GET /auth/me`; missing provider metadata is shown as unavailable, never inferred.
 Google-only accounts are directed to Google to manage their password.
 
 Users can upload JPEG/PNG/WebP files up to 5 MB. The browser crops and re-encodes a
 128 x 128 JPEG thumbnail (maximum 30,000 data-URL characters), stripping original metadata.
-Authenticated `POST /auth/avatar` decodes the thumbnail into an owner-scoped Storage BLOB;
+`auth.profile.updateAvatar()` uses authenticated `PUT /auth/me/avatar` to decode the thumbnail into an owner-scoped Storage BLOB;
 the user record holds only its storage key. `{ avatar: null }` removes it, and replacing
 or removing an upload deletes its previous object atomically.
-`GET /auth/state` returns `user.avatarId` and the Google `user.avatarUrl`; uploaded thumbnails are
+`GET /auth/me` returns `avatarId` and the Google `avatarUrl` directly; uploaded thumbnails are
 fetched through authenticated `GET /auth/avatar/:id` and shown using temporary blob URLs.
 Downloads are private/no-store, and blob URLs are revoked on replacement or sign-out.
 Both profile and navigation update immediately. Uploaded photos take precedence over
@@ -128,7 +135,7 @@ Google photos are restricted to HTTPS `lh<N>.googleusercontent.com` URLs, loaded
 a Referer header, and refreshed on Google sign-in. No extra Google API request/scope is needed.
 Broken or unavailable remote images fall back to initials.
 
-Authenticated `POST /auth/change-password` requires the current password, a new password
+`auth.password.change()` uses authenticated `POST /auth/password/change` and requires the current password, a new password
 of 8-256 characters, and matching confirmation. A successful change revokes every session
 and access-token version, removes outstanding recovery tokens, expires the refresh cookie,
 clears in-memory identity, and returns to Login with confirmation. Password verification

@@ -310,8 +310,13 @@ export class OrdsEndpoint {
     const outputs = this._params.filter((p) => this.paramSourceType(p) === 'RESPONSE')
     return (
       this._responseMediaType === 'application/json' &&
-      outputs.length > 0 &&
-      outputs.every((p) => p.direction === 'OUT' && p.odbType === 'json')
+      outputs.some((p) => p.odbType === 'json') &&
+      outputs.every(
+        (p) =>
+          p.direction === 'OUT' &&
+          p.odbType !== undefined &&
+          ['json', 'clob', 'string', 'guid', 'number'].includes(p.odbType),
+      )
     )
   }
 
@@ -346,9 +351,16 @@ export class OrdsEndpoint {
     const declarations = [
       ...this._params.flatMap((p) => {
         const name = this.nativeOutputName(p)
-        return name
-          ? [`${name} ${this.paramSourceType(p) === 'RESPONSE' ? 'CLOB' : 'VARCHAR2(32767)'};`]
-          : []
+        if (!name) return []
+        const type =
+          this.paramSourceType(p) === 'HEADER'
+            ? 'VARCHAR2(32767)'
+            : p.odbType === 'json' || p.odbType === 'clob'
+              ? 'CLOB'
+              : p.odbType === 'number'
+                ? 'NUMBER'
+                : 'VARCHAR2(32767)'
+        return [`${name} ${type};`]
       }),
       ...(this.nativeJsonResponse
         ? [
@@ -398,7 +410,10 @@ export class OrdsEndpoint {
           // ASCII escaping avoids HTP buffer overflows on large multibyte JSON strings.
           `SELECT JSON_SERIALIZE(JSON_OBJECT(${this._params
             .filter((p) => this.paramSourceType(p) === 'RESPONSE')
-            .map((p) => `${sqlStr(p.name)} VALUE ${this.nativeOutputName(p)} FORMAT JSON`)
+            .map(
+              (p) =>
+                `${sqlStr(p.name)} VALUE ${this.nativeOutputName(p)}${p.odbType === 'json' ? ' FORMAT JSON' : ''}`,
+            )
             .join(
               ', ',
             )} RETURNING CLOB STRICT) RETURNING CLOB ASCII) INTO v_json_response FROM dual;`,

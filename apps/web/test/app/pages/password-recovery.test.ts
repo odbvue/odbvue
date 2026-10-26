@@ -1,4 +1,4 @@
-import { authState } from '../../auth-state'
+import { authConfig } from '../../auth-state'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
@@ -45,11 +45,12 @@ async function setup(page = RecoverPassword, hash = '', authenticated = false) {
   })
   await router.push(page === RecoverPassword ? '/recover-password' : `/reset-password${hash}`)
   const fetch = vi.fn<typeof globalThis.fetch>()
+  fetch.mockResolvedValueOnce(json(authConfig()))
   if (authenticated) {
     fetch
       .mockResolvedValueOnce(json({ accessToken: 'old-access' }))
-      .mockResolvedValueOnce(json(authState({ userId: 7, username: 'ada@example.com' })))
-  } else fetch.mockResolvedValueOnce(json({}, 401)).mockResolvedValueOnce(json(authState()))
+      .mockResolvedValueOnce(json({ userId: 7, username: 'ada@example.com' }))
+  } else fetch.mockResolvedValueOnce(json({}, 401))
   const auth = createAuth({
     http: createHttpClient({ fetch }),
     onOperation: (operation) => useUi().loading.start(operation),
@@ -101,7 +102,7 @@ describe('password recovery pages', () => {
     fetch.mockResolvedValueOnce(new Response(null, { status: 204 }))
     wrapper.findComponent(form).vm.$emit('submit', { email: ' ada+reset@example.com ' })
     await flushPromises()
-    expect(String(fetch.mock.calls[2]![0])).toContain('/auth/recover-password')
+    expect(String(fetch.mock.calls[2]![0])).toContain('/auth/password/recover')
     expect(JSON.parse(String(fetch.mock.calls[2]![1]?.body))).toEqual({
       email: 'ada+reset@example.com',
     })
@@ -134,7 +135,7 @@ describe('password recovery pages', () => {
   it('removes the fragment, waits for submission, validates passwords, and clears local identity', async () => {
     const { wrapper, router, fetch, auth } = await setup(ResetPassword, `#token=${token}`, true)
     expect(router.currentRoute.value.hash).toBe('')
-    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch).toHaveBeenCalledTimes(3)
     const options: OvFormOptions = wrapper.findComponent(form).props('options')
     expect(options.fields.map((field) => field.name)).toEqual(['password', 'passwordRepeat'])
     const rules = options.fields[0]!.rules!
@@ -147,9 +148,9 @@ describe('password recovery pages', () => {
     fetch.mockResolvedValueOnce(new Response(null, { status: 204 }))
     wrapper.findComponent(form).vm.$emit('submit', passwords)
     await flushPromises()
-    expect(String(fetch.mock.calls[2]![0])).toContain('/auth/reset-password')
-    expect(JSON.parse(String(fetch.mock.calls[2]![1]?.body))).toEqual({ token, ...passwords })
-    expect(fetch.mock.calls[2]![1]?.credentials).toBe('omit')
+    expect(String(fetch.mock.calls[3]![0])).toContain('/auth/password/reset')
+    expect(JSON.parse(String(fetch.mock.calls[3]![1]?.body))).toEqual({ token, ...passwords })
+    expect(fetch.mock.calls[3]![1]?.credentials).toBe('omit')
     expect(wrapper.text()).toContain('auth.reset.success')
     expect(auth.accessToken.value).toBeNull()
     expect(auth.user.value).toBeNull()

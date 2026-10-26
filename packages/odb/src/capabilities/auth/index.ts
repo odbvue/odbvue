@@ -1,5 +1,7 @@
 export { odbAuth } from './auth.js'
 export { odbAuthPackage } from './package.js'
-export { authSessions, authUsers, authIdentities } from './tables.js'
+export { authSessions } from './core/tables/sessions.js'
+export { authUsers } from './core/tables/users.js'
+export { authIdentities } from './core/tables/identities.js'
 export { authJwtSettings } from './settings.js'
 export type { AuthConfig, AuthFeature } from './settings.js'

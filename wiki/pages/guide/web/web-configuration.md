@@ -60,7 +60,7 @@ Use `useAuth()` directly rather than wrapping it in an application store or addi
 
 ## Authentication
 
-On initial navigation, the authentication guard sends the refresh cookie to `/auth/refresh`, then fetches `/auth/state`, including when the refresh cookie is absent or invalid. The state response contains `{ user, providers: { password, google }, signup }`; anonymous callers receive `user: null`. Auth's idempotent `restore()` shares one promise across concurrent calls and subsequent navigations, including restoration failures. The reactive auth `ready` flag controls login UI, not bootstrap. Read shared capabilities from `auth.providers.value` and `auth.signupEnabled.value`; these are null before state loads. The HTTP service adds the access token to protected requests and refreshes it when needed. `getState()` explicitly supplies its optional bearer credential, so expired credentials still use normal refresh handling. Set `http.openapi` to the generated database OpenAPI document to distinguish protected operations from anonymous ones.
+On initial navigation, the authentication guard fetches anonymous `/auth/config` alongside sending the refresh cookie to `/auth/refresh`, then fetches protected `/auth/me` if refresh succeeds. Configuration is the direct flat boolean object `{ password, ldap, google, signup, twoFactor }`; `/auth/me` returns the user object directly, without a wrapper. Auth's idempotent `restore()` shares one promise across concurrent calls and subsequent navigations, including restoration failures. The reactive auth `ready` flag controls login UI, not bootstrap. Read shared deployment capabilities from the readonly `auth.config.value` ref; it is null before configuration loads and retained across logout. `refreshUser()` reloads the current user. The HTTP service adds the access token to protected requests and refreshes it when needed. Set `http.openapi` to the generated database OpenAPI document to distinguish protected operations from anonymous ones.
 
 Vue and router errors are captured explicitly in `main.ts`, and HTTP errors use an `onError` callback. Error reporting is separate from user notifications: user-facing flows decide when to show localized feedback.
 
@@ -70,11 +70,11 @@ import { useAuth } from '@/capabilities/auth'
 const auth = useAuth()
 
 await auth.login({ username: 'ada', password: 'correct horse battery staple' })
-await auth.getState()
+await auth.refreshUser()
 await auth.logout()
 ```
 
-`login()` and `refresh()` receive only an access token in the response body. The refresh token is an `HttpOnly`, `Secure`, `SameSite=Lax` cookie, so browser requests must remain on a compatible HTTPS origin. Override the default `/auth/login`, `/auth/refresh`, `/auth/logout`, and `/auth/state` routes with `auth: { endpoints: { ... } }` when necessary.
+`login()` and `refresh()` receive only an access token in the response body. The refresh token is an `HttpOnly`, `Secure`, `SameSite=Lax` cookie, so browser requests must remain on a compatible HTTPS origin. Override the default `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/config`, and `/auth/me` routes with `auth: { endpoints: { ... } }` when necessary. Feature operations use `auth.password.change/recover/reset`, `auth.google.login/link`, `auth.twoFactor.verify`, `auth.profile.updateAvatar`, and `auth.confirmSignup`; no legacy aliases are exposed. Password operations use `/auth/password/change`, `/auth/password/recover`, and `/auth/password/reset`; signup confirmation uses `POST /auth/signup/confirm`, and avatar updates use `PUT /auth/me/avatar`. UI destinations such as `/confirm-email` and `/reset-password` are unchanged.
 
 Application router destinations are separate from HTTP endpoints:
 

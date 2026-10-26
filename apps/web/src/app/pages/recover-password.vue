@@ -6,7 +6,7 @@
         <v-alert v-if="submitted" type="success" variant="tonal" class="mb-4">
           {{ t('auth.recover.sent') }}
         </v-alert>
-        <template v-else-if="auth.providers.value?.password">
+        <template v-else-if="auth.config.value?.password">
           <p class="mb-4">{{ t('auth.recover.description') }}</p>
           <v-ov-form :options="options" :data="data" :t="t" @submit="submit" />
         </template>
@@ -60,7 +60,7 @@ async function submit(values: OvFormData) {
   const stopLoading = ui.loading.start('overlay.auth.recoverPassword')
   const email = String(values.email ?? '').trim()
   try {
-    await auth.recoverPassword(email)
+    await auth.password.recover(email)
     submitted.value = true
   } catch (error) {
     const status = error instanceof Error && 'status' in error ? error.status : undefined

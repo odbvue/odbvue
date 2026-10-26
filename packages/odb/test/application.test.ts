@@ -127,6 +127,49 @@ describe('ODB application contract', () => {
     })
   })
 
+  it('streams mixed scalar and JSON outputs without quoting arrays or parsing text as JSON', () => {
+    const native = odbPackage('PCK_PROFILE', (pkg) => {
+      const read = pkg.proc(
+        'read',
+        {
+          out: {
+            name: odbType.string(),
+            count: odbType.number(),
+            bio: odbType.clob(),
+            roles: odbType.json(),
+          },
+        },
+        ({ params, body }) => {
+          body.set(params.name, 'true')
+          body.set(params.count, 1)
+          body.set(params.bio, null)
+          body.set(params.roles, '["admin"]')
+        },
+      )
+      defineService(read, {
+        auth: 'anonymous',
+        method: 'GET',
+        path: '/me',
+        responseMediaType: 'application/json',
+        response: {
+          name: read.parameters.name,
+          count: read.parameters.count,
+          bio: read.parameters.bio,
+          roles: read.parameters.roles,
+        },
+      })
+    })
+    const sql = generateApplication(native.application()).ords
+    expect(sql).toContain('v_output_0 VARCHAR2(32767);')
+    expect(sql).toContain('v_output_1 NUMBER;')
+    expect(sql).toContain('v_output_2 CLOB;')
+    expect(sql).toContain('v_output_3 CLOB;')
+    expect(sql).toContain(
+      "''name'' VALUE v_output_0, ''count'' VALUE v_output_1, ''bio'' VALUE v_output_2, ''roles'' VALUE v_output_3 FORMAT JSON",
+    )
+    expect(sql).not.toContain("p_name               => 'roles'")
+  })
+
   it('documents a single BLOB body and rejects mixed binary/JSON or GET bodies', () => {
     const binary = odbPackage('PCK_FILES', (pkg) => {
       const upload = pkg.proc(

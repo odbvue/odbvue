@@ -61,9 +61,9 @@ describe('trusted Google identities', () => {
     expect(google).not.toContain('hash_password')
     expect(google).not.toContain('grant_role')
     expect(google).toContain('ROLLBACK TO odb_google_login')
-    expect(odbAuth.loginGoogle('p_sub', 'p_email', 'p_name', 'l_access', 'l_refresh').toSQL()).toBe(
-      'odb_auth.login_google(p_sub, p_email, p_name, l_access, l_refresh)',
-    )
+    expect(
+      odbAuth.google.login('p_sub', 'p_email', 'p_name', 'l_access', 'l_refresh').toSQL(),
+    ).toBe('odb_auth.login_google(p_sub, p_email, p_name, l_access, l_refresh)')
   })
 
   it('shares session creation and checks enabled status under lock for both authentication methods', () => {

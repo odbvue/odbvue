@@ -123,15 +123,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/auth/state": {
+    "/auth/config": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Return the current user and public authentication capabilities */
-        get: operations["auth_get_state"];
+        /** Return public deployment authentication configuration */
+        get: operations["auth_get_config"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Return the authenticated user, profile and authorization */
+        get: operations["auth_get_me"];
         put?: never;
         post?: never;
         delete?: never;
@@ -157,7 +174,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/auth/confirm-email": {
+    "/auth/signup/confirm": {
         parameters: {
             query?: never;
             header?: never;
@@ -167,14 +184,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Activate an account using a single-use email confirmation token */
-        post: operations["auth_confirm_email"];
+        post: operations["auth_confirm_signup"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/auth/recover-password": {
+    "/auth/password/recover": {
         parameters: {
             query?: never;
             header?: never;
@@ -191,7 +208,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/auth/reset-password": {
+    "/auth/password/reset": {
         parameters: {
             query?: never;
             header?: never;
@@ -208,7 +225,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/auth/avatar": {
+    "/auth/me/avatar": {
         parameters: {
             query?: never;
             header?: never;
@@ -216,9 +233,9 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
         /** Set a JPEG thumbnail, or remove the uploaded avatar with null */
-        post: operations["auth_update_avatar"];
+        put: operations["auth_update_avatar"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -242,7 +259,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/auth/change-password": {
+    "/auth/password/change": {
         parameters: {
             query?: never;
             header?: never;
@@ -616,14 +633,27 @@ export interface components {
             accessToken: string;
         };
         AuthLogoutResponse: Record<string, never>;
-        AuthGetStateResponse: {
-            user: unknown;
-            providers: unknown;
+        AuthGetConfigResponse: {
+            password: unknown;
+            google: unknown;
+            ldap: unknown;
             signup: unknown;
             twoFactor: unknown;
         };
+        AuthGetMeResponse: {
+            userId: string;
+            username: string;
+            displayName: string;
+            avatarUrl: string;
+            avatarUploaded: number;
+            avatarId: string;
+            passwordConnected: number;
+            googleConnected: number;
+            roles: unknown;
+            permissions: unknown;
+        };
         AuthSignupResponse: Record<string, never>;
-        AuthConfirmEmailResponse: Record<string, never>;
+        AuthConfirmSignupResponse: Record<string, never>;
         AuthRecoverPasswordResponse: Record<string, never>;
         AuthResetPasswordResponse: Record<string, never>;
         AuthUpdateAvatarResponse: Record<string, never>;
@@ -934,12 +964,10 @@ export interface operations {
             };
         };
     };
-    auth_get_state: {
+    auth_get_config: {
         parameters: {
             query?: never;
-            header?: {
-                Authorization?: string;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -951,8 +979,35 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthGetStateResponse"];
+                    "application/json": components["schemas"]["AuthGetConfigResponse"];
                 };
+            };
+        };
+    };
+    auth_get_me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthGetMeResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -985,7 +1040,7 @@ export interface operations {
             };
         };
     };
-    auth_confirm_email: {
+    auth_confirm_signup: {
         parameters: {
             query?: never;
             header?: never;
@@ -1006,7 +1061,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthConfirmEmailResponse"];
+                    "application/json": components["schemas"]["AuthConfirmSignupResponse"];
                 };
             };
         };

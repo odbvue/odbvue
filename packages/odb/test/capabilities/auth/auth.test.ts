@@ -10,7 +10,7 @@ import {
 } from '../../../src/schema/package.js'
 import { generateApplicationOpenApi } from '../../../src/application.js'
 import { authJwtSettings } from '../../../src/capabilities/auth/settings.js'
-import { odbAuthJwt } from '../../../src/capabilities/auth/jwt.js'
+import { odbAuthJwt } from '../../../src/capabilities/auth/core/tokens.js'
 
 describe('service authorization generation', () => {
   it('binds verified identity without a public request parameter and emits OpenAPI security', () => {

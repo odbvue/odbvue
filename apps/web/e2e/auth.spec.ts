@@ -9,19 +9,19 @@ test('enrolls an authenticator and requires saving recovery codes before redirec
   let authenticated = false
   const actions: string[] = []
   await page.route('**/auth/**', async (route) => {
+    if (!['fetch', 'xhr'].includes(route.request().resourceType())) return route.fallback()
     const action = new URL(route.request().url()).pathname.split('/').at(-1)
     actions.push(action ?? '')
     if (action === 'refresh') await route.fulfill({ status: 401, json: {} })
-    else if (action === 'state')
+    else if (action === 'config')
       await route.fulfill({
-        json: {
-          user: authenticated
-            ? { userId: 7, username: 'ada', displayName: 'Ada', roles: ['admin'], permissions: [] }
-            : null,
-          providers: { password: true, google: false },
-          signup: true,
-          twoFactor: true,
-        },
+        json: { password: true, ldap: false, google: false, signup: true, twoFactor: true },
+      })
+    else if (action === 'me')
+      await route.fulfill({
+        json: authenticated
+          ? { userId: 7, username: 'ada', displayName: 'Ada', roles: ['admin'], permissions: [] }
+          : null,
       })
     else if (action === 'login')
       await route.fulfill({ json: { accessToken: null, challenge, setupSecret } })
@@ -57,7 +57,7 @@ test('enrolls an authenticator and requires saving recovery codes before redirec
   await expect(page.getByLabel('Authenticator setup key')).toBeVisible()
   await expect(page.getByLabel('Authenticator setup key')).toHaveValue(setupSecret)
   await expect(page).toHaveURL(/\/login\?redirect=/)
-  expect(actions).toEqual(['refresh', 'state', 'login'])
+  expect(actions).toEqual(['config', 'refresh', 'login'])
   await page.getByLabel('Authenticator or recovery code').fill('123456')
   await page.getByRole('button', { name: 'Verify', exact: true }).click()
   await expect(page.locator('li code')).toHaveCount(10)
@@ -71,30 +71,26 @@ test('enrolls an authenticator and requires saving recovery codes before redirec
   expect(persisted).not.toMatch(/verified-token|BBBBBBBBBBBBBBBB|0000000000000000/)
   await page.getByRole('button', { name: 'I have saved my recovery codes', exact: true }).click()
   await expect(page).toHaveURL(/\/sandbox$/)
-  expect(actions).toEqual(['refresh', 'state', 'login', 'verify', 'state'])
+  expect(actions).toEqual(['config', 'refresh', 'login', 'verify', 'me'])
 })
 
 test('requests recovery and resets a password only after explicit submission', async ({ page }) => {
   const token = 'A'.repeat(64)
   const actions: string[] = []
-  await page.route('**/auth/*', async (route) => {
+  await page.route('**/auth/**', async (route) => {
+    if (!['fetch', 'xhr'].includes(route.request().resourceType())) return route.fallback()
     const action = new URL(route.request().url()).pathname.split('/').at(-1)
     actions.push(action ?? '')
     if (action === 'refresh') {
       await route.fulfill({ status: 401, json: {} })
-    } else if (action === 'state') {
+    } else if (action === 'config') {
       await route.fulfill({
-        json: {
-          user: null,
-          providers: { password: true, google: false },
-          signup: true,
-          twoFactor: true,
-        },
+        json: { password: true, ldap: false, google: false, signup: true, twoFactor: true },
       })
-    } else if (action === 'recover-password') {
+    } else if (action === 'recover') {
       expect(route.request().postDataJSON()).toEqual({ email: 'ada+reset@example.com' })
       await route.fulfill({ status: 204 })
-    } else if (action === 'reset-password') {
+    } else if (action === 'reset') {
       expect(route.request().postDataJSON()).toEqual({
         token,
         password: 'new secure password!',
@@ -109,15 +105,15 @@ test('requests recovery and resets a password only after explicit submission', a
   await expect(page).toHaveURL(/\/recover-password$/)
   await page.getByRole('button', { name: 'Send reset link', exact: true }).click()
   await expect(page.getByText('Email is required', { exact: true })).toBeVisible()
-  expect(actions).toEqual(['refresh', 'state'])
+  expect(actions).toEqual(['config', 'refresh'])
   await page.getByLabel('Email', { exact: true }).fill('ada+reset@example.com')
   await page.getByLabel('Email', { exact: true }).press('Enter')
   await expect(page.getByText(/If an active account exists/)).toBeVisible()
-  expect(actions).toEqual(['refresh', 'state', 'recover-password'])
+  expect(actions).toEqual(['config', 'refresh', 'recover'])
 
   await page.goto(`/reset-password#token=${token}`)
   await expect(page).toHaveURL(/\/reset-password$/)
-  expect(actions).toEqual(['refresh', 'state', 'recover-password', 'refresh', 'state'])
+  expect(actions).toEqual(['config', 'refresh', 'recover', 'config', 'refresh'])
   await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute(
     'autocomplete',
     'new-password',
@@ -130,14 +126,7 @@ test('requests recovery and resets a password only after explicit submission', a
   await page.getByLabel('Repeat password', { exact: true }).fill('new secure password!')
   await page.getByLabel('Repeat password', { exact: true }).press('Enter')
   await expect(page.getByText(/Password reset. All previous sessions/)).toBeVisible()
-  expect(actions).toEqual([
-    'refresh',
-    'state',
-    'recover-password',
-    'refresh',
-    'state',
-    'reset-password',
-  ])
+  expect(actions).toEqual(['config', 'refresh', 'recover', 'config', 'refresh', 'reset'])
   const persisted = await page.evaluate(() => ({
     local: { ...localStorage },
     session: { ...sessionStorage },
@@ -154,7 +143,8 @@ async function mockAuth(
 ) {
   let session = options.restored ?? false
   const requests: string[] = []
-  await page.route('**/auth/*', async (route) => {
+  await page.route('**/auth/**', async (route) => {
+    if (!['fetch', 'xhr'].includes(route.request().resourceType())) return route.fallback()
     const action = new URL(route.request().url()).pathname.split('/').at(-1)
     requests.push(action ?? '')
     if (action === 'login') {
@@ -170,25 +160,24 @@ async function mockAuth(
         status: session ? 200 : 401,
         json: session ? { accessToken: 'test-access-token' } : {},
       })
-    } else if (action === 'state') {
+    } else if (action === 'config') {
+      await route.fulfill({
+        json: { password: true, ldap: false, google: false, signup: true, twoFactor: true },
+      })
+    } else if (action === 'me') {
       expect(route.request().headers().authorization).toBe(
         session ? 'Bearer test-access-token' : undefined,
       )
       await route.fulfill({
-        json: {
-          providers: { password: true, google: false },
-          signup: true,
-          twoFactor: true,
-          user: session
-            ? {
-                userId: 7,
-                username: 'ada',
-                displayName: 'Ada Lovelace',
-                roles: options.roles ?? ['admin'],
-                permissions: [],
-              }
-            : null,
-        },
+        json: session
+          ? {
+              userId: 7,
+              username: 'ada',
+              displayName: 'Ada Lovelace',
+              roles: options.roles ?? ['admin'],
+              permissions: [],
+            }
+          : null,
       })
     } else if (action === 'logout') {
       if (options.logoutFailure) {
@@ -218,7 +207,7 @@ test('validates login, reports errors, returns to a protected page, and logs out
   )
   await page.getByRole('button', { name: 'Login', exact: true }).click()
   await expect(page.getByText('Username is required', { exact: true })).toBeVisible()
-  expect(requests).toEqual(['refresh', 'state'])
+  expect(requests).toEqual(['config', 'refresh'])
 
   await page.getByLabel('Username').fill('ada')
   await page.getByLabel('Password', { exact: true }).fill('wrong-password')
@@ -232,13 +221,13 @@ test('validates login, reports errors, returns to a protected page, and logs out
   await expect(
     page.getByRole('button', { name: 'Account menu for Ada Lovelace', exact: true }),
   ).toBeVisible()
-  expect(requests).toEqual(['refresh', 'state', 'login', 'login', 'state'])
+  expect(requests).toEqual(['config', 'refresh', 'login', 'login', 'me'])
 
   await page.reload()
   await expect(
     page.getByRole('button', { name: 'Account menu for Ada Lovelace', exact: true }),
   ).toBeVisible()
-  expect(requests).toEqual(['refresh', 'state', 'login', 'login', 'state', 'refresh', 'state'])
+  expect(requests).toEqual(['config', 'refresh', 'login', 'login', 'me', 'config', 'refresh', 'me'])
   const persisted = await page.evaluate(() => ({
     local: { ...localStorage },
     session: { ...sessionStorage },
@@ -255,7 +244,7 @@ test('restores identity before handling an authenticated visit to login', async 
   const requests = await mockAuth(page, { restored: true })
   await page.goto('/login?redirect=%2Fsandbox')
   await expect(page).toHaveURL(/\/sandbox$/)
-  expect(requests).toEqual(['refresh', 'state'])
+  expect(requests).toEqual(['config', 'refresh', 'me'])
 })
 
 for (const field of ['Username', 'Password']) {
@@ -266,7 +255,7 @@ for (const field of ['Username', 'Password']) {
     await page.getByLabel('Password', { exact: true }).fill('valid-password')
     await page.getByLabel(field, { exact: true }).press('Enter')
     await expect(page).toHaveURL(/\/sandbox$/)
-    expect(requests).toEqual(['refresh', 'state', 'login', 'state'])
+    expect(requests).toEqual(['config', 'refresh', 'login', 'me'])
   })
 }
 
@@ -298,7 +287,7 @@ test('reports failed logout while clearing local identity and returning home', a
   await expect(page.getByRole('button', { name: 'Logout', exact: true })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Login', exact: true }).first()).toBeVisible()
   await expect(page.getByRole('alert')).toBeVisible()
-  expect(requests).toEqual(['refresh', 'state', 'logout'])
+  expect(requests).toEqual(['config', 'refresh', 'me', 'logout'])
 })
 
 test('loads app infrastructure and local shared components inside sandbox', async ({ page }) => {

@@ -10,7 +10,7 @@
           {{ t('auth.reset.invalid') }}
         </v-alert>
         <v-ov-form
-          v-else-if="auth.providers.value?.password"
+          v-else-if="auth.config.value?.password"
           :options="options"
           :data="data"
           :t="t"
@@ -95,7 +95,7 @@ async function submit(values: OvFormData) {
   }
   const stopLoading = ui.loading.start('overlay.auth.resetPassword')
   try {
-    await auth.resetPassword({ token: token.value, password, passwordRepeat })
+    await auth.password.reset({ token: token.value, password, passwordRepeat })
     completed.value = true
     token.value = ''
   } catch (error) {

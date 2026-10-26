@@ -62,14 +62,14 @@
         </template>
         <template v-else>
           <v-ov-form
-            v-if="auth.providers.value?.password || auth.providers.value?.ldap"
+            v-if="auth.config.value?.password || auth.config.value?.ldap"
             :options="options"
             :t="t"
             @submit="submit"
           />
           <VOvGoogleSignIn />
           <v-btn
-            v-if="auth.signupEnabled.value"
+            v-if="auth.config.value?.signup"
             :to="{
               path: '/signup',
               query: route.query.redirect ? { redirect: route.query.redirect } : {},
@@ -80,7 +80,7 @@
             {{ t('auth.signup') }}
           </v-btn>
           <v-btn
-            v-if="auth.providers.value?.password"
+            v-if="auth.config.value?.password"
             to="/recover-password"
             variant="text"
             class="mt-4"
@@ -230,7 +230,7 @@ async function verify() {
   ui.clear()
   const stopLoading = ui.loading.start('overlay.auth.verifyTwoFactor')
   try {
-    const result = await auth.verifyTwoFactor(
+    const result = await auth.twoFactor.verify(
       pending.value.challenge,
       verificationCode.value.trim(),
     )

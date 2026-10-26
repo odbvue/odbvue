@@ -64,7 +64,7 @@
             {{ providerStatus(auth.user.value?.passwordConnected) }}
           </v-chip>
           <v-btn
-            v-if="auth.user.value?.passwordConnected && auth.providers.value?.password"
+            v-if="auth.user.value?.passwordConnected && auth.config.value?.password"
             variant="text"
             color="primary"
             :disabled="busy"
@@ -75,7 +75,7 @@
             {{ t(editingPassword ? 'auth.profile.close' : 'auth.profile.password.change') }}
           </v-btn>
         </div>
-        <template v-if="auth.user.value?.passwordConnected && auth.providers.value?.password">
+        <template v-if="auth.user.value?.passwordConnected && auth.config.value?.password">
           <div v-if="editingPassword" id="profile-password" class="mt-4">
             <p class="mb-4">{{ t('auth.profile.password.description') }}</p>
             <v-ov-form
@@ -88,7 +88,7 @@
           </div>
         </template>
         <p
-          v-else-if="auth.user.value?.passwordConnected && auth.providers.value?.password === false"
+          v-else-if="auth.user.value?.passwordConnected && auth.config.value?.password === false"
           class="text-body-2 text-medium-emphasis mt-2"
         >
           {{ t('auth.password.disabled') }}
@@ -185,7 +185,7 @@ const initials = computed(() => avatarInitials(auth.user.value))
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-const enabled = computed(() => auth.providers.value?.google)
+const enabled = computed(() => auth.config.value?.google)
 const starting = ref(false)
 const avatarSaving = ref(false)
 const changingPassword = ref(false)
@@ -285,7 +285,7 @@ onMounted(async () => {
       delete query.google
       await router.replace({ path: route.path, query, hash: route.hash })
       if (result === 'linked') {
-        await auth.getState()
+        await auth.refreshUser()
         ui.success('auth.google.link.linked')
         if (continuing.value) {
           await router.replace(destination.value)
@@ -301,7 +301,7 @@ onMounted(async () => {
 })
 
 async function saveAvatar(avatar: string | null) {
-  await auth.updateAvatar(avatar)
+  await auth.profile.updateAvatar(avatar)
   ui.success('auth.profile.avatar.saved')
 }
 
@@ -338,7 +338,7 @@ async function changePassword(values: OvFormData) {
   changingPassword.value = true
   ui.clear()
   try {
-    await auth.changePassword({
+    await auth.password.change({
       currentPassword: String(values.currentPassword ?? ''),
       password: String(values.password ?? ''),
       passwordRepeat: String(values.passwordRepeat ?? ''),
@@ -366,7 +366,7 @@ async function connect() {
   const currentPassword = linkPassword.value
   linkPassword.value = ''
   try {
-    const { authorizationUrl } = await auth.startGoogleLink({
+    const { authorizationUrl } = await auth.google.link({
       redirect: destination.value,
       password: currentPassword,
     })

@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { createAuth as createCoreAuth, type AuthOptions } from '@/capabilities/auth/core'
 import { createLoading } from '@/capabilities/ui/loading'
 import { createHttpClient } from '@/capabilities/http/core'
-import { authState } from '../auth-state'
 
 const challenge = 'A'.repeat(64)
 const setupSecret = 'ABCDEFGHIJKLMNOP234567ABCDEFGHIJKLMNOP'.slice(0, 32)
@@ -20,9 +19,7 @@ function response<T>(data: T) {
 function setup() {
   const http = createHttpClient()
   const post = vi.spyOn(http, 'post')
-  const get = vi
-    .spyOn(http, 'get')
-    .mockResolvedValue(response(authState({ userId: 7, username: 'ada' })))
+  const get = vi.spyOn(http, 'get').mockResolvedValue(response({ userId: 7, username: 'ada' }))
   return { auth: createAuth({ http }), post, get }
 }
 
@@ -61,7 +58,7 @@ describe('two-factor authentication client', () => {
     async (recoveryCodes) => {
       const { auth, post, get } = setup()
       post.mockResolvedValue(response({ accessToken: 'verified-token', recoveryCodes }))
-      await expect(auth.verifyTwoFactor(challenge, '123456')).resolves.toEqual({
+      await expect(auth.twoFactor.verify(challenge, '123456')).resolves.toEqual({
         recoveryCodes: typeof recoveryCodes === 'string' ? codes : recoveryCodes,
       })
       expect(post).toHaveBeenCalledWith(
@@ -81,7 +78,7 @@ describe('two-factor authentication client', () => {
     post.mockResolvedValue(
       response({ accessToken: null, challenge, setupSecret, recoveryCodes: '[]' }),
     )
-    await expect(auth.verifyTwoFactor(challenge, codes[0]!)).resolves.toEqual({
+    await expect(auth.twoFactor.verify(challenge, codes[0]!)).resolves.toEqual({
       challenge,
       setupSecret,
     })
@@ -100,7 +97,7 @@ describe('two-factor authentication client', () => {
     )
     const http = createHttpClient({ fetch, configuration: { refreshAccessToken: refresh } })
     const auth = createAuth({ http })
-    await expect(auth.verifyTwoFactor(challenge, '000000')).rejects.toThrow()
+    await expect(auth.twoFactor.verify(challenge, '000000')).rejects.toThrow()
     expect(fetch).toHaveBeenCalledOnce()
     expect(refresh).not.toHaveBeenCalled()
     expect(auth.authenticated.value).toBe(false)
@@ -116,7 +113,7 @@ describe('two-factor authentication client', () => {
   ])('rejects invalid verification responses without authenticating', async (body) => {
     const { auth, post } = setup()
     post.mockResolvedValue(response(body))
-    await expect(auth.verifyTwoFactor(challenge, '123456')).rejects.toThrow()
+    await expect(auth.twoFactor.verify(challenge, '123456')).rejects.toThrow()
     expect(auth.authenticated.value).toBe(false)
     expect(auth.accessToken.value).toBeNull()
     expect(loading.active.value).toBe(false)
@@ -131,7 +128,7 @@ describe('two-factor authentication client', () => {
         request: '/auth/two-factor/verify',
       })
       post.mockResolvedValue({ data: null, error, status, headers: null })
-      await expect(auth.verifyTwoFactor(challenge, '123456')).rejects.toBe(error)
+      await expect(auth.twoFactor.verify(challenge, '123456')).rejects.toBe(error)
       expect(auth.authenticated.value).toBe(false)
       expect(loading.active.value).toBe(false)
     },

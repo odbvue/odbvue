@@ -7,7 +7,7 @@ import { createAuth, type Auth } from '@/capabilities/auth/core'
 import { createHttpClient, type HttpResponse } from '@/capabilities/http/core'
 import { createState } from '@/capabilities/state'
 import { useUi } from '@/capabilities/ui/store'
-import { authState } from '../../auth-state'
+import { authConfig } from '../../auth-state'
 import DefaultLayout from '@/app/layouts/DefaultLayout.vue'
 
 const runtime = vi.hoisted((): { auth?: Auth; ui?: ReturnType<typeof useUi> } => ({}))
@@ -56,13 +56,11 @@ async function setup(authenticated = true, avatarUrl: string | null = null, read
   const post = vi
     .spyOn(http, 'post')
     .mockResolvedValue(authenticated ? response({ accessToken: 'token' }) : response(null, 401))
-  vi.spyOn(http, 'get').mockResolvedValue(
+  vi.spyOn(http, 'get').mockImplementation(async (url) =>
     response(
-      authState(
-        authenticated
-          ? { userId: 7, username: 'ada', displayName: 'Ada Lovelace', avatarUrl }
-          : null,
-      ),
+      String(url).endsWith('/auth/config')
+        ? authConfig()
+        : { userId: 7, username: 'ada', displayName: 'Ada Lovelace', avatarUrl },
     ),
   )
   const auth = createAuth({ http, onOperation: (operation) => ui.loading.start(operation) })

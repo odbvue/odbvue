@@ -1,34 +1,249 @@
-import { authState } from '../auth-state'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { isReadonly } from 'vue'
 import { createAuth as createCoreAuth, type AuthOptions } from '@/capabilities/auth/core.js'
-import { createHttpClient, type HttpClient } from '@/capabilities/http/core.js'
+import { createHttpClient } from '@/capabilities/http/core.js'
 import { createLoading } from '@/capabilities/ui/loading'
+import { authConfig } from '../auth-state'
 
 const loading = createLoading()
-function createAuth(options: AuthOptions) {
-  return createCoreAuth({ ...options, onOperation: (operation) => loading.start(operation) })
-}
-
-type HttpPostMock = (url: string, body?: unknown) => Promise<unknown>
-type HttpGetMock = (url: string) => Promise<unknown>
+const ada = { userId: 7, username: 'ada' }
+const credentials = { username: 'ada', password: 'password' }
+const authorizationUrl = 'https://accounts.google.com/o/oauth2/v2/auth?state=server-state'
 
 function response<T>(data: T | null, status = 200) {
   return { data, error: null, status, headers: null }
 }
 
+function setup(options: Partial<AuthOptions> = {}) {
+  const http = createHttpClient()
+  const post = vi.spyOn(http, 'post').mockResolvedValue(response({ accessToken: 'token' }))
+  const put = vi.spyOn(http, 'put').mockResolvedValue(response(null, 204))
+  const get = vi
+    .spyOn(http, 'get')
+    .mockImplementation(async (url) => response(url.endsWith('/config') ? authConfig() : ada))
+  const auth = createCoreAuth({
+    http,
+    onOperation: (operation) => loading.start(operation),
+    ...options,
+  })
+  return { auth, http, post, put, get }
+}
+
+async function session() {
+  const context = setup()
+  await context.auth.restore()
+  context.post.mockClear()
+  return context
+}
+
 describe('authentication capability', () => {
   afterEach(() => vi.restoreAllMocks())
 
-  it('keeps login active through nested profile work and an overlapping refresh', async () => {
-    const http = createHttpClient()
+  it('exposes one readonly config and namespaced feature surface without old aliases', () => {
+    const { auth } = setup()
+    expect(isReadonly(auth.config)).toBe(true)
+    expect(isReadonly(auth.user)).toBe(true)
+    expect(auth.config.value).toBeNull()
+    for (const old of [
+      'providers',
+      'signupEnabled',
+      'twoFactorEnabled',
+      'getState',
+      'startGoogleLogin',
+      'startGoogleLink',
+      'verifyTwoFactor',
+      'confirmEmail',
+      'recoverPassword',
+      'resetPassword',
+      'changePassword',
+      'updateAvatar',
+    ])
+      expect(auth).not.toHaveProperty(old)
+    expect(auth.password.change).toBeTypeOf('function')
+    expect(auth.google.link).toBeTypeOf('function')
+    expect(auth.twoFactor.verify).toBeTypeOf('function')
+    expect(auth.profile.updateAvatar).toBeTypeOf('function')
+  })
+
+  it.each([true, false])(
+    'loads deployment configuration without an authenticated profile (%s)',
+    async (google) => {
+      const { auth, get, post } = setup()
+      get.mockResolvedValue(response(authConfig(google)))
+      post.mockResolvedValue(response(null, 401))
+      await expect(auth.restore()).resolves.toBe(false)
+      expect(auth.config.value).toEqual(authConfig(google))
+      expect(auth.ready.value).toBe(true)
+      expect(get).toHaveBeenCalledExactlyOnceWith('/auth/config', {
+        credentials: 'omit',
+        skipAuthRefresh: true,
+      })
+      expect(auth.user.value).toBeNull()
+      expect(auth.accessToken.value).toBeNull()
+      expect(loading.active.value).toBe(false)
+    },
+  )
+
+  it('loads config independently while refresh is pending and deduplicates restoration', async () => {
+    const { auth, get, post } = setup()
+    const refresh = Promise.withResolvers<ReturnType<typeof response>>()
+    post.mockReturnValue(refresh.promise)
+    const first = auth.restore()
+    const second = auth.restore()
+    expect(second).toBe(first)
+    await vi.waitFor(() => expect(auth.config.value).toEqual(authConfig()))
+    expect(get).toHaveBeenCalledTimes(1)
+    expect(auth.ready.value).toBe(false)
+    refresh.resolve(response({ accessToken: 'restored' }))
+    await expect(first).resolves.toBe(true)
+    expect(get).toHaveBeenLastCalledWith('/auth/me', {
+      headers: { Authorization: ['Bearer', 'restored'].join(' ') },
+    })
+    expect(post).toHaveBeenCalledTimes(1)
+    await auth.restore()
+    expect(get).toHaveBeenCalledTimes(2)
+  })
+
+  it('shares restoration failures without retrying and retains loaded deployment config', async () => {
+    const { auth, get, post } = setup()
+    const failure = Object.assign(new Error('Profile unavailable'), {
+      status: 503,
+      request: '/auth/me',
+    })
+    get.mockImplementation(async (url) =>
+      url.endsWith('/config') ? response(authConfig()) : { ...response(null, 503), error: failure },
+    )
+    const first = auth.restore()
+    expect(auth.restore()).toBe(first)
+    await expect(first).rejects.toBe(failure)
+    await expect(auth.restore()).rejects.toBe(failure)
+    expect(post).toHaveBeenCalledTimes(1)
+    expect(auth.ready.value).toBe(true)
+    expect(auth.accessToken.value).toBeNull()
+    expect(auth.config.value).toEqual(authConfig())
+    expect(loading.active.value).toBe(false)
+  })
+
+  it('keeps config after logout, password reset and failed profile hydration', async () => {
+    const { auth, get, post } = await session()
+    const configuration = auth.config.value
+    await auth.logout()
+    expect(auth.config.value).toBe(configuration)
+    post.mockResolvedValue(response({ accessToken: 'next-token' }))
+    await auth.login(credentials)
+    await auth.password.reset({ token: 'reset', password: 'next', passwordRepeat: 'next' })
+    expect(auth.config.value).toBe(configuration)
+    get.mockResolvedValue(response(null))
+    await expect(auth.login(credentials)).rejects.toThrow('user response')
+    expect(auth.accessToken.value).toBeNull()
+    expect(auth.config.value).toBe(configuration)
+  })
+
+  it.each([
+    null,
+    { password: true, google: true, signup: true, twoFactor: true },
+    { ...authConfig(), password: 'true' },
+    { ...authConfig(), twoFactor: 'false' },
+  ])(
+    'rejects malformed configuration instead of silently disabling features',
+    async (configuration) => {
+      const { auth, get, post } = setup()
+      get.mockResolvedValue(response(configuration))
+      post.mockResolvedValue(response(null, 401))
+      await expect(auth.restore()).rejects.toThrow('configuration')
+      expect(auth.config.value).toBeNull()
+      expect(auth.ready.value).toBe(true)
+    },
+  )
+
+  it('does not couple a restored identity to configuration failure', async () => {
+    const { auth, get } = setup()
+    const error = Object.assign(new Error('Config unavailable'), {
+      status: 503,
+      request: '/auth/config',
+    })
+    get.mockImplementation(async (url) =>
+      url.endsWith('/config') ? { ...response(null, 503), error } : response(ada),
+    )
+    await expect(auth.restore()).rejects.toBe(error)
+    await vi.waitFor(() => expect(auth.authenticated.value).toBe(true))
+    expect(auth.config.value).toBeNull()
+    expect(loading.active.value).toBe(false)
+  })
+
+  it('maps direct profile identity and ORDS authorization fields', async () => {
+    const { auth, get } = setup()
+    get.mockResolvedValue(
+      response({
+        ...ada,
+        displayName: 'Ada',
+        roles: '["admin"]',
+        permissions: '["write"]',
+        passwordConnected: 1,
+        googleConnected: 0,
+      }),
+    )
+    await auth.login(credentials)
+    expect(auth.user.value).toMatchObject({
+      id: 7,
+      displayName: 'Ada',
+      roles: ['admin'],
+      permissions: ['write'],
+      passwordConnected: true,
+      googleConnected: false,
+    })
+    expect(auth.hasRole('admin')).toBe(true)
+    expect(auth.hasRole('other')).toBe(false)
+    expect(auth.can('write')).toBe(true)
+    expect(auth.config.value).toBeNull()
+    expect(get).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    { roles: ['admin'], permissions: ['write'] },
+    { roles: '["admin"]', permissions: '["write"]' },
+    { roles: '{invalid', permissions: '[1]' },
+  ])(
+    'normalizes profile authorization without inventing provider connections',
+    async (authorization) => {
+      const { auth, get } = setup()
+      get.mockResolvedValue(response({ ...ada, ...authorization }))
+      await auth.login(credentials)
+      const valid = authorization.roles !== '{invalid'
+      expect(auth.hasRole('admin')).toBe(valid)
+      expect(auth.can('write')).toBe(valid)
+      expect(auth.user.value?.passwordConnected).toBeUndefined()
+      expect(auth.user.value?.googleConnected).toBeUndefined()
+    },
+  )
+
+  it.each([null, {}, { user: ada }, { userId: 7, username: null }])(
+    'clears issued tokens on malformed direct user responses',
+    async (profile) => {
+      const { auth, get } = setup()
+      get.mockResolvedValue(response(profile))
+      await expect(auth.login(credentials)).rejects.toThrow('user response')
+      expect(auth.user.value).toBeNull()
+      expect(auth.accessToken.value).toBeNull()
+      expect(loading.active.value).toBe(false)
+    },
+  )
+
+  it('supports independent custom config and profile endpoints', async () => {
+    const { auth, get } = setup({ endpoints: { config: '/custom/config', me: '/custom/me' } })
+    await auth.restore()
+    expect(get.mock.calls.map(([url]) => url)).toEqual(['/custom/config', '/custom/me'])
+  })
+
+  it('keeps login active through nested profile work and overlapping refresh', async () => {
+    const { auth, post, get } = setup()
     const profile = Promise.withResolvers<ReturnType<typeof response>>()
     const refresh = Promise.withResolvers<ReturnType<typeof response>>()
-    vi.spyOn(http, 'post')
+    post
       .mockResolvedValueOnce(response({ accessToken: 'login-token' }))
       .mockReturnValueOnce(refresh.promise)
-    const get = vi.spyOn(http, 'get').mockReturnValue(profile.promise)
-    const auth = createAuth({ http })
-    const login = auth.login({ username: 'ada', password: 'password' })
+    get.mockReturnValue(profile.promise)
+    const login = auth.login(credentials)
     await vi.waitFor(() => expect(get).toHaveBeenCalledOnce())
     expect(loading.has('auth.login')).toBe(true)
     expect(loading.has('auth.profile')).toBe(true)
@@ -37,321 +252,236 @@ describe('authentication capability', () => {
     await refreshing
     expect(loading.has('auth.refresh')).toBe(false)
     expect(loading.has('auth.login')).toBe(true)
-    profile.resolve(response(authState({ userId: 7, username: 'ada' })))
+    profile.resolve(response(ada))
     await login
     expect(loading.active.value).toBe(false)
     expect(auth.authenticated.value).toBe(true)
     expect(auth).not.toHaveProperty('loading')
   })
 
-  it('keeps avatar mutation guarded through profile reload independently of presentation state', async () => {
-    const { auth, post } = await linkSession()
+  it('updates and removes the avatar with PUT then reloads only the profile', async () => {
+    const { auth, put, get } = await session()
+    get.mockClear()
+    for (const avatar of ['data:image/jpeg;base64,/9j/AA==', null]) {
+      await auth.profile.updateAvatar(avatar)
+      expect(put).toHaveBeenLastCalledWith(
+        '/auth/me/avatar',
+        { avatar },
+        {
+          credentials: 'include',
+          skipAuthRefresh: true,
+          headers: { Authorization: ['Bearer', 'token'].join(' ') },
+        },
+      )
+    }
+    expect(get.mock.calls.map(([url]) => url)).toEqual(['/auth/me', '/auth/me'])
+  })
+
+  it('keeps mutation guards through profile reload without presentation tracking', async () => {
     const http = createHttpClient()
-    // A separate session with deliberately disabled presentation tracking must retain its guards.
     vi.spyOn(http, 'post').mockResolvedValue(response({ accessToken: 'token' }))
+    vi.spyOn(http, 'put').mockResolvedValue(response(null, 204))
     const get = vi
       .spyOn(http, 'get')
-      .mockResolvedValue(response(authState({ userId: 7, username: 'ada' })))
-    const isolated = createCoreAuth({ http })
-    await isolated.restore()
+      .mockImplementation(async (url) => response(url.endsWith('/config') ? authConfig() : ada))
+    const auth = createCoreAuth({ http })
+    await auth.restore()
     const profile = Promise.withResolvers<ReturnType<typeof response>>()
     get.mockReturnValueOnce(profile.promise)
-    const avatar = isolated.updateAvatar(null)
-    await vi.waitFor(() => expect(get).toHaveBeenCalledTimes(2))
-    await expect(isolated.startGoogleLink({ password: 'password' })).rejects.toThrow(
-      'already in progress',
-    )
-    await expect(isolated.updateAvatar(null)).rejects.toThrow('already in progress')
-    profile.resolve(response(authState({ userId: 7, username: 'ada' })))
+    const avatar = auth.profile.updateAvatar(null)
+    await vi.waitFor(() => expect(get).toHaveBeenCalledTimes(3))
+    await expect(auth.google.link({ password: 'password' })).rejects.toThrow('already in progress')
+    await expect(auth.profile.updateAvatar(null)).rejects.toThrow('already in progress')
+    profile.resolve(response(ada))
     await avatar
+  })
 
+  it('maps uploaded avatars and revokes replaced URLs and signed-out avatars', async () => {
+    const { auth, get } = setup()
+    const blob = new Blob(['jpeg'], { type: 'image/jpeg' })
+    const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:avatar')
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    get
+      .mockResolvedValueOnce(response({ ...ada, avatarUploaded: 1, avatarId: 'a'.repeat(32) }))
+      .mockResolvedValueOnce(response(blob))
+    await auth.login(credentials)
+    expect(auth.user.value?.avatarUrl).toBe('blob:avatar')
+    expect(createUrl).toHaveBeenCalledWith(blob)
+    expect(get).toHaveBeenLastCalledWith(`/auth/avatar/${'a'.repeat(32)}`, {
+      responseType: 'blob',
+      headers: { Authorization: ['Bearer', 'token'].join(' ') },
+    })
+    get.mockResolvedValue(response({ ...ada, avatarUrl: 'https://example.test/avatar' }))
+    await auth.refreshUser()
+    expect(auth.user.value?.avatarUrl).toBe('https://example.test/avatar')
+    expect(revoke).toHaveBeenCalledWith('blob:avatar')
+    get
+      .mockResolvedValueOnce(response({ ...ada, avatarUploaded: 1, avatarId: 'a'.repeat(32) }))
+      .mockResolvedValueOnce(response(blob))
+    await auth.refreshUser()
+    revoke.mockClear()
+    await auth.logout()
+    expect(revoke).toHaveBeenCalledWith('blob:avatar')
+  })
+
+  it('does not resurrect a profile from an avatar download after logout', async () => {
+    const { auth, get } = await session()
+    const download = Promise.withResolvers<ReturnType<typeof response>>()
+    get
+      .mockResolvedValueOnce(response({ ...ada, avatarUploaded: 1, avatarId: 'd'.repeat(32) }))
+      .mockReturnValueOnce(download.promise)
+    const profile = auth.refreshUser()
+    await vi.waitFor(() =>
+      expect(get).toHaveBeenLastCalledWith(`/auth/avatar/${'d'.repeat(32)}`, expect.anything()),
+    )
+    await auth.logout()
+    download.resolve(response(new Blob(['jpeg'], { type: 'image/jpeg' })))
+    await expect(profile).rejects.toThrow('no longer current')
+    expect(auth.user.value).toBeNull()
+  })
+
+  it('keeps the latest profile when profile requests complete out of order', async () => {
+    const { auth, get } = await session()
+    const stale = Promise.withResolvers<ReturnType<typeof response>>()
+    get
+      .mockReturnValueOnce(stale.promise)
+      .mockResolvedValueOnce(response({ ...ada, displayName: 'Latest' }))
+    const previous = auth.refreshUser()
+    await auth.refreshUser()
+    stale.resolve(response({ ...ada, displayName: 'Stale' }))
+    await expect(previous).rejects.toThrow('no longer current')
+    expect(auth.user.value?.displayName).toBe('Latest')
+    expect(loading.active.value).toBe(false)
+  })
+
+  it.each([
+    { avatarUploaded: 1, avatarId: '../invalid' },
+    { avatarUploaded: 1, avatarId: null },
+  ])('rejects unsafe avatar keys without replacing the profile', async (avatar) => {
+    const { auth, get } = await session()
+    const previous = auth.user.value
+    get.mockResolvedValue(response({ ...ada, ...avatar }))
+    await expect(auth.refreshUser()).rejects.toThrow('storage key')
+    expect(auth.user.value).toBe(previous)
+  })
+
+  it('surfaces failed avatar downloads without replacing the profile', async () => {
+    const { auth, get } = await session()
+    const previous = auth.user.value
+    get
+      .mockResolvedValueOnce(response({ ...ada, avatarUploaded: 1, avatarId: 'c'.repeat(32) }))
+      .mockResolvedValueOnce(response(new Blob(['png'], { type: 'image/png' })))
+    await expect(auth.refreshUser()).rejects.toThrow('retrieve the profile avatar')
+    expect(auth.user.value).toBe(previous)
+  })
+
+  it('changes passwords only with authenticated identity and clears session after success', async () => {
+    const { auth, post } = await session()
+    const change = { currentPassword: 'old', password: 'new', passwordRepeat: 'new' }
+    const error = Object.assign(new Error('Incorrect password'), {
+      status: 403,
+      request: '/auth/password/change',
+    })
+    post.mockResolvedValue({ ...response(null, 403), error })
+    await expect(auth.password.change(change)).rejects.toBe(error)
+    expect(auth.authenticated.value).toBe(true)
+    post.mockResolvedValue(response(null, 204))
+    await auth.password.change(change)
+    expect(post).toHaveBeenLastCalledWith('/auth/password/change', change, {
+      credentials: 'include',
+      skipAuthRefresh: true,
+      headers: { Authorization: ['Bearer', 'token'].join(' ') },
+    })
+    expect(auth.authenticated.value).toBe(false)
+  })
+
+  it('uses anonymous signup, confirmation and password recovery/reset routes', async () => {
+    const { auth, post } = setup()
+    post.mockResolvedValue(response(null, 204))
+    const signup = {
+      email: 'ada@example.com',
+      fullName: 'Ada',
+      password: 'pw',
+      passwordRepeat: 'pw',
+    }
+    const reset = { token: 'token', password: 'pw', passwordRepeat: 'pw' }
+    await auth.signup(signup)
+    await auth.confirmSignup('confirmation')
+    await auth.password.recover(signup.email)
+    await auth.password.reset(reset)
+    expect(post.mock.calls).toEqual([
+      ['/auth/signup', signup, { credentials: 'omit' }],
+      ['/auth/signup/confirm', { token: 'confirmation' }, { credentials: 'omit' }],
+      ['/auth/password/recover', { email: signup.email }, { credentials: 'omit' }],
+      ['/auth/password/reset', reset, { credentials: 'omit' }],
+    ])
+    expect(loading.active.value).toBe(false)
+  })
+
+  it('tracks overlapping anonymous requests separately and guards profile mutation', async () => {
+    const { auth, post } = await session()
     const first = Promise.withResolvers<ReturnType<typeof response>>()
     const second = Promise.withResolvers<ReturnType<typeof response>>()
     post.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
-    const signup = auth.signup({
-      email: 'ada@example.com',
-      fullName: 'Ada',
-      password: 'password',
-      passwordRepeat: 'password',
-    })
-    const recover = auth.recoverPassword('ada@example.com')
+    const signup = auth.confirmSignup('token')
+    const recover = auth.password.recover('ada@example.com')
     first.resolve(response(null, 204))
     await signup
     expect(loading.has('auth.recoverPassword')).toBe(true)
-    await expect(auth.startGoogleLink({ password: 'password' })).rejects.toThrow(
-      'already in progress',
-    )
+    await expect(auth.google.link({ password: 'pw' })).rejects.toThrow('already in progress')
     second.resolve(response(null, 204))
     await recover
     expect(loading.active.value).toBe(false)
   })
 
-  it('maps actual profile state without inventing provider connections', async () => {
-    const http = createHttpClient()
-    vi.spyOn(http, 'post').mockResolvedValue(response({ accessToken: 'token' }))
-    const avatar = new Blob(['jpeg'], { type: 'image/jpeg' })
-    const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:avatar')
-    const revokeUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
-    const get = vi
-      .spyOn(http, 'get')
-      .mockResolvedValueOnce(
-        response(
-          authState({
-            userId: 7,
-            username: 'ada',
-            displayName: 'Ada Lovelace',
-            avatarUrl: 'https://lh3.googleusercontent.com/ada',
-            avatarId: 'a'.repeat(32),
-            avatarUploaded: 1,
-            passwordConnected: 1,
-            googleConnected: 0,
-          }),
-        ),
-      )
-      .mockResolvedValueOnce(response(avatar))
-    const auth = createAuth({ http })
-    await auth.restore()
-    expect(auth.user.value).toMatchObject({
-      avatarUrl: 'blob:avatar',
-      avatarUploaded: true,
-      passwordConnected: true,
-      googleConnected: false,
-    })
-    expect(get).toHaveBeenLastCalledWith(`/auth/avatar/${'a'.repeat(32)}`, {
-      responseType: 'blob',
-      headers: { Authorization: 'Bearer token' },
-    })
-    expect(createUrl).toHaveBeenCalledWith(avatar)
-    get.mockResolvedValue(
-      response(
-        authState({
-          userId: 7,
-          username: 'ada',
-          avatarUrl: 'https://lh3.googleusercontent.com/ada',
-          avatarUploaded: 0,
-        }),
-      ),
-    )
-    await auth.getState()
-    expect(auth.user.value?.avatarUrl).toBe('https://lh3.googleusercontent.com/ada')
-    expect(revokeUrl).toHaveBeenCalledWith('blob:avatar')
+  it('rejects profile mutation and linking before a ready session', async () => {
+    const { auth, post, put } = setup()
+    await expect(auth.profile.updateAvatar(null)).rejects.toThrow('Sign in')
+    await expect(
+      auth.password.change({ currentPassword: 'old', password: 'new', passwordRepeat: 'new' }),
+    ).rejects.toThrow('Sign in')
+    await expect(auth.google.link({ password: 'pw' })).rejects.toThrow('Sign in')
+    expect(post).not.toHaveBeenCalled()
+    expect(put).not.toHaveBeenCalled()
   })
 
-  it('updates and removes avatars using the authenticated identity, then reloads the profile', async () => {
-    const { auth, post } = await linkSession()
-    post.mockResolvedValue(response(null, 204))
-    for (const avatar of ['data:image/jpeg;base64,/9j/AA==', null]) {
-      await auth.updateAvatar(avatar)
-      expect(post).toHaveBeenLastCalledWith(
-        '/auth/avatar',
-        { avatar },
-        expect.objectContaining({
-          credentials: 'include',
-          skipAuthRefresh: true,
-          headers: { Authorization: ['Bearer', 'original-token'].join(' ') },
-        }),
-      )
-    }
-    expect(auth.authenticated.value).toBe(true)
-  })
-
-  it('revokes uploaded avatar URLs on sign-out', async () => {
-    const http = createHttpClient()
-    vi.spyOn(http, 'post').mockResolvedValue(response({ accessToken: 'token' }))
-    vi.spyOn(http, 'get')
-      .mockResolvedValueOnce(
-        response(
-          authState({
-            userId: 7,
-            username: 'ada',
-            avatarUploaded: 1,
-            avatarId: 'b'.repeat(32),
-          }),
-        ),
-      )
-      .mockResolvedValueOnce(response(new Blob(['jpeg'], { type: 'image/jpeg' })))
-    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:uploaded')
-    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
-    const auth = createAuth({ http })
-    await auth.restore()
-    await auth.logout()
-    expect(revoke).toHaveBeenCalledWith('blob:uploaded')
-    expect(auth.user.value).toBeNull()
-  })
-
-  it('surfaces failed avatar downloads without replacing the current profile', async () => {
-    const http = createHttpClient()
-    vi.spyOn(http, 'post').mockResolvedValue(response({ accessToken: 'token' }))
-    const get = vi
-      .spyOn(http, 'get')
-      .mockResolvedValue(response(authState({ userId: 7, username: 'ada' })))
-    const auth = createAuth({ http })
-    await auth.restore()
-    const previous = auth.user.value
-    const error = Object.assign(new Error('Avatar not found'), {
-      status: 404,
-      request: '/auth/avatar/' + 'c'.repeat(32),
-    })
-    get
-      .mockResolvedValueOnce(
-        response(
-          authState({
-            userId: 7,
-            username: 'ada',
-            avatarUploaded: 1,
-            avatarId: 'c'.repeat(32),
-          }),
-        ),
-      )
-      .mockResolvedValueOnce({ ...response(null, 404), error })
-    await expect(auth.getState()).rejects.toBe(error)
-    expect(auth.user.value).toBe(previous)
-    expect(loading.active.value).toBe(false)
-  })
-
-  it('does not restore an avatar or identity when a download finishes after sign-out', async () => {
-    const http = createHttpClient()
-    vi.spyOn(http, 'post').mockResolvedValue(response({ accessToken: 'token' }))
-    const get = vi
-      .spyOn(http, 'get')
-      .mockResolvedValue(response(authState({ userId: 7, username: 'ada' })))
-    const auth = createAuth({ http })
-    await auth.restore()
-    const download = Promise.withResolvers<ReturnType<typeof response<Blob>>>()
-    get
-      .mockResolvedValueOnce(
-        response(
-          authState({
-            userId: 7,
-            username: 'ada',
-            avatarUploaded: 1,
-            avatarId: 'd'.repeat(32),
-          }),
-        ),
-      )
-      .mockReturnValueOnce(download.promise)
-    const pending = auth.getState()
-    await vi.waitFor(() =>
-      expect(get).toHaveBeenCalledWith(`/auth/avatar/${'d'.repeat(32)}`, expect.anything()),
-    )
-    await auth.logout()
-    download.resolve(response(new Blob(['jpeg'], { type: 'image/jpeg' })))
-    await expect(pending).rejects.toThrow('no longer current')
-    expect(auth.user.value).toBeNull()
-  })
-
-  it('clears identity only after a successful authenticated password change', async () => {
-    const { auth, post } = await linkSession()
-    const credentials = {
-      currentPassword: 'old-password',
-      password: 'new-password',
-      passwordRepeat: 'new-password',
-    }
-    const failure = Object.assign(new Error('Incorrect password'), {
-      status: 403,
-      request: '/auth/change-password',
-    })
-    post.mockResolvedValue({ ...response(null, 403), error: failure })
-    await expect(auth.changePassword(credentials)).rejects.toBe(failure)
-    expect(auth.authenticated.value).toBe(true)
-    expect(loading.active.value).toBe(false)
-    post.mockResolvedValue(response(null, 204))
-    await auth.changePassword(credentials)
+  it('starts Google login anonymously with transaction cookies', async () => {
+    const { auth, post } = setup()
+    post.mockResolvedValue(response({ authorizationUrl }))
+    await expect(auth.google.login({ redirect: '/sandbox' })).resolves.toEqual({ authorizationUrl })
     expect(post).toHaveBeenLastCalledWith(
-      '/auth/change-password',
-      credentials,
-      expect.objectContaining({
-        credentials: 'include',
-        skipAuthRefresh: true,
-        headers: { Authorization: ['Bearer', 'original-token'].join(' ') },
-      }),
+      '/auth/google/start',
+      { redirect: '/sandbox' },
+      { credentials: 'include' },
     )
-    expect(auth.user.value).toBeNull()
     expect(auth.accessToken.value).toBeNull()
   })
 
-  it('rejects profile updates before signing in without sending a request', async () => {
-    const http = createHttpClient()
-    const post = vi.spyOn(http, 'post')
-    const auth = createAuth({ http })
-    await expect(auth.updateAvatar(null)).rejects.toThrow('Sign in')
-    await expect(
-      auth.changePassword({
-        currentPassword: 'old-password',
-        password: 'new-password',
-        passwordRepeat: 'new-password',
-      }),
-    ).rejects.toThrow('Sign in')
-    expect(post).not.toHaveBeenCalled()
-  })
-
-  async function linkSession() {
-    const http = createHttpClient()
-    const post = vi
-      .spyOn(http, 'post')
-      .mockResolvedValue(response({ accessToken: 'original-token' }))
-    vi.spyOn(http, 'get').mockResolvedValue(response(authState({ userId: 7, username: 'ada' })))
-    const auth = createAuth({ http })
-    await auth.restore()
-    post.mockClear()
-    return { auth, post }
-  }
-
-  it('requires a ready authenticated session and current password before linking', async () => {
-    const http = createHttpClient()
-    vi.spyOn(http, 'get').mockResolvedValue(response(authState()))
-    const post = vi.spyOn(http, 'post').mockResolvedValue(response(null, 401))
-    const auth = createAuth({ http })
-    await expect(auth.startGoogleLink({ password: 'password' })).rejects.toThrow('Sign in')
-    expect(post).not.toHaveBeenCalled()
-    await auth.restore()
-    post.mockClear()
-    await expect(auth.startGoogleLink({ password: 'password' })).rejects.toThrow('Sign in')
-    expect(post).not.toHaveBeenCalled()
-    const context = await linkSession()
-    await expect(context.auth.startGoogleLink({ password: '' })).rejects.toThrow('password')
-    expect(context.post).not.toHaveBeenCalled()
-  })
-
-  it.each(['/settings/account', '/sandbox', '/sandbox?tab=profile#section'])(
-    'links with bearer auth, cookies and the requested local destination %s',
+  it.each([undefined, '/sandbox?tab=profile#section'])(
+    'links Google with the current identity (%s)',
     async (redirect) => {
-      const { auth, post } = await linkSession()
-      const user = auth.user.value
-      const authorizationUrl = 'https://accounts.google.com/o/oauth2/v2/auth?state=link'
-      post.mockResolvedValue(response({ authorizationUrl, accessToken: 'different-token' }))
-      await expect(
-        auth.startGoogleLink({ redirect, password: 'current-password' }),
-      ).resolves.toMatchObject({
+      const { auth, post } = await session()
+      const previous = auth.user.value
+      post.mockResolvedValue(response({ authorizationUrl, accessToken: 'ignored' }))
+      await expect(auth.google.link({ redirect, password: 'pw' })).resolves.toMatchObject({
         authorizationUrl,
       })
-      expect(post).toHaveBeenCalledWith(
+      expect(post).toHaveBeenLastCalledWith(
         '/auth/google/link/start',
-        { redirect, password: 'current-password' },
+        {
+          redirect: redirect ?? '/settings/account',
+          password: 'pw',
+        },
         {
           credentials: 'include',
-          headers: { Authorization: ['Bearer', 'original-token'].join(' ') },
           skipAuthRefresh: true,
+          headers: { Authorization: ['Bearer', 'token'].join(' ') },
         },
       )
-      expect(auth.user.value).toBe(user)
-      expect(auth.accessToken.value).toBe('original-token')
-      expect(loading.active.value).toBe(false)
+      expect(auth.user.value).toBe(previous)
+      expect(auth.accessToken.value).toBe('token')
     },
   )
-
-  it('defaults linking to account settings when no destination was supplied', async () => {
-    const { auth, post } = await linkSession()
-    post.mockResolvedValue(
-      response({ authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth' }),
-    )
-    await auth.startGoogleLink({ password: 'current-password' })
-    expect(post).toHaveBeenCalledWith(
-      '/auth/google/link/start',
-      { redirect: '/settings/account', password: 'current-password' },
-      expect.objectContaining({ credentials: 'include', skipAuthRefresh: true }),
-    )
-  })
 
   it.each([
     'https://evil.example/o/oauth2/v2/auth',
@@ -364,50 +494,62 @@ describe('authentication capability', () => {
     'javascript:alert(1)',
     '',
     undefined,
-  ])(
-    'preserves the session when a link URL is unsafe or malformed: %s',
-    async (authorizationUrl) => {
-      const { auth, post } = await linkSession()
-      post.mockResolvedValue(response({ authorizationUrl }))
-      await expect(auth.startGoogleLink({ password: 'password' })).rejects.toThrow()
-      expect(auth.accessToken.value).toBe('original-token')
-      expect(auth.user.value?.id).toBe(7)
-      expect(loading.active.value).toBe(false)
-    },
-  )
+  ])('rejects unsafe Google URLs without switching the session (%s)', async (url) => {
+    const { auth, post } = await session()
+    post.mockResolvedValue(response({ authorizationUrl: url }))
+    await expect(auth.google.login()).rejects.toThrow()
+    await expect(auth.google.link({ password: 'pw' })).rejects.toThrow()
+    expect(auth.accessToken.value).toBe('token')
+    expect(loading.active.value).toBe(false)
+  })
 
-  it('does not refresh or switch sessions on link password rejection', async () => {
-    const fetch = vi.fn<typeof globalThis.fetch>()
-    const refresh = vi.fn<() => Promise<boolean>>()
-    const auth = createAuth({
-      http: createHttpClient({ fetch, configuration: { refreshAccessToken: refresh } }),
-    })
-    fetch
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ accessToken: 'original-token' }), {
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(authState({ userId: 7, username: 'ada' })), {
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      )
-    await auth.restore()
-    fetch.mockClear()
-    fetch.mockResolvedValueOnce(new Response('{}', { status: 401 }))
-    await expect(auth.startGoogleLink({ password: 'wrong-password' })).rejects.toMatchObject({
-      status: 401,
-    })
-    expect(refresh).not.toHaveBeenCalled()
-    expect(fetch).toHaveBeenCalledTimes(1)
-    expect(auth.accessToken.value).toBe('original-token')
+  it('rejects empty linking passwords and overlapping link starts', async () => {
+    const { auth, post } = await session()
+    await expect(auth.google.link({ password: '' })).rejects.toThrow('password')
+    expect(post).not.toHaveBeenCalled()
+    const request = Promise.withResolvers<ReturnType<typeof response>>()
+    post.mockReturnValueOnce(request.promise)
+    const first = auth.google.link({ password: 'pw' })
+    await expect(auth.google.link({ password: 'pw' })).rejects.toThrow('in progress')
+    request.reject(new Error('Offline'))
+    await expect(first).rejects.toThrow('Offline')
     expect(auth.authenticated.value).toBe(true)
     expect(loading.active.value).toBe(false)
   })
 
-  it.each([403, 409, 429, 500])('preserves auth after link HTTP %s', async (status) => {
-    const { auth, post } = await linkSession()
+  it('does not refresh or switch sessions after Google link password rejection', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input) => {
+      const path = String(input)
+      const data = path.endsWith('/auth/config')
+        ? authConfig()
+        : path.endsWith('/auth/refresh')
+          ? { accessToken: 'token' }
+          : ada
+      return new Response(JSON.stringify(data), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    })
+    const refresh = vi.fn<() => Promise<boolean>>().mockResolvedValue(true)
+    const auth = createCoreAuth({
+      http: createHttpClient({ fetch, configuration: { refreshAccessToken: refresh } }),
+    })
+    await auth.restore()
+    fetch.mockClear()
+    fetch.mockResolvedValueOnce(
+      new Response('{}', {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    await expect(auth.google.link({ password: 'wrong' })).rejects.toMatchObject({ status: 401 })
+    expect(refresh).not.toHaveBeenCalled()
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(auth.accessToken.value).toBe('token')
+    expect(auth.authenticated.value).toBe(true)
+  })
+
+  it.each([401, 403, 409, 429, 500])('preserves the session after link HTTP %s', async (status) => {
+    const { auth, post } = await session()
     post.mockResolvedValue({
       ...response(null, status),
       error: Object.assign(new Error('Link rejected'), {
@@ -415,446 +557,43 @@ describe('authentication capability', () => {
         request: '/auth/google/link/start',
       }),
     })
-    await expect(auth.startGoogleLink({ password: 'password' })).rejects.toThrow('Link rejected')
-    expect(auth.accessToken.value).toBe('original-token')
-    expect(auth.authenticated.value).toBe(true)
+    await expect(auth.google.link({ password: 'pw' })).rejects.toThrow('Link rejected')
+    expect(auth.accessToken.value).toBe('token')
     expect(loading.active.value).toBe(false)
   })
 
-  it('rejects duplicate link starts and preserves auth after a network failure', async () => {
-    const { auth, post } = await linkSession()
-    let fail!: (error: Error) => void
-    post.mockImplementationOnce(
-      () =>
-        new Promise((_, reject) => {
-          fail = reject
-        }),
-    )
-    const first = auth.startGoogleLink({ password: 'password' })
-    await expect(auth.startGoogleLink({ password: 'password' })).rejects.toThrow('in progress')
-    expect(post).toHaveBeenCalledTimes(1)
-    fail(new Error('Offline'))
-    await expect(first).rejects.toThrow('Offline')
-    expect(auth.authenticated.value).toBe(true)
-    expect(auth.accessToken.value).toBe('original-token')
-    expect(loading.active.value).toBe(false)
-  })
-
-  it.each([true, false])('reads anonymous authentication state (%s)', async (enabled) => {
-    const http: Pick<HttpClient, 'get' | 'post'> = createHttpClient()
-    const get = vi.spyOn(http, 'get').mockResolvedValue(response(authState(null, enabled)))
-    const auth = createAuth({ http })
-    await expect(auth.getState()).resolves.toEqual(authState(null, enabled))
-    expect(get).toHaveBeenCalledWith('/auth/state', { headers: {} })
-    expect(auth.providers.value).toEqual({ password: true, google: enabled })
-    expect(auth.signupEnabled.value).toBe(true)
-    expect(auth.accessToken.value).toBeNull()
-  })
-
-  it('decodes ORDS JSON fields and supports a custom state endpoint', async () => {
-    const http = createHttpClient()
-    const get = vi.spyOn(http, 'get').mockResolvedValue(
-      response({
-        user: JSON.stringify({ userId: 7, username: 'ada', roles: ['admin'] }),
-        providers: '{"password":true,"google":false}',
-        signup: 'false',
-        twoFactor: 'true',
-      }),
-    )
-    const auth = createAuth({ http, endpoints: { state: '/custom/state' } })
-    await expect(auth.getState()).resolves.toMatchObject({
-      user: { id: 7, username: 'ada', roles: ['admin'] },
-      providers: { password: true, google: false },
-      signup: false,
-      twoFactor: true,
-    })
-    expect(get).toHaveBeenCalledWith('/custom/state', { headers: {} })
-    expect(auth.signupEnabled.value).toBe(false)
-  })
-
-  it('clears an existing identity when state becomes anonymous but retains public capabilities', async () => {
-    const http = createHttpClient()
-    vi.spyOn(http, 'post').mockResolvedValue(response({ accessToken: 'token' }))
-    const get = vi
-      .spyOn(http, 'get')
-      .mockResolvedValueOnce(response(authState({ userId: 7, username: 'ada' })))
-      .mockResolvedValueOnce(response(authState(null, false)))
-    const auth = createAuth({ http })
-    await auth.login({ username: 'ada', password: 'password' })
-    await expect(auth.getState()).resolves.toEqual(authState(null, false))
-    expect(auth.user.value).toBeNull()
-    expect(auth.accessToken.value).toBeNull()
-    expect(auth.authenticated.value).toBe(false)
-    expect(auth.providers.value?.google).toBe(false)
-    expect(get).toHaveBeenCalledTimes(2)
-  })
-
-  it('refreshes expired supplied credentials on an anonymous-friendly OpenAPI operation', async () => {
-    let expired = false
-    const fetch = vi.fn<typeof globalThis.fetch>(async (input, options) => {
-      const path = String(input)
-      let data: unknown
-      if (path.endsWith('/auth/login')) data = { accessToken: 'old-token' }
-      else if (path.endsWith('/auth/refresh')) data = { accessToken: 'fresh-token' }
-      else {
-        const token = new Headers(options?.headers).get('Authorization')
-        if (expired && token !== 'Bearer fresh-token') return new Response(null, { status: 401 })
-        data = authState({ userId: 7, username: 'ada' })
-      }
-      return new Response(JSON.stringify(data), {
-        headers: { 'Content-Type': 'application/json' },
-      })
-    })
-    const auth = createAuth({ http: () => http })
-    const http = createHttpClient({
-      fetch,
-      configuration: {
-        openapi: { paths: { '/auth/state': { get: { security: [] } } } },
-        getAccessToken: () => auth.accessToken.value,
-        refreshAccessToken: () => auth.refresh(),
-      },
-    })
-    await auth.login({ username: 'ada', password: 'password' })
-    expired = true
-    await expect(auth.getState()).resolves.toMatchObject({ user: { id: 7 } })
-    expect(auth.accessToken.value).toBe('fresh-token')
-    expect(
-      fetch.mock.calls.filter(([input]) => String(input).endsWith('/auth/refresh')),
-    ).toHaveLength(1)
-    expect(new Headers(fetch.mock.lastCall?.[1]?.headers).get('Authorization')).toBe(
-      'Bearer fresh-token',
-    )
-  })
-
-  it('surfaces failed or malformed authentication state rather than disabling silently', async () => {
-    const http: Pick<HttpClient, 'get' | 'post'> = createHttpClient()
-    const get = vi.spyOn(http, 'get')
-    get
-      .mockResolvedValueOnce({
-        ...response(null, 503),
-        error: Object.assign(new Error('Unavailable'), {
-          status: 503,
-          request: '/auth/state',
-        }),
-      })
-      .mockResolvedValueOnce(response({ enabled: 'false' }))
-    const auth = createAuth({ http })
-    await expect(auth.getState()).rejects.toThrow('Unavailable')
-    await expect(auth.getState()).rejects.toThrow('authentication state')
-  })
-
-  it('starts backend-owned Google authorization with the transaction cookie', async () => {
-    const authorizationUrl = 'https://accounts.google.com/o/oauth2/v2/auth?state=server-state'
-    const http: Pick<HttpClient, 'get' | 'post'> = createHttpClient()
-    const post = vi.spyOn(http, 'post').mockResolvedValue(response({ authorizationUrl }))
-    const auth = createAuth({ http })
-    await expect(auth.startGoogleLogin({ redirect: '/sandbox' })).resolves.toEqual({
-      authorizationUrl,
-    })
-    expect(post).toHaveBeenCalledWith(
-      '/auth/google/start',
-      { redirect: '/sandbox' },
-      { credentials: 'include' },
-    )
-    expect(auth.accessToken.value).toBeNull()
-    expect(auth.user.value).toBeNull()
-    expect(loading.active.value).toBe(false)
-  })
-
-  it.each([
-    'https://evil.example/o/oauth2/v2/auth',
-    'https://accounts.google.com.evil.example/o/oauth2/v2/auth',
-    'http://accounts.google.com/o/oauth2/v2/auth',
-    'https://accounts.google.com/other',
-    'https://accounts.google.com:444/o/oauth2/v2/auth',
-    'https://user:password@accounts.google.com/o/oauth2/v2/auth',
-    '/o/oauth2/v2/auth',
-    'javascript:alert(1)',
-    '',
-  ])('rejects unsafe Google navigation: %s', async (authorizationUrl) => {
-    const http: Pick<HttpClient, 'get' | 'post'> = createHttpClient()
-    vi.spyOn(http, 'post').mockResolvedValue(response({ authorizationUrl }))
-    const auth = createAuth({ http })
-    await expect(auth.startGoogleLogin()).rejects.toThrow()
-    expect(loading.active.value).toBe(false)
-    expect(auth.accessToken.value).toBeNull()
-  })
-
-  it('releases loading state after Google start failures', async () => {
-    const http: Pick<HttpClient, 'get' | 'post'> = createHttpClient()
-    const post = vi.spyOn(http, 'post')
-    post
-      .mockResolvedValueOnce({
-        ...response(null, 429),
-        error: Object.assign(new Error('Too many requests'), {
-          status: 429,
-          request: '/auth/google/start',
-        }),
-      })
-      .mockResolvedValueOnce(response({}))
-    const auth = createAuth({ http })
-    await expect(auth.startGoogleLogin()).rejects.toThrow('Too many requests')
-    await expect(auth.startGoogleLogin()).rejects.toThrow('Unable to start Google sign-in')
-    expect(loading.active.value).toBe(false)
-  })
-
-  it('clears issued tokens if identity hydration fails during login', async () => {
-    const auth = createAuth({
-      http: {
-        post: vi.fn<HttpPostMock>().mockResolvedValue(response({ accessToken: 'access-token' })),
-        get: vi.fn<HttpGetMock>().mockResolvedValue({
-          ...response(null, 403),
-          error: new Error('Forbidden'),
-        }),
-      } as unknown as HttpClient,
-    })
-
-    await expect(auth.login({ username: 'ada', password: 'password' })).rejects.toThrow('Forbidden')
-    expect(auth.accessToken.value).toBeNull()
-    expect(auth.user.value).toBeNull()
-    expect(loading.active.value).toBe(false)
-  })
-
-  it('surfaces logout errors and clears the local session', async () => {
-    const post = vi.fn<HttpPostMock>()
-    post
-      .mockResolvedValueOnce(response({ accessToken: 'access-token' }))
-      .mockResolvedValueOnce({ ...response(null, 500), error: new Error('Logout failed') })
-    const auth = createAuth({
-      http: {
-        post,
-        get: vi
-          .fn<HttpGetMock>()
-          .mockResolvedValue(response(authState({ userId: 7, username: 'ada' }))),
-      } as unknown as HttpClient,
-    })
-    await auth.login({ username: 'ada', password: 'password' })
-
-    await expect(auth.logout()).rejects.toThrow('Logout failed')
-    expect(auth.accessToken.value).toBeNull()
-    expect(auth.user.value).toBeNull()
-    expect(loading.active.value).toBe(false)
-  })
-
-  it('hydrates roles and permissions from JSON text or decoded arrays', async () => {
-    const auth = createAuth({
-      http: {
-        get: vi.fn<HttpGetMock>().mockResolvedValue(
-          response(
-            authState({
-              userId: 7,
-              username: 'ada',
-              roles: '["admin"]',
-              permissions: ['settings.read'],
-            }),
-          ),
-        ),
-      } as unknown as HttpClient,
-    })
-    await auth.getState()
-    expect(auth.hasRole('admin')).toBe(true)
-    expect(auth.can('settings.read')).toBe(true)
-    expect(auth.can('settings.write')).toBe(false)
-  })
-  it('hydrates the authenticated user after token issuance', async () => {
-    const post = vi.fn<HttpPostMock>()
-    post
-      .mockResolvedValueOnce(
-        response({
-          accessToken: 'access-token',
-        }),
-      )
-      .mockResolvedValueOnce(
-        response({
-          accessToken: 'next-access-token',
-        }),
-      )
-    const get = vi.fn<HttpGetMock>().mockResolvedValue(
-      response(
-        authState({
-          userId: 7,
-          username: 'ada',
-          displayName: 'Ada Lovelace',
-        }),
-      ),
-    )
-    const http = {
-      post,
-      get,
-    } as unknown as HttpClient
-    const auth = createAuth({ http })
-
-    await auth.login({ username: 'ada', password: 'password' })
-    expect(http.post).toHaveBeenNthCalledWith(
-      1,
-      '/auth/login',
-      { username: 'ada', password: 'password' },
-      { credentials: 'include' },
-    )
-    expect(auth.authenticated.value).toBe(true)
-    expect(auth.user.value?.username).toBe('ada')
-    await expect(auth.refresh()).resolves.toBe(true)
-    await expect(auth.getState()).resolves.toMatchObject({ user: { id: 7, username: 'ada' } })
-
-    expect(auth.authenticated.value).toBe(true)
-    expect(auth.user.value?.username).toBe('ada')
-    expect(auth.hasRole('developer')).toBe(false)
-    expect(auth.can('orders.write')).toBe(false)
-    expect(http.get).toHaveBeenCalledWith('/auth/state', expect.anything())
-    expect(http.post).toHaveBeenLastCalledWith('/auth/refresh', undefined, {
-      credentials: 'include',
-    })
-  })
-
-  it('becomes ready anonymously when the refresh cookie is invalid', async () => {
-    const auth = createAuth({
-      http: {
-        post: vi.fn<HttpPostMock>().mockResolvedValue(response(null, 401)),
-        get: vi.fn<HttpGetMock>().mockResolvedValue(response(authState())),
-      } as unknown as HttpClient,
-    })
-
-    await expect(auth.restore()).resolves.toBe(false)
-    expect(auth.ready.value).toBe(true)
-    expect(auth.authenticated.value).toBe(false)
-  })
-
-  it('shares one lazy restoration across concurrent calls and later navigations', async () => {
-    let finish!: (response: Response) => void
-    const fetch = vi.fn<typeof globalThis.fetch>()
-    fetch
-      .mockImplementationOnce(
-        () =>
-          new Promise<Response>((resolve) => {
-            finish = resolve
-          }),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(authState({ userId: 7, username: 'ada' })), {
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      )
-    const auth = createAuth({ http: createHttpClient({ fetch }) })
-    expect(fetch).not.toHaveBeenCalled()
-
-    const first = auth.restore()
-    const second = auth.restore()
-    expect(second).toBe(first)
-    expect(auth.ready.value).toBe(false)
-    finish(
-      new Response(JSON.stringify({ accessToken: 'restored-token' }), {
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    )
-    await expect(first).resolves.toBe(true)
-    expect(auth.restore()).toBe(first)
-    await expect(auth.restore()).resolves.toBe(true)
-    expect(fetch).toHaveBeenCalledTimes(2)
-    expect(auth.ready.value).toBe(true)
-  })
-
-  it('shares restoration failures instead of silently retrying or hanging', async () => {
-    const error = new Error('Identity unavailable')
-    const fetch = vi.fn<typeof globalThis.fetch>()
-    fetch
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ accessToken: 'restored-token' }), {
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      )
-      .mockResolvedValue(new Response(null, { status: 403 }))
-    const http = createHttpClient({ fetch })
-    const auth = createAuth({ http })
-    vi.spyOn(auth, 'getState').mockRejectedValue(error)
-    const first = auth.restore()
-    await expect(first).rejects.toBe(error)
-    expect(auth.restore()).toBe(first)
-    await expect(auth.restore()).rejects.toBe(error)
-    expect(auth.ready.value).toBe(true)
-  })
-
-  it('clears an existing session when refresh returns unauthorized', async () => {
-    const post = vi.fn<HttpPostMock>()
-    post
-      .mockResolvedValueOnce(response({ accessToken: 'access-token' }))
-      .mockResolvedValueOnce(response(null, 401))
-    const get = vi
-      .fn<HttpGetMock>()
-      .mockResolvedValue(response(authState({ userId: 7, username: 'ada' })))
-    const auth = createAuth({ http: { post, get } as unknown as HttpClient })
-
-    await auth.login({ username: 'ada', password: 'password' })
+  it.each([401, 403])('clears identity on invalid refresh cookie (%s)', async (status) => {
+    const { auth, post } = await session()
+    post.mockResolvedValue(response(null, status))
     await expect(auth.refresh()).resolves.toBe(false)
-
     expect(auth.accessToken.value).toBeNull()
+    expect(auth.user.value).toBeNull()
+    expect(auth.config.value).toEqual(authConfig())
+  })
+
+  it('preserves identity on an unavailable refresh and clears it even when logout fails', async () => {
+    const { auth, post } = await session()
+    const error = Object.assign(new Error('Offline'), { status: 503, request: '/auth/refresh' })
+    post.mockResolvedValue({ ...response(null, 503), error })
+    await expect(auth.refresh()).resolves.toBe(false)
+    expect(auth.authenticated.value).toBe(true)
+    await expect(auth.logout()).rejects.toBe(error)
     expect(auth.authenticated.value).toBe(false)
-  })
-
-  it('consumes camelCase ORDS token and user responses', async () => {
-    const post = vi.fn<HttpPostMock>().mockResolvedValue(
-      response({
-        accessToken: 'access-token',
-      }),
-    )
-    const get = vi.fn<HttpGetMock>().mockResolvedValue(
-      response(
-        authState({
-          userId: 7,
-          username: 'ada',
-          displayName: 'Ada Lovelace',
-        }),
-      ),
-    )
-    const auth = createAuth({ http: { post, get } as unknown as HttpClient })
-
-    await auth.login({ username: 'ada', password: 'password' })
-
-    expect(auth.accessToken.value).toBe('access-token')
-    expect(auth.authenticated.value).toBe(true)
-    expect(auth.user.value).toMatchObject({ id: 7, username: 'ada', displayName: 'Ada Lovelace' })
-    expect(get).toHaveBeenCalledWith('/auth/state', expect.anything())
-  })
-
-  it('restores an authenticated user using the browser refresh cookie', async () => {
-    const post = vi.fn<HttpPostMock>().mockResolvedValue(response({ accessToken: 'access-token' }))
-    const get = vi
-      .fn<HttpGetMock>()
-      .mockResolvedValue(response(authState({ userId: 7, username: 'ada' })))
-    const auth = createAuth({ http: { post, get } as unknown as HttpClient })
-
-    await expect(auth.restore()).resolves.toBe(true)
-
-    expect(auth.ready.value).toBe(true)
-    expect(auth.authenticated.value).toBe(true)
-    expect(post).toHaveBeenCalledWith('/auth/refresh', undefined, { credentials: 'include' })
-    expect(get).toHaveBeenCalledWith('/auth/state', expect.anything())
+    expect(auth.config.value).toEqual(authConfig())
+    expect(loading.active.value).toBe(false)
   })
 
   it('preserves the session when refresh fails without an HTTP response', async () => {
-    const post = vi.fn<HttpPostMock>()
-    post
-      .mockResolvedValueOnce(
-        response({
-          accessToken: 'access-token',
-        }),
-      )
-      .mockResolvedValueOnce({
-        data: null,
-        error: new Error('Offline'),
-        status: null,
-        headers: null,
-      })
-    const http = {
-      post,
-      get: vi
-        .fn<HttpGetMock>()
-        .mockResolvedValue(response(authState({ userId: 7, username: 'ada' }))),
-    } as unknown as HttpClient
-    const auth = createAuth({ http })
-    await auth.login({ username: 'ada', password: 'password' })
-
+    const { auth, post } = await session()
+    const previous = auth.user.value
+    post.mockResolvedValue({
+      data: null,
+      status: null,
+      headers: null,
+      error: Object.assign(new Error('Offline'), { status: null, request: '/auth/refresh' }),
+    })
     await expect(auth.refresh()).resolves.toBe(false)
-    expect(auth.accessToken.value).toBe('access-token')
-    expect(auth.authenticated.value).toBe(true)
+    expect(auth.user.value).toBe(previous)
+    expect(auth.accessToken.value).toBe('token')
   })
 })

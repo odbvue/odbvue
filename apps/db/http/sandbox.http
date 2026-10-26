@@ -53,6 +53,9 @@ Content-Type: application/json
 # @name refresh
 POST {{baseUrl}}/auth/refresh
 
+### Public deployment configuration (independent of the current session)
+GET {{baseUrl}}/auth/config
+
 ### Current user
 GET {{baseUrl}}/auth/me
 Authorization: Bearer {{accessToken}}

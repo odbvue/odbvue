@@ -19,16 +19,13 @@ const migrations = {
 const load = async (file: keyof typeof migrations) => (await migrations[file]()).migration
 
 describe('app-owned ORDS migrations', () => {
-  it('generates authentication state using typed queries without raw statement nodes', async () => {
+  it('generates separate configuration and user operations without raw statement nodes', async () => {
     const { appPackage } = await migrations['00000000000000-bootstrap']()
     expect(JSON.stringify(appPackage.application())).not.toContain('"kind":"raw"')
     const sql = appPackage.toSQLUp()
-    expect(sql).toContain(
-      "SELECT JSON_OBJECT('password' VALUE l_password_enabled FORMAT JSON, 'google' VALUE l_google_enabled FORMAT JSON, 'ldap' VALUE l_ldap_enabled FORMAT JSON RETURNING CLOB) INTO p_providers FROM dual;",
-    )
-    expect(sql).toContain(
-      "'roles' VALUE l_roles FORMAT JSON, 'permissions' VALUE l_permissions FORMAT JSON RETURNING CLOB) INTO p_user FROM dual;",
-    )
+    expect(sql).toContain('PROCEDURE get_config(')
+    expect(sql).toContain('PROCEDURE get_me(')
+    expect(sql).not.toContain('PROCEDURE get_state(')
   })
 
   it('installs profile storage and runtime packages through bootstrap', async () => {
@@ -57,21 +54,33 @@ describe('app-owned ORDS migrations', () => {
       expect(proc.service?.params?.context).toMatchObject({ userId: { name: 'p_user_id' } })
       expect(proc.service?.params?.body).not.toHaveProperty('userId')
     }
-    const state = app.procedures.find((p) => p.name === 'get_state')!
-    expect(state.service).toMatchObject({ auth: 'anonymous', path: 'state' })
-    expect(state.service?.params?.response).toMatchObject({
-      user: { name: 'p_user' },
-      providers: { name: 'p_providers' },
+    const config = app.procedures.find((p) => p.name === 'get_config')!
+    expect(config.service).toMatchObject({ auth: 'anonymous', path: 'config' })
+    expect(config.service?.params?.response).toMatchObject({
+      password: { name: 'p_password' },
+      google: { name: 'p_google' },
+      ldap: { name: 'p_ldap' },
       signup: { name: 'p_signup' },
+      twoFactor: { name: 'p_two_factor' },
     })
-    expect(sql).toContain('IF p_authorization IS NOT NULL THEN')
-    expect(sql).toContain('l_user_id := odb_auth.require_user(')
-    expect(sql).toContain("p_user := 'null'")
-    expect(sql).toContain("'avatarId' VALUE l_avatar_id")
-    expect(sql).toContain("'googleConnected' VALUE l_google_connected")
-    expect(sql).toContain("'roles' VALUE l_roles FORMAT JSON")
-    expect(sql).toContain("'permissions' VALUE l_permissions FORMAT JSON")
-    expect(sql).toContain("'password' VALUE l_password_enabled FORMAT JSON")
+    expect(config.service?.params?.response).not.toHaveProperty('user')
+    const me = app.procedures.find((p) => p.name === 'get_me')!
+    expect(me.service).toMatchObject({ auth: 'authenticated', path: 'me' })
+    expect(me.service?.params?.context).toMatchObject({ userId: { name: 'p_subject' } })
+    expect(me.service?.params?.response).toMatchObject({
+      userId: { name: 'p_user_id' },
+      avatarId: { name: 'p_avatar_id' },
+      googleConnected: { name: 'p_google_connected' },
+      roles: { name: 'p_roles' },
+      permissions: { name: 'p_permissions' },
+    })
+    expect(me.service?.params?.response).not.toHaveProperty('password')
+    const avatar = app.procedures.find((p) => p.name === 'update_avatar')!
+    expect(avatar.service).toMatchObject({
+      auth: 'authenticated',
+      method: 'PUT',
+      path: 'me/avatar',
+    })
     expect(sql).toContain('odb_google.enabled()')
     expect(sql).toContain("p_signup := 'true'")
     expect(sql).toContain("p_cache_control := 'no-store'")
@@ -93,28 +102,31 @@ describe('app-owned ORDS migrations', () => {
     )
   })
 
-  it('uses SQL numeric types for state flags passed to JSON_OBJECT on Oracle 19c', async () => {
+  it('uses SQL numeric types for user flags returned as JSON on Oracle 19c', async () => {
     const { appPackage } = await migrations['00000000000000-bootstrap']()
     const sql = appPackage.toSQLUp()
-    const state = sql.slice(
-      sql.indexOf('PROCEDURE get_state(', sql.indexOf('PACKAGE BODY')),
-      sql.indexOf('END get_state;'),
+    const me = sql.slice(
+      sql.indexOf('PROCEDURE get_me(', sql.indexOf('PACKAGE BODY')),
+      sql.indexOf('END get_me;'),
     )
     for (const flag of ['avatar_uploaded', 'password_connected', 'google_connected']) {
-      expect(state).toContain(`l_${flag} NUMBER;`)
-      expect(state).not.toContain(`l_${flag} PLS_INTEGER;`)
-      expect(state).toContain(`VALUE l_${flag}`)
+      expect(me).toContain(`p_${flag} OUT NUMBER`)
+      expect(me).not.toContain(`p_${flag} OUT PLS_INTEGER`)
     }
   })
 
-  it('streams state JSON natively instead of registering string response binds', async () => {
+  it('streams configuration booleans and user authorization as native JSON', async () => {
     const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
-    expect(sql).toContain("'user'' VALUE v_output_1 FORMAT JSON")
-    expect(sql).toContain("'providers'' VALUE v_output_2 FORMAT JSON")
+    expect(sql).toContain("'password'' VALUE v_output_0 FORMAT JSON")
+    expect(sql).toContain("'google'' VALUE v_output_1 FORMAT JSON")
+    expect(sql).toContain("'ldap'' VALUE v_output_2 FORMAT JSON")
     expect(sql).toContain("'signup'' VALUE v_output_3 FORMAT JSON")
+    expect(sql).toContain("'twoFactor'' VALUE v_output_4 FORMAT JSON")
+    expect(sql).toContain("'roles'' VALUE v_output_9 FORMAT JSON")
+    expect(sql).toContain("'permissions'' VALUE v_output_10 FORMAT JSON")
     expect(sql).toContain('RETURNING CLOB STRICT) RETURNING CLOB ASCII) INTO v_json_response')
-    expect(sql).toContain('p_user => v_output_1')
-    expect(sql).toContain('p_providers => v_output_2')
+    expect(sql).toContain('p_user_id => v_output_1')
+    expect(sql).toContain('p_password => v_output_0')
     expect(sql).toContain('p_signup => v_output_3')
     expect(sql).toContain("htp.p(''Cache-Control: '' || v_output_5)")
     expect(sql).toContain('v_json_amount := 8000')
@@ -504,9 +516,10 @@ describe('app-owned ORDS migrations', () => {
         >
       >
     }
-    expect(document.paths['/auth/state']?.get?.security).toEqual([])
+    expect(document.paths['/auth/config']?.get?.security).toEqual([])
     expect(document.paths).not.toHaveProperty('/auth/google/config')
-    expect(document.paths).not.toHaveProperty('/auth/me')
+    expect(document.paths['/auth/me']?.get?.security).not.toEqual([])
+    expect(document.paths).not.toHaveProperty('/auth/state')
     expect(
       document.paths['/auth/google/start']?.post?.requestBody?.content['application/json'].schema
         .properties,
@@ -559,15 +572,28 @@ describe('app-owned ORDS migrations', () => {
       >
       components: { schemas: Record<string, { properties: Record<string, unknown> }> }
     }
+    for (const removed of [
+      '/auth/state',
+      '/auth/confirm-email',
+      '/auth/recover-password',
+      '/auth/reset-password',
+      '/auth/change-password',
+      '/auth/avatar',
+    ]) {
+      expect(publicApi.paths).not.toHaveProperty(removed)
+    }
+    expect(publicApi.paths['/auth/me']?.get?.security).toEqual([{ bearerAuth: [] }])
+    expect(publicApi.paths['/auth/me/avatar']?.put?.security).toEqual([{ bearerAuth: [] }])
+    expect(publicApi.paths['/auth/password/change']?.post?.security).toEqual([{ bearerAuth: [] }])
     for (const [path, method] of [
       ['/auth/login', 'post'],
       ['/auth/refresh', 'post'],
       ['/auth/logout', 'post'],
       ['/auth/signup', 'post'],
-      ['/auth/confirm-email', 'post'],
-      ['/auth/recover-password', 'post'],
-      ['/auth/reset-password', 'post'],
-      ['/auth/state', 'get'],
+      ['/auth/signup/confirm', 'post'],
+      ['/auth/password/recover', 'post'],
+      ['/auth/password/reset', 'post'],
+      ['/auth/config', 'get'],
     ]) {
       expect(publicApi.paths[path!]?.[method!]?.security).toEqual([])
     }
@@ -581,11 +607,11 @@ describe('app-owned ORDS migrations', () => {
       passwordRepeat: { type: 'string' },
     })
     expect(
-      publicApi.paths['/auth/recover-password']?.post?.requestBody?.content['application/json']
+      publicApi.paths['/auth/password/recover']?.post?.requestBody?.content['application/json']
         .schema.properties,
     ).toEqual({ email: { type: 'string' } })
     expect(
-      publicApi.paths['/auth/reset-password']?.post?.requestBody?.content['application/json'].schema
+      publicApi.paths['/auth/password/reset']?.post?.requestBody?.content['application/json'].schema
         .properties,
     ).toMatchObject({
       token: { type: 'string' },

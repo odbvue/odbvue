@@ -1,4 +1,4 @@
-import { odbType } from '../../schema/package.js'
+import { odbType } from '../../../schema/package.js'
 
 export const authTypes = {
   username: odbType.string(128),

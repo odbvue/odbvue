@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { odbAuth } from '../../../src/capabilities/auth/auth.js'
-import { odbAuthCrypto } from '../../../src/capabilities/auth/crypto.js'
+import { odbAuthCrypto } from '../../../src/capabilities/auth/core/crypto.js'
 
 const sql = odbAuth.toSQLUp({ schema: 'APP' })
 function procedure(name: string) {

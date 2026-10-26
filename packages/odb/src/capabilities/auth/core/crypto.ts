@@ -1,12 +1,12 @@
 import { pbkdf2Sync } from 'node:crypto'
-import { odbPackage, odbType } from '../../schema/package.js'
-import { cond, odbLiteral, plsqlExpr } from '../../schema/attribute.js'
-import { odbDbmsCrypto, odbOracle, odbUtlI18n, odbUtlRaw } from '../../oracle/index.js'
+import { odbPackage, odbType } from '../../../schema/package.js'
+import { cond, odbLiteral, plsqlExpr } from '../../../schema/attribute.js'
+import { odbDbmsCrypto, odbOracle, odbUtlI18n, odbUtlRaw } from '../../../oracle/index.js'
 import {
   PASSWORD_HASH_ALGORITHM,
   PASSWORD_HASH_BYTES,
   PASSWORD_HASH_ITERATIONS,
-} from './constants.js'
+} from '../constants.js'
 
 export function dummyPasswordHash(): string {
   const salt = Buffer.alloc(16)

@@ -11,7 +11,7 @@ import {
 } from '../../oracle/index.js'
 import { odbSettings } from '../settings/settings.js'
 import { odbRateLimitApi } from '../rate-limit/rate-limit.js'
-import { authTypes } from '../auth/types.js'
+import { authTypes } from '../auth/core/types.js'
 import { odbAuth } from '../auth/auth.js'
 import { googleKeys, googleTransactions } from './tables.js'
 import { defineGoogleHttp } from './http.js'
@@ -413,7 +413,7 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
         sessionId: odbType.guid(),
         tokenVersion: odbType.number(),
       })
-      body.call(odbAuth.prepareGoogleLink(userId, refreshToken, password, sessionId, tokenVersion))
+      body.call(odbAuth.google.prepareLink(userId, refreshToken, password, sessionId, tokenVersion))
       body.call(
         startTransaction.invoke(
           returnPath,
@@ -520,7 +520,7 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
       )
       body.ifThen(cond.eq(purpose, 'link'), (then) => {
         then.call(
-          odbAuth.checkGoogleLink(
+          odbAuth.google.checkLink(
             binding.userId,
             binding.sessionId,
             binding.tokenVersion,
@@ -595,7 +595,7 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
         cond.eq(purpose, 'link'),
         (then) => {
           then.call(
-            odbAuth.linkGoogle(
+            odbAuth.google.link(
               binding.userId,
               binding.sessionId,
               binding.tokenVersion,
@@ -606,8 +606,8 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
         },
         (otherwise) => {
           otherwise.block((login) => {
-            login.call(odbAuth.loginGoogle(subject, email, displayName, accessToken, refreshToken))
-            login.call(odbAuth.updateGoogleAvatar(subject, picture))
+            login.call(odbAuth.google.login(subject, email, displayName, accessToken, refreshToken))
+            login.call(odbAuth.google.updateAvatar(subject, picture))
             login.whenOthers((handler) => {
               handler.ifThen(
                 cond.and([

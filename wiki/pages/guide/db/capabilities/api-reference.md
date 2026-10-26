@@ -177,6 +177,13 @@ Direct bindings map public HTTP names to typed procedure parameters. Bind every 
 
 For example, a POST request body is explicit: `body: { username: procedure.parameters.username }`. Use `headers` and `uri` for their respective transports.
 
+With `responseMediaType: 'application/json'`, OUT responses containing
+`odbType.json()` alongside string, GUID, number, or CLOB values are streamed as
+one native JSON object. Only JSON-typed fields use `FORMAT JSON`; scalar fields
+retain their JSON string, number, or null representation. This allows `/auth/me`
+to return profile fields and role/permission arrays without nesting or double
+encoding them.
+
 `responseStatus` declares a successful HTTP status from 200 through 399
 (default 200) in both the generated ORDS handler and OpenAPI. A redirect
 procedure can use `responseStatus: 303` and an OUT `Location` header; error
@@ -230,7 +237,7 @@ caller input. Login success returns refresh credentials; linking validates the
 current refresh cookie and returns an outcome without opening a session.
 The user ID must come from authenticated server
 context and the refresh token from the current HttpOnly cookie, not request-body
-identity fields. `odbAuth.linkGoogle` remains a trusted server-only primitive,
+identity fields. `odbAuth.google.link` remains a trusted server-only primitive,
 called only after successful provider and transaction verification.
 The TypeScript-defined bootstrap installs the transaction binding columns and
 the authenticated linking start and shared callback endpoints. Redeploy the database from the bootstrap; there is no

@@ -41,8 +41,8 @@
               @click="restore"
               >Restore</v-btn
             >
-            <v-btn :loading="callingState" prepend-icon="$mdiAccountSearch" @click="getState"
-              >Call /state</v-btn
+            <v-btn :loading="callingState" prepend-icon="$mdiAccountSearch" @click="refreshUser"
+              >Call /me</v-btn
             >
             <v-btn
               :disabled="!auth.accessToken.value"
@@ -91,15 +91,13 @@ async function restore() {
   events.value.push('POST /auth/refresh')
   await auth.restore()
 }
-async function getState() {
+async function refreshUser() {
   callingState.value = true
   try {
-    await auth.getState()
-    events.value.push('GET /auth/state -> 200')
+    await auth.refreshUser()
+    events.value.push('GET /auth/me -> 200')
   } catch (error) {
-    events.value.push(
-      `GET /auth/state -> ${error instanceof Error ? error.message : 'network error'}`,
-    )
+    events.value.push(`GET /auth/me -> ${error instanceof Error ? error.message : 'network error'}`)
   } finally {
     callingState.value = false
   }

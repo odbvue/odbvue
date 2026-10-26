@@ -10,33 +10,33 @@ async function mockProfile(
   let avatar: string | null = null
   let active = true
   await page.route('**/auth/**', async (route) => {
+    if (!['fetch', 'xhr'].includes(route.request().resourceType())) return route.fallback()
     const path = new URL(route.request().url()).pathname
     if (path.endsWith('/refresh')) {
       await route.fulfill({
         status: active ? 200 : 401,
         json: active ? { accessToken: 'profile-token' } : {},
       })
-    } else if (path.endsWith('/state')) {
+    } else if (path.endsWith('/config')) {
       await route.fulfill({
-        json: {
-          providers: { password: true, google: true },
-          signup: true,
-          twoFactor: true,
-          user: active
-            ? {
-                userId: 7,
-                username: 'ada@example.com',
-                displayName: 'Ada Lovelace',
-                avatarUrl: googlePhoto,
-                avatarId: avatar ? 'a'.repeat(32) : null,
-                avatarUploaded: avatar ? 1 : 0,
-                passwordConnected: passwordConnected ? 1 : 0,
-                googleConnected: googleConnected ? 1 : 0,
-                roles: [],
-                permissions: [],
-              }
-            : null,
-        },
+        json: { password: true, ldap: false, google: true, signup: true, twoFactor: true },
+      })
+    } else if (path.endsWith('/me')) {
+      await route.fulfill({
+        json: active
+          ? {
+              userId: 7,
+              username: 'ada@example.com',
+              displayName: 'Ada Lovelace',
+              avatarUrl: googlePhoto,
+              avatarId: avatar ? 'a'.repeat(32) : null,
+              avatarUploaded: avatar ? 1 : 0,
+              passwordConnected: passwordConnected ? 1 : 0,
+              googleConnected: googleConnected ? 1 : 0,
+              roles: [],
+              permissions: [],
+            }
+          : null,
       })
     } else if (path.endsWith('/google/link/start')) {
       updates.push(route.request().postDataJSON())
@@ -51,13 +51,14 @@ async function mockProfile(
         contentType: 'image/jpeg',
         body: Buffer.from(avatar!.split(',')[1]!, 'base64'),
       })
-    } else if (path.endsWith('/avatar')) {
+    } else if (path.endsWith('/me/avatar')) {
+      expect(route.request().method()).toBe('PUT')
       expect(route.request().headers().authorization).toBe(['Bearer', 'profile-token'].join(' '))
       const data = route.request().postDataJSON()
       updates.push(data)
       avatar = data.avatar
       await route.fulfill({ status: 204 })
-    } else if (path.endsWith('/change-password')) {
+    } else if (path.endsWith('/password/change')) {
       const data = route.request().postDataJSON()
       updates.push(data)
       if (data.currentPassword !== 'current-password') {
@@ -137,14 +138,10 @@ test('continues to handle Google callbacks from legacy account URLs', async ({ p
 
 test('protects account settings and preserves the destination through login', async ({ page }) => {
   await page.route('**/auth/**', async (route) => {
-    if (new URL(route.request().url()).pathname.endsWith('/state')) {
+    if (!['fetch', 'xhr'].includes(route.request().resourceType())) return route.fallback()
+    if (new URL(route.request().url()).pathname.endsWith('/config')) {
       await route.fulfill({
-        json: {
-          user: null,
-          providers: { password: true, google: true },
-          signup: true,
-          twoFactor: true,
-        },
+        json: { password: true, ldap: false, google: true, signup: true, twoFactor: true },
       })
     } else await route.fulfill({ status: 401, json: {} })
   })

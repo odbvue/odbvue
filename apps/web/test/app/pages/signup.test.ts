@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { authState } from '../../auth-state'
+import { authConfig } from '../../auth-state'
 import { defineComponent } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -55,7 +55,7 @@ async function setup(page: typeof Signup | typeof ConfirmEmail = Signup, hash = 
   })
   await router.push(page === Signup ? '/signup?redirect=/' : `/confirm-email${hash}`)
   const fetch = vi.fn<typeof globalThis.fetch>()
-  fetch.mockResolvedValueOnce(json({}, 401)).mockResolvedValueOnce(json(authState()))
+  fetch.mockResolvedValueOnce(json(authConfig())).mockResolvedValueOnce(json({}, 401))
   const auth = createAuth({
     http: createHttpClient({ fetch }),
     onOperation: (operation) => useUi().loading.start(operation),
@@ -198,6 +198,7 @@ describe('signup and email confirmation', () => {
     fetch.mockResolvedValueOnce(new Response(null, { status: 204 }))
     await wrapper.findComponent(button).trigger('click')
     await flushPromises()
+    expect(String(fetch.mock.calls[2]![0])).toContain('/auth/signup/confirm')
     expect(JSON.parse(String(fetch.mock.calls[2]![1]?.body))).toEqual({ token })
     expect(wrapper.text()).toContain('auth.confirm.success')
     expect(auth.authenticated.value).toBe(false)

@@ -10,7 +10,7 @@
           <p class="mb-4">{{ t('auth.signup.check.email') }}</p>
         </template>
         <v-ov-form
-          v-else-if="auth.signupEnabled.value"
+          v-else-if="auth.config.value?.signup"
           :options="options"
           :data="data"
           :t="t"

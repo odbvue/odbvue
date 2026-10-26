@@ -1,3 +1,3 @@
-export function authState(user: unknown = null, google = true) {
-  return { user, providers: { password: true, google }, signup: true, twoFactor: true }
+export function authConfig(google = true) {
+  return { password: true, ldap: false, google, signup: true, twoFactor: true }
 }

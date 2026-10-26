@@ -1,5 +1,13 @@
 import { test, expect } from '@playwright/test'
 
+test.beforeEach(async ({ page }) => {
+  await page.route('**/auth/config', (route) =>
+    route.fulfill({
+      json: { password: true, ldap: false, google: false, signup: true, twoFactor: true },
+    }),
+  )
+})
+
 test('renders the application shell while session restoration is pending', async ({ page }) => {
   let finish!: () => void
   const pending = new Promise<void>((resolve) => {

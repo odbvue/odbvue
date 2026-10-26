@@ -1,4 +1,4 @@
-import { authState } from '../../auth-state'
+import { authConfig } from '../../auth-state'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
@@ -48,8 +48,8 @@ async function setup(enabled = true, redirect = '/sandbox', configError = false,
   const ui = useUi()
   ui.clear()
   fetch
+    .mockResolvedValueOnce(json(configError ? {} : authConfig(enabled)))
     .mockResolvedValueOnce(json({}, 401))
-    .mockResolvedValueOnce(json(configError ? {} : authState(null, enabled)))
   if (ready) {
     try {
       await auth.restore()
@@ -92,7 +92,7 @@ describe('shared Google sign-in button', () => {
     const { wrapper, ui } = await setup(true, '/', true)
     expect(wrapper.find('button').exists()).toBe(false)
     expect(ui.notification.value?.type).toBe('error')
-    expect(ui.notification.value?.message).toContain('authentication state')
+    expect(ui.notification.value?.message).toContain('authentication configuration')
     wrapper.unmount()
   })
 

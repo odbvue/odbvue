@@ -1,9 +1,15 @@
-import { cond, odbLiteral, plsqlExpr, PlsqlExpression, LocalVar } from '../../schema/attribute.js'
-import { odbType, type PackageImpl, type ProcedureBody } from '../../schema/package.js'
-import { odbOracle } from '../../oracle/index.js'
-import { odbSettings } from '../settings/settings.js'
-import { authTypes } from './types.js'
-import { odbAudit } from '../audit/audit.js'
+import {
+  cond,
+  odbLiteral,
+  plsqlExpr,
+  PlsqlExpression,
+  LocalVar,
+} from '../../../../schema/attribute.js'
+import { odbType, type PackageImpl, type ProcedureBody } from '../../../../schema/package.js'
+import { odbOracle } from '../../../../oracle/index.js'
+import { odbSettings } from '../../../settings/settings.js'
+import { authTypes } from '../../core/types.js'
+import { odbAudit } from '../../../audit/audit.js'
 
 /** Search with a service account, then bind the matching entry using the configured transport. */
 export function defineLdapCredentials(pkg: PackageImpl) {

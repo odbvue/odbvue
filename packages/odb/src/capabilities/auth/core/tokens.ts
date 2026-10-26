@@ -1,11 +1,18 @@
-import { odbPackage, odbType } from '../../schema/package.js'
-import { cond, odbLiteral, plsqlExpr } from '../../schema/attribute.js'
-import { odbQuery } from '../../query/index.js'
-import { odbDbmsCrypto, odbJson, odbOracle, odbUtlEncode, odbUtlRaw } from '../../oracle/index.js'
-import { odbSettings } from '../settings/settings.js'
-import { odbAudit } from '../audit/audit.js'
-import { authJwtSettings } from './settings.js'
-import { authSessions, authUsers } from './tables.js'
+import { odbPackage, odbType } from '../../../schema/package.js'
+import { cond, odbLiteral, plsqlExpr } from '../../../schema/attribute.js'
+import { odbQuery } from '../../../query/index.js'
+import {
+  odbDbmsCrypto,
+  odbJson,
+  odbOracle,
+  odbUtlEncode,
+  odbUtlRaw,
+} from '../../../oracle/index.js'
+import { odbSettings } from '../../settings/settings.js'
+import { odbAudit } from '../../audit/audit.js'
+import { authJwtSettings } from '../settings.js'
+import { authSessions } from './tables/sessions.js'
+import { authUsers } from './tables/users.js'
 
 const JWT_HEADER = Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url')
 const EPOCH_NOW = odbOracle.floor(odbOracle.utcEpochSeconds(odbOracle.sysTimestamp()))

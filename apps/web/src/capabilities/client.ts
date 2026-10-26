@@ -16,7 +16,8 @@ const useAuthStore = defineStore('auth', () =>
 )
 
 const authStore = useAuthStore(pinia)
-export const auth = readonlyAuth({ ...authStore, ...storeToRefs(authStore) })
+const { user, accessToken, ready, authenticated, config } = storeToRefs(authStore)
+export const auth = readonlyAuth({ ...authStore, user, accessToken, ready, authenticated, config })
 
 export const http = createHttp({
   ...appConfig.http,

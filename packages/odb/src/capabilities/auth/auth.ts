@@ -15,23 +15,21 @@ import { odbBlock, odbType } from '../../schema/package.js'
 import { odbQuery } from '../../query/index.js'
 import { odbOracle } from '../../oracle/index.js'
 import { REFRESH_TOKEN_MAX_AGE_SECONDS } from './constants.js'
-import { odbAuthCrypto, dummyPasswordHash } from './crypto.js'
-import { odbAuthJwt } from './jwt.js'
+import { odbAuthCrypto, dummyPasswordHash } from './core/crypto.js'
+import { odbAuthJwt } from './core/tokens.js'
 import { odbAuthPackage } from './package.js'
-import {
-  authSessions,
-  authUsers,
-  authRoles,
-  authUserRoles,
-  authRolePermissions,
-  authConfirmations,
-  authPasswordResets,
-  authIdentities,
-  authFactors,
-  authChallenges,
-  authRecoveryCodes,
-} from './tables.js'
-import { authTypes } from './types.js'
+import { authSessions } from './core/tables/sessions.js'
+import { authUsers } from './core/tables/users.js'
+import { authRoles } from './core/tables/authorization.js'
+import { authUserRoles } from './core/tables/authorization.js'
+import { authRolePermissions } from './core/tables/authorization.js'
+import { authConfirmations } from './features/signup/tables.js'
+import { authPasswordResets } from './features/password/tables.js'
+import { authIdentities } from './core/tables/identities.js'
+import { authFactors } from './features/two-factor/tables.js'
+import { authChallenges } from './features/two-factor/tables.js'
+import { authRecoveryCodes } from './features/two-factor/tables.js'
+import { authTypes } from './core/types.js'
 import { odbSettings } from '../settings/settings.js'
 import { settingsStore } from '../settings/tables.js'
 import {
@@ -43,6 +41,115 @@ import {
 } from './settings.js'
 /** Install after `odbRateLimit`, `odbSettings`, `odbLob` and `odbStorage`. */
 export const odbAuth = {
+  password: {
+    change(userId: PlsqlRenderable, currentPassword: PlsqlRenderable, password: PlsqlRenderable) {
+      return odbAuthPackage.changePassword(userId, currentPassword, password)
+    },
+    /** Returns a recovery token for an enabled account, or NULL otherwise. */
+    recover(username: PlsqlRenderable, resetToken: PlsqlRenderable) {
+      return odbAuthPackage.recoverPassword(username, resetToken)
+    },
+    /** Consumes a recovery token, changes the password, and revokes existing sessions. */
+    reset(token: PlsqlRenderable, password: PlsqlRenderable) {
+      return odbAuthPackage.resetPassword(token, password)
+    },
+  },
+
+  google: {
+    /** Trusted server-only entry point; verify Google's token and transaction first. */
+    login(
+      subject: PlsqlRenderable,
+      email: PlsqlRenderable,
+      displayName: PlsqlRenderable,
+      accessToken: PlsqlRenderable,
+      refreshToken: PlsqlRenderable,
+    ) {
+      return odbAuthPackage.loginGoogle(subject, email, displayName, accessToken, refreshToken)
+    },
+    prepareLink(
+      userId: PlsqlRenderable,
+      refreshToken: PlsqlRenderable,
+      password: PlsqlRenderable,
+      sessionId: PlsqlRenderable,
+      tokenVersion: PlsqlRenderable,
+    ) {
+      return odbAuthPackage.prepareGoogleLink(
+        userId,
+        refreshToken,
+        password,
+        sessionId,
+        tokenVersion,
+      )
+    },
+    checkLink(
+      userId: PlsqlRenderable,
+      sessionId: PlsqlRenderable,
+      tokenVersion: PlsqlRenderable,
+      refreshToken: PlsqlRenderable,
+    ) {
+      return odbAuthPackage.checkGoogleLink(userId, sessionId, tokenVersion, refreshToken)
+    },
+    /** Server-only: the subject must have passed OIDC and transaction verification. */
+    link(
+      userId: PlsqlRenderable,
+      sessionId: PlsqlRenderable,
+      tokenVersion: PlsqlRenderable,
+      refreshToken: PlsqlRenderable,
+      subject: PlsqlRenderable,
+    ) {
+      return odbAuthPackage.linkGoogle(userId, sessionId, tokenVersion, refreshToken, subject)
+    },
+    /** The subject and picture must come from a verified Google token. */
+    updateAvatar(subject: PlsqlRenderable, picture: PlsqlRenderable) {
+      return odbAuthPackage.updateGoogleAvatar(subject, picture)
+    },
+  },
+
+  twoFactor: {
+    verify(
+      challenge: PlsqlRenderable,
+      code: PlsqlRenderable,
+      accessToken: PlsqlRenderable,
+      refreshToken: PlsqlRenderable,
+      recoveryCodes: PlsqlRenderable,
+      nextChallenge: PlsqlRenderable,
+      setupSecret: PlsqlRenderable,
+    ) {
+      return odbAuthPackage.verifyTwoFactor(
+        challenge,
+        code,
+        accessToken,
+        refreshToken,
+        recoveryCodes,
+        nextChallenge,
+        setupSecret,
+      )
+    },
+  },
+
+  profile: {
+    read(
+      userId: PlsqlRenderable,
+      avatarUrl: PlsqlRenderable,
+      avatarUploaded: PlsqlRenderable,
+      passwordConnected: PlsqlRenderable,
+      googleConnected: PlsqlRenderable,
+      avatarId: PlsqlRenderable,
+    ) {
+      return odbAuthPackage.readProfile(
+        userId,
+        avatarUrl,
+        avatarUploaded,
+        passwordConnected,
+        googleConnected,
+        avatarId,
+      )
+    },
+    updateAvatar(userId: PlsqlRenderable, avatar: PlsqlRenderable) {
+      return odbAuthPackage.updateAvatar(userId, avatar)
+    },
+  },
+
   /** Deployment policy stored in Settings; LDAP is opt-in, other omitted flags are enabled. */
   config(options: AuthConfig = {}) {
     return odbSettings.seed(
@@ -74,25 +181,6 @@ export const odbAuth = {
       accessToken,
       refreshToken,
       challenge,
-      setupSecret,
-    )
-  },
-  verifyTwoFactor(
-    challenge: PlsqlRenderable,
-    code: PlsqlRenderable,
-    accessToken: PlsqlRenderable,
-    refreshToken: PlsqlRenderable,
-    recoveryCodes: PlsqlRenderable,
-    nextChallenge: PlsqlRenderable,
-    setupSecret: PlsqlRenderable,
-  ) {
-    return odbAuthPackage.verifyTwoFactor(
-      challenge,
-      code,
-      accessToken,
-      refreshToken,
-      recoveryCodes,
-      nextChallenge,
       setupSecret,
     )
   },
@@ -219,53 +307,8 @@ export const odbAuth = {
   },
 
   /** Consumes an unexpired confirmation token and enables its account. */
-  confirmEmail(token: PlsqlRenderable) {
+  confirmSignup(token: PlsqlRenderable) {
     return odbAuthPackage.confirmEmail(token)
-  },
-
-  /** Returns a fresh recovery token for an enabled account, or NULL for an unknown/disabled one. */
-  recoverPassword(username: PlsqlRenderable, resetToken: PlsqlRenderable) {
-    return odbAuthPackage.recoverPassword(username, resetToken)
-  },
-
-  /** Consumes a recovery token, changes the password, and revokes all existing sessions. */
-  resetPassword(token: PlsqlRenderable, password: PlsqlRenderable) {
-    return odbAuthPackage.resetPassword(token, password)
-  },
-
-  changePassword(
-    userId: PlsqlRenderable,
-    currentPassword: PlsqlRenderable,
-    password: PlsqlRenderable,
-  ) {
-    return odbAuthPackage.changePassword(userId, currentPassword, password)
-  },
-
-  readProfile(
-    userId: PlsqlRenderable,
-    avatarUrl: PlsqlRenderable,
-    avatarUploaded: PlsqlRenderable,
-    passwordConnected: PlsqlRenderable,
-    googleConnected: PlsqlRenderable,
-    avatarId: PlsqlRenderable,
-  ) {
-    return odbAuthPackage.readProfile(
-      userId,
-      avatarUrl,
-      avatarUploaded,
-      passwordConnected,
-      googleConnected,
-      avatarId,
-    )
-  },
-
-  updateAvatar(userId: PlsqlRenderable, avatar: PlsqlRenderable) {
-    return odbAuthPackage.updateAvatar(userId, avatar)
-  },
-
-  /** Server-only: the Google subject and picture must come from a verified token. */
-  updateGoogleAvatar(subject: PlsqlRenderable, picture: PlsqlRenderable) {
-    return odbAuthPackage.updateGoogleAvatar(subject, picture)
   },
 
   role: {
@@ -384,45 +427,6 @@ export const odbAuth = {
     refreshToken: PlsqlRenderable,
   ) {
     return odbAuthPackage.login(username, password, accessToken, refreshToken)
-  },
-
-  /** Trusted server-only entry point; the caller must verify Google's token and transaction first. */
-  loginGoogle(
-    subject: PlsqlRenderable,
-    email: PlsqlRenderable,
-    displayName: PlsqlRenderable,
-    accessToken: PlsqlRenderable,
-    refreshToken: PlsqlRenderable,
-  ) {
-    return odbAuthPackage.loginGoogle(subject, email, displayName, accessToken, refreshToken)
-  },
-
-  prepareGoogleLink(
-    userId: PlsqlRenderable,
-    refreshToken: PlsqlRenderable,
-    password: PlsqlRenderable,
-    sessionId: PlsqlRenderable,
-    tokenVersion: PlsqlRenderable,
-  ) {
-    return odbAuthPackage.prepareGoogleLink(userId, refreshToken, password, sessionId, tokenVersion)
-  },
-  checkGoogleLink(
-    userId: PlsqlRenderable,
-    sessionId: PlsqlRenderable,
-    tokenVersion: PlsqlRenderable,
-    refreshToken: PlsqlRenderable,
-  ) {
-    return odbAuthPackage.checkGoogleLink(userId, sessionId, tokenVersion, refreshToken)
-  },
-  /** Server-only: Google subject must already have passed OIDC and transaction verification. */
-  linkGoogle(
-    userId: PlsqlRenderable,
-    sessionId: PlsqlRenderable,
-    tokenVersion: PlsqlRenderable,
-    refreshToken: PlsqlRenderable,
-    subject: PlsqlRenderable,
-  ) {
-    return odbAuthPackage.linkGoogle(userId, sessionId, tokenVersion, refreshToken, subject)
   },
 
   /** `odb_auth.refresh(<refreshToken>, <accessToken>, <nextRefreshToken>)` with OUT tokens. */

@@ -1,4 +1,4 @@
-import { authState } from '../../auth-state'
+import { authConfig } from '../../auth-state'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
@@ -33,7 +33,7 @@ function json(data: unknown, status = 200) {
   })
 }
 
-async function setup(location = '/login?redirect=/sandbox') {
+async function setup(location = '/login?redirect=/sandbox', config = authConfig()) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -49,7 +49,7 @@ async function setup(location = '/login?redirect=/sandbox') {
   })
   await router.push(location)
   const fetch = vi.fn<typeof globalThis.fetch>()
-  fetch.mockResolvedValueOnce(json({}, 401)).mockResolvedValueOnce(json(authState()))
+  fetch.mockResolvedValueOnce(json(config)).mockResolvedValueOnce(json({}, 401))
   const auth: Auth = createAuth({
     onOperation: (operation) => useUi().loading.start(operation),
     http: () => useHttp({ fetch, configuration: { getAccessToken: () => auth.accessToken.value } }),
@@ -93,15 +93,12 @@ describe('login page using application auth', () => {
   })
 
   it('shows the ordinary credential form for LDAP-only deployments without local recovery', async () => {
-    const context = await setup()
-    context.fetch.mockResolvedValueOnce(
-      json({
-        ...authState(),
-        providers: { password: false, google: false, ldap: true },
-        signup: false,
-      }),
-    )
-    await context.auth.getState()
+    const context = await setup(undefined, {
+      ...authConfig(false),
+      password: false,
+      ldap: true,
+      signup: false,
+    })
     await flushPromises()
     expect(context.wrapper.findComponent(form).exists()).toBe(true)
     expect(context.wrapper.text()).not.toContain(messages['auth.recover.title'])
@@ -154,7 +151,7 @@ describe('login page using application auth', () => {
     expect(context.fetch).toHaveBeenCalledTimes(3)
     context.fetch
       .mockResolvedValueOnce(json({ accessToken: 'verified-token', recoveryCodes: codes }))
-      .mockResolvedValueOnce(json(authState({ userId: 7, username: 'ada' })))
+      .mockResolvedValueOnce(json({ userId: 7, username: 'ada' }))
     await context.wrapper.find('input[autocomplete="one-time-code"]').setValue('123456')
     await context.wrapper.find('form').trigger('submit')
     await flushPromises()
@@ -244,16 +241,7 @@ describe('login page using application auth', () => {
   })
 
   it('hides password and sign-up controls when disabled by server policy', async () => {
-    const context = await setup()
-    context.fetch.mockResolvedValueOnce(
-      json({
-        user: null,
-        providers: { password: false, google: true },
-        signup: false,
-        twoFactor: true,
-      }),
-    )
-    await context.auth.getState()
+    const context = await setup(undefined, { ...authConfig(), password: false, signup: false })
     await flushPromises()
     expect(context.wrapper.findComponent(form).exists()).toBe(false)
     expect(context.wrapper.text()).not.toContain(messages['auth.signup'])
@@ -306,7 +294,7 @@ describe('login page using application auth', () => {
     await flushPromises()
     context.fetch
       .mockResolvedValueOnce(json({ accessToken: 'login-token' }))
-      .mockResolvedValueOnce(json(authState({ userId: 7, username: 'ada' })))
+      .mockResolvedValueOnce(json({ userId: 7, username: 'ada' }))
     await context.wrapper.findComponent(form).trigger('click')
     await flushPromises()
     expect(context.router.currentRoute.value.path).toBe('/settings/account')
@@ -323,9 +311,7 @@ describe('login page using application auth', () => {
     const context = await setup()
     context.fetch
       .mockResolvedValueOnce(json({ accessToken: 'login-token' }))
-      .mockResolvedValueOnce(
-        json(authState({ userId: 7, username: 'ada', permissions: ['settings.read'] })),
-      )
+      .mockResolvedValueOnce(json({ userId: 7, username: 'ada', permissions: ['settings.read'] }))
 
     await context.wrapper.findComponent(form).trigger('click')
     await flushPromises()
@@ -380,7 +366,7 @@ describe('login page using application auth', () => {
             finish = resolve
           }),
       )
-      .mockResolvedValueOnce(json(authState({ userId: 7, username: 'ada' })))
+      .mockResolvedValueOnce(json({ userId: 7, username: 'ada' }))
     const loginForm = context.wrapper.findComponent(form)
     expect(loginForm.props('loading')).toBeUndefined()
     expect(context.ui.loading.active.value).toBe(false)

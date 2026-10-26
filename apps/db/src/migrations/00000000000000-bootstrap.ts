@@ -18,7 +18,6 @@ import {
   odbLiteral,
   odbOracle,
   odbPackage,
-  odbQuery,
   odbType,
   plsqlExpr,
   type Package,
@@ -362,7 +361,7 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
     }) => {
       const { refreshToken } = body.variables({ refreshToken: odbAuth.types.refreshToken })
       body.call(
-        odbAuth.verifyTwoFactor(
+        odbAuth.twoFactor.verify(
           challenge,
           code,
           accessToken,
@@ -442,58 +441,29 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
     headers: { Cookie: logout.parameters.cookie, 'Set-Cookie': logout.parameters.setCookie },
   })
 
-  const getState = pkg.proc(
-    'get_state',
+  const getConfig = pkg.proc(
+    'get_config',
     {
-      in: { authorization: odbType.string(4000) },
       out: {
-        user: odbType.json(),
-        providers: odbType.json(),
+        password: odbType.json(),
+        google: odbType.json(),
+        ldap: odbType.json(),
         signup: odbType.json(),
         twoFactor: odbType.json(),
         cacheControl: odbType.string(32),
       },
     },
-    ({ params: { authorization, user, providers, signup, twoFactor, cacheControl }, body }) => {
-      const {
-        userId,
-        username,
-        displayName,
-        avatarUrl,
-        avatarUploaded,
-        avatarId,
-        passwordConnected,
-        googleConnected,
-        roles,
-        permissions,
-        googleEnabled,
-        passwordEnabled,
-        ldapEnabled,
-      } = body.variables({
-        userId: odbAuth.types.userId,
-        username: odbAuth.types.username,
-        displayName: odbAuth.types.displayName,
-        avatarUrl: odbType.clob(),
-        avatarUploaded: odbType.number(),
-        avatarId: odbStorage.types.id,
-        passwordConnected: odbType.number(),
-        googleConnected: odbType.number(),
-        roles: odbType.json(),
-        permissions: odbType.json(),
-        googleEnabled: odbType.string(5),
-        passwordEnabled: odbType.string(5),
-        ldapEnabled: odbType.string(5),
-      })
+    ({ params: { password, google, ldap, signup, twoFactor, cacheControl }, body }) => {
       body.set(cacheControl, 'no-store')
       body.ifThen(
         cond.eq(odbAuth.enabled('ldap'), true),
-        (yes) => yes.set(ldapEnabled, 'true'),
-        (no) => no.set(ldapEnabled, 'false'),
+        (yes) => yes.set(ldap, 'true'),
+        (no) => no.set(ldap, 'false'),
       )
       body.ifThen(
         cond.eq(odbAuth.enabled('password'), true),
-        (yes) => yes.set(passwordEnabled, 'true'),
-        (no) => no.set(passwordEnabled, 'false'),
+        (yes) => yes.set(password, 'true'),
+        (no) => no.set(password, 'false'),
       )
       body.ifThen(
         cond.and([
@@ -508,83 +478,103 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
         (yes) => yes.set(twoFactor, 'true'),
         (no) => no.set(twoFactor, 'false'),
       )
-      body.set(user, 'null')
       body.ifThen(
         cond.eq(odbGoogle.enabled(), true),
-        (then) => then.set(googleEnabled, odbLiteral('true')),
-        (otherwise) => otherwise.set(googleEnabled, odbLiteral('false')),
+        (yes) => yes.set(google, 'true'),
+        (no) => no.set(google, 'false'),
       )
-      body.query(
-        odbQuery()
-          .selectFrom('dual')
-          .select(
-            plsqlExpr.jsonObject(
-              { password: passwordEnabled, google: googleEnabled, ldap: ldapEnabled },
-              'CLOB',
-              {
-                formatJson: ['password', 'google', 'ldap'],
-              },
-            ),
-          )
-          .into(providers),
-      )
-      body.ifThen(cond.isNotNull(authorization), (then) => {
-        then.set(userId, odbAuth.requireUser(odbHttp.bearerToken(authorization)))
-        then.call(odbAuth.readUser(userId, username, displayName))
-        then.call(odbAuth.readAuthorization(userId, roles, permissions))
-        then.call(
-          odbAuth.readProfile(
-            userId,
-            avatarUrl,
-            avatarUploaded,
-            passwordConnected,
-            googleConnected,
-            avatarId,
-          ),
-        )
-        then.query(
-          odbQuery()
-            .selectFrom('dual')
-            .select(
-              plsqlExpr.jsonObject(
-                {
-                  userId,
-                  username,
-                  displayName,
-                  avatarUrl,
-                  avatarUploaded,
-                  avatarId,
-                  passwordConnected,
-                  googleConnected,
-                  roles,
-                  permissions,
-                },
-                'CLOB',
-                { formatJson: ['roles', 'permissions'] },
-              ),
-            )
-            .into(user),
-        )
-      })
     },
   )
-  defineService(getState, {
+  defineService(getConfig, {
     auth: 'anonymous',
     method: 'GET',
-    path: '/state',
+    path: '/config',
     module: 'auth',
     basePath: '/auth',
-    summary: 'Return the current user and public authentication capabilities',
+    summary: 'Return public deployment authentication configuration',
     responseMediaType: 'application/json',
-    headers: {
-      Authorization: getState.parameters.authorization,
-      'Cache-Control': getState.parameters.cacheControl,
-    },
+    headers: { 'Cache-Control': getConfig.parameters.cacheControl },
     response: {
-      user: getState.parameters.user,
-      providers: getState.parameters.providers,
-      signup: getState.parameters.signup,
-      twoFactor: getState.parameters.twoFactor,
+      password: getConfig.parameters.password,
+      google: getConfig.parameters.google,
+      ldap: getConfig.parameters.ldap,
+      signup: getConfig.parameters.signup,
+      twoFactor: getConfig.parameters.twoFactor,
+    },
+  })
+
+  const getMe = pkg.proc(
+    'get_me',
+    {
+      in: { subject: odbAuth.types.userId },
+      out: {
+        userId: odbAuth.types.userId,
+        username: odbAuth.types.username,
+        displayName: odbAuth.types.displayName,
+        avatarUrl: odbType.clob(),
+        avatarUploaded: odbType.number(),
+        avatarId: odbStorage.types.id,
+        passwordConnected: odbType.number(),
+        googleConnected: odbType.number(),
+        roles: odbType.json(),
+        permissions: odbType.json(),
+        cacheControl: odbType.string(32),
+      },
+    },
+    ({
+      params: {
+        subject,
+        userId,
+        username,
+        displayName,
+        avatarUrl,
+        avatarUploaded,
+        avatarId,
+        passwordConnected,
+        googleConnected,
+        roles,
+        permissions,
+        cacheControl,
+      },
+      body,
+    }) => {
+      body.set(userId, subject)
+      body.set(cacheControl, 'no-store')
+      body.call(odbAuth.readUser(userId, username, displayName))
+      body.call(odbAuth.readAuthorization(userId, roles, permissions))
+      body.call(
+        odbAuth.profile.read(
+          userId,
+          avatarUrl,
+          avatarUploaded,
+          passwordConnected,
+          googleConnected,
+          avatarId,
+        ),
+      )
+    },
+  )
+  defineService(getMe, {
+    auth: 'authenticated',
+    method: 'GET',
+    path: '/me',
+    module: 'auth',
+    basePath: '/auth',
+    summary: 'Return the authenticated user, profile and authorization',
+    context: { userId: getMe.parameters.subject },
+    responseMediaType: 'application/json',
+    headers: { 'Cache-Control': getMe.parameters.cacheControl },
+    response: {
+      userId: getMe.parameters.userId,
+      username: getMe.parameters.username,
+      displayName: getMe.parameters.displayName,
+      avatarUrl: getMe.parameters.avatarUrl,
+      avatarUploaded: getMe.parameters.avatarUploaded,
+      avatarId: getMe.parameters.avatarId,
+      passwordConnected: getMe.parameters.passwordConnected,
+      googleConnected: getMe.parameters.googleConnected,
+      roles: getMe.parameters.roles,
+      permissions: getMe.parameters.permissions,
     },
   })
 
@@ -667,25 +657,25 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
     },
   })
 
-  const confirmEmail = pkg.proc(
-    'confirm_email',
+  const confirmSignup = pkg.proc(
+    'confirm_signup',
     { in: { token: odbType.string(64) } },
     ({ params: { token }, body }) => {
       const { ip } = body.variables({ ip: odbType.string(128) })
       body.set(ip, odbOracle.sysContext(odbLiteral('USERENV'), odbLiteral('IP_ADDRESS')))
       body.call(odbRateLimitApi.enforce(odbLiteral('AUTH_CONFIRM_IP'), ip))
       body.call(odbRateLimitApi.failure(odbLiteral('AUTH_CONFIRM_IP'), ip))
-      body.call(odbAuth.confirmEmail(token))
+      body.call(odbAuth.confirmSignup(token))
     },
   )
-  defineService(confirmEmail, {
+  defineService(confirmSignup, {
     auth: 'anonymous',
     method: 'POST',
     module: 'auth',
     basePath: '/auth',
-    path: '/confirm-email',
+    path: '/signup/confirm',
     summary: 'Activate an account using a single-use email confirmation token',
-    body: { token: confirmEmail.parameters.token },
+    body: { token: confirmSignup.parameters.token },
   })
   const recoverPassword = pkg.proc(
     'recover_password',
@@ -710,7 +700,7 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
         ]),
         (then) => then.invalid('RECOVERY_URL_NOT_CONFIGURED'),
       )
-      body.call(odbAuth.recoverPassword(email, token))
+      body.call(odbAuth.password.recover(email, token))
       body.ifThen(cond.isNull(token), (then) => then.return())
       body.set(address, odbOracle.lower(odbOracle.trim(email)))
       const link = plsqlExpr.concat(
@@ -745,7 +735,7 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
     method: 'POST',
     module: 'auth',
     basePath: '/auth',
-    path: '/recover-password',
+    path: '/password/recover',
     summary: 'Request a password reset email without disclosing account existence',
     body: { email: recoverPassword.parameters.email },
   })
@@ -768,7 +758,7 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
         cond.or([cond.isNull(passwordRepeat), cond.ne(password, passwordRepeat)]),
         (then) => then.invalid('PASSWORD_RESET_PASSWORD_MISMATCH'),
       )
-      body.call(odbAuth.resetPassword(token, password))
+      body.call(odbAuth.password.reset(token, password))
     },
   )
   defineService(resetPassword, {
@@ -776,7 +766,7 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
     method: 'POST',
     module: 'auth',
     basePath: '/auth',
-    path: '/reset-password',
+    path: '/password/reset',
     summary: 'Consume a single-use recovery token and revoke existing sessions',
     body: {
       token: resetPassword.parameters.token,
@@ -788,14 +778,15 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
   const updateAvatar = pkg.proc(
     'update_avatar',
     { in: { userId: odbAuth.types.userId, avatar: odbType.clob() } },
-    ({ params: { userId, avatar }, body }) => body.call(odbAuth.updateAvatar(userId, avatar)),
+    ({ params: { userId, avatar }, body }) =>
+      body.call(odbAuth.profile.updateAvatar(userId, avatar)),
   )
   defineService(updateAvatar, {
     auth: 'authenticated',
-    method: 'POST',
+    method: 'PUT',
     module: 'auth',
     basePath: '/auth',
-    path: '/avatar',
+    path: '/me/avatar',
     summary: 'Set a JPEG thumbnail, or remove the uploaded avatar with null',
     context: { userId: updateAvatar.parameters.userId },
     body: { avatar: updateAvatar.parameters.avatar },
@@ -829,7 +820,7 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
         meta: odbStorage.types.meta,
       })
       body.call(
-        odbAuth.readProfile(
+        odbAuth.profile.read(
           userId,
           avatarUrl,
           avatarUploaded,
@@ -873,7 +864,7 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
         cond.or([cond.isNull(passwordRepeat), cond.ne(password, passwordRepeat)]),
         (then) => then.invalid('PASSWORD_CHANGE_PASSWORD_MISMATCH'),
       )
-      body.call(odbAuth.changePassword(userId, currentPassword, password))
+      body.call(odbAuth.password.change(userId, currentPassword, password))
       body.set(setCookie, refreshCookie.expire())
     },
   )
@@ -882,7 +873,7 @@ export const appPackage: Package<Record<never, never>> = odbPackage('pck_app', (
     method: 'POST',
     module: 'auth',
     basePath: '/auth',
-    path: '/change-password',
+    path: '/password/change',
     summary: 'Change a local password after reauthentication and revoke all sessions',
     context: { userId: changePassword.parameters.userId },
     body: {

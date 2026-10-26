@@ -79,7 +79,7 @@ describe('odbAuth framework package', () => {
     expect(recovery).not.toContain('UPDATE odb_auth_users')
     expect(recovery).not.toContain('odb_auth_confirmations')
     expect(recovery).toContain("odb_rate_limit.failure('AUTH_RECOVERY_EMAIL', l_email)")
-    expect(odbAuth.recoverPassword('p_email', 'l_token').toSQL()).toBe(
+    expect(odbAuth.password.recover('p_email', 'l_token').toSQL()).toBe(
       'odb_auth.recover_password(p_email, l_token)',
     )
   })
@@ -90,7 +90,7 @@ describe('odbAuth framework package', () => {
       'PROCEDURE reset_password(',
       sql.indexOf('PACKAGE BODY APP.odb_auth AS'),
     )
-    const reset = sql.slice(start, sql.indexOf('PROCEDURE login(', start))
+    const reset = sql.slice(start, sql.indexOf('END reset_password;', start))
     expect(reset).toContain("REGEXP_LIKE(p_token, '^[A-F0-9]{64}$')")
     expect(reset).toContain('LENGTH(p_password) < 8')
     expect(reset).toContain('LENGTH(p_password) > 256')
@@ -116,7 +116,7 @@ describe('odbAuth framework package', () => {
     expect(login).toContain('FOR UPDATE')
     expect(login.indexOf('FOR UPDATE')).toBeLessThan(login.indexOf('verify_password'))
     expect(login).toMatch(/WHEN NO_DATA_FOUND THEN\s+l_password_hash := c_dummy_password_hash;/)
-    expect(odbAuth.resetPassword('p_token', 'p_password').toSQL()).toBe(
+    expect(odbAuth.password.reset('p_token', 'p_password').toSQL()).toBe(
       'odb_auth.reset_password(p_token, p_password)',
     )
   })
@@ -144,7 +144,7 @@ describe('odbAuth framework package', () => {
     expect(odbAuth.signup('p_email', 'p_password', 'p_name', 'l_token').toSQL()).toBe(
       'odb_auth.signup(p_email, p_password, p_name, l_token)',
     )
-    expect(odbAuth.confirmEmail('p_token').toSQL()).toBe('odb_auth.confirm_email(p_token)')
+    expect(odbAuth.confirmSignup('p_token').toSQL()).toBe('odb_auth.confirm_email(p_token)')
   })
 
   it('emits tables and auth primitives without ORDS endpoints', () => {

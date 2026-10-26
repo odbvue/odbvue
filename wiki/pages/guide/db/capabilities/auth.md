@@ -15,12 +15,41 @@
 
 The application owns:
 
-- login, refresh, logout, and `getState` endpoints and their shapes;
+- login, refresh, logout, configuration, and current-user endpoints and their shapes;
 - choosing service authorization policies, reading `Cookie`, and writing `Set-Cookie`;
 - authorization policy (who may call what);
 - mapping ODB errors to HTTP responses.
 
 The test for placement: would another PL/SQL package reasonably call this without HTTP? If yes, it belongs in `odbAuth`; if it concerns headers, cookies, status codes, or endpoint shape, it belongs in the application.
+
+## Domain API and implementation
+
+There is one `odbAuth` capability and one public `ODB_AUTH` PL/SQL API. Its
+TypeScript surface groups optional workflows by domain:
+
+| TypeScript helper                                                                              | Existing PL/SQL routine                                                                           |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `confirmSignup`                                                                                | `confirm_email`                                                                                   |
+| `password.change`, `password.recover`, `password.reset`                                        | `change_password`, `recover_password`, `reset_password`                                           |
+| `google.login`, `google.prepareLink`, `google.checkLink`, `google.link`, `google.updateAvatar` | `login_google`, `prepare_google_link`, `check_google_link`, `link_google`, `update_google_avatar` |
+| `twoFactor.verify`                                                                             | `verify_two_factor`                                                                               |
+| `profile.read`, `profile.updateAvatar`                                                         | `read_profile`, `update_avatar`                                                                   |
+
+These replace the old flat TypeScript helpers; no compatibility aliases are
+provided. Parameter order, OUT values, database routine signatures, validation,
+locking, and transactional behavior are unchanged. `signup`, `login`,
+`beginLogin`, `refresh`, `logout`, `readUser`, `readAuthorization`, `requireUser`,
+`role`, `permission`, `types`, `config`, `enabled`, `seedSettings`, `seedUser`,
+`refreshTokenMaxAge`, and the migration install/drop methods remain on `odbAuth`.
+
+Internally, `package.ts` composes typed domain-definition functions into the same
+package. `core/` owns users, identities, sessions, tokens, authorization, shared
+types, crypto, and policy; it never imports a feature. `features/` owns password
+recovery/change, signup, Google identities/linking, LDAP credential verification,
+two-factor authentication, and profile operations. Feature-specific tables live
+with their workflows. Login orchestration supplies typed credential/session
+dependencies to the features; these modules are not separate capabilities or
+additional public database packages.
 
 ## Install
 
@@ -118,8 +147,8 @@ Settings API rejects writes/removals of all `AUTH_*` keys.
 Enable with `odbAuth.config({ ldap: true })` after configuring the directory, or
 with `ov ss` / `ov setup-settings`. LDAP is disabled by default and is not inferred
 from a saved hostname. The existing username/password form and `/auth/login`
-endpoint are used; users do not choose a provider. `/auth/state` includes a
-`providers.ldap` boolean, so the form remains available when local passwords are
+endpoint are used; users do not choose a provider. `/auth/config` includes a
+`ldap` boolean, so the form remains available when local passwords are
 disabled.
 
 `odbAuth.seedSettings()` inserts the following missing settings without overwriting
@@ -242,7 +271,7 @@ explicitly and opens the manual-key fallback. QR images are kept only in compone
 memory and removed when enrollment is completed or cancelled.
 Pending setup is not an authenticated session.
 
-`odbAuth.verifyTwoFactor(challenge, code, accessToken, refreshToken, recoveryCodes, nextChallenge, setupSecret)`
+`odbAuth.twoFactor.verify(challenge, code, accessToken, refreshToken, recoveryCodes, nextChallenge, setupSecret)`
 accepts a six-digit authenticator code. TOTP uses RFC 6238 (SHA1, 30-second steps,
 six digits, UTC, one step of clock skew in either direction). Accepted counters
 cannot be replayed, including immediately after enrollment; wait for the next
@@ -382,12 +411,12 @@ change and Google connection forms open on demand; guided Google linking opens
 its form automatically and preserves the return destination. Closing either
 password-entry form clears its entered values.
 
-`odbAuth.readProfile(userId, avatarUrl, avatarUploaded, passwordConnected, googleConnected, avatarId)`
+`odbAuth.profile.read(userId, avatarUrl, avatarUploaded, passwordConnected, googleConnected, avatarId)`
 reads the Google photo URL, uploaded storage key and actual identity counts. The application exposes these
-through `/auth/state`; the three numeric status fields are `0` or positive counts.
+through authenticated `/auth/me`; the three numeric status fields are `0` or positive counts.
 An uploaded avatar takes precedence over a Google photo. `readUser` remains unchanged.
 
-`odbAuth.updateAvatar(userId, avatar)` accepts a JPEG thumbnail data URL of at most
+`odbAuth.profile.updateAvatar(userId, avatar)` accepts a JPEG thumbnail data URL of at most
 30,000 characters, or `NULL` to remove the upload. The web app produces a cropped,
 metadata-free 128 x 128 JPEG from JPEG, PNG or WebP input of at most 5 MB. The data URL
 is only an upload transport: the database validates its size, base64 shape and JPEG
@@ -400,12 +429,12 @@ Authenticated `GET /auth/avatar/:id` serves only the enabled owner's current ava
 with private/no-store caching and `nosniff` headers. The web client fetches it with bearer
 authentication and displays a temporary blob URL, revoked on replacement or sign-out.
 No avatar keys are made publicly readable.
-Trusted `updateGoogleAvatar(subject, picture)` is called only after Google token verification
+Trusted `odbAuth.google.updateAvatar(subject, picture)` is called only after Google token verification
 and successful sign-in; only HTTPS `lh<N>.googleusercontent.com` photo URLs are accepted,
 and uploaded photos are never replaced. The optional verified `picture` claim needs no
 additional Google scope or server-side image download.
 
-`odbAuth.changePassword(userId, currentPassword, password)` rate-limits attempts per
+`odbAuth.password.change(userId, currentPassword, password)` rate-limits attempts per
 user and locks the enabled account before verifying its local password. It rejects
 Google-only users, checks the existing 8-256-character password policy, hashes the new
 password, increments the access-token version, revokes all refresh sessions and deletes
@@ -420,35 +449,37 @@ separate incremental profile migration is supplied.
 
 The bootstrap migration (`apps/db/src/migrations/00000000000000-bootstrap.ts`)
 installs `pck_app`, which exposes these endpoints beneath `/auth`. `odbAuth` does
-not register them; the application package does. The sandbox retains duplicate
-login, refresh, logout, and `me` procedures under `/sandbox/auth`, without
-overwriting the application's public routes.
+not register them; the application package does.
 
 | Endpoint                       | Purpose                                                                                                                                                                                                                                            |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `POST /auth/login`             | Accepts `{ username, password }`; returns `{ accessToken, challenge, setupSecret }`. With 2FA enabled, only the restricted challenge (and setup key for enrollment) is populated; no refresh cookie is issued.                                     |
 | `POST /auth/two-factor/verify` | Accepts `{ challenge, code }`. Successful TOTP returns an access token, refresh cookie, and recovery-code array (ten on enrollment, otherwise empty). A recovery code instead returns a replacement enrollment challenge/setup key without tokens. |
 | `POST /auth/signup`            | Accepts JSON `{ email, fullName, password, passwordRepeat }`, creates an inactive account, and sends a confirmation email.                                                                                                                         |
-| `POST /auth/confirm-email`     | Accepts JSON `{ token }`, consumes an unexpired confirmation token, and enables the account without creating a session.                                                                                                                            |
-| `POST /auth/recover-password`  | Accepts JSON `{ email }` and sends a reset link for an active account; unknown or disabled accounts receive the same empty success response.                                                                                                       |
-| `POST /auth/reset-password`    | Accepts JSON `{ token, password, passwordRepeat }`, changes the password, and revokes existing sessions without logging in.                                                                                                                        |
+| `POST /auth/signup/confirm`    | Accepts JSON `{ token }`, consumes an unexpired confirmation token, and enables the account without creating a session.                                                                                                                            |
+| `POST /auth/password/recover`  | Accepts JSON `{ email }` and sends a reset link for an active account; unknown or disabled accounts receive the same empty success response.                                                                                                       |
+| `POST /auth/password/reset`    | Accepts JSON `{ token, password, passwordRepeat }`, changes the password, and revokes existing sessions without logging in.                                                                                                                        |
 | `POST /auth/refresh`           | Rotates the refresh cookie and returns `{ accessToken }`.                                                                                                                                                                                          |
 | `POST /auth/logout`            | Revokes the browser session and expires the refresh cookie.                                                                                                                                                                                        |
-| `GET /auth/state`              | Returns `{ user, providers: { password, google }, signup, twoFactor }`; `user` is null without credentials and contains the profile, roles, and permissions for a valid bearer token.                                                              |
+| `GET /auth/config`             | Anonymous deployment capabilities: `{ password, ldap, google, signup, twoFactor }` booleans.                                                                                                                                                       |
+| `GET /auth/me`                 | Requires a valid bearer token and returns the current profile, roles, and permissions directly, including `userId`.                                                                                                                                |
+| `PUT /auth/me/avatar`          | Requires authentication; replaces or removes the current user's uploaded avatar.                                                                                                                                                                   |
+| `POST /auth/password/change`   | Requires authentication and the current password; changes the password and revokes existing sessions.                                                                                                                                              |
 
-The web client's `auth.getState()` loads both the current identity and public
-authentication capabilities. `auth.providers`, `auth.signupEnabled`, and `auth.twoFactorEnabled` are reactive
-refs, initially null until state has loaded. Startup restoration attempts
-`POST /auth/refresh`, then loads `/auth/state` even when no refresh session exists.
-Login and profile updates also reload state; Google buttons reuse the shared
-capabilities instead of making a separate configuration request.
+The web client's readonly `auth.config` ref holds public deployment capabilities;
+`auth.user` separately holds the authenticated profile. Startup restoration loads
+configuration and attempts `POST /auth/refresh`; an authenticated session then
+loads `/auth/me`. `auth.refreshUser()` reloads the profile after account changes.
+Google buttons reuse `auth.config.value.google` instead of making a separate
+provider-specific configuration request.
 
-`/auth/state` emits native JSON objects and booleans, not JSON strings:
+`/auth/config` emits native JSON booleans, not JSON strings:
 
 ```json
 {
-  "user": null,
-  "providers": { "password": true, "google": true },
+  "password": true,
+  "ldap": false,
+  "google": true,
   "signup": true,
   "twoFactor": true
 }
@@ -459,13 +490,13 @@ response fields. Its generated PL/SQL handler validates and streams the JSON,
 preserving `Cache-Control: no-store`. SQL query handlers can use `"{}name"`
 aliases for embedded JSON; PL/SQL OUT parameters need explicit JSON output.
 
-`/auth/state` returns 200 for anonymous callers and sets `Cache-Control: no-store`.
-A supplied invalid, expired, or malformed bearer credential still returns 401,
-allowing the client's normal refresh handling. It replaces the public `/auth/me`
-and `/auth/google/config` endpoints. Rebuild and redeploy bootstrap to install
-the updated routes; no incremental migration is supplied.
+`/auth/config` requires no credentials; `/auth/me` rejects missing, invalid,
+expired, or malformed bearer credentials with 401. Both responses use
+`Cache-Control: no-store`. The combined `/auth/state` and provider-specific
+`/auth/google/config` routes are not retained as aliases. Rebuild and redeploy
+bootstrap to install the updated routes; no incremental migration is supplied.
 
-The state procedure uses SQL `NUMBER` locals for profile flags passed to
+The profile procedure uses SQL `NUMBER` locals for profile flags passed to
 `JSON_OBJECT`. Oracle 19c rejects PL/SQL `PLS_INTEGER` inputs to JSON generation
 with `ORA-40654`, leaving the package body invalid and the endpoint returning 500.
 
@@ -558,8 +589,8 @@ Authentication failures raise ODB errors that ORDS maps to HTTP responses, inclu
 
 Google authentication uses a backend-owned OpenID Connect authorization-code
 flow with PKCE (S256), state, and nonce. The Login and Signup pages read shared
-`GET /auth/state` capabilities and show **Continue with Google** only when
-`providers.google` is true.
+`GET /auth/config` capabilities and show **Continue with Google** only when
+`google` is true.
 The public client ID is not proof of identity and is not a password. No Google
 script, ID token, or client secret is needed in the frontend.
 
@@ -567,7 +598,7 @@ script, ID token, or client secret is needed in the frontend.
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `POST /auth/google/start`      | Accepts `{ "redirect": "/local/path" }`, requires the configured application Origin, sets a five-minute HttpOnly transaction cookie, and returns `{ "authorizationUrl": "https://accounts.google.com/..." }`.                                                                    |
 | `GET /auth/google/callback`    | Accepts Google's `state`, `code`, or `error` and consumes the browser-bound transaction. Its stored purpose determines login or linking. Login success sets the normal refresh cookie and redirects to Login; linking returns to Account settings without replacing the session. |
-| `POST /auth/google/link/start` | Requires an authenticated access token, the current refresh cookie, the configured Origin, and `{ "redirect": "/settings/account", "password": "<current password>" }`. Starts explicit linking and returns the Google authorization URL.                                                 |
+| `POST /auth/google/link/start` | Requires an authenticated access token, the current refresh cookie, the configured Origin, and `{ "redirect": "/settings/account", "password": "<current password>" }`. Starts explicit linking and returns the Google authorization URL.                                        |
 
 The callback must be exposed through the browser-facing deployment and registered
 **exactly** in the Google Cloud OAuth client's authorized redirect URIs.
@@ -673,7 +704,7 @@ API. Rebuilding removes existing data; preserving data from an older schema requ
 a separately planned migration.
 
 Only a server-verified Google identity can reach the trusted
-`odbAuth.loginGoogle` primitive. Google tokens are verified using Google's
+`odbAuth.google.login` primitive. Google tokens are verified using Google's
 RSA signing keys, the configured audience, issuer, timestamps, nonce, and
 verified email. Signing-key retrieval is bounded and cached briefly; token
 headers cannot choose a key URL. The existing HS256 verifier is used only for
@@ -747,15 +778,15 @@ no-store`.
 
 ## Procedures
 
-| Procedure          | Parameters                                                             | Behavior                                                                                                                                                  |
-| ------------------ | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `login`            | `p_username`, `p_password` IN; `p_access_token`, `p_refresh_token` OUT | Legacy password-only entry point; rejects with `TWO_FACTOR_REQUIRED` while 2FA is enabled. Use `beginLogin` and `verifyTwoFactor` for the two-stage flow. |
-| `refresh`          | `p_refresh_token` IN; `p_access_token`, `p_next_refresh_token` OUT     | Rotates the refresh token. Reuse of a rotated token revokes the session.                                                                                  |
-| `logout`           | `p_refresh_token` IN                                                   | Revokes the session; unknown or empty tokens are ignored.                                                                                                 |
-| `recover_password` | `p_username` IN; `p_reset_token` OUT                                   | Returns a one-hour token for an enabled account, otherwise NULL. The trusted application sends the email.                                                 |
-| `reset_password`   | `p_token`, `p_password` IN                                             | Consumes a recovery token, changes the password, increments token version, and revokes sessions. Invalid tokens/passwords raise `VALIDATION_ERROR`.       |
-| `read_user`        | `p_user_id` IN; `p_username`, `p_display_name` OUT                     | Reads an enabled user; raises `NOT_FOUND` otherwise.                                                                                                      |
-| `require_user`     | `p_access_token` IN                                                    | Returns the user id behind a valid access token; raises `UNAUTHORIZED` otherwise.                                                                         |
+| Procedure          | Parameters                                                             | Behavior                                                                                                                                                            |
+| ------------------ | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `login`            | `p_username`, `p_password` IN; `p_access_token`, `p_refresh_token` OUT | Password-only entry point; rejects with `TWO_FACTOR_REQUIRED` while 2FA is enabled. Use `odbAuth.beginLogin` and `odbAuth.twoFactor.verify` for the two-stage flow. |
+| `refresh`          | `p_refresh_token` IN; `p_access_token`, `p_next_refresh_token` OUT     | Rotates the refresh token. Reuse of a rotated token revokes the session.                                                                                            |
+| `logout`           | `p_refresh_token` IN                                                   | Revokes the session; unknown or empty tokens are ignored.                                                                                                           |
+| `recover_password` | `p_username` IN; `p_reset_token` OUT                                   | Returns a one-hour token for an enabled account, otherwise NULL. The trusted application sends the email.                                                           |
+| `reset_password`   | `p_token`, `p_password` IN                                             | Consumes a recovery token, changes the password, increments token version, and revokes sessions. Invalid tokens/passwords raise `VALIDATION_ERROR`.                 |
+| `read_user`        | `p_user_id` IN; `p_username`, `p_display_name` OUT                     | Reads an enabled user; raises `NOT_FOUND` otherwise.                                                                                                                |
+| `require_user`     | `p_access_token` IN                                                    | Returns the user id behind a valid access token; raises `UNAUTHORIZED` otherwise.                                                                                   |
 
 Tokens are plain values. Use `odbHttp.defineCookie(...)` in the application package for refresh-token transport. Protected services automatically extract bearer tokens:
 
@@ -837,7 +868,7 @@ const auth = useAuth()
 const challenge = await auth.login({ username: 'ada', password: 'correct horse battery staple' })
 if (challenge) {
   // Render enrollment when setupSecret is present; otherwise request a TOTP/recovery code.
-  // Submit the entered code with auth.verifyTwoFactor(challenge.challenge, code).
+  // Submit the entered code with auth.twoFactor.verify(challenge.challenge, code).
   // Handle a replacement enrollment challenge or show returned recoveryCodes before navigating.
 }
 

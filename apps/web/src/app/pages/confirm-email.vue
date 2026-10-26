@@ -55,7 +55,7 @@ async function confirm() {
   ui.clear()
   const stopLoading = ui.loading.start('overlay.auth.confirmEmail')
   try {
-    await auth.confirmEmail(token.value)
+    await auth.confirmSignup(token.value)
     confirmed.value = true
     token.value = ''
   } catch (error) {

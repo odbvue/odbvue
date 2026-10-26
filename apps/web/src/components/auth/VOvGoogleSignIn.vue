@@ -22,7 +22,7 @@ const ui = useUi()
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-const enabled = computed(() => auth.providers.value?.google === true)
+const enabled = computed(() => auth.config.value?.google === true)
 const starting = ref(false)
 
 async function start() {
@@ -37,7 +37,7 @@ async function start() {
       appConfig.auth?.routes?.authenticated ?? '/',
       appConfig.auth?.routes?.login ?? '/login',
     )
-    const { authorizationUrl } = await auth.startGoogleLogin({ redirect })
+    const { authorizationUrl } = await auth.google.login({ redirect })
     window.location.assign(authorizationUrl)
   } catch (error) {
     starting.value = false

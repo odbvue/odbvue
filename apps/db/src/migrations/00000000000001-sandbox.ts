@@ -101,7 +101,7 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
     }) => {
       const { refreshToken } = body.variables({ refreshToken: odbAuth.types.refreshToken })
       body.call(
-        odbAuth.verifyTwoFactor(
+        odbAuth.twoFactor.verify(
           challenge,
           code,
           accessToken,
