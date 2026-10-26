@@ -139,6 +139,31 @@ describe('authentication capability', () => {
     expect(auth.config.value).toBe(configuration)
   })
 
+  it.each([true, false])(
+    'logout clears cached restoration failure even when revocation succeeds: %s',
+    async (succeeds) => {
+      const { auth, get, post } = setup()
+      get.mockImplementation(async (url) =>
+        response(
+          url.endsWith('/config')
+            ? authConfig()
+            : { ...ada, avatarUploaded: 1, avatarId: 'a'.repeat(32).padEnd(32767) },
+        ),
+      )
+      await expect(auth.restore()).rejects.toThrow('Invalid avatar storage key')
+      const error = new Error('Logout unavailable')
+      if (succeeds) post.mockResolvedValueOnce(response(null, 204))
+      else post.mockRejectedValueOnce(error)
+      if (succeeds) await auth.logout()
+      else await expect(auth.logout()).rejects.toBe(error)
+      await expect(auth.restore()).resolves.toBe(false)
+      expect(auth.authenticated.value).toBe(false)
+      expect(auth.config.value).toEqual(authConfig())
+      expect(loading.active.value).toBe(false)
+      expect(post).toHaveBeenCalledTimes(2)
+    },
+  )
+
   it.each([
     null,
     { password: true, google: true, signup: true, twoFactor: true },

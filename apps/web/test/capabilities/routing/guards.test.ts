@@ -137,6 +137,30 @@ describe('application router guards', () => {
     context.dispose()
   })
 
+  it('can navigate to login after logging out of a failed avatar restoration', async () => {
+    const context = setup()
+    context.fetch.mockReset()
+    context.fetch
+      .mockResolvedValueOnce(json(authConfig()))
+      .mockResolvedValueOnce(json({ accessToken: 'restored-token' }))
+      .mockResolvedValueOnce(
+        json({
+          userId: 7,
+          username: 'ada',
+          avatarUploaded: 1,
+          avatarId: 'a'.repeat(32).padEnd(32767),
+        }),
+      )
+    await expect(context.auth.restore()).rejects.toThrow('Invalid avatar storage key')
+    context.fetch.mockResolvedValueOnce(new Response(null, { status: 204 }))
+    await context.auth.logout()
+    await context.router.push('/login')
+    expect(context.router.currentRoute.value.path).toBe('/login')
+    expect(context.fetch).toHaveBeenCalledTimes(4)
+    expect(context.auth.authenticated.value).toBe(false)
+    context.dispose()
+  })
+
   it.each(['/admin', '/parent/child', '/settings?tab=1#permissions'])(
     'redirects role and permission requirements at %s to login',
     async (path) => {

@@ -412,7 +412,7 @@ export class OrdsEndpoint {
             .filter((p) => this.paramSourceType(p) === 'RESPONSE')
             .map(
               (p) =>
-                `${sqlStr(p.name)} VALUE ${this.nativeOutputName(p)}${p.odbType === 'json' ? ' FORMAT JSON' : ''}`,
+                `${sqlStr(p.name)} VALUE ${p.odbType === 'guid' ? `RTRIM(${this.nativeOutputName(p)})` : this.nativeOutputName(p)}${p.odbType === 'json' ? ' FORMAT JSON' : ''}`,
             )
             .join(
               ', ',

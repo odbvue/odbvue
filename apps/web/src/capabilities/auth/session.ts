@@ -69,6 +69,7 @@ export function createSession<User extends AuthUser>(
         if (response.error) throw response.error
       } finally {
         clear()
+        restorePromise = Promise.resolve(false)
         finish()
       }
     },

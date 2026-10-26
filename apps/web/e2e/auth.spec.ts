@@ -235,8 +235,8 @@ test('validates login, reports errors, returns to a protected page, and logs out
   expect(JSON.stringify(persisted)).not.toMatch(/test-access-token|valid-password|Ada Lovelace/)
 
   await page.getByRole('button', { name: 'Account menu for Ada Lovelace', exact: true }).click()
-  await page.getByRole('button', { name: 'Logout', exact: true }).click()
-  await expect(page).toHaveURL(/\/$/)
+  await page.locator('.v-menu .v-list').getByRole('button', { name: 'Logout', exact: true }).click()
+  await expect(page).toHaveURL(/\/login$/)
   await expect(page.getByRole('link', { name: 'Login', exact: true }).first()).toBeVisible()
 })
 
@@ -278,12 +278,14 @@ test('denies role-protected pages and hides their home navigation', async ({ pag
   await expect(page.getByRole('link', { name: /Sandbox/ })).toHaveCount(0)
 })
 
-test('reports failed logout while clearing local identity and returning home', async ({ page }) => {
+test('reports failed logout while clearing local identity and returning to login', async ({
+  page,
+}) => {
   const requests = await mockAuth(page, { restored: true, logoutFailure: true })
   await page.goto('/sandbox')
   await page.getByRole('button', { name: 'Account menu for Ada Lovelace', exact: true }).click()
-  await page.getByRole('button', { name: 'Logout', exact: true }).click()
-  await expect(page).toHaveURL(/\/$/)
+  await page.locator('.v-menu .v-list').getByRole('button', { name: 'Logout', exact: true }).click()
+  await expect(page).toHaveURL(/\/login$/)
   await expect(page.getByRole('button', { name: 'Logout', exact: true })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Login', exact: true }).first()).toBeVisible()
   await expect(page.getByRole('alert')).toBeVisible()

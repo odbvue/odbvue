@@ -137,6 +137,8 @@ describe('ODB application contract', () => {
             count: odbType.number(),
             bio: odbType.clob(),
             roles: odbType.json(),
+            avatarId: users.uuid,
+            storageId: odbType.guid(),
           },
         },
         ({ params, body }) => {
@@ -144,6 +146,8 @@ describe('ODB application contract', () => {
           body.set(params.count, 1)
           body.set(params.bio, null)
           body.set(params.roles, '["admin"]')
+          body.set(params.avatarId, 'a'.repeat(32))
+          body.set(params.storageId, 'b'.repeat(32))
         },
       )
       defineService(read, {
@@ -156,6 +160,8 @@ describe('ODB application contract', () => {
           count: read.parameters.count,
           bio: read.parameters.bio,
           roles: read.parameters.roles,
+          avatarId: read.parameters.avatarId,
+          storageId: read.parameters.storageId,
         },
       })
     })
@@ -168,6 +174,9 @@ describe('ODB application contract', () => {
       "''name'' VALUE v_output_0, ''count'' VALUE v_output_1, ''bio'' VALUE v_output_2, ''roles'' VALUE v_output_3 FORMAT JSON",
     )
     expect(sql).not.toContain("p_name               => 'roles'")
+    expect(sql).toContain("''avatarId'' VALUE RTRIM(v_output_4)")
+    expect(sql).toContain("''storageId'' VALUE RTRIM(v_output_5)")
+    expect(sql).not.toContain('RTRIM(v_output_0)')
   })
 
   it('documents a single BLOB body and rejects mixed binary/JSON or GET bodies', () => {

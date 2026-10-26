@@ -114,6 +114,9 @@ memory; the server-managed refresh cookie is `HttpOnly`, `Secure`, and `SameSite
 preference persistence is unchanged.
 
 The default layout shows an accessible name/avatar menu containing Settings and Logout.
+Logout clears cached restoration failures and opens the configured login route
+(`auth.routes.login`, default `/login`), including when server-side revocation fails.
+Logout and navigation failures are reported through UI feedback.
 The drawer shows a static identity summary above separate Settings and Logout entries.
 Settings (`/settings`) opens Account (`/settings/account`) by default. Account is currently
 the only settings section; future sections will use `/settings/appearance`,

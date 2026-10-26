@@ -242,7 +242,11 @@ async function logout() {
   } catch (error) {
     ui.error(error)
   }
-  await router.replace('/')
+  try {
+    await router.replace(appConfig.auth?.routes?.login ?? '/login')
+  } catch (error) {
+    ui.error(error)
+  }
 }
 const { mobile } = useDisplay()
 const { t } = useI18n()

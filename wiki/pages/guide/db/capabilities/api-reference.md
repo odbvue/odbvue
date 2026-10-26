@@ -183,6 +183,8 @@ one native JSON object. Only JSON-typed fields use `FORMAT JSON`; scalar fields
 retain their JSON string, number, or null representation. This allows `/auth/me`
 to return profile fields and role/permission arrays without nesting or double
 encoding them.
+GUID outputs are right-trimmed when serialized to remove Oracle `CHAR` OUT
+parameter padding; ordinary string fields retain their whitespace.
 
 `responseStatus` declares a successful HTTP status from 200 through 399
 (default 200) in both the generated ORDS handler and OpenAPI. A redirect

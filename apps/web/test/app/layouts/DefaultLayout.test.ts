@@ -72,6 +72,7 @@ async function setup(authenticated = true, avatarUrl: string | null = null, read
     history: createMemoryHistory(),
     routes: [
       { path: '/', component: {} },
+      { path: '/login', component: {} },
       { path: '/settings/account', component: {} },
     ],
   })
@@ -211,7 +212,7 @@ describe('default layout account navigation', () => {
     },
   )
 
-  it('closes the drawer, disables both Logout entries while pending, and navigates home', async () => {
+  it('closes the drawer, disables both Logout entries while pending, and navigates to login', async () => {
     const { wrapper, router, post, ui } = await setup()
     await wrapper.get('[data-drawer-toggle]').trigger('click')
     expect(wrapper.get('aside').attributes('data-open')).toBe('true')
@@ -226,13 +227,13 @@ describe('default layout account navigation', () => {
     expect(entries.every((entry) => entry.props('disabled') === true)).toBe(true)
     pending.resolve(response(null, 204))
     await flushPromises()
-    expect(router.currentRoute.value.path).toBe('/')
+    expect(router.currentRoute.value.path).toBe('/login')
     expect(ui.loading.active.value).toBe(false)
     expect(wrapper.get('aside').text()).toBe('Login')
     wrapper.unmount()
   })
 
-  it('reports logout failures through UI feedback and still returns home', async () => {
+  it('reports logout failures through UI feedback and still navigates to login', async () => {
     const { wrapper, router, post, ui } = await setup()
     post.mockRejectedValueOnce(new Error('Logout failed'))
     await wrapper
@@ -241,7 +242,19 @@ describe('default layout account navigation', () => {
       .trigger('click')
     await flushPromises()
     expect(ui.notification.value).toMatchObject({ type: 'error', message: 'Logout failed' })
-    expect(router.currentRoute.value.path).toBe('/')
+    expect(router.currentRoute.value.path).toBe('/login')
+    wrapper.unmount()
+  })
+
+  it('reports failed logout navigation through UI feedback', async () => {
+    const { wrapper, router, ui } = await setup()
+    vi.spyOn(router, 'replace').mockRejectedValueOnce(new Error('Navigation failed'))
+    await wrapper
+      .findAllComponents(listItem)
+      .find((entry) => entry.props('title') === 'Logout')!
+      .trigger('click')
+    await flushPromises()
+    expect(ui.notification.value).toMatchObject({ type: 'error', message: 'Navigation failed' })
     wrapper.unmount()
   })
 })

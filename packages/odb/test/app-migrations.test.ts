@@ -124,6 +124,7 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain("'twoFactor'' VALUE v_output_4 FORMAT JSON")
     expect(sql).toContain("'roles'' VALUE v_output_9 FORMAT JSON")
     expect(sql).toContain("'permissions'' VALUE v_output_10 FORMAT JSON")
+    expect(sql).toContain("'avatarId'' VALUE RTRIM(v_output_6)")
     expect(sql).toContain('RETURNING CLOB STRICT) RETURNING CLOB ASCII) INTO v_json_response')
     expect(sql).toContain('p_user_id => v_output_1')
     expect(sql).toContain('p_password => v_output_0')

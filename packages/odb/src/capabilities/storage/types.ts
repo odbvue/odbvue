@@ -1,7 +1,7 @@
 import { odbType } from '../../schema/package.js'
 
 export const storageTypes = {
-  id: odbType.string(32),
+  id: odbType.guid(),
   ownerId: odbType.string(32),
   fileName: odbType.string(255),
   mimeType: odbType.string(200),

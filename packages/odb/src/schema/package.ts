@@ -197,7 +197,7 @@ export const odbType = {
     return { type: 'PLS_INTEGER' }
   },
   guid(): OdbTypeDescriptor<'VARCHAR2'> {
-    return { type: 'VARCHAR2', length: 32 }
+    return { type: 'VARCHAR2', length: 32, odbType: 'guid' }
   },
   boolean(): OdbTypeDescriptor<'BOOLEAN'> {
     return { type: 'BOOLEAN' }
