@@ -103,7 +103,7 @@ describe('Sandbox ACL services', () => {
 
   beforeAll(async () => {
     vi.stubEnv('ODBVUE_ADB_SCHEMA_USERNAME', 'APP')
-    const module = await import('../../../../../apps/db/src/migrations/00000000000001-sandbox.js')
+    const module = await import('../../../../../apps/db/src/migrations/00000000000002-sandbox.js')
     sandbox = module.sandboxPackage
   })
   afterAll(() => vi.unstubAllEnvs())
@@ -165,7 +165,7 @@ describe('Sandbox ACL services', () => {
     const { migration: bootstrap } =
       await import('../../../../../apps/db/src/migrations/00000000000000-bootstrap.js')
     const { migration } =
-      await import('../../../../../apps/db/src/migrations/00000000000001-sandbox.js')
+      await import('../../../../../apps/db/src/migrations/00000000000002-sandbox.js')
     expect(bootstrap.compile().up().join('\n')).toContain('CREATE OR REPLACE PACKAGE APP.odb_acl')
     expect(bootstrap.compile().down().join('\n')).toContain('DROP PACKAGE APP.odb_acl')
     const compiled = migration.compile()

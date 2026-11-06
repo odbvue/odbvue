@@ -62,6 +62,22 @@ export const migration = defineMigration('20260628161706_test', {
 
 That single migration can emit package DDL, ORDS registration PL/SQL, and the matching rollback SQL, which the framework derives automatically.
 
+### Application Migration Layout
+
+For a fresh schema, the application migrations run in filename order:
+
+| Migration                     | Responsibility                                                                   |
+| ----------------------------- | -------------------------------------------------------------------------------- |
+| `00000000000000-bootstrap.ts` | Schema export and grants, runtime capabilities, settings, and administrator seed |
+| `00000000000001-app.ts`       | Application package `pck_app` and its ORDS endpoints                             |
+| `00000000000002-sandbox.ts`   | Sandbox package `pck_sandbox` and its ORDS endpoints                             |
+
+Storage is installed before identity, and all runtime capabilities and seeds precede
+the API packages. Rollback reverses this order. This baseline replaces the previous
+two-migration layout and requires a fresh schema, not an upgrade of existing migration
+history. Keep helper modules outside the migrations directory: every top-level
+compiled JavaScript file there must export a migration.
+
 ## Core Concepts
 
 ### DDL: Schemas and Users

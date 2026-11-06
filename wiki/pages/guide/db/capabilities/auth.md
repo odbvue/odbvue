@@ -443,11 +443,12 @@ replacement session or commit the change. The authenticated application service 
 the user ID from the verified bearer token, validates repeat-password confirmation and
 expires the refresh cookie; it never accepts a caller-supplied target user.
 
-Profile columns, auth/Google runtime procedures and application services are included
-in the bootstrap migration. Rebuild and redeploy the database to install them; no
+Profile columns and auth/Google runtime procedures are included in the bootstrap
+migration, and application services are included in the app migration.
+Rebuild and redeploy the database to install them; no
 separate incremental profile migration is supplied.
 
-The bootstrap migration (`apps/db/src/migrations/00000000000000-bootstrap.ts`)
+The app API migration (`apps/db/src/migrations/00000000000001-app.ts`)
 installs `pck_app`, which exposes these endpoints beneath `/auth`. `odbAuth` does
 not register them; the application package does.
 

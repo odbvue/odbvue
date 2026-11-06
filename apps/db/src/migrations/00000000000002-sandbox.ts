@@ -565,6 +565,6 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
   return {}
 })
 
-export const migration = defineMigration('00000000000001_sandbox', {
+export const migration = defineMigration('00000000000002_sandbox', {
   schema: odbEnv.schemaUsername,
 }).install(sandboxPackage)

@@ -1,3 +1,4 @@
+import { readdirSync } from 'node:fs'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { generateApplicationOpenApi, generateApplicationsOpenApi } from '../src/application.js'
 import { odbAclPackage } from '../src/capabilities/acl/index.js'
@@ -12,15 +13,90 @@ beforeAll(() => {
 const migrations = {
   '00000000000000-bootstrap': () =>
     import('../../../apps/db/src/migrations/00000000000000-bootstrap.js'),
-  '00000000000001-sandbox': () =>
-    import('../../../apps/db/src/migrations/00000000000001-sandbox.js'),
+  '00000000000001-app': () => import('../../../apps/db/src/migrations/00000000000001-app.js'),
+  '00000000000002-sandbox': () =>
+    import('../../../apps/db/src/migrations/00000000000002-sandbox.js'),
 }
 
 const load = async (file: keyof typeof migrations) => (await migrations[file]()).migration
 
+const loadUpSql = async () => {
+  const ordered = await Promise.all(
+    Object.values(migrations).map(async (loadModule) => (await loadModule()).migration),
+  )
+  return ordered.flatMap((migration) => migration.compile().up()).join('\n')
+}
+
 describe('app-owned ORDS migrations', () => {
+  it('splits the fresh-schema baseline into three ordered migrations with one owner per API package', async () => {
+    expect(Object.keys(migrations)).toEqual(Object.keys(migrations).toSorted())
+    expect(
+      readdirSync(new URL('../../../apps/db/src/migrations/', import.meta.url))
+        .filter((file) => file.endsWith('.ts'))
+        .toSorted(),
+    ).toEqual(Object.keys(migrations).map((file) => `${file}.ts`))
+    const ordered = await Promise.all(
+      Object.values(migrations).map(async (loadModule) => (await loadModule()).migration),
+    )
+    const compiled = ordered.map((migration) => migration.compile())
+    expect(compiled.map((migration) => migration.name)).toEqual([
+      '00000000000000_bootstrap',
+      '00000000000001_app',
+      '00000000000002_sandbox',
+    ])
+    expect(ordered.map((migration) => migration.applications().map((app) => app.name))).toEqual([
+      [],
+      ['pck_app'],
+      ['pck_sandbox'],
+    ])
+    expect(compiled.map((migration) => migration.blueGreenObjects)).toEqual([
+      [],
+      ['pck_app'],
+      ['pck_sandbox'],
+    ])
+    const up = compiled.map((migration) => migration.up().join('\n'))
+    for (const [index, marker] of [
+      [0, 'CREATE TABLE ODBVUE.odb_storage_files'],
+      [0, 'CREATE TABLE ODBVUE.odb_auth_users'],
+      [0, 'CREATE TABLE ODBVUE.odb_emails_queue'],
+      [0, "ODBVUE.odb_auth.define_role('admin'"],
+      [1, 'CREATE OR REPLACE PACKAGE ODBVUE.PCK_APP_BLUE AS'],
+      [2, 'CREATE OR REPLACE PACKAGE ODBVUE.PCK_SANDBOX_BLUE AS'],
+    ] as const) {
+      expect(up[index]).toContain(marker)
+      expect(up.filter((sql) => sql.includes(marker))).toHaveLength(1)
+    }
+    expect(up[1]).not.toContain('CREATE TABLE')
+    expect(up[2]).not.toContain('CREATE TABLE')
+  })
+
+  it('rolls back APIs and seeds before their runtime dependencies', async () => {
+    const ordered = await Promise.all(
+      Object.values(migrations).map(async (loadModule) => (await loadModule()).migration),
+    )
+    const down = ordered
+      .toReversed()
+      .flatMap((migration) => migration.compile().down())
+      .join('\n')
+    const markers = [
+      'DROP PACKAGE ODBVUE.PCK_SANDBOX_BLUE',
+      'DROP PACKAGE ODBVUE.PCK_APP_BLUE',
+      "ODBVUE.odb_settings.remove('APP_VERSION')",
+      "ODBVUE.odb_settings.remove('SMTP_HOST')",
+      'DROP PACKAGE ODBVUE.odb_emails',
+      'DROP PACKAGE ODBVUE.odb_acl',
+      'DROP PACKAGE ODBVUE.odb_google',
+      'DROP PACKAGE ODBVUE.odb_auth',
+      'DROP TABLE ODBVUE.odb_storage_files',
+      'DROP TABLE ODBVUE.odb_settings_store',
+    ]
+    const positions = markers.map((marker) => down.indexOf(marker))
+    expect(positions.every((position) => position >= 0)).toBe(true)
+    expect(positions).toEqual(positions.toSorted((a, b) => a - b))
+  })
+
   it('generates separate configuration and user operations without raw statement nodes', async () => {
-    const { appPackage } = await migrations['00000000000000-bootstrap']()
+    const { appPackage } = await migrations['00000000000001-app']()
     expect(JSON.stringify(appPackage.application())).not.toContain('"kind":"raw"')
     const sql = appPackage.toSQLUp()
     expect(sql).toContain('PROCEDURE get_config(')
@@ -28,9 +104,8 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).not.toContain('PROCEDURE get_state(')
   })
 
-  it('installs profile storage and runtime packages through bootstrap', async () => {
-    const migration = (await load('00000000000000-bootstrap')).compile()
-    const up = migration.up().join('\n')
+  it('installs profile storage before identity runtime packages', async () => {
+    const up = await loadUpSql()
     expect(up).toContain('CREATE TABLE ODBVUE.odb_auth_users')
     expect(up).toContain('avatar CHAR(32 CHAR)')
     expect(up.indexOf('CREATE TABLE ODBVUE.odb_storage_files')).toBeLessThan(
@@ -45,7 +120,7 @@ describe('app-owned ORDS migrations', () => {
   })
 
   it('binds profile changes to verified identity and exposes actual provider and avatar fields', async () => {
-    const migration = await load('00000000000000-bootstrap')
+    const migration = await load('00000000000001-app')
     const sql = migration.compile().up().join('\n')
     const app = migration.applications()[0]!
     for (const name of ['update_avatar', 'change_password']) {
@@ -103,7 +178,7 @@ describe('app-owned ORDS migrations', () => {
   })
 
   it('uses SQL numeric types for user flags returned as JSON on Oracle 19c', async () => {
-    const { appPackage } = await migrations['00000000000000-bootstrap']()
+    const { appPackage } = await migrations['00000000000001-app']()
     const sql = appPackage.toSQLUp()
     const me = sql.slice(
       sql.indexOf('PROCEDURE get_me(', sql.indexOf('PACKAGE BODY')),
@@ -116,7 +191,7 @@ describe('app-owned ORDS migrations', () => {
   })
 
   it('streams configuration booleans and user authorization as native JSON', async () => {
-    const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
+    const sql = (await load('00000000000001-app')).compile().up().join('\n')
     expect(sql).toContain("'password'' VALUE v_output_0 FORMAT JSON")
     expect(sql).toContain("'google'' VALUE v_output_1 FORMAT JSON")
     expect(sql).toContain("'ldap'' VALUE v_output_2 FORMAT JSON")
@@ -141,7 +216,7 @@ describe('app-owned ORDS migrations', () => {
   })
 
   it('guides collisions through existing-account login and preserves the destination after linking', async () => {
-    const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
+    const sql = (await load('00000000000001-app')).compile().up().join('\n')
     const start = sql.indexOf('PACKAGE BODY ODBVUE.PCK_APP')
     const callback = sql.slice(
       sql.indexOf('PROCEDURE google_callback(', start),
@@ -159,7 +234,7 @@ describe('app-owned ORDS migrations', () => {
   })
 
   it('protects link start with bearer auth, browser origin, password and refresh-cookie binding', async () => {
-    const migration = await load('00000000000000-bootstrap')
+    const migration = await load('00000000000001-app')
     const sql = migration.compile().up().join('\n')
     const app = migration.applications()[0]!
     const start = app.procedures.find((p) => p.name === 'google_link_start')!
@@ -195,7 +270,7 @@ describe('app-owned ORDS migrations', () => {
   })
 
   it('uses one callback and only writes refresh cookies for successful login transactions', async () => {
-    const migration = await load('00000000000000-bootstrap')
+    const migration = await load('00000000000001-app')
     const sql = migration.compile().up().join('\n')
     const callback = sql.slice(
       sql.indexOf('PROCEDURE google_callback(', sql.indexOf('PACKAGE BODY ODBVUE.PCK_APP')),
@@ -218,7 +293,7 @@ describe('app-owned ORDS migrations', () => {
   })
 
   it('installs emails and seeds six empty SMTP settings without a host ACL', async () => {
-    const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
+    const sql = await loadUpSql()
     expect(sql).toContain('CREATE TABLE ODBVUE.odb_emails_queue')
     expect(sql).toContain('CREATE TABLE ODBVUE.odb_emails_addr')
     expect(sql).toContain('CREATE TABLE ODBVUE.odb_emails_attc')
@@ -243,7 +318,11 @@ describe('app-owned ORDS migrations', () => {
     )
     const aclPackageSql = odbAclPackage.toSQLUp({ schema: 'ODBVUE' })
     expect(sql).toContain(aclPackageSql)
-    const bootstrapSql = sql.replace(aclPackageSql, '')
+    const bootstrapSql = (await load('00000000000000-bootstrap'))
+      .compile()
+      .up()
+      .join('\n')
+      .replace(aclPackageSql, '')
     expect(bootstrapSql).not.toContain('DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE')
     expect(bootstrapSql).not.toMatch(/odb_acl\.add_(?:http|smtp)\s*\(/i)
     const schemaSql = (await migrations['00000000000000-bootstrap']()).schema.toSQLUp()
@@ -258,7 +337,7 @@ describe('app-owned ORDS migrations', () => {
   })
 
   it('exposes admin-only email send, history and retry services with owner-scoped attachments', async () => {
-    const migration = await load('00000000000001-sandbox')
+    const migration = await load('00000000000002-sandbox')
     const sql = migration.compile().up().join('\n')
     expect(sql).toContain(
       'odb_emails.mail(p_address, p_name, p_subject, p_content, p_priority, p_id)',
@@ -314,7 +393,7 @@ describe('app-owned ORDS migrations', () => {
     const bootstrap = (await load('00000000000000-bootstrap')).compile().up().join('\n')
     expect(bootstrap).toContain('CREATE TABLE ODBVUE.odb_storage_files')
     expect(bootstrap).toContain('CREATE OR REPLACE PACKAGE ODBVUE.odb_storage AS')
-    const migration = await load('00000000000001-sandbox')
+    const migration = await load('00000000000002-sandbox')
     const sql = migration.compile().up().join('\n')
     expect(sql).toContain('odb_storage.list(p_owner_id, p_after, p_limit, p_items)')
     expect(sql).toContain(
@@ -372,8 +451,8 @@ describe('app-owned ORDS migrations', () => {
     })
   })
 
-  it('installs app auth routes in bootstrap while keeping sandbox settings separate', async () => {
-    const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
+  it('installs app auth routes in the app API migration while keeping sandbox settings separate', async () => {
+    const sql = (await load('00000000000001-app')).compile().up().join('\n')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE ODBVUE.PCK_APP_BLUE AS')
     expect(sql).toContain('CREATE OR REPLACE SYNONYM ODBVUE.pck_app')
     expect(sql).toContain("p_base_path      => 'auth/'")
@@ -383,16 +462,16 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).not.toContain('CREATE OR REPLACE SYNONYM ODBVUE.pck_secrets')
   })
 
-  it('installs the odb_settings package with its table and seed in bootstrap', async () => {
-    const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
+  it('installs the odb_settings package before application seeds', async () => {
+    const sql = await loadUpSql()
     expect(sql).toContain('CREATE TABLE ODBVUE.odb_settings_store')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE ODBVUE.odb_settings AS')
     expect(sql).toContain("ODBVUE.odb_settings.write('APP_VERSION', '1.0.0'")
     expect(sql).not.toContain("ODBVUE.odb_settings.write('SANDBOX_DEMO'")
   })
 
-  it('installs the transport-independent odb_auth package in bootstrap', async () => {
-    const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
+  it('installs the transport-independent odb_auth package after settings', async () => {
+    const sql = await loadUpSql()
     expect(sql).toContain('CREATE OR REPLACE PACKAGE ODBVUE.odb_auth AS')
     expect(sql).toContain('odb_auth_crypto.verify_password(p_password, l_password_hash) = FALSE')
     expect(sql).toContain('IF l_presented_refresh_token_hash = l_previous_refresh_token_hash THEN')
@@ -412,7 +491,7 @@ describe('app-owned ORDS migrations', () => {
   })
 
   it('exposes auth and settings services from a single pck_sandbox package', async () => {
-    const migration = await load('00000000000001-sandbox')
+    const migration = await load('00000000000002-sandbox')
     const sql = migration.compile().up().join('\n')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE ODBVUE.PCK_SANDBOX_BLUE AS')
     expect(sql.match(/CREATE OR REPLACE PACKAGE (?:BODY )?ODBVUE\.\w+/g)).toHaveLength(2)
@@ -452,7 +531,7 @@ describe('app-owned ORDS migrations', () => {
   })
 
   it('keeps the auth OpenAPI contract free of cookies', async () => {
-    const migration = await load('00000000000000-bootstrap')
+    const migration = await load('00000000000001-app')
     const openapi = generateApplicationOpenApi(migration.applications()[0]) as {
       components: { schemas: Record<string, { properties: Record<string, unknown> }> }
     }
@@ -464,13 +543,13 @@ describe('app-owned ORDS migrations', () => {
   })
 
   it('wires Google code-flow endpoints without exposing provider identity claims or tokens', async () => {
-    const bootstrap = await load('00000000000000-bootstrap')
-    const sql = bootstrap.compile().up().join('\n')
+    const app = await load('00000000000001-app')
+    const sql = await loadUpSql()
     expect(sql).toContain('CREATE TABLE ODBVUE.odb_auth_identities')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE ODBVUE.odb_google')
     expect(sql).toContain("odb_rate_limit.enforce('AUTH_GOOGLE_START_IP'")
     expect(sql).toContain("odb_rate_limit.enforce('AUTH_GOOGLE_CALLBACK_IP'")
-    const appSql = (await migrations['00000000000000-bootstrap']()).appPackage.toSQLUp()
+    const appSql = (await migrations['00000000000001-app']()).appPackage.toSQLUp()
     const start = appSql.slice(
       appSql.indexOf('PROCEDURE google_start(', appSql.indexOf('PACKAGE BODY')),
       appSql.indexOf('END google_start;'),
@@ -501,7 +580,7 @@ describe('app-owned ORDS migrations', () => {
     const schemaSql = (await migrations['00000000000000-bootstrap']()).schema.toSQLUp()
     expect(schemaSql).toContain('GRANT EXECUTE ON UTL_HTTP')
     expect(schemaSql).toContain('GRANT EXECUTE ON UTL_URL')
-    const document = generateApplicationOpenApi(bootstrap.applications()[0]) as {
+    const document = generateApplicationOpenApi(app.applications()[0]) as {
       paths: Record<
         string,
         Record<
@@ -535,10 +614,10 @@ describe('app-owned ORDS migrations', () => {
     expect(Object.keys(document.paths).some((path) => path.includes('login-google'))).toBe(false)
   })
 
-  it('owns all auth endpoints in pck_app with signup and email delivery wired into bootstrap', async () => {
-    const bootstrap = await load('00000000000000-bootstrap')
-    const sandbox = await load('00000000000001-sandbox')
-    const sql = bootstrap.compile().up().join('\n')
+  it('owns all auth endpoints in pck_app with signup and email delivery wired into the migration sequence', async () => {
+    const app = await load('00000000000001-app')
+    const sandbox = await load('00000000000002-sandbox')
+    const sql = await loadUpSql()
     expect(sql).not.toContain('pck_registration')
     expect(sql).toContain("ODBVUE.odb_settings.write('APP_PUBLIC_URL', ''")
     expect(sql).toContain('odb_auth.signup(p_email, p_password, p_full_name, l_token)')
@@ -558,7 +637,7 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain('/confirm-email#token=')
     expect(sql).toContain('odb_emails.mail(l_address, NULL,')
     expect(sql).toMatch(/COMMIT;\s+odb_emails.send\(l_email_id, 300\)/)
-    const publicApi = generateApplicationOpenApi(bootstrap.applications()[0]) as {
+    const publicApi = generateApplicationOpenApi(app.applications()[0]) as {
       paths: Record<
         string,
         Record<
@@ -620,7 +699,7 @@ describe('app-owned ORDS migrations', () => {
       passwordRepeat: { type: 'string' },
     })
     const document = generateApplicationsOpenApi([
-      ...bootstrap.applications(),
+      ...app.applications(),
       ...sandbox.applications(),
     ]) as { paths: Record<string, unknown> }
     expect(document.paths).toHaveProperty('/auth/signup')
@@ -628,7 +707,7 @@ describe('app-owned ORDS migrations', () => {
   })
 
   it('exposes authenticated audit listing and severity actions', async () => {
-    const migration = await load('00000000000001-sandbox')
+    const migration = await load('00000000000002-sandbox')
     const sql = migration.compile().up().join('\n')
     expect(sql).toContain('odb_audit.list(p_after, p_limit, p_items)')
     expect(sql).toContain('odb_audit.info(p_message)')
@@ -659,7 +738,7 @@ describe('app-owned ORDS migrations', () => {
   })
 
   it('keeps settings meta typed as JSON and lists with limit/cursor query parameters', async () => {
-    const migration = await load('00000000000001-sandbox')
+    const migration = await load('00000000000002-sandbox')
     const openapi = generateApplicationOpenApi(migration.applications()[0]) as {
       paths: Record<string, Record<string, { parameters: { name: string; in: string }[] }>>
       components: { schemas: Record<string, { properties: Record<string, unknown> }> }
@@ -680,8 +759,8 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain('list_settings(p_after => :after')
   })
 
-  it('seeds an admin grant without an unprivileged test user in bootstrap', async () => {
-    const sql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
+  it('seeds an admin grant without an unprivileged test user after identity installation', async () => {
+    const sql = await loadUpSql()
     expect(sql).toContain('CREATE TABLE ODBVUE.odb_auth_user_roles')
     expect(sql).toContain("ODBVUE.odb_auth.define_role('admin'")
     expect(sql).toContain("ODBVUE.odb_auth.grant_role(l_user_id, 'admin', SYSTIMESTAMP, NULL)")

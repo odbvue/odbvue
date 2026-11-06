@@ -165,7 +165,7 @@ const api = odbPackage('pck_app_api', (pkg) => {
 
 Reuse the exported capability types instead of redeclaring them. `value: odbSettings.types.value` preserves JSON typing, sizes, and future changes to the capability contract; `value: odbType.string(2000)` does not.
 
-The sandbox migration (`apps/db/src/migrations/00000000000001-sandbox.ts`) shows the full set of `list`, `read`, `write`, and `remove` services in one `pck_sandbox` package.
+The sandbox API migration (`apps/db/src/migrations/00000000000002-sandbox.ts`) shows the full set of `list`, `read`, `write`, and `remove` services in one `pck_sandbox` package.
 
 ## Calling From PL/SQL
 
