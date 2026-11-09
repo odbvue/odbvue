@@ -138,6 +138,8 @@ defineService(listUsers, {
 
 The CLI writes `apps/db/dist/openapi.json` after every successful database migration operation. The document describes the API currently deployed to ORDS: `ov du` includes newly applied migrations, `ov dd` removes rolled-back migrations, and `ov di` writes an empty document after the schema is removed.
 
+`ov di` permanently removes the configured schema and its data. It removes ORDS metadata, locks the account, and terminates schema sessions before dropping the user. Oracle can finish session cleanup asynchronously, so `ORA-01940` triggers up to 10 drop attempts with waits of 1, 2, 4, then 5 seconds between attempts (37 seconds of total retry waits). The CLI reports when it is waiting. If cleanup still prevents removal, stop applications and ORDS connections using the schema, allow Oracle cleanup to finish, and retry. If session termination is not permitted, an active-session failure is reported immediately instead.
+
 `SYS_REFCURSOR` outputs opened through a typed ODB query become reusable OpenAPI row schemas. The response preserves column types and nullability, so OpenAPI client generators can produce typed result arrays.
 
 The web app consumes this manifest through `openapi-typescript`; see [Consuming Web Services](/guide/web/consuming-web-services#generated-ords-types).

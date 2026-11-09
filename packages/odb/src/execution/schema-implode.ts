@@ -1,6 +1,6 @@
 import type { ExecuteResult } from './executor.js'
 
-export type SchemaImplodePhase = 'ords' | 'lock' | 'drain' | 'drop' | 'verify'
+export type SchemaImplodePhase = 'ords' | 'lock' | 'drain' | 'drop' | 'wait' | 'verify'
 
 export interface SchemaImplodeExecutor {
   run<T = unknown>(sql: string, bindings?: Record<string, unknown>): Promise<ExecuteResult<T>>
@@ -92,7 +92,7 @@ export const implodeSchema = async (
   options: SchemaImplodeOptions = {},
 ): Promise<SchemaImplodeResult> => {
   const normalizedSchema = normalizeSchema(schema)
-  const maxDropAttempts = options.maxDropAttempts ?? 5
+  const maxDropAttempts = options.maxDropAttempts ?? 10
   if (!Number.isInteger(maxDropAttempts) || maxDropAttempts < 1) {
     throw new Error('maxDropAttempts must be a positive integer')
   }
@@ -121,7 +121,18 @@ export const implodeSchema = async (
           { cause: error },
         )
       }
-      if (errorNumber(error) !== 1940 || dropAttempts === maxDropAttempts - 1) throw error
+      if (errorNumber(error) !== 1940) throw error
+      if (dropAttempts === maxDropAttempts - 1) {
+        throw new Error(
+          `Cannot drop schema ${normalizedSchema}: ORA-01940 persists after ${maxDropAttempts} attempts. Oracle may still be cleaning up terminated sessions. Stop all application and ORDS connections using ${normalizedSchema}, wait for session cleanup, then retry.`,
+          { cause: error },
+        )
+      }
+      options.onPhase?.('wait')
+      // Session termination can return before Oracle has finished cleaning up.
+      await new Promise<void>((resolve) =>
+        setTimeout(resolve, Math.min(1_000 * 2 ** dropAttempts, 5_000)),
+      )
     }
   }
 

@@ -18,6 +18,7 @@ const phaseMessages: Record<SchemaImplodePhase, string> = {
   lock: 'Locking the schema account...',
   drain: 'Disconnecting schema sessions...',
   drop: 'Dropping the schema...',
+  wait: 'Waiting for Oracle to finish session cleanup before retrying...',
   verify: 'Verifying schema removal...',
 }
 

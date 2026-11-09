@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { implodeSchema, type SchemaImplodeExecutor } from '../src/execution/schema-implode.js'
 
@@ -28,6 +28,9 @@ class FakeExecutor implements SchemaImplodeExecutor {
 }
 
 describe('implodeSchema', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
   it('removes ORDS metadata before locking, draining, and dropping the user', async () => {
     const executor = new FakeExecutor([true, false])
     await expect(implodeSchema(executor, 'app')).resolves.toEqual({
@@ -52,7 +55,9 @@ describe('implodeSchema', () => {
 
   it('retries ORA-01940 after draining sessions', async () => {
     const executor = new FakeExecutor([true, false], [{ errorNum: 1940 }])
-    await expect(implodeSchema(executor, 'APP')).resolves.toMatchObject({ dropAttempts: 2 })
+    const result = implodeSchema(executor, 'APP')
+    await vi.runAllTimersAsync()
+    await expect(result).resolves.toMatchObject({ dropAttempts: 2 })
   })
 
   it('reports active sessions when session termination is denied', async () => {
