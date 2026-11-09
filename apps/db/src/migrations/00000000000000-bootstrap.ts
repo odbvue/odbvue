@@ -43,7 +43,7 @@ export const migration = defineMigration('00000000000000_bootstrap', {
   .install(odbAuth.seedSettings())
   .install(odbGoogle)
   .install(odbGoogle.seedSettings())
-  .install(odbAuth.config({ twoFactor: process.env.NODE_ENV !== 'development' }))
+  .install(odbAuth.config())
   .install(odbAcl)
   .install(odbEmails)
   .install(

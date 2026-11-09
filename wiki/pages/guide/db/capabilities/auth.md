@@ -128,14 +128,11 @@ the values and enforce policy inside the database capability. Missing/invalid
 settings raise an error rather than enabling a fallback. Provider flags are not
 authorization grants and do not revoke sessions that already exist.
 
-The shipped application bootstrap sets `twoFactor` to `false` only when
-`NODE_ENV=development` is present in the environment running the database migration.
-All other values, including an unset `NODE_ENV`, enable it. This is a persisted
-database setting, not a frontend development-mode switch: changing `NODE_ENV`
-after bootstrap does not change an already-applied migration. For an existing
-development database, use a trusted `ov setup-settings` JSON file with
+For a development database, use a trusted `ov setup-settings` JSON file with
 `"auth_two_factor_enabled": false`; set it to `true` to restore the requirement.
-Never use development mode against a database that requires 2FA.
+This is a persisted database policy, independent of Vite mode or `NODE_ENV`.
+Editing the JSON file alone does not apply the setting; run
+`ov setup-settings .config/dev/settings.json` to update the database.
 
 Password login, signup, password recovery/reset, and password changes are rejected
 when password authentication is disabled. Signup additionally requires the signup
