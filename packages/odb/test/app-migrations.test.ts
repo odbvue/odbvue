@@ -2,6 +2,8 @@ import { readdirSync } from 'node:fs'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { generateApplicationOpenApi, generateApplicationsOpenApi } from '../src/application.js'
 import { odbAclPackage } from '../src/capabilities/acl/index.js'
+import { compileApplicationEndpoints } from '../src/schema/package.js'
+import { oracleParameterName } from '../src/model.js'
 
 beforeAll(() => {
   process.env.ODBVUE_ADB_SCHEMA_USERNAME = 'ODBVUE'
@@ -28,6 +30,32 @@ const loadUpSql = async () => {
 }
 
 describe('app-owned ORDS migrations', () => {
+  it('serializes every existing typed cursor service using its OpenAPI camelCase row names', async () => {
+    const packages = [
+      (await migrations['00000000000001-app']()).appPackage,
+      (await migrations['00000000000002-sandbox']()).sandboxPackage,
+    ]
+    let cursorResponses = 0
+    for (const pkg of packages) {
+      for (const endpoint of compileApplicationEndpoints(pkg.application())) {
+        const node = endpoint.toNode()
+        for (const parameter of node.params.filter((param) => param.resultColumns?.length)) {
+          cursorResponses++
+          expect(node.source).toContain('SYS_REFCURSOR;')
+          expect(node.source).toContain('JSON_ARRAY_T := JSON_ARRAY_T();')
+          expect(node.source).toContain(`'${parameter.name}' VALUE`)
+          expect(node.source).toContain('_json FORMAT JSON')
+          expect(endpoint.toSQLUp()).not.toContain("p_param_type         => 'RESULTSET'")
+          for (const column of parameter.resultColumns ?? []) {
+            const name = oracleParameterName(column.name, { stripPrefix: false })
+            expect(node.source).toContain(`'${name}' VALUE`)
+          }
+        }
+      }
+    }
+    expect(cursorResponses).toBeGreaterThanOrEqual(5)
+  })
+
   it('splits the fresh-schema baseline into three ordered migrations with one owner per API package', async () => {
     expect(Object.keys(migrations)).toEqual(Object.keys(migrations).toSorted())
     expect(

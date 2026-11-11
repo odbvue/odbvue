@@ -40,6 +40,9 @@ describe('odbAudit (framework package odb_audit)', () => {
       expect(sql).toContain('ORDER BY observed_timestamp DESC, id DESC')
       expect(sql).toContain('FETCH FIRST NVL(p_limit, 50) ROWS ONLY')
       expect(sql).toContain('AUDIT_CURSOR_NOT_FOUND')
+      expect(sql).toContain(
+        'OPEN p_items FOR SELECT id AS "id", observed_timestamp AS "observedTimestamp", event_timestamp AS "eventTimestamp", severity_text AS "severityText", body AS "body", attributes AS "attributes" FROM odb_audit_logs',
+      )
     })
 
     it('toSQLUp() emits the table, spec and body under the odb_audit name', () => {

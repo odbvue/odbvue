@@ -6,7 +6,13 @@ import {
   generateApplicationOpenApi,
 } from '../src/application.js'
 import { odbQuery } from '../src/query/index.js'
-import { defineService, odbPackage, odbType, type OdbApplication } from '../src/schema/package.js'
+import {
+  compileApplicationEndpoints,
+  defineService,
+  odbPackage,
+  odbType,
+  type OdbApplication,
+} from '../src/schema/package.js'
 import { odbTable } from '../src/schema/table.js'
 
 const users = odbTable('APP_USERS', (table) => ({
@@ -236,7 +242,8 @@ describe('ODB application contract', () => {
     expect(procedure.body?.statements[0]).toEqual({
       kind: 'open-for',
       cursor: 'p_result',
-      query: 'SELECT ID, UUID, CREATED_AT, EMAIL FROM APP_USERS',
+      query:
+        'SELECT ID AS "id", UUID AS "uuid", CREATED_AT AS "createdAt", EMAIL AS "email" FROM APP_USERS',
     })
     expect(procedure.body?.resultSets?.P_RESULT).toEqual([
       { name: 'ID', type: 'number', nullable: false },
@@ -368,6 +375,22 @@ describe('ODB application contract', () => {
         },
       },
     })
+    expect(application.toSQLUp()).toContain(
+      'OPEN p_result FOR SELECT ID AS "id", UUID AS "uuid", CREATED_AT AS "createdAt", EMAIL AS "email" FROM APP_USERS',
+    )
+    const source = compileApplicationEndpoints(application.application())[0]?.toNode().source
+    expect(source).toContain('p_result => v_output_1')
+    expect(source).toContain('v_output_1 SYS_REFCURSOR')
+    expect(source).toContain('FETCH v_output_1 INTO v_output_1_column_0')
+    expect(source).toContain("'createdAt' VALUE TO_CHAR(v_output_1_column_2")
+    expect(source).toContain("'uuid' VALUE RTRIM(v_output_1_column_1)")
+    expect(source).toContain("'result' VALUE v_output_1_json FORMAT JSON")
+    expect(source).toContain('CLOSE v_output_1;')
+    expect(source).toContain('IF v_output_1%ISOPEN THEN CLOSE v_output_1; END IF;')
+    expect(source?.indexOf('LOOP FETCH')).toBeGreaterThan(
+      source?.indexOf('p_result => v_output_1') ?? -1,
+    )
+    expect(emitApplicationOrdsSql(application)).not.toContain("p_param_type         => 'RESULTSET'")
   })
 
   it('keeps typed cursor rows when a service delegates to another package procedure', () => {
@@ -376,7 +399,10 @@ describe('ODB application contract', () => {
         'LIST_USERS',
         { out: { rows: odbType.resultset() } },
         ({ params, body }) =>
-          body.openFor(params.rows, odbQuery().selectFrom(users).select([users.id, users.email])),
+          body.openFor(
+            params.rows,
+            odbQuery().selectFrom(users).select([users.id, users.createdAt, users.email]),
+          ),
       )
       return { listUsers }
     })
@@ -397,8 +423,14 @@ describe('ODB application contract', () => {
     }
 
     expect(document.components.schemas.OuterListItemsItem).toMatchObject({
-      required: ['id'],
-      properties: { id: { type: 'number' }, email: { type: ['string', 'null'] } },
+      required: ['id', 'createdAt'],
+      properties: {
+        id: { type: 'number' },
+        createdAt: { type: 'string', format: 'date-time' },
+        email: { type: ['string', 'null'] },
+      },
     })
+    expect(inner.toSQLUp()).toContain('CREATED_AT AS "createdAt"')
+    expect(outer.toSQLUp()).toContain('PCK_INNER.LIST_USERS(p_items)')
   })
 })

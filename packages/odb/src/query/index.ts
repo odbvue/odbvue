@@ -1,4 +1,5 @@
 import { Column, type ColumnNode } from '../schema/column.js'
+import { toCamelCase } from '../model.js'
 import {
   type ColumnKeyOf,
   type Insertable,
@@ -66,6 +67,11 @@ function exprSql(expr: SqlExpr): string {
   return typeof expr === 'string' ? expr : expr.toSQL()
 }
 
+function cursorColumnSql(expression: string, name: string): string {
+  const alias = toCamelCase(name.slice(name.lastIndexOf('.') + 1))
+  return `${expression} AS "${alias}"`
+}
+
 function isSqlExpression(value: unknown): value is { toSQL(): string } {
   return (
     typeof value === 'object' &&
@@ -97,6 +103,7 @@ export class SelectQueryBuilder<
   private readonly _resultType?: TResult
   private readonly _hasSelectionType?: THasSelection
   private _columns: string[] = []
+  private _cursorColumns: string[] = []
   private _selectedColumns: ColumnNode[] | undefined = []
   private _where: ExpressionNode[] = []
   private _joins: JoinClause[] = []
@@ -173,6 +180,11 @@ export class SelectQueryBuilder<
   select(columns: SqlExpr | SqlExpr[]): SelectQueryBuilder<TTable, unknown, true> {
     const cols = Array.isArray(columns) ? columns : [columns]
     this._columns.push(...cols.map(exprSql))
+    this._cursorColumns.push(
+      ...cols.map((column) =>
+        column instanceof Column ? cursorColumnSql(column.toSQL(), column.name) : exprSql(column),
+      ),
+    )
     if (this._selectedColumns) {
       if (cols.every((column) => column instanceof Column)) {
         this._selectedColumns.push(...cols.map((column) => (column as ColumnLike).toNode()))
@@ -194,6 +206,7 @@ export class SelectQueryBuilder<
   > {
     const name = column.name.slice(column.name.lastIndexOf('.') + 1)
     this._columns.push(`${exprSql(expression)} AS ${name}`)
+    this._cursorColumns.push(cursorColumnSql(exprSql(expression), name))
     this._selectedColumns?.push({ ...column.toNode(), name })
     return this as SelectQueryBuilder<
       TTable,
@@ -204,6 +217,9 @@ export class SelectQueryBuilder<
 
   /** Selected typed columns, when the row shape can be inferred without parsing SQL. */
   selectedColumns(): ColumnNode[] | undefined {
+    if (!this._columns.length && this._table instanceof Table && !this._joins.length) {
+      return this._table.toNode().columns
+    }
     return this._selectedColumns?.map((column) => ({
       ...column,
       options: { ...column.options },
@@ -304,6 +320,21 @@ export class SelectQueryBuilder<
 
   toSQL(): string {
     const cols = this._columns.length > 0 ? this._columns.join(', ') : '*'
+    return this.renderSQL(cols)
+  }
+
+  /** Render typed cursor projections with case-preserving camelCase JSON field names. */
+  toCursorSQL(): string {
+    const columns =
+      this._cursorColumns.length > 0
+        ? this._cursorColumns
+        : this._table instanceof Table && !this._joins.length
+          ? this._table.toNode().columns.map((column) => cursorColumnSql(column.name, column.name))
+          : ['*']
+    return this.renderSQL(columns.join(', '))
+  }
+
+  private renderSQL(cols: string): string {
     let sql = `SELECT ${cols}`
     if (this._into) sql += ` INTO ${this._into}`
     sql += ` FROM ${this.tableName()}`

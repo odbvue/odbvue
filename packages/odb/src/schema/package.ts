@@ -44,6 +44,7 @@ import {
 /** Any query builder that can emit SQL and optionally expose a typed selected row. */
 export type AnyQueryBuilder = {
   toSQL(): string
+  toCursorSQL?(): string
   selectedColumns?(): ColumnNode[] | undefined
 }
 
@@ -783,7 +784,7 @@ export class ProcedureBody {
   }
 
   /**
-   * Emit `OPEN <cursor> FOR <select query>;`
+   * Emit `OPEN <cursor> FOR <select query>;` with camelCase aliases for typed columns.
    *
    * @example
    * body.openFor('p_cursor', select('employees').columns(['id', 'name']))
@@ -801,7 +802,11 @@ export class ProcedureBody {
         })),
       )
     }
-    this._statements.push({ kind: 'open-for', cursor: cursorName, query: qb.toSQL() })
+    this._statements.push({
+      kind: 'open-for',
+      cursor: cursorName,
+      query: qb.toCursorSQL?.() ?? qb.toSQL(),
+    })
     return this
   }
 

@@ -1,6 +1,12 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-import { oracleParameterName, toKebabCase, type OdbOrdsType, type OdbType } from './model.js'
+import {
+  emitOracleType,
+  oracleParameterName,
+  toKebabCase,
+  type OdbOrdsType,
+  type OdbType,
+} from './model.js'
 import type { ColumnType } from './schema/column.js'
 import { ODB_ERROR_NUMBER, ODB_ERROR_STATUS } from './schema/errors.js'
 import { odbHttp } from './helpers/http/http.js'
@@ -309,13 +315,18 @@ export class OrdsEndpoint {
   private get nativeJsonResponse(): boolean {
     const outputs = this._params.filter((p) => this.paramSourceType(p) === 'RESPONSE')
     return (
-      this._responseMediaType === 'application/json' &&
-      outputs.some((p) => p.odbType === 'json') &&
+      (this._responseMediaType === 'application/json' ||
+        (this._responseMediaType === undefined &&
+          outputs.some((p) => p.paramType === 'RESULTSET'))) &&
+      outputs.some((p) => p.odbType === 'json' || p.paramType === 'RESULTSET') &&
       outputs.every(
         (p) =>
           p.direction === 'OUT' &&
-          p.odbType !== undefined &&
-          ['json', 'clob', 'string', 'guid', 'number'].includes(p.odbType),
+          ((p.paramType === 'RESULTSET' &&
+            !!p.resultColumns?.length &&
+            p.resultColumns.every((column) => column.type !== 'blob')) ||
+            (p.odbType !== undefined &&
+              ['json', 'clob', 'string', 'guid', 'number'].includes(p.odbType))),
       )
     )
   }
@@ -326,6 +337,43 @@ export class OrdsEndpoint {
     return transport === 'RESPONSE' || transport === 'HEADER'
       ? `v_output_${this._params.indexOf(param)}`
       : undefined
+  }
+
+  private get nativeCursorOutputs(): OrdsParam[] {
+    return this.nativeJsonResponse
+      ? this._params.filter(
+          (p) => this.paramSourceType(p) === 'RESPONSE' && p.paramType === 'RESULTSET',
+        )
+      : []
+  }
+
+  private cursorJsonStatements(param: OrdsParam): string[] {
+    const name = this.nativeOutputName(param)
+    const columns = param.resultColumns
+    if (!name || !columns?.length) {
+      throw new Error('Native cursor JSON serialization requires typed result columns.')
+    }
+    const values = columns.map((column, index) => {
+      const value = `${name}_column_${index}`
+      const expression =
+        column.type === 'guid'
+          ? `RTRIM(${value})`
+          : column.type === 'timestamp'
+            ? `TO_CHAR(${value}, 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"')`
+            : column.type === 'date'
+              ? `TO_CHAR(${value}, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`
+              : value
+      return `${sqlStr(oracleParameterName(column.name, { stripPrefix: false }))} VALUE ${expression}`
+    })
+    return [
+      `LOOP FETCH ${name} INTO ${columns.map((_column, index) => `${name}_column_${index}`).join(', ')};`,
+      `EXIT WHEN ${name}%NOTFOUND;`,
+      `SELECT JSON_OBJECT(${values.join(', ')} NULL ON NULL RETURNING CLOB STRICT) INTO v_json_row FROM dual;`,
+      `${name}_array.append(JSON_OBJECT_T.parse(v_json_row));`,
+      'END LOOP;',
+      `CLOSE ${name};`,
+      `${name}_json := ${name}_array.to_clob();`,
+    ]
   }
 
   private get handlerSource(): string {
@@ -355,13 +403,28 @@ export class OrdsEndpoint {
         const type =
           this.paramSourceType(p) === 'HEADER'
             ? 'VARCHAR2(32767)'
-            : p.odbType === 'json' || p.odbType === 'clob'
-              ? 'CLOB'
-              : p.odbType === 'number'
-                ? 'NUMBER'
-                : 'VARCHAR2(32767)'
-        return [`${name} ${type};`]
+            : p.paramType === 'RESULTSET'
+              ? 'SYS_REFCURSOR'
+              : p.odbType === 'json' || p.odbType === 'clob'
+                ? 'CLOB'
+                : p.odbType === 'number'
+                  ? 'NUMBER'
+                  : 'VARCHAR2(32767)'
+        return [
+          `${name} ${type};`,
+          ...(p.paramType === 'RESULTSET'
+            ? [
+                `${name}_array JSON_ARRAY_T := JSON_ARRAY_T();`,
+                `${name}_json CLOB;`,
+                ...(p.resultColumns ?? []).map(
+                  (column, index) =>
+                    `${name}_column_${index} ${emitOracleType(column.type, { length: 32767 })};`,
+                ),
+              ]
+            : []),
+        ]
       }),
+      ...(this.nativeCursorOutputs.length ? ['v_json_row CLOB;'] : []),
       ...(this.nativeJsonResponse
         ? [
             'v_json_response CLOB;',
@@ -407,12 +470,13 @@ export class OrdsEndpoint {
       : ''
     const jsonResponse = this.nativeJsonResponse
       ? [
+          ...this.nativeCursorOutputs.flatMap((p) => this.cursorJsonStatements(p)),
           // ASCII escaping avoids HTP buffer overflows on large multibyte JSON strings.
           `SELECT JSON_SERIALIZE(JSON_OBJECT(${this._params
             .filter((p) => this.paramSourceType(p) === 'RESPONSE')
             .map(
               (p) =>
-                `${sqlStr(p.name)} VALUE ${p.odbType === 'guid' ? `RTRIM(${this.nativeOutputName(p)})` : this.nativeOutputName(p)}${p.odbType === 'json' ? ' FORMAT JSON' : ''}`,
+                `${sqlStr(p.name)} VALUE ${p.paramType === 'RESULTSET' ? `${this.nativeOutputName(p)}_json` : p.odbType === 'guid' ? `RTRIM(${this.nativeOutputName(p)})` : this.nativeOutputName(p)}${p.odbType === 'json' || p.paramType === 'RESULTSET' ? ' FORMAT JSON' : ''}`,
             )
             .join(
               ', ',
@@ -461,7 +525,13 @@ export class OrdsEndpoint {
       'owa_util.http_header_close;',
       `htp.p('{"code":"INTERNAL_SERVER_ERROR"}');`,
     ].join(' ')
-    return `${declaration}BEGIN ${authorization}${enforcement}${call} EXCEPTION WHEN OTHERS THEN IF SQLCODE = -20999 THEN ${explicitResponse} ELSIF SQLCODE = ${ODB_ERROR_NUMBER} THEN ${odbErrorResponse} ELSE ${fallbackResponse} END IF; END;`
+    const closeCursors = this.nativeCursorOutputs
+      .map((p) => {
+        const name = this.nativeOutputName(p)
+        return `IF ${name}%ISOPEN THEN CLOSE ${name}; END IF;`
+      })
+      .join(' ')
+    return `${declaration}BEGIN ${authorization}${enforcement}${call} EXCEPTION WHEN OTHERS THEN ${closeCursors ? `${closeCursors} ` : ''}IF SQLCODE = -20999 THEN ${explicitResponse} ELSIF SQLCODE = ${ODB_ERROR_NUMBER} THEN ${odbErrorResponse} ELSE ${fallbackResponse} END IF; END;`
   }
 
   private paramSourceType(param: OrdsParam): OrdsParamNode['sourceType'] {

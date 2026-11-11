@@ -142,4 +142,20 @@ The CLI writes `apps/db/dist/openapi.json` after every successful database migra
 
 `SYS_REFCURSOR` outputs opened through a typed ODB query become reusable OpenAPI row schemas. The response preserves column types and nullability, so OpenAPI client generators can produce typed result arrays.
 
+`body.openFor()` automatically renders typed columns with quoted camelCase aliases,
+such as `severity_text AS "severityText"`. This also applies to `selectAs()` expressions
+and an implicit selection of all columns from a single typed table. Database column
+names, ordinary `toSQL()` / `compile()` queries, predicates, and ordering stay unchanged.
+ORDS's RESULTSET serializer lowercases even quoted aliases. For typed cursor
+responses, ODB therefore generates JSON explicitly in the service handler using
+the same camelCase names as OpenAPI, and streams it through the existing JSON
+response writer. Empty cursors produce `[]`; null fields, numeric values, timestamp
+strings, and CLOB strings keep their response shapes.
+Raw SQL projections are emitted as written and lack inferred row metadata.
+Untyped cursors and cursors containing binary columns retain ORDS RESULTSET
+serialization; quoted aliases alone do not guarantee camelCase there.
+Existing services that delegate to capability list procedures inherit explicit
+JSON serialization after database redeployment; no per-service migration changes
+or client-side snake_case mapping are needed.
+
 The web app consumes this manifest through `openapi-typescript`; see [Consuming Web Services](/guide/web/consuming-web-services#generated-ords-types).

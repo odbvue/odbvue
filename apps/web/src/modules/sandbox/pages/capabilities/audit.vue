@@ -110,6 +110,7 @@
 import { useAuth } from '@/capabilities/auth'
 import { useHttp } from '@/capabilities/http'
 import { computed, ref } from 'vue'
+import type { components } from '@/api/openapi.generated'
 
 definePage({
   meta: {
@@ -121,13 +122,7 @@ definePage({
 })
 
 type Severity = 'info' | 'warn' | 'error'
-type Item = {
-  id: string
-  eventTimestamp: string
-  severityText: string
-  body: string
-  attributes: unknown
-}
+type Item = components['schemas']['SandboxListAuditItemsItem']
 
 const pageSize = 50
 const auth = useAuth()
@@ -142,7 +137,9 @@ const canWrite = computed(() => auth.authenticated.value && !!message.value.trim
 async function load(cursor?: string) {
   const query = new URLSearchParams({ limit: String(pageSize + 1) })
   if (cursor) query.set('cursor', cursor)
-  const response = await http.get<{ items: Item[] }>(`/sandbox/audit?${query}`)
+  const response = await http.get<components['schemas']['SandboxListAuditResponse']>(
+    `/sandbox/audit?${query}`,
+  )
   if (response.error || !response.data) throw response.error ?? new Error('No data')
   items.value = response.data.items.slice(0, pageSize)
   nextCursor.value = response.data.items.length > pageSize ? items.value.at(-1)?.id : undefined

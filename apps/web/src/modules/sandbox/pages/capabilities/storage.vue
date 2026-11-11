@@ -168,14 +168,6 @@ definePage({
 })
 
 type Item = components['schemas']['SandboxListStorageItemsItem']
-type StoredFileResponse = {
-  id: string
-  file_name: string
-  mime_type: string
-  file_size: number
-  meta: unknown
-  created_at: string
-}
 const maxFileBytes = 10 * 1024 * 1024
 const pageSize = 50
 const auth = useAuth()
@@ -209,16 +201,11 @@ async function run(action: string, call: () => Promise<void>) {
 async function load(cursor?: string) {
   const query = new URLSearchParams({ limit: String(pageSize + 1) })
   if (cursor) query.set('cursor', cursor)
-  const response = await http.get<{ items: StoredFileResponse[] }>(`/sandbox/storage?${query}`)
+  const response = await http.get<components['schemas']['SandboxListStorageResponse']>(
+    `/sandbox/storage?${query}`,
+  )
   if (response.error || !response.data) throw new Error('Files could not be loaded.')
-  items.value = response.data.items.slice(0, pageSize).map((item) => ({
-    id: item.id,
-    fileName: item.file_name,
-    mimeType: item.mime_type,
-    fileSize: item.file_size,
-    meta: item.meta,
-    createdAt: item.created_at,
-  }))
+  items.value = response.data.items.slice(0, pageSize)
   nextCursor.value = response.data.items.length > pageSize ? items.value.at(-1)?.id : undefined
 }
 

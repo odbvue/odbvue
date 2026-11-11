@@ -169,9 +169,9 @@ describe('sandbox Network ACL page', () => {
     get.mockResolvedValueOnce({
       data: {
         items: [
-          { host: 'range.example.com', lower_port: 440, upper_port: 450, privilege: 'HTTP' },
-          { host: 'all.example.com', lower_port: null, upper_port: null, privilege: 'SMTP' },
-          { host: 'mail.example.com', lower_port: 465, upper_port: 465, privilege: 'SMTP' },
+          { host: 'range.example.com', lowerPort: 440, upperPort: 450, privilege: 'HTTP' },
+          { host: 'all.example.com', lowerPort: null, upperPort: null, privilege: 'SMTP' },
+          { host: 'mail.example.com', lowerPort: 465, upperPort: 465, privilege: 'SMTP' },
         ],
       },
       error: null,
@@ -213,8 +213,8 @@ describe('sandbox Network ACL page', () => {
     get.mockResolvedValueOnce({
       data: {
         items: [
-          { host: 'api.chucknorris.io', lower_port: 443, upper_port: 443, privilege: 'HTTP' },
-          { host: 'smtp.example.com', lower_port: 587, upper_port: 587, privilege: 'SMTP' },
+          { host: 'api.chucknorris.io', lowerPort: 443, upperPort: 443, privilege: 'HTTP' },
+          { host: 'smtp.example.com', lowerPort: 587, upperPort: 587, privilege: 'SMTP' },
         ],
       },
       error: null,

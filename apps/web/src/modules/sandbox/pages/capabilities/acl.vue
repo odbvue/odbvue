@@ -116,11 +116,6 @@ definePage({
 })
 
 type Item = components['schemas']['SandboxListAclItemsItem']
-// ORDS serializes cursor column names in snake_case, unlike the generated OpenAPI types.
-type WireItem = Omit<Item, 'lowerPort' | 'upperPort'> & {
-  lower_port: number | null
-  upper_port: number | null
-}
 type Action = 'add' | 'remove' | 'list'
 
 const auth = useAuth()
@@ -147,19 +142,19 @@ const busy = ref<Action>()
 const message = ref<{ type: 'success' | 'error'; text: string }>()
 
 async function load() {
-  const response = await http.get<{ items: WireItem[] }>('/sandbox/acl')
+  const response = await http.get<components['schemas']['SandboxListAclResponse']>('/sandbox/acl')
   if (response.error || !response.data) throw response.error ?? new Error('No ACL data returned')
   items.value = response.data.items.map((item) => {
     if (
-      (item.lower_port !== null && !Number.isInteger(item.lower_port)) ||
-      (item.upper_port !== null && !Number.isInteger(item.upper_port))
+      (item.lowerPort !== null && !Number.isInteger(item.lowerPort)) ||
+      (item.upperPort !== null && !Number.isInteger(item.upperPort))
     ) {
       throw new Error('ACL response contains missing or invalid port bounds.')
     }
     return {
       host: item.host,
-      lowerPort: item.lower_port,
-      upperPort: item.upper_port,
+      lowerPort: item.lowerPort,
+      upperPort: item.upperPort,
       privilege: item.privilege.toLowerCase(),
     }
   })

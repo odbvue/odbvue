@@ -88,7 +88,9 @@ describe('Network ACL capability', () => {
     expect(
       statement.cursors?.P_ITEMS?.find((column) => column.name === 'lower_port')?.nullable,
     ).toBe(true)
-    expect(sql).toContain('SELECT host, lower_port, upper_port, privilege FROM dba_host_aces')
+    expect(sql).toContain(
+      'SELECT host AS "host", lower_port AS "lowerPort", upper_port AS "upperPort", privilege AS "privilege" FROM dba_host_aces',
+    )
     expect(sql).toContain("LOWER(privilege) = 'http' OR LOWER(privilege) = 'smtp'")
     expect(sql).toContain('ORDER BY host ASC, lower_port ASC, upper_port ASC, privilege ASC')
     const down = odbAcl.toSQLDown({ schema: 'APP' })

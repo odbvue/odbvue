@@ -10,6 +10,75 @@ import {
 } from '../../src/schema/table.js'
 
 describe('odbQuery', () => {
+  it('quotes camelCase cursor fields without changing ordinary queries or database metadata', () => {
+    const logs = odbTable('logs', (t) => ({
+      id: t.guid('ID').primaryKey(),
+      observedTimestamp: t.timestamp('OBSERVED_TIMESTAMP').notNull(),
+      severityText: t.string('SEVERITY_TEXT'),
+    }))
+    const query = odbQuery()
+      .selectFrom(logs)
+      .select([logs.id, logs.observedTimestamp, logs.severityText])
+      .where(logs.id, '=', 'cursor')
+      .orderBy(logs.observedTimestamp, 'desc')
+      .limit(51)
+    expect(query.toCursorSQL()).toBe(
+      'SELECT ID AS "id", OBSERVED_TIMESTAMP AS "observedTimestamp", SEVERITY_TEXT AS "severityText" FROM logs WHERE ID = \'cursor\' ORDER BY OBSERVED_TIMESTAMP DESC FETCH FIRST 51 ROWS ONLY',
+    )
+    expect(query.toSQL()).toBe(
+      "SELECT ID, OBSERVED_TIMESTAMP, SEVERITY_TEXT FROM logs WHERE ID = 'cursor' ORDER BY OBSERVED_TIMESTAMP DESC FETCH FIRST 51 ROWS ONLY",
+    )
+    expect(query.compile().sql).toContain('SELECT ID, OBSERVED_TIMESTAMP, SEVERITY_TEXT')
+    expect(query.selectedColumns()?.map((column) => column.name)).toEqual([
+      'ID',
+      'OBSERVED_TIMESTAMP',
+      'SEVERITY_TEXT',
+    ])
+  })
+
+  it('aliases typed join columns and selectAs expressions but preserves raw projections', () => {
+    const logs = odbTable('logs', (t) => ({
+      userId: t.guid(),
+      severityText: t.string(),
+    })).as('l')
+    const users = odbTable('users', (t) => ({ id: t.guid() })).as('u')
+    const query = odbQuery()
+      .selectFrom(logs)
+      .join(users, cond.eq(logs.userId, users.id))
+      .select(logs.userId)
+      .selectAs("COALESCE(l.severity_text, 'INFO')", logs.severityText)
+    expect(query.toCursorSQL()).toBe(
+      'SELECT l.user_id AS "userId", COALESCE(l.severity_text, \'INFO\') AS "severityText" FROM logs l JOIN users u ON l.user_id = u.id',
+    )
+    expect(query.selectedColumns()?.map((column) => column.name)).toEqual([
+      'l.user_id',
+      'severity_text',
+    ])
+    query.select('COUNT(*) AS "totalCount"')
+    expect(query.toCursorSQL()).toContain('COUNT(*) AS "totalCount"')
+    expect(query.selectedColumns()).toBeUndefined()
+    expect(odbQuery().selectFrom('logs').select('severity_text').toCursorSQL()).toBe(
+      'SELECT severity_text FROM logs',
+    )
+  })
+
+  it('expands implicit typed cursor selections while keeping ordinary SELECT star unchanged', () => {
+    const logs = odbTable('logs', (t) => ({
+      eventTimestamp: t.timestamp().notNull(),
+      severityText: t.string(),
+    })).as('l')
+    const query = odbQuery().selectFrom(logs).resolveSchema('APP')
+    expect(query.toCursorSQL()).toBe(
+      'SELECT event_timestamp AS "eventTimestamp", severity_text AS "severityText" FROM APP.logs l',
+    )
+    expect(query.toSQL()).toBe('SELECT * FROM APP.logs l')
+    expect(query.selectedColumns()?.map((column) => column.name)).toEqual([
+      'event_timestamp',
+      'severity_text',
+    ])
+    expect(odbQuery().selectFrom('logs').toCursorSQL()).toBe('SELECT * FROM logs')
+  })
+
   it('preserves typed cursor metadata for aliased select expressions', () => {
     const settings = odbTable('settings', (t) => ({
       id: t.string(128).primaryKey(),

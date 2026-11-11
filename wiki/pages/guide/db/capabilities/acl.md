@@ -71,8 +71,10 @@ Oracle's dictionary can return uppercase privilege names such as `SMTP`.
 Listing and removal compare privileges case-insensitively; the sandbox displays
 them in lowercase and allows selecting exact-port grants regardless of case.
 
-ORDS serializes cursor port columns as `lower_port` and `upper_port`. The sandbox
-maps those wire fields to its display model. Only explicit SQL `NULL` bounds
+The service returns cursor port columns as `lowerPort` and `upperPort`, using
+ODB's explicit JSON serialization rather than ORDS's lowercasing RESULTSET writer.
+The sandbox consumes the generated response types directly.
+Only explicit SQL `NULL` bounds
 represent all-port grants; missing or invalid port fields produce an error.
 
 Transactions belong to callers. `ov setup-settings` uses this capability to
