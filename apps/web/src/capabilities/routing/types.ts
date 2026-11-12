@@ -59,7 +59,12 @@ export interface Routing {
   title: ComputedRef<(path: string) => string>
   params: RouteParams
   navigate: Router['push']
-  setBreadcrumb: (breadcrumbTitle: string, href?: string, icon?: string, disabled?: boolean) => void
+  setBreadcrumb: (
+    breadcrumbTitle?: string,
+    href?: string,
+    icon?: string,
+    disabled?: boolean,
+  ) => void
 }
 
 declare module 'vue-router' {

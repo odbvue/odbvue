@@ -1,0 +1,23 @@
+{
+  "admin.title": "Admin",
+  "admin.users": "Users",
+  "admin.usersDescription": "Browse user accounts and view their details.",
+  "admin.userDetails": "User details",
+  "admin.details": "Details",
+  "admin.searchUsers": "Username or display name",
+  "admin.username": "Username",
+  "admin.displayName": "Display name",
+  "admin.userId": "User ID",
+  "admin.status": "Status",
+  "admin.enabled": "Enabled",
+  "admin.disabled": "Disabled",
+  "admin.createdAt": "Created",
+  "admin.updatedAt": "Updated",
+  "admin.backToUsers": "Back to users",
+  "admin.readOnly": "User account details are read-only.",
+  "admin.loadingUser": "Loading user details",
+  "admin.noUsers": "No users found.",
+  "admin.userNotFound": "User not found.",
+  "admin.loadUsersError": "Users could not be loaded. Use Refresh to try again.",
+  "admin.loadUserError": "User details could not be loaded."
+}

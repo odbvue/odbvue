@@ -158,6 +158,7 @@
                             maxLength: options.maxLength,
                             actionFormat: options.actionFormat,
                             t,
+                            locale,
                           } as OvViewOptions,
                           (eventName: string, ...args: unknown[]) => {
                             eventName === 'details'
@@ -202,6 +203,7 @@
                           maxLength: options.maxLength,
                           actionFormat: options.actionFormat,
                           t,
+                          locale,
                         } as OvViewOptions,
                         (eventName: string, ...args: unknown[]) => {
                           eventName === 'details'
@@ -370,7 +372,7 @@ import {
 import { emptyRowCount, pageItems } from './pagination'
 
 import { useI18n } from 'vue-i18n'
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 type DefaultsRecord = Record<string, Record<string, unknown> | undefined>
 

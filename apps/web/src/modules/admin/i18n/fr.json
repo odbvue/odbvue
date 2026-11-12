@@ -1,0 +1,23 @@
+{
+  "admin.title": "Administration",
+  "admin.users": "Utilisateurs",
+  "admin.usersDescription": "Parcourir les comptes et consulter leurs détails.",
+  "admin.userDetails": "Détails de l'utilisateur",
+  "admin.details": "Détails",
+  "admin.searchUsers": "Nom d'utilisateur ou nom affiché",
+  "admin.username": "Nom d'utilisateur",
+  "admin.displayName": "Nom affiché",
+  "admin.userId": "Identifiant utilisateur",
+  "admin.status": "Statut",
+  "admin.enabled": "Activé",
+  "admin.disabled": "Désactivé",
+  "admin.createdAt": "Créé",
+  "admin.updatedAt": "Mis à jour",
+  "admin.backToUsers": "Retour aux utilisateurs",
+  "admin.readOnly": "Les détails du compte sont en lecture seule.",
+  "admin.loadingUser": "Chargement des détails de l'utilisateur",
+  "admin.noUsers": "Aucun utilisateur trouvé.",
+  "admin.userNotFound": "Utilisateur introuvable.",
+  "admin.loadUsersError": "Impossible de charger les utilisateurs. Actualisez pour réessayer.",
+  "admin.loadUserError": "Impossible de charger les détails de l'utilisateur."
+}

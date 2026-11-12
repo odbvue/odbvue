@@ -7,7 +7,7 @@
           :key="item.name"
           :cols="12 / (mobile ? 1 : options.cols || 1)"
         >
-          <component :is="renderViewItem(data[item.name], item, data, options, handleEmit)" />
+          <component :is="renderViewItem(data[item.name], item, data, viewOptions, handleEmit)" />
         </v-col>
       </v-row>
       <v-row v-if="actions.length > 0">
@@ -46,6 +46,7 @@
 </template>
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useDisplay, useDefaults } from 'vuetify'
 import VOvForm from '../forms/VOvForm.vue'
 import {
@@ -94,6 +95,7 @@ const { defaults } = useDefaults({
 })
 
 const { mobile } = useDisplay()
+const { locale } = useI18n()
 const {
   data,
   options = {} as OvViewOptions,
@@ -105,6 +107,7 @@ const {
   t?: (text?: string) => string
   loading?: boolean
 }>()
+const viewOptions = computed(() => ({ ...options, locale: options.locale ?? locale.value }))
 
 const emit = defineEmits<{
   (e: 'details', name: string, value: string): void

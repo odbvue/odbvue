@@ -9,6 +9,9 @@ import { createState } from '@/capabilities/state'
 import { useUi } from '@/capabilities/ui/store'
 import { authConfig } from '../../auth-state'
 import DefaultLayout from '@/app/layouts/DefaultLayout.vue'
+import type { Breadcrumb } from '@/capabilities/routing'
+
+const breadcrumbItems = ref<Breadcrumb[]>([])
 
 const runtime = vi.hoisted((): { auth?: Auth; ui?: ReturnType<typeof useUi> } => ({}))
 
@@ -23,7 +26,7 @@ vi.mock('@/capabilities/ui', () => ({
   useNotificationMessage: () => ref(''),
 }))
 vi.mock('@/capabilities/routing', () => ({
-  useRouting: () => ({ pages: ref([]), breadcrumbs: ref([]) }),
+  useRouting: () => ({ pages: ref([]), breadcrumbs: breadcrumbItems }),
 }))
 vi.mock('vuetify', () => ({ useDisplay: () => ({ mobile: ref(false) }) }))
 
@@ -44,6 +47,11 @@ const image = defineComponent({
 const overlay = defineComponent({
   props: { modelValue: Boolean, contained: Boolean },
   template: '<div />',
+})
+const breadcrumbs = defineComponent({
+  props: ['items'],
+  template:
+    '<nav><a v-for="item in items" :key="item.href" :href="item.href">{{ item.title }}</a></nav>',
 })
 
 function response<T>(data: T | null, status = 200): HttpResponse<T> {
@@ -90,6 +98,16 @@ async function setup(authenticated = true, avatarUrl: string | null = null, read
               'auth.logout': 'Logout',
               'auth.login': 'Login',
               'auth.profile.menu': 'Account menu for {name}',
+              'admin.title': 'Admin',
+              'admin.users': 'Users',
+            },
+            de: {
+              'settings.title': 'Einstellungen',
+              'auth.logout': 'Abmelden',
+              'auth.login': 'Anmelden',
+              'auth.profile.menu': 'Kontomenü für {name}',
+              'admin.title': 'Administration',
+              'admin.users': 'Benutzer',
             },
           },
         }),
@@ -113,7 +131,7 @@ async function setup(authenticated = true, avatarUrl: string | null = null, read
         VImg: image,
         VIcon: true,
         VProgressLinear: true,
-        VBreadcrumbs: true,
+        VBreadcrumbs: breadcrumbs,
         VAlert: true,
         VMain: container,
         VSnackbar: true,
@@ -127,9 +145,42 @@ async function setup(authenticated = true, avatarUrl: string | null = null, read
   return { wrapper, router, auth, ui, post }
 }
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.restoreAllMocks()
+  breadcrumbItems.value = []
+})
 
 describe('default layout account navigation', () => {
+  it('localizes breadcrumb titles reactively while preserving links and literal titles', async () => {
+    breadcrumbItems.value = [
+      { title: 'admin.title', href: '/admin', disabled: false },
+      { title: 'admin.users', href: '/admin/users', disabled: false },
+      { title: 'Ada @ team', href: '', disabled: true },
+    ]
+    const { wrapper } = await setup()
+    try {
+      expect(wrapper.findAll('nav a').map((link) => link.text())).toEqual([
+        'Admin',
+        'Users',
+        'Ada @ team',
+      ])
+      expect(wrapper.findAll('nav a').map((link) => link.attributes('href'))).toEqual([
+        '/admin',
+        '/admin/users',
+        '',
+      ])
+      wrapper.vm.$i18n.locale = 'de'
+      await nextTick()
+      expect(wrapper.findAll('nav a').map((link) => link.text())).toEqual([
+        'Administration',
+        'Benutzer',
+        'Ada @ team',
+      ])
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it.each(['auth.refresh', 'auth.profile', 'sandbox.demo', 'overlay.auth.login'])(
     'shows the contained overlay for %s until all activity finishes',
     async (key) => {

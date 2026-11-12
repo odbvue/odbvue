@@ -80,7 +80,7 @@ export function useRouting(auth: PageAuth = useAuth()): Routing {
 
     const items: Breadcrumb[] = matchedPages.filter(isNavigable).map((page, index, matched) => ({
       title: page.title,
-      disabled: index === matched.length - 1,
+      disabled: index === matched.length - 1 && !breadcrumbOverride.value,
       href: page.route.name
         ? router.resolve({
             name: page.route.name,
@@ -95,8 +95,9 @@ export function useRouting(auth: PageAuth = useAuth()): Routing {
     return items
   })
 
-  function setBreadcrumb(breadcrumbTitle: string, href = '', icon = '', disabled = true): void {
-    breadcrumbOverride.value = { title: breadcrumbTitle, href, icon, disabled }
+  function setBreadcrumb(breadcrumbTitle?: string, href = '', icon = '', disabled = true): void {
+    breadcrumbOverride.value =
+      breadcrumbTitle === undefined ? undefined : { title: breadcrumbTitle, href, icon, disabled }
   }
 
   return {

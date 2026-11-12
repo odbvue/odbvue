@@ -59,6 +59,27 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/admin/': RouteRecordInfo<
+      '/admin/',
+      '/admin',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/admin/users/': RouteRecordInfo<
+      '/admin/users/',
+      '/admin/users',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/admin/users/[id]': RouteRecordInfo<
+      '/admin/users/[id]',
+      '/admin/users/:id',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
+      | never
+    >,
     '/confirm-email': RouteRecordInfo<
       '/confirm-email',
       '/confirm-email',
@@ -358,6 +379,30 @@ declare module 'vue-router/auto-routes' {
         | never
       pathParamNames:
         | never
+    }
+    'src/modules/admin/pages/index.vue': {
+      routes:
+        | '/admin/'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/modules/admin/pages/users/index.vue': {
+      routes:
+        | '/admin/users/'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/modules/admin/pages/users/[id].vue': {
+      routes:
+        | '/admin/users/[id]'
+      views:
+        | never
+      pathParamNames:
+        | 'id'
     }
     'src/app/pages/confirm-email.vue': {
       routes:

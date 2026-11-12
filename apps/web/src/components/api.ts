@@ -74,6 +74,7 @@ export type OvFormat = {
   target?: string
   hidden?: boolean
   html?: boolean
+  /** Locale-aware 'date', 'time', 'datetime', or a legacy date/time mask. */
   tsFormat?: string
 }
 
@@ -341,6 +342,7 @@ export type OvViewOptions = {
   actionAlign?: OvAlign
   maxLength?: number
   t?: (key: string) => string
+  locale?: string
 }
 
 export type OvFormData = Record<string, unknown>
@@ -510,14 +512,26 @@ export const renderViewItem = (
   return () => {
     let displayValue = value
 
-    // Apply tsFormat if provided
     const format = Array.isArray(item?.format) ? item?.format[0] : item?.format
-    if (format?.tsFormat) {
-      try {
-        // Support date formatting with Intl API
-        if (displayValue instanceof Date || typeof displayValue === 'string') {
-          const date =
-            typeof displayValue === 'string' ? new Date(displayValue as string) : displayValue
+    if (
+      format?.tsFormat &&
+      (displayValue instanceof Date || (typeof displayValue === 'string' && displayValue !== ''))
+    ) {
+      const date =
+        typeof displayValue === 'string'
+          ? new Date(
+              /^\d{4}-\d{2}-\d{2}$/.test(displayValue) ? `${displayValue}T00:00:00` : displayValue,
+            )
+          : displayValue
+      if (Number.isNaN(date.getTime())) {
+        console.warn('Unable to format invalid timestamp', displayValue)
+      } else {
+        if (['date', 'time', 'datetime'].includes(format.tsFormat)) {
+          displayValue = new Intl.DateTimeFormat(options?.locale, {
+            ...(format.tsFormat !== 'time' ? { dateStyle: 'medium' } : {}),
+            ...(format.tsFormat !== 'date' ? { timeStyle: 'medium' } : {}),
+          }).format(date)
+        } else {
           const hasTime =
             format.tsFormat.includes('HH') ||
             format.tsFormat.includes('mm') ||
@@ -550,9 +564,6 @@ export const renderViewItem = (
           }
           if (formatted) displayValue = formatted
         }
-      } catch (e) {
-        // Silently fail and use original value
-        console.debug('Format error:', e)
       }
     }
 

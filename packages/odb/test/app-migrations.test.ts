@@ -18,6 +18,7 @@ const migrations = {
   '00000000000001-app': () => import('../../../apps/db/src/migrations/00000000000001-app.js'),
   '00000000000002-sandbox': () =>
     import('../../../apps/db/src/migrations/00000000000002-sandbox.js'),
+  '00000000000003-admin': () => import('../../../apps/db/src/migrations/00000000000003-admin.js'),
 }
 
 const load = async (file: keyof typeof migrations) => (await migrations[file]()).migration
@@ -30,10 +31,60 @@ const loadUpSql = async () => {
 }
 
 describe('app-owned ORDS migrations', () => {
+  it('exposes read-only admin user services with bounded search and safe typed fields', async () => {
+    const { adminPackage, migration } = await migrations['00000000000003-admin']()
+    const endpoints = compileApplicationEndpoints(adminPackage.application())
+    expect(endpoints).toHaveLength(2)
+    for (const endpoint of endpoints) {
+      const node = endpoint.toNode()
+      expect(node.method).toBe('GET')
+      expect(node.source).toContain("odb_auth.has_role(v_auth_user_id, 'admin')")
+      const columns = node.params.find((param) => param.resultColumns?.length)?.resultColumns
+      expect(columns?.map((column) => column.name)).toEqual([
+        'id',
+        'username',
+        'display_name',
+        'enabled',
+        'created_at',
+        'updated_at',
+      ])
+      expect(node.source).toContain("WHEN 1 THEN 'true' WHEN 0 THEN 'false'")
+    }
+    const sql = migration.compile().up().join('\n')
+    expect(sql).toContain('ADMIN_LIMIT_INVALID')
+    expect(sql).toContain('p_limit < 1')
+    expect(sql).toContain('p_limit > 101')
+    expect(sql).toContain('FETCH FIRST NVL(p_limit, 26) ROWS ONLY')
+    expect(sql).toContain('id > p_after')
+    expect(sql).toContain('ORDER BY id ASC')
+    expect(sql).toContain('INSTR(LOWER(username), LOWER(TRIM(p_search)))')
+    expect(sql).toContain('INSTR(LOWER(display_name), LOWER(TRIM(p_search)))')
+    expect(sql).toContain('WHEN NO_DATA_FOUND THEN')
+    expect(sql).toContain('ADMIN_USER_NOT_FOUND')
+    expect(sql).not.toContain('password_hash')
+    expect(sql).not.toContain('refresh_token')
+    expect(sql).not.toMatch(/\b(?:INSERT INTO|UPDATE|DELETE FROM)\s+odb_auth_users/i)
+    expect(JSON.stringify(adminPackage.application())).not.toContain('"kind":"raw"')
+    const document = generateApplicationOpenApi(adminPackage.application()) as {
+      paths: Record<string, Record<string, { security: unknown; parameters: { name: string }[] }>>
+    }
+    expect(Object.keys(document.paths)).toEqual(['/admin/users', '/admin/users/{id}'])
+    expect(document.paths['/admin/users']?.get?.parameters.map((param) => param.name)).toEqual([
+      'cursor',
+      'limit',
+      'search',
+    ])
+    for (const path of Object.values(document.paths)) {
+      expect(Object.keys(path)).toEqual(['get'])
+      expect(path.get?.security).toEqual([{ bearerAuth: [] }])
+    }
+  })
+
   it('serializes every existing typed cursor service using its OpenAPI camelCase row names', async () => {
     const packages = [
       (await migrations['00000000000001-app']()).appPackage,
       (await migrations['00000000000002-sandbox']()).sandboxPackage,
+      (await migrations['00000000000003-admin']()).adminPackage,
     ]
     let cursorResponses = 0
     for (const pkg of packages) {
@@ -56,7 +107,7 @@ describe('app-owned ORDS migrations', () => {
     expect(cursorResponses).toBeGreaterThanOrEqual(5)
   })
 
-  it('splits the fresh-schema baseline into three ordered migrations with one owner per API package', async () => {
+  it('splits the fresh-schema baseline into ordered migrations with one owner per API package', async () => {
     expect(Object.keys(migrations)).toEqual(Object.keys(migrations).toSorted())
     expect(
       readdirSync(new URL('../../../apps/db/src/migrations/', import.meta.url))
@@ -71,16 +122,19 @@ describe('app-owned ORDS migrations', () => {
       '00000000000000_bootstrap',
       '00000000000001_app',
       '00000000000002_sandbox',
+      '00000000000003_admin',
     ])
     expect(ordered.map((migration) => migration.applications().map((app) => app.name))).toEqual([
       [],
       ['pck_app'],
       ['pck_sandbox'],
+      ['pck_admin'],
     ])
     expect(compiled.map((migration) => migration.blueGreenObjects)).toEqual([
       [],
       ['pck_app'],
       ['pck_sandbox'],
+      ['pck_admin'],
     ])
     const up = compiled.map((migration) => migration.up().join('\n'))
     for (const [index, marker] of [
@@ -90,12 +144,14 @@ describe('app-owned ORDS migrations', () => {
       [0, "ODBVUE.odb_auth.define_role('admin'"],
       [1, 'CREATE OR REPLACE PACKAGE ODBVUE.PCK_APP_BLUE AS'],
       [2, 'CREATE OR REPLACE PACKAGE ODBVUE.PCK_SANDBOX_BLUE AS'],
+      [3, 'CREATE OR REPLACE PACKAGE ODBVUE.PCK_ADMIN_BLUE AS'],
     ] as const) {
       expect(up[index]).toContain(marker)
       expect(up.filter((sql) => sql.includes(marker))).toHaveLength(1)
     }
     expect(up[1]).not.toContain('CREATE TABLE')
     expect(up[2]).not.toContain('CREATE TABLE')
+    expect(up[3]).not.toContain('CREATE TABLE')
   })
 
   it('rolls back APIs and seeds before their runtime dependencies', async () => {
@@ -107,6 +163,7 @@ describe('app-owned ORDS migrations', () => {
       .flatMap((migration) => migration.compile().down())
       .join('\n')
     const markers = [
+      'DROP PACKAGE ODBVUE.PCK_ADMIN_BLUE',
       'DROP PACKAGE ODBVUE.PCK_SANDBOX_BLUE',
       'DROP PACKAGE ODBVUE.PCK_APP_BLUE',
       "ODBVUE.odb_settings.remove('APP_VERSION')",

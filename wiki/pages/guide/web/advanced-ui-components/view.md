@@ -66,6 +66,27 @@ None.
 - `actionAlign`: alignment for the action row.
 - `maxLength`: default truncation limit.
 - `t`: optional translation function used by nested action formatting.
+- `locale`: optional locale override for date/time formatting; defaults to the current i18n locale.
+
+### Dates and Timestamps
+
+Pass service data unchanged and declare presentation in the item options:
+
+```ts
+const options: OvViewOptions = {
+  items: [
+    { name: 'birthday', format: { tsFormat: 'date' } },
+    { name: 'createdAt', format: { tsFormat: 'datetime' } },
+    { name: 'startTime', format: { tsFormat: 'time' } },
+  ],
+}
+```
+
+`VOvView` and `VOvTable` share this formatter. The named styles use the current
+locale and browser time zone, update when the locale changes, and accept ISO
+timestamp strings or `Date` objects. Date-only strings retain their calendar date.
+Empty values stay empty; invalid timestamps are logged and remain visible.
+Legacy `tsFormat` masks remain supported.
 
 ### Notes
 

@@ -25,6 +25,29 @@ const baseOptions: OvTableOptions = {
 }
 
 describe('VOvTable', () => {
+  it('formats raw timestamp columns through the shared renderer', () => {
+    const timestamp = '2026-11-11T03:03:34.956221Z'
+    const wrapper = mountTable(
+      {
+        key: 'id',
+        columns: [{ name: 'createdAt', format: { tsFormat: 'datetime' } }],
+        itemsPerPage: 5,
+        mobileItemsPerPage: 5,
+      },
+      [{ id: 'one', createdAt: timestamp }],
+    )
+    try {
+      expect(wrapper.text()).toContain(
+        new Intl.DateTimeFormat('en', {
+          dateStyle: 'medium',
+          timeStyle: 'medium',
+        }).format(new Date(timestamp)),
+      )
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it('renders table with column headers', () => {
     const wrapper = mountTable(baseOptions, sampleData)
     expect(wrapper.text()).toContain('name')

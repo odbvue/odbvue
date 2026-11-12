@@ -8,7 +8,7 @@
           :prepend-icon="page.meta.icon || '$mdiMinus'"
           :to="page.path"
         >
-          <v-list-item-title>{{ page.title }}</v-list-item-title>
+          <v-list-item-title>{{ translateTitle(page.title) }}</v-list-item-title>
         </v-list-item>
       </v-list>
       <v-divider />
@@ -163,7 +163,7 @@
       ></v-progress-linear>
     </v-app-bar>
     <v-app-bar>
-      <v-breadcrumbs :items="routing.breadcrumbs.value">
+      <v-breadcrumbs :items="breadcrumbs">
         <template v-slot:divider>
           <v-icon icon="$mdiChevronRight"></v-icon>
         </template>
@@ -219,12 +219,17 @@ import { usePreferencesStore } from '@/capabilities/ui'
 import { useNotificationMessage } from '@/capabilities/ui'
 
 const drawer = ref(false)
+const { t, te } = useI18n()
+const translateTitle = (title: string) => (te(title) ? t(title) : title)
 const preferences = usePreferencesStore()
 const { ui, auth } = useApp()
 const avatarUrl = computed(() => auth.user.value?.avatarUrl)
 const initials = computed(() => avatarInitials(auth.user.value))
 const notificationMessage = useNotificationMessage(() => ui.notification.value?.message)
 const routing = useRouting()
+const breadcrumbs = computed(() =>
+  routing.breadcrumbs.value.map((item) => ({ ...item, title: translateTitle(item.title) })),
+)
 const navigationPages = computed(() =>
   routing.pages.value.filter((page) => page.module === undefined && page.path !== '/settings'),
 )
@@ -249,5 +254,4 @@ async function logout() {
   }
 }
 const { mobile } = useDisplay()
-const { t } = useI18n()
 </script>

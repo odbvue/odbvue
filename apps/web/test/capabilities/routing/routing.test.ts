@@ -324,6 +324,16 @@ describe('routing metadata', () => {
       icon: '',
       disabled: true,
     })
+    expect(routing!.breadcrumbs.value.at(-2)).toMatchObject({
+      href: '/customers',
+      disabled: false,
+    })
+    routing!.setBreadcrumb()
+    expect(routing!.breadcrumbs.value.at(-1)).toMatchObject({
+      href: '/customers',
+      disabled: true,
+    })
+    expect(routing!.breadcrumbs.value.some((item) => item.title === 'Acme Corp')).toBe(false)
     await routing!.navigate('/customers/42')
     expect(routing!.params.pathParams.value).toEqual({ id: '42' })
   })

@@ -7,6 +7,7 @@
 import {
 	mdiAccount,
 	mdiAccountGroup,
+	mdiAccountOff,
 	mdiAccountSearch,
 	mdiAlert,
 	mdiAlertCircle,
@@ -128,6 +129,7 @@ import {
 export default {
 	mdiAccount,
 	mdiAccountGroup,
+	mdiAccountOff,
 	mdiAccountSearch,
 	mdiAlert,
 	mdiAlertCircle,

@@ -6,9 +6,13 @@
         class="h-100"
         :style="useCardBackground(page.meta.color || '#ffffff').value"
         :prepend-icon="page.meta.icon"
-        :title="page.title"
+        :title="te(page.title) ? t(page.title) : page.title"
         :to="page.path"
-        :text="page.meta.description"
+        :text="
+          page.meta.description && te(page.meta.description)
+            ? t(page.meta.description)
+            : page.meta.description
+        "
       >
       </v-card>
     </v-col>
@@ -27,6 +31,7 @@ definePage({
   },
 })
 import { useCardBackground } from '@/capabilities/ui'
+const { t, te } = useI18n()
 const routing = useRouting()
 const navigationPages = computed(() =>
   routing.pages.value.filter(

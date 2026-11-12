@@ -10,6 +10,24 @@ const columns: OrdsResultColumnNode[] = [
 ]
 
 describe('native cursor JSON responses', () => {
+  it('serializes numeric boolean columns as JSON booleans, preserving nulls', () => {
+    const source = new OrdsEndpoint('probe', 'pck_probe', 'list')
+      .param(
+        'P_ITEMS',
+        'OUT',
+        'RESULTSET',
+        undefined,
+        [{ name: 'enabled', type: 'boolean', nullable: true }],
+        'resultset',
+        'items',
+      )
+      .toNode().source
+    expect(source).toContain('v_output_0_column_0 NUMBER(1);')
+    expect(source).toContain(
+      "'enabled' VALUE CASE v_output_0_column_0 WHEN 1 THEN 'true' WHEN 0 THEN 'false' ELSE 'null' END FORMAT JSON",
+    )
+  })
+
   it('serializes cursor rows after the call and before headers, preserving nulls and value types', () => {
     const endpoint = new OrdsEndpoint('probe', 'pck_probe', 'list')
       .param('P_ITEMS', 'OUT', 'RESULTSET', undefined, columns, 'resultset', 'items')

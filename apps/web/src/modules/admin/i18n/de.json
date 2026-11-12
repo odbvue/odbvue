@@ -1,0 +1,23 @@
+{
+  "admin.title": "Administration",
+  "admin.users": "Benutzer",
+  "admin.usersDescription": "Benutzerkonten durchsuchen und Details anzeigen.",
+  "admin.userDetails": "Benutzerdetails",
+  "admin.details": "Details",
+  "admin.searchUsers": "Benutzername oder Anzeigename",
+  "admin.username": "Benutzername",
+  "admin.displayName": "Anzeigename",
+  "admin.userId": "Benutzer-ID",
+  "admin.status": "Status",
+  "admin.enabled": "Aktiviert",
+  "admin.disabled": "Deaktiviert",
+  "admin.createdAt": "Erstellt",
+  "admin.updatedAt": "Aktualisiert",
+  "admin.backToUsers": "Zurück zu den Benutzern",
+  "admin.readOnly": "Benutzerdetails sind schreibgeschützt.",
+  "admin.loadingUser": "Benutzerdetails werden geladen",
+  "admin.noUsers": "Keine Benutzer gefunden.",
+  "admin.userNotFound": "Benutzer nicht gefunden.",
+  "admin.loadUsersError": "Benutzer konnten nicht geladen werden. Erneut aktualisieren.",
+  "admin.loadUserError": "Benutzerdetails konnten nicht geladen werden."
+}
