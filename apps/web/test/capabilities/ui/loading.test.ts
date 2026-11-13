@@ -5,6 +5,33 @@ import { createLoading } from '@/capabilities/ui/loading'
 import { useUi } from '@/capabilities/ui/store'
 
 describe('keyed UI loading', () => {
+  it('runs UI operations with loading and returns successful results', async () => {
+    const ui = useUi(createState())
+    ui.error('Old error')
+    const pending = Promise.withResolvers<number>()
+    const running = ui.run('save', () => pending.promise)
+    expect(ui.loading.has('save')).toBe(true)
+    expect(ui.notification.value).toBeUndefined()
+    pending.resolve(42)
+    await expect(running).resolves.toBe(42)
+    expect(ui.loading.active.value).toBe(false)
+  })
+
+  it.each(['sync', 'async'] as const)(
+    'handles %s UI failures without an unhandled rejection',
+    async (kind) => {
+      const ui = useUi(createState())
+      await expect(
+        ui.run('save', () => {
+          if (kind === 'sync') throw new Error('Save failed')
+          return Promise.reject(new Error('Save failed'))
+        }),
+      ).resolves.toBeUndefined()
+      expect(ui.notification.value).toMatchObject({ type: 'error', message: 'Save failed' })
+      expect(ui.loading.active.value).toBe(false)
+    },
+  )
+
   it('counts same-key operations and releases each at most once', () => {
     const loading = createLoading()
     const first = loading.start('auth.login')

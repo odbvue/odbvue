@@ -9,6 +9,7 @@ import VOvView from '@/components/data/VOvView.vue'
 import { globalPlugins } from '../../support/components.setup'
 
 const { get } = vi.hoisted(() => ({ get: vi.fn<HttpClient['get']>() }))
+vi.mock('@/capabilities/client', () => ({ http: { get } }))
 vi.mock('@/capabilities/http', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/capabilities/http')>()),
   useHttp: () => ({ get }),

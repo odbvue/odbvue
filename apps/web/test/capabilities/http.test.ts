@@ -12,6 +12,35 @@ function response(status: number, data: unknown = {}): Response {
 }
 
 describe('HTTP capability', () => {
+  it('returns decoded data from putOrThrow and preserves the response-object API', async () => {
+    const fetch = vi.fn<FetchMock>(async () => response(200, { enabled: false }))
+    const http = useHttp({ fetch })
+    await expect(
+      http.putOrThrow<{ enabled: boolean }>('/status', { enabled: false }),
+    ).resolves.toEqual({ enabled: false })
+    expect(fetch.mock.calls[0]?.[1]?.method).toBe('PUT')
+    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toEqual({ enabled: false })
+    expect((await http.put('/status', { enabled: true })).error).toBeNull()
+  })
+
+  it('accepts 204 responses without requiring a response body', async () => {
+    const http = useHttp({
+      fetch: vi.fn<FetchMock>(async () => new Response(null, { status: 204 })),
+    })
+    await expect(http.putOrThrow('/status', { enabled: false })).resolves.toBeNull()
+  })
+
+  it('throws normalized failures from putOrThrow without retrying writes', async () => {
+    const fetch = vi.fn<FetchMock>(async () => response(403))
+    const http = useHttp({ fetch })
+    await expect(http.putOrThrow('/status', {})).rejects.toMatchObject({
+      status: 403,
+      request: '/status',
+    })
+    expect(fetch).toHaveBeenCalledOnce()
+    expect((await http.put('/status', {})).error?.status).toBe(403)
+  })
+
   it('forwards all verb helpers through the client while preserving options and bodies', async () => {
     const fetch = vi.fn<FetchMock>(() => Promise.resolve(response(200, { ok: true })))
     const http = useHttp({ fetch })

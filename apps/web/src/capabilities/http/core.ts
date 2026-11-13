@@ -59,6 +59,11 @@ export interface HttpClient {
   get<T>(url: string, options?: HttpRequestOptions): Promise<HttpResponse<T>>
   post<T>(url: string, body?: unknown, options?: HttpRequestOptions): Promise<HttpResponse<T>>
   put<T>(url: string, body?: unknown, options?: HttpRequestOptions): Promise<HttpResponse<T>>
+  putOrThrow<T = unknown>(
+    url: string,
+    body?: unknown,
+    options?: HttpRequestOptions,
+  ): Promise<T | null>
   delete<T>(url: string, options?: HttpRequestOptions): Promise<HttpResponse<T>>
   patch<T>(url: string, body?: unknown, options?: HttpRequestOptions): Promise<HttpResponse<T>>
   upload<T>(
@@ -250,6 +255,11 @@ export function createHttpClient(clientOptions: HttpClientOptions = {}): HttpCli
       method: 'PUT',
       body: body as Record<string, unknown>,
     })
+  http.putOrThrow = async <T>(url: string, body?: unknown, options?: HttpRequestOptions) => {
+    const { data, error } = await http.put<T>(url, body, options)
+    if (error) throw error
+    return data
+  }
   http.delete = (url, options) =>
     http(url, {
       ...options,

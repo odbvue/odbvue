@@ -59,22 +59,26 @@ all existing sessions without deleting account data. Re-enabling permits a fresh
 old sessions are not restored. Administrators cannot disable themselves (enforced in
 both the UI and API). Admin pages use shared `useUi()` alerts and app-level loading
 for list, detail, and status requests, including empty-list feedback. Loading is
-released on completion, cancellation, or unmount; page feedback is cleared on new
-requests and unmount.
+released when requests finish; page feedback is cleared on new requests and unmount.
 The [confirmation dialog](./src/components/overlays/VOvDialog.vue) closes on confirmation,
 before saving. Success and failure both use app-level alerts; failures leave the
 displayed user unchanged, and retrying requires a fresh confirmation.
 The [Details page](./src/modules/admin/pages/users/[id].vue) performs status changes
-with a direct `http.put()`, checks the result, and displays success or error feedback.
-It replaces the displayed user with the server response, including timestamps.
-App-level loading blocks duplicate submissions and is released on completion or navigation.
-The detail page uses no abort signals. Navigation ignores pending results rather than
-cancelling requests, and does not undo a change already applied by the server.
-[useMutation](./src/capabilities/http/mutation.ts) remains available for other workflows;
-no resource layer, operation-ID client, or HTTP lifecycle callbacks are required.
+with `ui.run('admin.users.status', async () => { ... })` and `http.putOrThrow()`.
+After a confirmed success, it updates the local `enabled` boolean. It does not select
+a returned record or refresh timestamps. The existing backend response stays compatible.
+`putOrThrow()` returns response data (including `null` for 204), or throws the normalized
+HTTP error; ordinary `http.put()` still returns the response object.
+`ui.run()` clears old feedback, tracks loading, and reports thrown errors as alerts
+without rejecting. Use `ui.loading.run()` when error propagation is needed instead.
+App-level loading blocks duplicate submissions. Writes continue to completion even
+after navigation, without signals or cancellation bookkeeping.
+[useMutation](./src/capabilities/http/mutation.ts) remains available for workflows that need
+reactive mutation state and cancellation; simple updates need no mutation-specific composable.
 The [Details page](./src/modules/admin/pages/users/[id].vue) owns detail fetching,
-status updates, confirmation, response validation, breadcrumbs, and localized feedback.
-Its only watcher reloads details when the route user ID changes.
+using a direct `http.get()` inside `ui.run()`, with no fetch composable.
+Its route watcher loads details when the user ID changes; stale detail results are ignored.
+The existing dialog component owns confirmation state.
 Mutations are never automatically retried.
 
 The admin-only `PUT /admin/users/{id}/status` accepts `{ "enabled": true | false }`

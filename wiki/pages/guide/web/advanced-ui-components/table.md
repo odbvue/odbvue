@@ -356,27 +356,21 @@ const {
 
 **Returns:** `{ loading, data, fetch }`
 
-### useFormAction
+### Simple mutations
 
-Handles form-based actions with automatic error handling and loading state.
-
-```typescript
-const { action: actionSettings } = useFormAction({
-  endpoint: 'adm/setting/',
-})
-```
-
-**Options:**
-
-- `endpoint` (string, required): API endpoint for the action
-
-**Returns:** `{ loading, action }`
-
-The action function accepts: `(name, item, value?, callback?)` where callback receives errors if present.
-
-**Multiple Actions:**
+For a simple update, call HTTP directly and use `ui.run` for loading and error feedback:
 
 ```typescript
-const { action: actionSettings } = useFormAction({ endpoint: 'adm/setting/' })
-const { action: actionUsers } = useFormAction({ endpoint: 'adm/user/' })
+const http = useHttp()
+const ui = useUi()
+
+async function updateSetting(id: string, value: string) {
+  await ui.run('settings.update', async () => {
+    await http.putOrThrow(`/settings/${encodeURIComponent(id)}`, { value })
+    ui.success('settings.updated')
+  })
+}
 ```
+
+`putOrThrow` throws on HTTP failure; `ui.run` reports the error and releases loading.
+Use `ui.loading.run` instead if the caller needs the error to propagate.

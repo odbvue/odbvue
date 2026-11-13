@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { computed, defineComponent } from 'vue'
+import { computed, defineComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { createI18n } from 'vue-i18n'
@@ -19,13 +19,14 @@ import { renderViewItem, type OvTableOptions } from '@/components/api'
 
 const { get, put, authUser } = vi.hoisted(() => ({
   get: vi.fn<HttpClient['get']>(),
-  put: vi.fn<HttpClient['put']>(),
+  put: vi.fn<HttpClient['putOrThrow']>(),
   authUser: { value: { id: 'C'.repeat(32) } },
 }))
 vi.mock('@/capabilities/http', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/capabilities/http')>()),
-  useHttp: () => ({ get, put }),
+  useHttp: () => ({ get, putOrThrow: put }),
 }))
+vi.mock('@/capabilities/client', () => ({ http: { get } }))
 vi.mock('@/capabilities/auth', () => ({ useAuth: () => ({ user: authUser }) }))
 
 const table = defineComponent({
@@ -98,17 +99,31 @@ async function setup(details = false) {
           template: '<button :disabled="disabled"><slot /></button>',
         },
         VOvDialog: {
-          props: ['modelValue', 'title', 'content', 'actions', 'actionCancel', 'actionSubmit'],
+          props: ['title', 'content', 'actions', 'actionCancel', 'actionSubmit'],
           emits: ['update:modelValue', 'submit', 'cancel'],
+          setup() {
+            const open = ref(false)
+            const root = ref<HTMLElement>()
+            let activator: HTMLElement | null | undefined
+            const activate = () => {
+              open.value = true
+            }
+            onMounted(() => {
+              activator = root.value?.parentElement
+              activator?.addEventListener('click', activate)
+            })
+            onBeforeUnmount(() => activator?.removeEventListener('click', activate))
+            return { open, root }
+          },
           template: `
-            <div v-if="modelValue" role="dialog">
+            <span ref="root"><div v-if="open" role="dialog" @click.stop>
               {{ title }}{{ content }}
               <button v-for="action in actions" @click="
                 $emit((typeof action === 'string' ? action : action.name) === actionSubmit ? 'submit' : 'cancel');
-                $emit('update:modelValue', false)
+                open = false
               ">{{ $t(typeof action === 'string' ? action : action.name) }}</button>
               <slot name="content" /><slot name="actions" />
-            </div>`,
+            </div></span>`,
         },
         VCard: {
           props: ['title', 'subtitle', 'text'],
@@ -129,7 +144,7 @@ beforeEach(() => {
   ui.clear()
   vi.stubGlobal('definePage', vi.fn<() => void>())
   get.mockReset()
-  get.mockResolvedValue(result())
+  get.mockImplementation(async () => result([{ ...user }]))
   put.mockReset()
   authUser.value = { id: 'C'.repeat(32) }
 })
@@ -294,9 +309,7 @@ describe('admin users list', () => {
 describe('admin user details', () => {
   it('loads the selected account into a static view in a single Details tab', async () => {
     const { wrapper, router } = await setup(true)
-    expect(get).toHaveBeenCalledWith(
-      `/admin/users/${user.id}`,
-    )
+    expect(get).toHaveBeenCalledWith(`/admin/users/${user.id}`)
     const component = wrapper.findComponent(view)
     expect(component.props('data')).toEqual(user)
     expect(wrapper.get('h3').text()).toBe(user.username)
@@ -351,9 +364,10 @@ describe('admin user details', () => {
     get.mockResolvedValue(result([next]))
     await router.push(`/admin/users/${next.id}`)
     await flushPromises()
-    expect(ui.loading.active.value).toBe(false)
+    expect(ui.loading.has('admin.users.details')).toBe(true)
     resolveFirst(failure(500))
     await flushPromises()
+    expect(ui.loading.active.value).toBe(false)
     expect(wrapper.findComponent(view).props('data')).toEqual(next)
     expect(wrapper.get('h3').text()).toBe(next.username)
     expect(getBreadcrumbOverride(router).value?.title).toBe(next.displayName)
@@ -361,7 +375,7 @@ describe('admin user details', () => {
     expect(ui.notification.value).toBeUndefined()
   })
 
-  it('releases detail loading on unmount and ignores late errors', async () => {
+  it('tracks a detail request until completion after unmount and ignores its late response', async () => {
     let resolveRequest!: (response: ReturnType<typeof result>) => void
     get.mockReturnValue(
       new Promise((resolve) => {
@@ -371,21 +385,22 @@ describe('admin user details', () => {
     const { wrapper } = await setup(true)
     expect(ui.loading.active.value).toBe(true)
     wrapper.unmount()
-    expect(ui.loading.active.value).toBe(false)
+    expect(ui.loading.has('admin.users.details')).toBe(true)
     resolveRequest(failure(500))
     await flushPromises()
+    expect(ui.loading.active.value).toBe(false)
     expect(ui.notification.value).toBeUndefined()
   })
 
   it('reports thrown detail requests and releases app loading', async () => {
     get.mockRejectedValue(new Error('Network failed'))
     const { wrapper } = await setup(true)
-    expect(ui.notification.value).toMatchObject({ type: 'error', message: 'admin.loadUserError' })
+    expect(ui.notification.value).toMatchObject({ type: 'error', message: 'Network failed' })
     expect(ui.loading.active.value).toBe(false)
     expect(wrapper.findComponent(view).exists()).toBe(false)
   })
 
-  it('requires confirmation before disabling and updates status and timestamps from the server', async () => {
+  it('requires confirmation before disabling and updates the local status after success', async () => {
     const { wrapper } = await setup(true)
     const disable = wrapper
       .findAll('button')
@@ -397,15 +412,13 @@ describe('admin user details', () => {
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
     expect(put).not.toHaveBeenCalled()
     await disable.trigger('click')
-    const updated = { ...user, enabled: false, updatedAt: '2026-11-13T10:00:00Z' }
-    put.mockResolvedValue(result([updated]))
+    put.mockResolvedValue(null)
     await wrapper.get('[role="dialog"]').findAll('button')[1]!.trigger('click')
     await flushPromises()
-    expect(put).toHaveBeenCalledExactlyOnceWith(
-      `/admin/users/${user.id}/status`,
-      { enabled: false },
-    )
-    expect(wrapper.findComponent(view).props('data')).toEqual(updated)
+    expect(put).toHaveBeenCalledExactlyOnceWith(`/admin/users/${user.id}/status`, {
+      enabled: false,
+    })
+    expect(wrapper.findComponent(view).props('data')).toEqual({ ...user, enabled: false })
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
     expect(ui.notification.value).toMatchObject({ type: 'success', message: 'admin.userDisabled' })
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
@@ -421,10 +434,7 @@ describe('admin user details', () => {
       .find((button) => button.text() === messages['admin.enableUser'])!
       .trigger('click')
     await flushPromises()
-    expect(put).toHaveBeenCalledWith(
-      `/admin/users/${user.id}/status`,
-      { enabled: true },
-    )
+    expect(put).toHaveBeenCalledWith(`/admin/users/${user.id}/status`, { enabled: true })
     expect(wrapper.findComponent(view).props('data').enabled).toBe(true)
     expect(ui.notification.value).toMatchObject({ type: 'success', message: 'admin.userEnabled' })
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
@@ -446,7 +456,7 @@ describe('admin user details', () => {
   it.each([403, 404, 500])(
     'keeps the old status and reports a %s failure through the app alert',
     async (status) => {
-      put.mockResolvedValue(failure(status))
+      put.mockRejectedValue(failure(status).error)
       const { wrapper } = await setup(true)
       await wrapper
         .findAll('button')
@@ -460,7 +470,7 @@ describe('admin user details', () => {
       expect(wrapper.text()).not.toContain(messages['admin.userDisabled'])
       expect(ui.notification.value).toMatchObject({
         type: 'error',
-        message: status === 404 ? 'admin.userNotFound' : 'admin.statusUpdateError',
+        message: 'Request failed',
       })
       expect(ui.loading.active.value).toBe(false)
       expect(
@@ -473,7 +483,7 @@ describe('admin user details', () => {
   )
 
   it('requires a fresh confirmation to retry a failure and clears the alert when saving', async () => {
-    put.mockResolvedValue(failure(500))
+    put.mockRejectedValue(failure(500).error)
     const { wrapper } = await setup(true)
     await wrapper
       .findAll('button')
@@ -481,7 +491,7 @@ describe('admin user details', () => {
       .trigger('click')
     await wrapper.get('[role="dialog"]').findAll('button')[1]!.trigger('click')
     await flushPromises()
-    expect(ui.notification.value?.message).toBe('admin.statusUpdateError')
+    expect(ui.notification.value?.message).toBe('Request failed')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
     await wrapper
@@ -506,9 +516,9 @@ describe('admin user details', () => {
     expect(ui.notification.value?.message).toBe('admin.userDisabled')
   })
 
-  it('reports an empty mutation response instead of claiming success', async () => {
+  it('accepts a no-content mutation response without selecting a returned record', async () => {
     get.mockResolvedValue(result([{ ...user, enabled: false }]))
-    put.mockResolvedValue(result([]))
+    put.mockResolvedValue(null)
     const { wrapper } = await setup(true)
     await wrapper
       .findAll('button')
@@ -516,11 +526,10 @@ describe('admin user details', () => {
       .trigger('click')
     await flushPromises()
     expect(ui.notification.value).toMatchObject({
-      type: 'error',
-      message: 'admin.statusUpdateError',
+      type: 'success',
+      message: 'admin.userEnabled',
     })
-    expect(wrapper.findComponent(view).props('data').enabled).toBe(false)
-    expect(wrapper.text()).not.toContain(messages['admin.userEnabled'])
+    expect(wrapper.findComponent(view).props('data').enabled).toBe(true)
   })
 
   it('reports a thrown status request and releases loading without changing the user', async () => {
@@ -534,13 +543,13 @@ describe('admin user details', () => {
     await flushPromises()
     expect(ui.notification.value).toMatchObject({
       type: 'error',
-      message: 'admin.statusUpdateError',
+      message: 'Network failed',
     })
     expect(ui.loading.active.value).toBe(false)
     expect(wrapper.findComponent(view).props('data').enabled).toBe(false)
   })
 
-  it('prevents duplicate submissions and ignores a late mutation after navigating away', async () => {
+  it('prevents duplicate submissions and only changes the original account after navigation', async () => {
     let resolveMutation!: (response: ReturnType<typeof result>) => void
     put.mockReturnValue(
       new Promise((resolve) => {
@@ -566,14 +575,15 @@ describe('admin user details', () => {
     get.mockResolvedValue(result([next]))
     await router.push(`/admin/users/${next.id}`)
     await flushPromises()
-    expect(ui.loading.active.value).toBe(false)
+    expect(ui.loading.has('admin.users.status')).toBe(true)
     expect(put.mock.calls[0]).toHaveLength(2)
     resolveMutation(result([{ ...user, enabled: false }]))
     await flushPromises()
     expect(wrapper.findComponent(view).props('data')).toEqual(next)
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain(messages['admin.userDisabled'])
-    expect(ui.notification.value).toBeUndefined()
+    expect(ui.notification.value?.message).toBe('admin.userDisabled')
+    ui.clear()
   })
 
   it('closes an unsubmitted confirmation when the route user changes', async () => {
@@ -591,7 +601,7 @@ describe('admin user details', () => {
     expect(put).not.toHaveBeenCalled()
   })
 
-  it('releases mutation loading on unmount and ignores late failures', async () => {
+  it('lets a write finish after unmount and reports its failure through ui.run', async () => {
     get.mockResolvedValue(result([{ ...user, enabled: false }]))
     let rejectMutation!: (cause: Error) => void
     put.mockReturnValue(
@@ -606,10 +616,12 @@ describe('admin user details', () => {
       .trigger('click')
     expect(ui.loading.has('admin.users.status')).toBe(true)
     wrapper.unmount()
-    expect(ui.loading.active.value).toBe(false)
+    expect(ui.loading.has('admin.users.status')).toBe(true)
     expect(put.mock.calls[0]).toHaveLength(2)
     rejectMutation(new Error('Network failed'))
     await flushPromises()
-    expect(ui.notification.value).toBeUndefined()
+    expect(ui.loading.active.value).toBe(false)
+    expect(ui.notification.value).toMatchObject({ type: 'error', message: 'Network failed' })
+    ui.clear()
   })
 })

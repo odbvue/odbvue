@@ -16,17 +16,16 @@
             :text="user.enabled && isSelf ? t('admin.cannotDisableSelf') : undefined"
           >
             <v-card-actions>
-              <v-btn
-                v-if="user.enabled"
-                color="warning"
-                :disabled="busy || isSelf"
-              >
+              <v-btn v-if="user.enabled" color="warning" :disabled="busy || isSelf">
                 {{ t('admin.disableUser') }}
                 <v-ov-dialog
                   activator="parent"
                   :title="t('admin.confirmDisableUser')"
                   :content="t('admin.disableConfirmation', { username: user.username })"
-                  :actions="['admin.cancel', { name: 'admin.disableUser', format: { color: 'warning' } }]"
+                  :actions="[
+                    'admin.cancel',
+                    { name: 'admin.disableUser', format: { color: 'warning' } },
+                  ]"
                   action-cancel="admin.cancel"
                   action-submit="admin.disableUser"
                   max-width="480"
@@ -45,11 +44,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onScopeDispose, ref, watchEffect } from 'vue'
+import { computed, onScopeDispose, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuth } from '@/capabilities/auth'
-import { useFetch, useFormAction } from '@/capabilities/http'
+import { useHttp } from '@/capabilities/http'
 import { computedRouteParam, useRouting } from '@/capabilities/routing'
 import { useUi } from '@/capabilities/ui'
 import type { components } from '@/api/openapi.generated'
@@ -65,39 +64,36 @@ definePage({
 })
 
 const { t } = useI18n()
+const http = useHttp()
 const auth = useAuth()
 const routing = useRouting()
 const ui = useUi()
 const tab = ref('details')
 const id = computedRouteParam(useRoute(), 'id')
-const selectUser = (response: components['schemas']['AdminGetUserResponse']) => response.items[0]
-const { data: user, loading } = useFetch({
-  endpoint: () => `/admin/users/${encodeURIComponent(id.value)}`,
-  select: selectUser,
-  loadingKey: 'admin.users.details',
-  messages: {
-    error: 'admin.loadUserError',
-    notFound: 'admin.userNotFound',
-    empty: 'admin.userNotFound',
-  },
-})
-const { action: setEnabled, loading: saving } = useFormAction({
-  endpoint: () => `/admin/users/${encodeURIComponent(id.value)}/status`,
-  method: 'put',
-  transformPayload: (enabled: boolean) => ({ enabled }),
-  select: selectUser,
-  loadingKey: 'admin.users.status',
-  messages: {
-    error: 'admin.statusUpdateError',
-    notFound: 'admin.userNotFound',
-    success: (_user, enabled) => enabled ? 'admin.userEnabled' : 'admin.userDisabled',
-  },
-  onSuccess: (updated) => { user.value = updated },
-})
+const user = ref<components['schemas']['AdminGetUserItemsItem']>()
 const isSelf = computed(() => user.value?.id === auth.user.value?.id)
-const busy = computed(() => loading.value || saving.value)
-watchEffect(() =>
-  routing.setBreadcrumb(user.value?.displayName?.trim() || user.value?.username),
+const busy = computed(() => ui.loading.has('admin.users'))
+watchEffect(() => routing.setBreadcrumb(user.value?.displayName?.trim() || user.value?.username))
+
+watch(
+  id,
+  (value, _previous, onCleanup) => {
+    let current = true
+    onCleanup(() => {
+      current = false
+    })
+    user.value = undefined
+    void ui.run('admin.users.details', async () => {
+      const { data, error, status } = await http.get<components['schemas']['AdminGetUserResponse']>(
+        `/admin/users/${encodeURIComponent(value)}`,
+      )
+      if (!current) return
+      if (error) throw new Error(status === 404 ? 'admin.userNotFound' : 'admin.loadUserError')
+      user.value = data?.items[0]
+      if (!user.value) throw new Error('admin.userNotFound')
+    })
+  },
+  { immediate: true },
 )
 
 const options = computed<OvViewOptions>(() => ({
@@ -122,6 +118,17 @@ const options = computed<OvViewOptions>(() => ({
     { name: 'updatedAt', label: t('admin.updatedAt'), format: { tsFormat: 'datetime' } },
   ],
 }))
+
+async function setEnabled(enabled: boolean) {
+  const account = user.value
+  if (!account || busy.value) return
+  if (!enabled && isSelf.value) return ui.error('admin.cannotDisableSelf')
+  await ui.run('admin.users.status', async () => {
+    await http.putOrThrow(`/admin/users/${encodeURIComponent(account.id)}/status`, { enabled })
+    account.enabled = enabled
+    ui.success(enabled ? 'admin.userEnabled' : 'admin.userDisabled')
+  })
+}
 
 onScopeDispose(() => {
   routing.setBreadcrumb()

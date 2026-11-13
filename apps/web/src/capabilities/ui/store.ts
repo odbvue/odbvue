@@ -90,6 +90,16 @@ export function useUi(state: Pinia = pinia) {
     notification: readonly(notification),
     snackbar: readonly(snackbar),
     clear: store.clearAll,
+    /** Handles UI-operation failures; loading.run remains available for propagation. */
+    run: async <T>(key: string, action: () => T | Promise<T>): Promise<T | undefined> => {
+      store.clearAll()
+      try {
+        return await store.runLoading(key, action)
+      } catch (error) {
+        store.show('error', messageFrom(error), 'alert')
+        return undefined
+      }
+    },
     info: (message: string, options?: AlertOptions) =>
       store.show('info', message, 'alert', options),
     success: (message: string, options?: AlertOptions) =>
