@@ -59,7 +59,7 @@ all existing sessions without deleting account data. Re-enabling permits a fresh
 old sessions are not restored. Administrators cannot disable themselves (enforced in
 both the UI and API). Admin pages use shared `useUi()` alerts and app-level loading
 for list, detail, and status requests, including empty-list feedback. Loading is
-released when requests finish. The details page does not clear unrelated global feedback.
+released when requests finish. Neither admin users page clears unrelated global feedback.
 The [confirmation dialog](./src/components/overlays/VOvDialog.vue) closes on confirmation,
 before saving. Success and failure both use app-level alerts; failures leave the
 displayed user unchanged, and retrying requires a fresh confirmation.
@@ -80,9 +80,9 @@ notifications are operation-wide and may appear after leaving the page.
 reactive mutation state and cancellation; simple updates need no mutation-specific composable.
 The [Details page](./src/modules/admin/pages/users/[id].vue) owns detail fetching,
 using a direct `http.get()` inside `ui.run()`, with no fetch composable.
-It loads details on mount and reloads them when the user ID changes. Requests are not
-cancelled or ordered, so a slow earlier response can overwrite a newer user's details;
-errors may also appear after navigation or unmount.
+It loads details on mount. The router creates a fresh page when the path changes;
+query and hash changes keep the same page. Requests are not cancelled,
+so errors from a page that has been left can still appear as global notifications.
 The existing dialog component owns confirmation state.
 Mutations are never automatically retried.
 

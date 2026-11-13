@@ -1,6 +1,6 @@
 <template>
   <component :is="LayoutComponent">
-    <RouterView />
+    <RouterView :key="route.path" />
   </component>
 </template>
 

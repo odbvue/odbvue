@@ -44,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuth } from '@/capabilities/auth'
@@ -75,20 +75,16 @@ const isSelf = computed(() => user.value?.id === auth.user.value?.id)
 const busy = computed(() => ui.loading.has('admin.users'))
 watchEffect(() => routing.setBreadcrumb(user.value?.displayName?.trim() || user.value?.username))
 
-function loadUser(userId: string) {
-  user.value = undefined
+onMounted(() => {
   void ui.run('admin.users.details', async () => {
     const { data, error, status } = await http.get<components['schemas']['AdminGetUserResponse']>(
-      `/admin/users/${encodeURIComponent(userId)}`,
+      `/admin/users/${encodeURIComponent(id.value)}`,
     )
     if (error) throw new Error(status === 404 ? 'admin.userNotFound' : 'admin.loadUserError')
     user.value = data?.items[0]
     if (!user.value) throw new Error('admin.userNotFound')
   })
-}
-
-onMounted(() => loadUser(id.value))
-watch(id, loadUser)
+})
 
 const options = computed<OvViewOptions>(() => ({
   cols: 2,

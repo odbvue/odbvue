@@ -13,7 +13,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useCursorQuery, useHttp } from '@/capabilities/http'
 import { useUi } from '@/capabilities/ui'
@@ -38,7 +38,6 @@ const { items, nextCursor, loading, load } = useCursorQuery({
     http.get<components['schemas']['AdminListUsersResponse']>('/admin/users', { query, signal }),
   onError: () => ui.error('admin.loadUsersError'),
 })
-onBeforeUnmount(() => ui.clear())
 
 const options = computed<OvTableOptions>(() => ({
   key: 'id',
@@ -89,7 +88,6 @@ async function fetchUsers(
   _sort?: string,
   complete?: (success: boolean) => void,
 ) {
-  ui.clear()
   const success = await load({ cursor, limit, search })
   if (success && !items.value.length) ui.info('admin.noUsers')
   complete?.(success)

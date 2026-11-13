@@ -14,6 +14,7 @@ import { useUi } from '@/capabilities/ui'
 import type { components } from '@/api/openapi.generated'
 import Users from '@/modules/admin/pages/users/index.vue'
 import UserDetails from '@/modules/admin/pages/users/[id].vue'
+import App from '@/app/App.vue'
 import messages from '@/modules/admin/i18n/en.json'
 import { renderViewItem, type OvTableOptions } from '@/components/api'
 
@@ -28,6 +29,12 @@ vi.mock('@/capabilities/http', async (importOriginal) => ({
 }))
 vi.mock('@/capabilities/client', () => ({ http: { get } }))
 vi.mock('@/capabilities/auth', () => ({ useAuth: () => ({ user: authUser }) }))
+vi.mock('@/app/layouts/DefaultLayout.vue', () => ({
+  default: { template: '<main><slot /></main>' },
+}))
+vi.mock('@/app/layouts/FullscreenLayout.vue', () => ({
+  default: { template: '<main><slot /></main>' },
+}))
 
 const table = defineComponent({
   name: 'VOvTable',
@@ -82,7 +89,7 @@ async function setup(details = false) {
     ],
   })
   await router.push(details ? `/admin/users/${user.id}` : '/admin/users')
-  const wrapper = mount(details ? UserDetails : Users, {
+  const wrapper = mount(App, {
     global: {
       plugins: [router, createI18n({ legacy: false, locale: 'en', messages: { en: messages } })],
       stubs: {
@@ -180,6 +187,20 @@ describe('admin page metadata', () => {
 })
 
 describe('admin users list', () => {
+  it('preserves unrelated feedback during searches and after unmount', async () => {
+    const pending = Promise.withResolvers<ReturnType<typeof result>>()
+    get.mockReturnValue(pending.promise)
+    ui.success('Other operation completed')
+    const { wrapper } = await setup()
+    wrapper.findComponent(table).vm.$emit('fetch', [], undefined, 5, 'ada')
+    expect(ui.notification.value?.message).toBe('Other operation completed')
+    pending.resolve(result())
+    await flushPromises()
+    expect(ui.notification.value?.message).toBe('Other operation completed')
+    wrapper.unmount()
+    expect(ui.notification.value?.message).toBe('Other operation completed')
+  })
+
   it('requests five displayed users and uses backend-owned continuation on desktop and mobile', async () => {
     const records = Array.from({ length: 5 }, (_, index) => ({
       ...user,
@@ -358,7 +379,7 @@ describe('admin user details', () => {
     expect(wrapper.findComponent(view).exists()).toBe(false)
   })
 
-  it('reloads on route changes but allows a late response to replace the newer user', async () => {
+  it('ignores a late response for the previous user after a route change', async () => {
     let resolveFirst!: (response: ReturnType<typeof result>) => void
     get.mockReturnValueOnce(
       new Promise((resolve) => {
@@ -376,9 +397,9 @@ describe('admin user details', () => {
     resolveFirst(result([{ ...user }]))
     await flushPromises()
     expect(ui.loading.active.value).toBe(false)
-    expect(wrapper.findComponent(view).props('data')).toEqual(user)
-    expect(wrapper.get('h3').text()).toBe(user.username)
-    expect(getBreadcrumbOverride(router).value?.title).toBe(user.displayName)
+    expect(wrapper.findComponent(view).props('data')).toEqual(next)
+    expect(wrapper.get('h3').text()).toBe(next.username)
+    expect(getBreadcrumbOverride(router).value?.title).toBe(next.displayName)
     expect(get.mock.calls[0]).toHaveLength(1)
     expect(ui.notification.value).toBeUndefined()
   })
@@ -423,6 +444,38 @@ describe('admin user details', () => {
       }
     },
   )
+
+  it('ignores an old response even after navigating back to the same user', async () => {
+    const first = Promise.withResolvers<ReturnType<typeof result>>()
+    get.mockReturnValueOnce(first.promise)
+    const { wrapper, router } = await setup(true)
+    const next = { ...user, id: 'B'.repeat(32) }
+    get.mockResolvedValueOnce(result([next]))
+    await router.push(`/admin/users/${next.id}`)
+    await flushPromises()
+    const latest = { ...user, displayName: 'Latest' }
+    get.mockResolvedValueOnce(result([latest]))
+    await router.push(`/admin/users/${user.id}`)
+    await flushPromises()
+    first.resolve(result([{ ...user, displayName: 'Stale' }]))
+    await flushPromises()
+    expect(wrapper.findComponent(view).props('data')).toEqual(latest)
+    expect(getBreadcrumbOverride(router).value?.title).toBe('Latest')
+  })
+
+  it('reports a returned error from a previous page without changing the new user', async () => {
+    const first = Promise.withResolvers<ReturnType<typeof result>>()
+    get.mockReturnValueOnce(first.promise)
+    const { wrapper, router } = await setup(true)
+    const next = { ...user, id: 'B'.repeat(32) }
+    get.mockResolvedValue(result([next]))
+    await router.push(`/admin/users/${next.id}`)
+    await flushPromises()
+    first.resolve(failure(500))
+    await flushPromises()
+    expect(ui.notification.value?.message).toBe('admin.loadUserError')
+    expect(wrapper.findComponent(view).props('data')).toEqual(next)
+  })
 
   it('reports thrown detail requests and releases app loading', async () => {
     get.mockRejectedValue(new Error('Network failed'))
