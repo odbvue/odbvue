@@ -1,4 +1,5 @@
 import { onScopeDispose, ref, shallowReadonly, shallowRef } from 'vue'
+import { useUi } from '../ui/store.js'
 import type { HttpResponse } from './core.js'
 
 export interface CursorQueryParams {
@@ -13,6 +14,8 @@ export interface CursorPage<Item> {
 }
 
 export interface CursorQueryOptions<Item> {
+  /** Opts into app-level loading, released on completion, cancellation, or scope disposal. */
+  loadingKey?: string
   /** Receives the displayed page size; continuation is owned by the server. */
   fetch: (
     params: CursorQueryParams & { signal: AbortSignal },
@@ -30,11 +33,14 @@ export function useCursorQuery<Item>(options: CursorQueryOptions<Item>) {
   let requestId = 0
   let controller: AbortController | undefined
   let disposed = false
+  let stopLoading: (() => void) | undefined
 
   function cancel() {
     requestId++
     controller?.abort()
     controller = undefined
+    stopLoading?.()
+    stopLoading = undefined
     loading.value = false
   }
 
@@ -49,6 +55,7 @@ export function useCursorQuery<Item>(options: CursorQueryOptions<Item>) {
     let failure: Error | undefined
 
     try {
+      if (options.loadingKey !== undefined) stopLoading = useUi().loading.start(options.loadingKey)
       if (!Number.isSafeInteger(params.limit) || params.limit < 1) {
         throw new RangeError('Cursor query limit must be a positive safe integer')
       }
@@ -81,6 +88,8 @@ export function useCursorQuery<Item>(options: CursorQueryOptions<Item>) {
       error.value = failure
     } finally {
       if (currentRequest === requestId) {
+        stopLoading?.()
+        stopLoading = undefined
         loading.value = false
         loaded.value = true
         controller = undefined

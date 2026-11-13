@@ -641,6 +641,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/users/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Enable or disable a user; disabling revokes sessions and cannot target yourself */
+        put: operations["admin_set_user_enabled"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -833,6 +850,19 @@ export interface components {
         };
         AdminGetUserResponse: {
             items: components["schemas"]["AdminGetUserItemsItem"][];
+        };
+        AdminSetUserEnabledItemsItem: {
+            id: string;
+            username: string;
+            displayName?: string | null;
+            enabled: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        AdminSetUserEnabledResponse: {
+            items: components["schemas"]["AdminSetUserEnabledItemsItem"][];
         };
     };
     responses: never;
@@ -2314,6 +2344,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminGetUserResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient authorization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    admin_set_user_enabled: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    enabled?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSetUserEnabledResponse"];
                 };
             };
             /** @description Authentication required */

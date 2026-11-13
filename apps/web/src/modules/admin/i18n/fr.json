@@ -1,7 +1,7 @@
 {
   "admin.title": "Administration",
   "admin.users": "Utilisateurs",
-  "admin.usersDescription": "Parcourir les comptes et consulter leurs détails.",
+  "admin.usersDescription": "Parcourir les comptes, consulter leurs détails et gérer leur accès.",
   "admin.userDetails": "Détails de l'utilisateur",
   "admin.details": "Détails",
   "admin.searchUsers": "Nom d'utilisateur ou nom affiché",
@@ -19,5 +19,17 @@
   "admin.noUsers": "Aucun utilisateur trouvé.",
   "admin.userNotFound": "Utilisateur introuvable.",
   "admin.loadUsersError": "Impossible de charger les utilisateurs. Actualisez pour réessayer.",
-  "admin.loadUserError": "Impossible de charger les détails de l'utilisateur."
+  "admin.loadUserError": "Impossible de charger les détails de l'utilisateur.",
+  "admin.accountAccess": "Accès au compte",
+  "admin.disableDescription": "La désactivation bloque la connexion et met fin à toutes les sessions existantes. Le compte et ses données sont conservés.",
+  "admin.enableDescription": "Activez ce compte pour permettre à l'utilisateur de se reconnecter. Les anciennes sessions restent révoquées.",
+  "admin.disableUser": "Désactiver l'utilisateur",
+  "admin.enableUser": "Activer l'utilisateur",
+  "admin.confirmDisableUser": "Désactiver cet utilisateur ?",
+  "admin.disableConfirmation": "Désactiver {username} ? L'utilisateur sera déconnecté et ne pourra plus se connecter tant que le compte ne sera pas réactivé.",
+  "admin.cannotDisableSelf": "Vous ne pouvez pas désactiver votre propre compte.",
+  "admin.cancel": "Annuler",
+  "admin.statusUpdateError": "Impossible de modifier le statut du compte. Veuillez réessayer.",
+  "admin.userEnabled": "Utilisateur activé.",
+  "admin.userDisabled": "Utilisateur désactivé. Les sessions existantes ont été révoquées."
 }

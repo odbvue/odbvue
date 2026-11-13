@@ -1,7 +1,7 @@
 {
   "admin.title": "Administration",
   "admin.users": "Benutzer",
-  "admin.usersDescription": "Benutzerkonten durchsuchen und Details anzeigen.",
+  "admin.usersDescription": "Benutzerkonten durchsuchen, Details anzeigen und den Kontozugriff verwalten.",
   "admin.userDetails": "Benutzerdetails",
   "admin.details": "Details",
   "admin.searchUsers": "Benutzername oder Anzeigename",
@@ -19,5 +19,17 @@
   "admin.noUsers": "Keine Benutzer gefunden.",
   "admin.userNotFound": "Benutzer nicht gefunden.",
   "admin.loadUsersError": "Benutzer konnten nicht geladen werden. Erneut aktualisieren.",
-  "admin.loadUserError": "Benutzerdetails konnten nicht geladen werden."
+  "admin.loadUserError": "Benutzerdetails konnten nicht geladen werden.",
+  "admin.accountAccess": "Kontozugriff",
+  "admin.disableDescription": "Die Deaktivierung verhindert die Anmeldung und beendet alle bestehenden Sitzungen. Das Konto und seine Daten bleiben erhalten.",
+  "admin.enableDescription": "Aktivieren Sie dieses Konto, damit sich der Benutzer wieder anmelden kann. Frühere Sitzungen bleiben widerrufen.",
+  "admin.disableUser": "Benutzer deaktivieren",
+  "admin.enableUser": "Benutzer aktivieren",
+  "admin.confirmDisableUser": "Diesen Benutzer deaktivieren?",
+  "admin.disableConfirmation": "{username} deaktivieren? Der Benutzer wird abgemeldet und kann sich erst nach erneuter Aktivierung des Kontos wieder anmelden.",
+  "admin.cannotDisableSelf": "Sie können Ihr eigenes Konto nicht deaktivieren.",
+  "admin.cancel": "Abbrechen",
+  "admin.statusUpdateError": "Der Kontostatus konnte nicht aktualisiert werden. Bitte versuchen Sie es erneut.",
+  "admin.userEnabled": "Benutzer aktiviert.",
+  "admin.userDisabled": "Benutzer deaktiviert. Bestehende Sitzungen wurden widerrufen."
 }

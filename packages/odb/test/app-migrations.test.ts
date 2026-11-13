@@ -31,13 +31,13 @@ const loadUpSql = async () => {
 }
 
 describe('app-owned ORDS migrations', () => {
-  it('exposes read-only admin user services with bounded search and safe typed fields', async () => {
+  it('exposes admin user services with bounded search and safe typed fields', async () => {
     const { adminPackage, migration } = await migrations['00000000000003-admin']()
     const endpoints = compileApplicationEndpoints(adminPackage.application())
-    expect(endpoints).toHaveLength(2)
+    expect(endpoints).toHaveLength(3)
+    expect(endpoints.map((endpoint) => endpoint.toNode().method)).toEqual(['GET', 'GET', 'PUT'])
     for (const endpoint of endpoints) {
       const node = endpoint.toNode()
-      expect(node.method).toBe('GET')
       expect(node.source).toContain("odb_auth.has_role(v_auth_user_id, 'admin')")
       const columns = node.params.find((param) => param.resultColumns?.length)?.resultColumns
       expect(columns?.map((column) => column.name)).toEqual([
@@ -63,21 +63,72 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain('ADMIN_USER_NOT_FOUND')
     expect(sql).not.toContain('password_hash')
     expect(sql).not.toContain('refresh_token')
-    expect(sql).not.toMatch(/\b(?:INSERT INTO|UPDATE|DELETE FROM)\s+odb_auth_users/i)
+    expect(sql).toContain('UPDATE odb_auth_users')
+    expect(sql).not.toMatch(/\b(?:INSERT INTO|DELETE FROM)\s+odb_auth_users/i)
     expect(JSON.stringify(adminPackage.application())).not.toContain('"kind":"raw"')
     const document = generateApplicationOpenApi(adminPackage.application()) as {
       paths: Record<string, Record<string, { security: unknown; parameters: { name: string }[] }>>
     }
-    expect(Object.keys(document.paths)).toEqual(['/admin/users', '/admin/users/{id}'])
+    expect(Object.keys(document.paths)).toEqual([
+      '/admin/users',
+      '/admin/users/{id}',
+      '/admin/users/{id}/status',
+    ])
     expect(document.paths['/admin/users']?.get?.parameters.map((param) => param.name)).toEqual([
       'cursor',
       'limit',
       'search',
     ])
     for (const path of Object.values(document.paths)) {
-      expect(Object.keys(path)).toEqual(['get'])
-      expect(path.get?.security).toEqual([{ bearerAuth: [] }])
+      for (const operation of Object.values(path)) {
+        expect(operation.security).toEqual([{ bearerAuth: [] }])
+      }
     }
+  })
+
+  it('sets an explicit boolean status with trusted actor context and revokes sessions on disable', async () => {
+    const { adminPackage, migration } = await migrations['00000000000003-admin']()
+    const endpoint = compileApplicationEndpoints(adminPackage.application()).find(
+      (candidate) => candidate.toNode().method === 'PUT',
+    )!
+    const node = endpoint.toNode()
+    expect(node.source).toContain("odb_auth.has_role(v_auth_user_id, 'admin')")
+    expect(node.source).toContain('p_actor_id => v_auth_user_id')
+    expect(node.source).toContain('set_user_enabled')
+    const sql = migration.compile().up().join('\n')
+    expect(sql).toContain('IF p_enabled IS NULL THEN')
+    expect(sql).toContain('ADMIN_USER_STATUS_INVALID')
+    expect(sql).toContain('p_id = p_actor_id')
+    expect(sql).toContain('ADMIN_SELF_DISABLE_FORBIDDEN')
+    expect(sql).toContain('FOR UPDATE')
+    expect(sql).toContain('IF l_current_enabled != l_requested_enabled THEN')
+    expect(sql).toContain('l_requested_enabled := 1')
+    expect(sql).toContain('l_requested_enabled := 0')
+    expect(sql).toContain('enabled = l_requested_enabled')
+    expect(sql).toContain('updated_at = SYSTIMESTAMP')
+    expect(sql).toContain('IF p_enabled = FALSE THEN')
+    expect(sql).toContain('token_version = token_version + 1')
+    expect(sql).toContain('UPDATE odb_auth_sessions')
+    expect(sql).toContain('revoked_at = SYSTIMESTAMP')
+    expect(sql).toContain('user_id = p_id AND revoked_at IS NULL')
+    const document = generateApplicationOpenApi(adminPackage.application()) as {
+      paths: Record<
+        string,
+        Record<
+          string,
+          {
+            parameters: { name: string }[]
+            requestBody: { content: { 'application/json': { schema: unknown } } }
+          }
+        >
+      >
+    }
+    const operation = document.paths['/admin/users/{id}/status']?.put
+    expect(operation?.parameters.map((param) => param.name)).toEqual(['id'])
+    expect(operation?.requestBody.content['application/json'].schema).toMatchObject({
+      type: 'object',
+      properties: { enabled: { type: 'boolean' } },
+    })
   })
 
   it('serializes every existing typed cursor service using its OpenAPI camelCase row names', async () => {

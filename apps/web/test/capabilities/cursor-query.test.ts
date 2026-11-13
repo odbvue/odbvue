@@ -18,6 +18,7 @@ const response = (items: Item[], nextCursor?: string): HttpResponse<Response> =>
   headers: null,
 })
 const scopes: ReturnType<typeof effectScope>[] = []
+const ui = useUi()
 
 function setup(overrides: Partial<CursorQueryOptions<Item>> = {}) {
   const scope = effectScope()
@@ -26,6 +27,7 @@ function setup(overrides: Partial<CursorQueryOptions<Item>> = {}) {
   const onError = vi.fn<(error: Error) => void>()
   const query = scope.run(() =>
     useCursorQuery({
+      loadingKey: 'test.cursorQuery',
       fetch,
       onError,
       ...overrides,
@@ -36,6 +38,7 @@ function setup(overrides: Partial<CursorQueryOptions<Item>> = {}) {
 
 afterEach(() => {
   scopes.splice(0).forEach((scope) => scope.stop())
+  expect(ui.loading.active.value).toBe(false)
 })
 
 describe('useCursorQuery', () => {
@@ -80,10 +83,12 @@ describe('useCursorQuery', () => {
     fetch.mockReturnValueOnce(pending.promise)
     const load = query.load({ cursor: 'a', limit: 1 })
     expect(query.loading.value).toBe(true)
+    expect(ui.loading.has('test.cursorQuery')).toBe(true)
     expect(query.items.value).toEqual([{ id: 'a' }])
     expect(query.nextCursor.value).toBe('opaque-continuation')
     pending.reject(new Error('Failed'))
     expect(await load).toBe(false)
+    expect(ui.loading.active.value).toBe(false)
     expect(query.items.value).toEqual([{ id: 'a' }])
     expect(query.nextCursor.value).toBe('opaque-continuation')
     fetch.mockResolvedValueOnce(response([{ id: 'b' }]))
@@ -128,6 +133,7 @@ describe('useCursorQuery', () => {
       fetch.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
       const old = query.load({ limit: 1, search: 'old' })
       const current = query.load({ limit: 1, search: 'current' })
+      expect(ui.loading.has('test.cursorQuery')).toBe(true)
       expect(fetch.mock.calls[0]?.[0].signal.aborted).toBe(true)
       const error = Object.assign(new Error('Old failure'), { status: 500, request: '/list' })
       if (kind === 'rejection') first.reject(error)
@@ -135,12 +141,14 @@ describe('useCursorQuery', () => {
         first.resolve({ data: null, error, status: 500, headers: null })
       else first.resolve(response([{ id: 'old' }]))
       expect(await old).toBe(false)
+      expect(ui.loading.has('test.cursorQuery')).toBe(true)
       expect(query.loading.value).toBe(true)
       expect(query.loaded.value).toBe(false)
       expect(query.error.value).toBeUndefined()
       expect(onError).not.toHaveBeenCalled()
       second.resolve(response([{ id: 'current' }]))
       expect(await current).toBe(true)
+      expect(ui.loading.active.value).toBe(false)
       expect(query.items.value).toEqual([{ id: 'current' }])
     },
   )
@@ -154,6 +162,7 @@ describe('useCursorQuery', () => {
     else scope.stop()
     expect(fetch.mock.calls[0]?.[0].signal.aborted).toBe(true)
     expect(query.loading.value).toBe(false)
+    expect(ui.loading.active.value).toBe(false)
     pending.reject(new DOMException('Aborted', 'AbortError'))
     expect(await load).toBe(false)
     expect(query.items.value).toEqual([])
@@ -162,6 +171,46 @@ describe('useCursorQuery', () => {
     expect(onError).not.toHaveBeenCalled()
     await query.load({ limit: 1 })
     expect(fetch).toHaveBeenCalledTimes(action === 'cancel' ? 2 : 1)
+  })
+
+  it('does not use app loading unless a loading key is provided', async () => {
+    const { query, fetch } = setup({ loadingKey: undefined })
+    const pending = Promise.withResolvers<HttpResponse<Response>>()
+    fetch.mockReturnValueOnce(pending.promise)
+    const loading = query.load({ limit: 1 })
+    expect(query.loading.value).toBe(true)
+    expect(ui.loading.active.value).toBe(false)
+    pending.resolve(response([]))
+    expect(await loading).toBe(true)
+  })
+
+  it('keeps independent queries with the same key active when one is cancelled', async () => {
+    const first = setup()
+    const second = setup()
+    const old = Promise.withResolvers<HttpResponse<Response>>()
+    const current = Promise.withResolvers<HttpResponse<Response>>()
+    first.fetch.mockReturnValueOnce(old.promise)
+    second.fetch.mockReturnValueOnce(current.promise)
+    const oldRequest = first.query.load({ limit: 1 })
+    const currentRequest = second.query.load({ limit: 1 })
+    first.query.cancel()
+    expect(ui.loading.has('test.cursorQuery')).toBe(true)
+    old.resolve(response([]))
+    expect(await oldRequest).toBe(false)
+    expect(ui.loading.has('test.cursorQuery')).toBe(true)
+    current.resolve(response([]))
+    expect(await currentRequest).toBe(true)
+    expect(ui.loading.active.value).toBe(false)
+  })
+
+  it('surfaces an invalid loading key without fetching', async () => {
+    const { query, fetch, onError } = setup({ loadingKey: '' })
+    expect(await query.load({ limit: 1 })).toBe(false)
+    expect(fetch).not.toHaveBeenCalled()
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'A loading operation key is required.' }),
+    )
+    expect(ui.loading.active.value).toBe(false)
   })
 
   it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
@@ -203,11 +252,11 @@ describe('useCursorQuery', () => {
   })
 
   it('integrates opt-in localized UI feedback without displaying backend messages', async () => {
-    const ui = useUi(createState())
-    const { query, fetch } = setup({ onError: () => ui.error('admin.loadUsersError') })
+    const isolatedUi = useUi(createState())
+    const { query, fetch } = setup({ onError: () => isolatedUi.error('admin.loadUsersError') })
     fetch.mockRejectedValueOnce(new Error('Internal backend detail'))
     await query.load({ limit: 1 })
-    expect(ui.notification.value).toMatchObject({
+    expect(isolatedUi.notification.value).toMatchObject({
       type: 'error',
       message: 'admin.loadUsersError',
       presentation: 'alert',

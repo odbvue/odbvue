@@ -1,12 +1,5 @@
 <template>
   <v-container>
-    <v-alert v-if="error" type="error" :text="t('admin.loadUsersError')" class="mb-4" />
-    <v-alert
-      v-else-if="loaded && !loading && !items.length"
-      type="info"
-      :text="t('admin.noUsers')"
-      class="mb-4"
-    />
     <v-ov-table
       :options="options"
       :items="items"
@@ -20,9 +13,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useCursorQuery, useHttp } from '@/capabilities/http'
+import { useUi } from '@/capabilities/ui'
 import type { components } from '@/api/openapi.generated'
 import type { OvFilterValue, OvTableData, OvTableOptions } from '@/components/api'
 
@@ -37,10 +31,14 @@ definePage({
 
 const { t } = useI18n()
 const http = useHttp()
-const { items, nextCursor, loading, loaded, error, load } = useCursorQuery({
+const ui = useUi()
+const { items, nextCursor, loading, load } = useCursorQuery({
+  loadingKey: 'admin.users.list',
   fetch: ({ signal, ...query }) =>
     http.get<components['schemas']['AdminListUsersResponse']>('/admin/users', { query, signal }),
+  onError: () => ui.error('admin.loadUsersError'),
 })
+onBeforeUnmount(() => ui.clear())
 
 const options = computed<OvTableOptions>(() => ({
   key: 'id',
@@ -91,7 +89,9 @@ async function fetchUsers(
   _sort?: string,
   complete?: (success: boolean) => void,
 ) {
+  ui.clear()
   const success = await load({ cursor, limit, search })
+  if (success && !items.value.length) ui.info('admin.noUsers')
   complete?.(success)
 }
 </script>

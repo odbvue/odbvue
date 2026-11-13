@@ -1,7 +1,7 @@
 {
   "admin.title": "Admin",
   "admin.users": "Users",
-  "admin.usersDescription": "Browse user accounts and view their details.",
+  "admin.usersDescription": "Browse user accounts, view details, and manage account access.",
   "admin.userDetails": "User details",
   "admin.details": "Details",
   "admin.searchUsers": "Username or display name",
@@ -19,5 +19,17 @@
   "admin.noUsers": "No users found.",
   "admin.userNotFound": "User not found.",
   "admin.loadUsersError": "Users could not be loaded. Use Refresh to try again.",
-  "admin.loadUserError": "User details could not be loaded."
+  "admin.loadUserError": "User details could not be loaded.",
+  "admin.accountAccess": "Account access",
+  "admin.disableDescription": "Disabling blocks sign-in and ends all existing sessions. The account and its data are kept.",
+  "admin.enableDescription": "Enable this account to allow the user to sign in again. Previous sessions remain revoked.",
+  "admin.disableUser": "Disable user",
+  "admin.enableUser": "Enable user",
+  "admin.confirmDisableUser": "Disable this user?",
+  "admin.disableConfirmation": "Disable {username}? They will be signed out and unable to sign in until the account is enabled again.",
+  "admin.cannotDisableSelf": "You cannot disable your own account.",
+  "admin.cancel": "Cancel",
+  "admin.statusUpdateError": "The account status could not be updated. Please try again.",
+  "admin.userEnabled": "User enabled.",
+  "admin.userDisabled": "User disabled. Existing sessions have been revoked."
 }

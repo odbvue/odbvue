@@ -49,6 +49,38 @@ Main pages generate `/...` routes from `src/app/pages`; module pages generate
 scanned. Restart Vite after adding a new module's pages folder; existing page
 changes use route HMR. Modules share the same auth/navigation metadata rules.
 
+## Admin user access
+
+Administrators browse accounts at [Users](./src/modules/admin/pages/users/index.vue).
+The list shows status badges; the [Details page](./src/modules/admin/pages/users/[id].vue)
+contains **Disable user** / **Enable user**, keeping access changes out of the list.
+Disabling requires confirmation, blocks sign-in, invalidates access tokens, and revokes
+all existing sessions without deleting account data. Re-enabling permits a fresh sign-in;
+old sessions are not restored. Administrators cannot disable themselves (enforced in
+both the UI and API). Admin pages use shared `useUi()` alerts and app-level loading
+for list, detail, and status requests, including empty-list feedback. Loading is
+released on completion, cancellation, or unmount; page feedback is cleared on new
+requests and unmount.
+The [confirmation dialog](./src/components/overlays/VOvDialog.vue) closes on confirmation,
+before saving. Success and failure both use app-level alerts; failures leave the
+displayed user unchanged, and retrying requires a fresh confirmation.
+Shared [useMutation](./src/capabilities/http/mutation.ts) owns mutation loading/error
+state, duplicate-submit protection, and scope-disposal cleanup. Its optional
+`loadingKey` enables app-level loading without page watchers or cleanup callbacks;
+[useCursorQuery](./src/capabilities/http/cursor-query.ts) supports the same option.
+`reset()` aborts the
+client request and ignores late responses when the selected user changes; it does not
+undo a change already applied by the server.
+The [Details page](./src/modules/admin/pages/users/[id].vue) owns detail fetching,
+status updates, confirmation, response validation, breadcrumbs, and localized feedback.
+Its only watcher reloads details when the route user ID changes.
+Mutations are never automatically retried.
+
+The admin-only `PUT /admin/users/{id}/status` accepts `{ "enabled": true | false }`
+and returns the same safe user fields as Details. The existing
+[admin migration](../db/src/migrations/00000000000003-admin.ts) must be redeployed;
+regenerate the deployed OpenAPI manifest and web types after deployment.
+
 ## Authentication
 
 The [login page](./src/app/pages/login.vue) supports username/password authentication.

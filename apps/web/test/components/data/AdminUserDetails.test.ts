@@ -9,7 +9,13 @@ import VOvView from '@/components/data/VOvView.vue'
 import { globalPlugins } from '../../support/components.setup'
 
 const { get } = vi.hoisted(() => ({ get: vi.fn<HttpClient['get']>() }))
-vi.mock('@/capabilities/http', () => ({ useHttp: () => ({ get }) }))
+vi.mock('@/capabilities/http', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/capabilities/http')>()),
+  useHttp: () => ({ get }),
+}))
+vi.mock('@/capabilities/auth', () => ({
+  useAuth: () => ({ user: { value: { id: 'another-admin' } } }),
+}))
 
 afterEach(() => {
   vi.unstubAllGlobals()

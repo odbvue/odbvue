@@ -80,6 +80,7 @@ describe('VOvDialog', () => {
     const btn = buttons.find((b) => b.textContent?.includes('agree'))
     btn?.click()
     expect(w.emitted('submit')).toBeTruthy()
+    expect(w.emitted('update:modelValue')).toEqual([[false]])
   })
 
   it('closes dialog on close button click', async () => {

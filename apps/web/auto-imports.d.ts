@@ -58,6 +58,7 @@ declare global {
   const toValue: typeof import('vue').toValue
   const triggerRef: typeof import('vue').triggerRef
   const unref: typeof import('vue').unref
+  const useAdminUser: typeof import('./src/modules/admin/composables/useAdminUser').useAdminUser
   const useAttrs: typeof import('vue').useAttrs
   const useCardBackground: typeof import('@/capabilities/ui').useCardBackground
   const useCssModule: typeof import('vue').useCssModule
