@@ -176,6 +176,27 @@ Vue, router, and HTTP errors are captured by the error service. Capturing a fram
 error does not automatically display a notification; user-facing flows explicitly
 choose their feedback.
 
+## Server-backed lists
+
+Use `useCursorQuery` from `@/capabilities/http` for server-backed tables. Supply
+`fetch` (returning `HttpResponse<T>`), `select` (extracting the records), and
+`getCursor` (extracting the last displayed record's cursor). Call
+`load({ cursor, limit, search })` from the table's fetch handler. The composable
+trims search, requests `limit + 1` rows, exposes readonly `items`, `nextCursor`,
+`loading`, `loaded`, and `error` refs, and cancels superseded requests and scope
+disposal. `cancel()` also invalidates late responses. Rows and errors clear at
+the start of each load; `loaded` means a request has settled, including failures.
+The endpoint must support the extra row and accept `getCursor(item)` as its cursor.
+`VOvTable` retains navigation/presentation; the composable owns request state.
+
+Errors remain available for inline feedback (as on the admin users page).
+For global feedback instead, pass
+`onError: () => ui.error('admin.loadUsersError')`, where `ui = useUi()`.
+This callback runs only for current failures, never cancellation or stale results.
+Do not also show an inline error unless duplicate feedback is intentional.
+HTTP errors continue to use the existing error-capture pipeline; the composable
+does not import UI or automatically display backend error messages.
+
 Use HTTPS in production and a compatible API origin so the browser can send the refresh cookie.
 If developing through Vite's `/api` proxy, verify that the browser accepts the secure cookie
 on your development origin; without that cookie, login works only until the page is reloaded.

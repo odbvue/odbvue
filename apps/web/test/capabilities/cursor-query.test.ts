@@ -1,0 +1,200 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { effectScope, isReadonly } from 'vue'
+import { useCursorQuery, type CursorQueryOptions } from '@/capabilities/http/cursor-query'
+import type { HttpResponse } from '@/capabilities/http/core'
+import { createState } from '@/capabilities/state'
+import { useUi } from '@/capabilities/ui/store'
+
+type Item = { id: string }
+type Response = { items: Item[] }
+const response = (items: Item[]): HttpResponse<Response> => ({
+  data: { items },
+  error: null,
+  status: 200,
+  headers: null,
+})
+const scopes: ReturnType<typeof effectScope>[] = []
+
+function setup(overrides: Partial<CursorQueryOptions<Response, Item>> = {}) {
+  const scope = effectScope()
+  scopes.push(scope)
+  const fetch = vi.fn<CursorQueryOptions<Response, Item>['fetch']>().mockResolvedValue(response([]))
+  const onError = vi.fn<(error: Error) => void>()
+  const query = scope.run(() =>
+    useCursorQuery({
+      fetch,
+      select: (data) => data.items,
+      getCursor: (item) => item.id,
+      onError,
+      ...overrides,
+    }),
+  )!
+  return { query, fetch, onError, scope }
+}
+
+afterEach(() => {
+  scopes.splice(0).forEach((scope) => scope.stop())
+})
+
+describe('useCursorQuery', () => {
+  it('exposes readonly idle state and normalizes search while requesting one lookahead row', async () => {
+    const { query, fetch } = setup()
+    expect(query.items.value).toEqual([])
+    expect(query.loaded.value).toBe(false)
+    expect(query.loading.value).toBe(false)
+    expect(query.error.value).toBeUndefined()
+    for (const state of [query.items, query.nextCursor, query.loaded, query.loading, query.error]) {
+      expect(isReadonly(state)).toBe(true)
+    }
+    fetch.mockResolvedValue(response([{ id: 'a' }, { id: 'b' }, { id: 'c' }]))
+    await query.load({ cursor: 'previous', limit: 2, search: ' ada ' })
+    expect(fetch).toHaveBeenCalledWith({
+      cursor: 'previous',
+      limit: 3,
+      search: 'ada',
+      signal: expect.any(AbortSignal),
+    })
+    expect(query.items.value).toEqual([{ id: 'a' }, { id: 'b' }])
+    expect(query.nextCursor.value).toBe('b')
+    expect(query.loaded.value).toBe(true)
+    expect(query.loading.value).toBe(false)
+  })
+
+  it.each([0, 1, 2])('has no next cursor for a terminal page of %s records', async (count) => {
+    const { query, fetch } = setup()
+    const items = Array.from({ length: count }, (_, index) => ({ id: String(index) }))
+    fetch.mockResolvedValue(response(items))
+    await query.load({ limit: 2, search: '  ' })
+    expect(query.items.value).toEqual(items)
+    expect(query.nextCursor.value).toBeUndefined()
+    expect(fetch.mock.calls[0]?.[0].search).toBeUndefined()
+  })
+
+  it('clears previous rows and cursors while a new page is loading', async () => {
+    const { query, fetch } = setup()
+    fetch.mockResolvedValueOnce(response([{ id: 'a' }, { id: 'b' }]))
+    await query.load({ limit: 1 })
+    const pending = Promise.withResolvers<HttpResponse<Response>>()
+    fetch.mockReturnValueOnce(pending.promise)
+    const load = query.load({ cursor: 'a', limit: 1 })
+    expect(query.loading.value).toBe(true)
+    expect(query.items.value).toEqual([])
+    expect(query.nextCursor.value).toBeUndefined()
+    pending.resolve(response([{ id: 'b' }]))
+    await load
+    expect(query.items.value).toEqual([{ id: 'b' }])
+  })
+
+  it.each(['returned', 'rejected', 'missing data'] as const)(
+    'surfaces %s failures, then clears the error on retry',
+    async (kind) => {
+      const { query, fetch, onError } = setup()
+      const error = Object.assign(new Error('Failed'), { status: 503, request: '/list' })
+      if (kind === 'rejected') fetch.mockRejectedValueOnce(error)
+      else
+        fetch.mockResolvedValueOnce({
+          data: null,
+          error: kind === 'returned' ? error : null,
+          status: 503,
+          headers: null,
+        })
+      await query.load({ limit: 1 })
+      expect(query.error.value).toBeInstanceOf(Error)
+      if (kind !== 'missing data') expect(query.error.value).toBe(error)
+      expect(query.items.value).toEqual([])
+      expect(query.nextCursor.value).toBeUndefined()
+      expect(query.loading.value).toBe(false)
+      expect(query.loaded.value).toBe(true)
+      expect(onError).toHaveBeenCalledExactlyOnceWith(query.error.value)
+      await query.load({ limit: 1 })
+      expect(query.error.value).toBeUndefined()
+      expect(onError).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it.each(['success', 'returned error', 'rejection'] as const)(
+    'aborts superseded requests and ignores late %s without settling the active request',
+    async (kind) => {
+      const { query, fetch, onError } = setup()
+      const first = Promise.withResolvers<HttpResponse<Response>>()
+      const second = Promise.withResolvers<HttpResponse<Response>>()
+      fetch.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+      const old = query.load({ limit: 1, search: 'old' })
+      const current = query.load({ limit: 1, search: 'current' })
+      expect(fetch.mock.calls[0]?.[0].signal.aborted).toBe(true)
+      const error = Object.assign(new Error('Old failure'), { status: 500, request: '/list' })
+      if (kind === 'rejection') first.reject(error)
+      else if (kind === 'returned error')
+        first.resolve({ data: null, error, status: 500, headers: null })
+      else first.resolve(response([{ id: 'old' }]))
+      await old
+      expect(query.loading.value).toBe(true)
+      expect(query.loaded.value).toBe(false)
+      expect(query.error.value).toBeUndefined()
+      expect(onError).not.toHaveBeenCalled()
+      second.resolve(response([{ id: 'current' }]))
+      await current
+      expect(query.items.value).toEqual([{ id: 'current' }])
+    },
+  )
+
+  it.each(['cancel', 'dispose'] as const)('invalidates late responses on %s', async (action) => {
+    const { query, fetch, onError, scope } = setup()
+    const pending = Promise.withResolvers<HttpResponse<Response>>()
+    fetch.mockReturnValueOnce(pending.promise)
+    const load = query.load({ limit: 1 })
+    if (action === 'cancel') query.cancel()
+    else scope.stop()
+    expect(fetch.mock.calls[0]?.[0].signal.aborted).toBe(true)
+    expect(query.loading.value).toBe(false)
+    pending.reject(new DOMException('Aborted', 'AbortError'))
+    await load
+    expect(query.items.value).toEqual([])
+    expect(query.error.value).toBeUndefined()
+    expect(query.loaded.value).toBe(false)
+    expect(onError).not.toHaveBeenCalled()
+    await query.load({ limit: 1 })
+    expect(fetch).toHaveBeenCalledTimes(action === 'cancel' ? 2 : 1)
+  })
+
+  it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER])(
+    'reports invalid limit %s without fetching',
+    async (limit) => {
+      const { query, fetch, onError } = setup()
+      await query.load({ limit })
+      expect(fetch).not.toHaveBeenCalled()
+      expect(query.error.value).toBeInstanceOf(RangeError)
+      expect(onError).toHaveBeenCalledExactlyOnceWith(query.error.value)
+      expect(query.loading.value).toBe(false)
+    },
+  )
+
+  it('reports selection and cursor errors without publishing partial rows', async () => {
+    const error = new Error('Invalid records')
+    const { query, onError } = setup({
+      select: () => {
+        throw error
+      },
+    })
+    await query.load({ limit: 1 })
+    expect(query.error.value).toBe(error)
+    expect(onError).toHaveBeenCalledExactlyOnceWith(error)
+    const other = setup({ getCursor: () => '' })
+    other.fetch.mockResolvedValue(response([{ id: 'a' }, { id: 'b' }]))
+    await other.query.load({ limit: 1 })
+    expect(other.query.error.value?.message).toContain('non-empty cursor')
+    expect(other.query.items.value).toEqual([])
+  })
+
+  it('integrates opt-in localized UI feedback without displaying backend messages', async () => {
+    const ui = useUi(createState())
+    const { query, fetch } = setup({ onError: () => ui.error('admin.loadUsersError') })
+    fetch.mockRejectedValueOnce(new Error('Internal backend detail'))
+    await query.load({ limit: 1 })
+    expect(ui.notification.value).toMatchObject({
+      type: 'error',
+      message: 'admin.loadUsersError',
+      presentation: 'alert',
+    })
+  })
+})

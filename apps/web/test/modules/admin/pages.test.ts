@@ -17,7 +17,10 @@ import messages from '@/modules/admin/i18n/en.json'
 import { renderViewItem, type OvTableOptions } from '@/components/api'
 
 const { get } = vi.hoisted(() => ({ get: vi.fn<HttpClient['get']>() }))
-vi.mock('@/capabilities/http', () => ({ useHttp: () => ({ get }) }))
+vi.mock('@/capabilities/http', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/capabilities/http')>()),
+  useHttp: () => ({ get }),
+}))
 
 const table = defineComponent({
   name: 'VOvTable',
