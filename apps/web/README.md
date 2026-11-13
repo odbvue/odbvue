@@ -64,13 +64,14 @@ requests and unmount.
 The [confirmation dialog](./src/components/overlays/VOvDialog.vue) closes on confirmation,
 before saving. Success and failure both use app-level alerts; failures leave the
 displayed user unchanged, and retrying requires a fresh confirmation.
-Shared [useMutation](./src/capabilities/http/mutation.ts) owns mutation loading/error
-state, duplicate-submit protection, and scope-disposal cleanup. Its optional
-`loadingKey` enables app-level loading without page watchers or cleanup callbacks;
-[useCursorQuery](./src/capabilities/http/cursor-query.ts) supports the same option.
-`reset()` aborts the
-client request and ignores late responses when the selected user changes; it does not
-undo a change already applied by the server.
+The [Details page](./src/modules/admin/pages/users/[id].vue) performs status changes
+with a direct `http.put()`, checks the result, and displays success or error feedback.
+It replaces the displayed user with the server response, including timestamps.
+App-level loading blocks duplicate submissions and is released on completion or navigation.
+The detail page uses no abort signals. Navigation ignores pending results rather than
+cancelling requests, and does not undo a change already applied by the server.
+[useMutation](./src/capabilities/http/mutation.ts) remains available for other workflows;
+no resource layer, operation-ID client, or HTTP lifecycle callbacks are required.
 The [Details page](./src/modules/admin/pages/users/[id].vue) owns detail fetching,
 status updates, confirmation, response validation, breadcrumbs, and localized feedback.
 Its only watcher reloads details when the route user ID changes.

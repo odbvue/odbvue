@@ -296,7 +296,6 @@ describe('admin user details', () => {
     const { wrapper, router } = await setup(true)
     expect(get).toHaveBeenCalledWith(
       `/admin/users/${user.id}`,
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
     const component = wrapper.findComponent(view)
     expect(component.props('data')).toEqual(user)
@@ -358,7 +357,7 @@ describe('admin user details', () => {
     expect(wrapper.findComponent(view).props('data')).toEqual(next)
     expect(wrapper.get('h3').text()).toBe(next.username)
     expect(getBreadcrumbOverride(router).value?.title).toBe(next.displayName)
-    expect(get.mock.calls[0]?.[1]?.signal?.aborted).toBe(true)
+    expect(get.mock.calls[0]).toHaveLength(1)
     expect(ui.notification.value).toBeUndefined()
   })
 
@@ -405,7 +404,6 @@ describe('admin user details', () => {
     expect(put).toHaveBeenCalledExactlyOnceWith(
       `/admin/users/${user.id}/status`,
       { enabled: false },
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
     expect(wrapper.findComponent(view).props('data')).toEqual(updated)
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
@@ -426,7 +424,6 @@ describe('admin user details', () => {
     expect(put).toHaveBeenCalledWith(
       `/admin/users/${user.id}/status`,
       { enabled: true },
-      expect.any(Object),
     )
     expect(wrapper.findComponent(view).props('data').enabled).toBe(true)
     expect(ui.notification.value).toMatchObject({ type: 'success', message: 'admin.userEnabled' })
@@ -526,6 +523,23 @@ describe('admin user details', () => {
     expect(wrapper.text()).not.toContain(messages['admin.userEnabled'])
   })
 
+  it('reports a thrown status request and releases loading without changing the user', async () => {
+    get.mockResolvedValue(result([{ ...user, enabled: false }]))
+    put.mockRejectedValue(new Error('Network failed'))
+    const { wrapper } = await setup(true)
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === messages['admin.enableUser'])!
+      .trigger('click')
+    await flushPromises()
+    expect(ui.notification.value).toMatchObject({
+      type: 'error',
+      message: 'admin.statusUpdateError',
+    })
+    expect(ui.loading.active.value).toBe(false)
+    expect(wrapper.findComponent(view).props('data').enabled).toBe(false)
+  })
+
   it('prevents duplicate submissions and ignores a late mutation after navigating away', async () => {
     let resolveMutation!: (response: ReturnType<typeof result>) => void
     put.mockReturnValue(
@@ -553,7 +567,7 @@ describe('admin user details', () => {
     await router.push(`/admin/users/${next.id}`)
     await flushPromises()
     expect(ui.loading.active.value).toBe(false)
-    expect(put.mock.calls[0]?.[2]?.signal?.aborted).toBe(true)
+    expect(put.mock.calls[0]).toHaveLength(2)
     resolveMutation(result([{ ...user, enabled: false }]))
     await flushPromises()
     expect(wrapper.findComponent(view).props('data')).toEqual(next)
@@ -593,7 +607,7 @@ describe('admin user details', () => {
     expect(ui.loading.has('admin.users.status')).toBe(true)
     wrapper.unmount()
     expect(ui.loading.active.value).toBe(false)
-    expect(put.mock.calls[0]?.[2]?.signal?.aborted).toBe(true)
+    expect(put.mock.calls[0]).toHaveLength(2)
     rejectMutation(new Error('Network failed'))
     await flushPromises()
     expect(ui.notification.value).toBeUndefined()

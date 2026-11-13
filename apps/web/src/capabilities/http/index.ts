@@ -9,6 +9,8 @@ export {
   type CursorQueryOptions,
 } from './cursor-query.js'
 export { useMutation, type MutationOptions } from './mutation.js'
+export { useFormAction, type FormActionOptions } from './form-action.js'
+export { useFetch, type FetchOptions } from './fetch.js'
 export { http }
 
 export function useHttp(clientOptions?: HttpClientOptions): HttpClient {

@@ -7,8 +7,8 @@ export interface MutationOptions<Input, Output> {
   loadingKey?: string
   request: (input: Input, context: { signal: AbortSignal }) => Promise<HttpResponse<Output>>
   /** Called only for the current request; validate domain data before applying it. */
-  onSuccess?: (data: Output | null, input: Input) => void
-  onError?: (error: Error) => void
+  onSuccess?: (data: Output | null, input: Input) => void | Promise<void>
+  onError?: (error: Error) => void | Promise<void>
 }
 
 export function useMutation<Input, Output>(options: MutationOptions<Input, Output>) {
@@ -44,7 +44,7 @@ export function useMutation<Input, Output>(options: MutationOptions<Input, Outpu
       if (response.error) throw response.error
       if (response.status === null || response.status < 200 || response.status >= 300)
         throw new Error('Mutation request failed')
-      options.onSuccess?.(response.data, input)
+      await options.onSuccess?.(response.data, input)
     } catch (cause) {
       if (currentRequest !== requestId) return false
       failure = cause instanceof Error ? cause : new Error(String(cause))
@@ -58,7 +58,7 @@ export function useMutation<Input, Output>(options: MutationOptions<Input, Outpu
       }
     }
 
-    if (failure) options.onError?.(failure)
+    if (failure) await options.onError?.(failure)
     return !failure && currentRequest === requestId
   }
 
