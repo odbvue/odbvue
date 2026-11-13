@@ -7,16 +7,21 @@ export interface CursorQueryParams {
   search?: string
 }
 
-export interface CursorQueryOptions<Response, Item> {
-  /** Receives the normalized search and the requested page size plus one lookahead row. */
-  fetch: (params: CursorQueryParams & { signal: AbortSignal }) => Promise<HttpResponse<Response>>
-  select: (response: Response) => readonly Item[]
-  getCursor: (item: Item) => string
+export interface CursorPage<Item> {
+  items: Item[]
+  nextCursor?: string
+}
+
+export interface CursorQueryOptions<Item> {
+  /** Receives the displayed page size; continuation is owned by the server. */
+  fetch: (
+    params: CursorQueryParams & { signal: AbortSignal },
+  ) => Promise<HttpResponse<CursorPage<Item>>>
   /** Called only for the current request; use for optional UI feedback. */
   onError?: (error: Error) => void
 }
 
-export function useCursorQuery<Response, Item>(options: CursorQueryOptions<Response, Item>) {
+export function useCursorQuery<Item>(options: CursorQueryOptions<Item>) {
   const items = shallowRef<Item[]>([])
   const nextCursor = ref<string>()
   const loading = ref(false)
@@ -46,18 +51,12 @@ export function useCursorQuery<Response, Item>(options: CursorQueryOptions<Respo
     let failure: Error | undefined
 
     try {
-      if (
-        !Number.isSafeInteger(params.limit) ||
-        params.limit < 1 ||
-        params.limit >= Number.MAX_SAFE_INTEGER
-      ) {
-        throw new RangeError(
-          'Cursor query limit must be a positive safe integer with room for lookahead',
-        )
+      if (!Number.isSafeInteger(params.limit) || params.limit < 1) {
+        throw new RangeError('Cursor query limit must be a positive safe integer')
       }
       const response = await options.fetch({
         ...params,
-        limit: params.limit + 1,
+        limit: params.limit,
         search: params.search?.trim() || undefined,
         signal: currentController.signal,
       })
@@ -65,15 +64,19 @@ export function useCursorQuery<Response, Item>(options: CursorQueryOptions<Respo
       if (response.error) throw response.error
       if (response.data === null) throw new Error('Cursor query response has no data')
 
-      const records = options.select(response.data)
-      const page = records.slice(0, params.limit)
-      const last = page.at(-1)
-      const cursor =
-        records.length > params.limit && last !== undefined ? options.getCursor(last) : undefined
-      if (cursor !== undefined && !cursor)
-        throw new Error('Cursor query lookahead requires a non-empty cursor')
-      items.value = page
-      nextCursor.value = cursor
+      const page = response.data
+      if (
+        !Array.isArray(page.items) ||
+        page.items.length > params.limit ||
+        (page.nextCursor !== undefined &&
+          (typeof page.nextCursor !== 'string' ||
+            !page.nextCursor.trim() ||
+            !page.items.length ||
+            page.nextCursor === params.cursor))
+      )
+        throw new Error('Invalid cursor page response')
+      items.value = page.items
+      nextCursor.value = page.nextCursor
     } catch (cause) {
       if (currentRequest !== requestId) return
       failure = cause instanceof Error ? cause : new Error(String(cause))

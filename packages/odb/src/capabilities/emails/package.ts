@@ -191,13 +191,10 @@ export const odbEmailsPackage = odbPackage('odb_emails', (pkg) => {
   const list = pkg.proc(
     'list',
     {
-      in: { after: emailsTypes.id, limit: odbType.integer() },
+      in: { after: odbType.json(), limit: odbType.integer() },
       out: { items: odbType.resultset() },
     },
     ({ params: { after, limit, items }, body }) => {
-      body.ifThen(cond.or([cond.lt(limit, 1), cond.gt(limit, 101)]), (then) =>
-        then.invalid('EMAILS_LIMIT_INVALID'),
-      )
       body.openFor(
         items,
         odbQuery()
@@ -213,9 +210,8 @@ export const odbEmailsPackage = odbPackage('odb_emails', (pkg) => {
             emails.postponed,
             emails.error,
           ])
-          .where(cond.or([cond.isNull(after), cond.gt(emails.id, after)]))
           .orderBy(emails.id)
-          .limit(odbOracle.nvl(limit, odbLiteral(50))),
+          .paginate({ cursor: after, limit }),
       )
     },
   )

@@ -179,15 +179,26 @@ choose their feedback.
 ## Server-backed lists
 
 Use `useCursorQuery` from `@/capabilities/http` for server-backed tables. Supply
-`fetch` (returning `HttpResponse<T>`), `select` (extracting the records), and
-`getCursor` (extracting the last displayed record's cursor). Call
+`fetch` (returning `HttpResponse<CursorPage<T>>`). Call
 `load({ cursor, limit, search })` from the table's fetch handler. The composable
-trims search, requests `limit + 1` rows, exposes readonly `items`, `nextCursor`,
+trims search, requests exactly the displayed `limit`, exposes readonly `items`, `nextCursor`,
 `loading`, `loaded`, and `error` refs, and cancels superseded requests and scope
 disposal. `cancel()` also invalidates late responses. Rows and errors clear at
 the start of each load; `loaded` means a request has settled, including failures.
-The endpoint must support the extra row and accept `getCursor(item)` as its cursor.
+The backend returns `{ items, nextCursor? }`: at most `limit` rows, and no
+`nextCursor` when exhausted. Clients pass continuation tokens unchanged; they
+never derive them from IDs or slice away lookahead rows. Invalid response shapes
+are reported as query errors rather than silently normalized.
 `VOvTable` retains navigation/presentation; the composable owns request state.
+
+Database services infer the contract from a typed query's
+`paginate({ cursor, limit })`, which derives keyset predicates and composite
+cursor values from its ordering. Shared limits default to 25/100, with optional
+package-level and per-service `pagination` overrides. Ordering must be
+stable and non-null, with a unique tie-breaker; absent ordering is inferred only
+from a single primary key. Tokens are bound to the endpoint, ordering, query and
+authenticated user. Changing search/filter/sort requires restarting from the
+first page. This does not provide snapshot consistency across requests.
 
 Errors remain available for inline feedback (as on the admin users page).
 For global feedback instead, pass

@@ -112,7 +112,7 @@ describe('Emails', () => {
     expect(sql).toContain('EMAILS_SUBJECT_INVALID')
     expect(sql).toContain('EMAILS_CONTENT_REQUIRED')
     expect(sql).toContain('EMAILS_PRIORITY_INVALID')
-    expect(sql).toContain('EMAILS_LIMIT_INVALID')
+    expect(sql).toContain('FETCH FIRST NVL(p_limit, 25) + 1 ROWS ONLY')
     expect(sql).toContain('odb_storage.read(p_owner_id, p_storage_id')
     expect(sql).toContain('EMAILS_ALREADY_SENT')
     expect(sql).toContain('EMAILS_BUSY')

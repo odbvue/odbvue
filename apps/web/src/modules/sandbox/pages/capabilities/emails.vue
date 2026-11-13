@@ -195,15 +195,15 @@ const formatDate = (value: string | null | undefined) =>
   value ? new Date(value).toLocaleString() : ''
 
 async function load(cursor?: string) {
-  const query = new URLSearchParams({ limit: '51' })
+  const query = new URLSearchParams({ limit: '50' })
   if (cursor) query.set('cursor', cursor)
   const response = await http.get<components['schemas']['SandboxListEmailsResponse']>(
     `/sandbox/emails?${query}`,
   )
   if (response.error || !response.data)
     throw response.error ?? new Error('Emails could not be loaded.')
-  items.value = response.data.items.slice(0, 50)
-  nextCursor.value = response.data.items.length > 50 ? items.value.at(-1)?.id : undefined
+  items.value = response.data.items
+  nextCursor.value = response.data.nextCursor
 }
 
 async function run(action: string, call: () => Promise<void>) {

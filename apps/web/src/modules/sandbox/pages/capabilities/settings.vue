@@ -212,16 +212,14 @@ const remove = () =>
 
 const list = (cursor?: string) =>
   run('list', 'Settings loaded.', 'Settings could not be loaded.', async () => {
-    const query = new URLSearchParams({ limit: String(pageSize + 1) })
+    const query = new URLSearchParams({ limit: String(pageSize) })
     if (cursor) query.set('cursor', cursor)
     const response = await http.get<components['schemas']['SandboxListSettingsResponse']>(
       `/sandbox/settings?${query}`,
     )
     if (response.error || !response.data) throw response.error ?? new Error('No data')
-    // An extra row means another page exists.
-    const page = response.data.items.slice(0, pageSize)
-    items.value = page
-    nextCursor.value = response.data.items.length > pageSize ? page.at(-1)?.id : undefined
+    items.value = response.data.items
+    nextCursor.value = response.data.nextCursor
   })
 
 function pick(item: Item) {

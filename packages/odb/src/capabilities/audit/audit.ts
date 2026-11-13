@@ -20,7 +20,7 @@ export const odbAudit = {
   /** Parameter types for declaring procedures that pass audit values through, without knowing the table. */
   types: auditTypes,
 
-  /** Newest-first keyset page; NULL starts the list and a NULL limit defaults to 50. */
+  /** Newest-first keyset page from a decoded timestamp/id tuple, including one lookahead row. */
   list(after: PlsqlRenderable, limit: PlsqlRenderable, items: PlsqlRenderable): PlsqlStatement {
     return odbAuditPackage.list(after, limit, items)
   },

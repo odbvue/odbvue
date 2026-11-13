@@ -2,7 +2,7 @@ import { cond, odbLiteral, plsqlExpr, PlsqlExpression } from '../../schema/attri
 import { odbPackage, odbType } from '../../schema/package.js'
 import { odbQuery } from '../../query/index.js'
 import { odbDbmsLob, odbOracle } from '../../oracle/index.js'
-import { DEFAULT_LIMIT, MAX_FILE_BYTES, PACKAGE_NAME } from './constants.js'
+import { MAX_FILE_BYTES, PACKAGE_NAME } from './constants.js'
 import { storageFiles } from './tables.js'
 import { storageTypes } from './types.js'
 
@@ -10,14 +10,11 @@ export const odbStoragePackage = odbPackage(PACKAGE_NAME, (pkg) => {
   const list = pkg.proc(
     'list',
     {
-      in: { ownerId: storageTypes.ownerId, after: storageTypes.id, limit: odbType.integer() },
+      in: { ownerId: storageTypes.ownerId, after: odbType.json(), limit: odbType.integer() },
       out: { items: odbType.resultset() },
     },
     ({ params: { ownerId, after, limit, items }, body }) => {
       body.ifThen(cond.isNull(ownerId), (then) => then.invalid('STORAGE_OWNER_REQUIRED'))
-      body.ifThen(cond.or([cond.lt(limit, 1), cond.gt(limit, 101)]), (then) =>
-        then.invalid('STORAGE_LIMIT_INVALID'),
-      )
       body.openFor(
         items,
         odbQuery()
@@ -30,14 +27,9 @@ export const odbStoragePackage = odbPackage(PACKAGE_NAME, (pkg) => {
             storageFiles.meta,
             storageFiles.createdAt,
           ])
-          .where(
-            cond.and([
-              cond.eq(storageFiles.ownerId, ownerId),
-              cond.or([cond.isNull(after), cond.gt(storageFiles.id, after)]),
-            ]),
-          )
+          .where(cond.eq(storageFiles.ownerId, ownerId))
           .orderBy(storageFiles.id)
-          .limit(odbOracle.nvl(limit, odbLiteral(DEFAULT_LIMIT))),
+          .paginate({ cursor: after, limit }),
       )
     },
   )

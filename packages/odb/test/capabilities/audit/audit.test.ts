@@ -33,13 +33,13 @@ describe('odbAudit (framework package odb_audit)', () => {
     it('lists newest first with a timestamp and id keyset', () => {
       const sql = odbAudit.toSQLUp()
       expect(sql).toContain(
-        'PROCEDURE list(p_after IN VARCHAR2, p_limit IN PLS_INTEGER, p_items OUT SYS_REFCURSOR)',
+        'PROCEDURE list(p_after IN CLOB, p_limit IN PLS_INTEGER, p_items OUT SYS_REFCURSOR)',
       )
-      expect(sql).toContain('observed_timestamp < l_after_timestamp')
-      expect(sql).toContain('id < p_after')
+      expect(sql).toContain("observed_timestamp < TO_TIMESTAMP(JSON_VALUE(p_after, '$[0]'")
+      expect(sql).toContain("id < JSON_VALUE(p_after, '$[1]'")
       expect(sql).toContain('ORDER BY observed_timestamp DESC, id DESC')
-      expect(sql).toContain('FETCH FIRST NVL(p_limit, 50) ROWS ONLY')
-      expect(sql).toContain('AUDIT_CURSOR_NOT_FOUND')
+      expect(sql).toContain('FETCH FIRST NVL(p_limit, 25) + 1 ROWS ONLY')
+      expect(sql).not.toContain('AUDIT_CURSOR_NOT_FOUND')
       expect(sql).toContain(
         'OPEN p_items FOR SELECT id AS "id", observed_timestamp AS "observedTimestamp", event_timestamp AS "eventTimestamp", severity_text AS "severityText", body AS "body", attributes AS "attributes" FROM odb_audit_logs',
       )

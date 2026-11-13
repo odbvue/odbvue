@@ -79,6 +79,7 @@ export class PlsqlStatement {
   constructor(
     private readonly sql: string,
     readonly cursors?: Readonly<Record<string, readonly OrdsResultColumnNode[]>>,
+    readonly paginations?: Readonly<Record<string, import('../pagination.js').CursorQueryMetadata>>,
   ) {}
 
   toSQL(): string {

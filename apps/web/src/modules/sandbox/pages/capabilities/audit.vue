@@ -135,14 +135,14 @@ const notice = ref<{ type: 'success' | 'error'; text: string }>()
 const canWrite = computed(() => auth.authenticated.value && !!message.value.trim() && !busy.value)
 
 async function load(cursor?: string) {
-  const query = new URLSearchParams({ limit: String(pageSize + 1) })
+  const query = new URLSearchParams({ limit: String(pageSize) })
   if (cursor) query.set('cursor', cursor)
   const response = await http.get<components['schemas']['SandboxListAuditResponse']>(
     `/sandbox/audit?${query}`,
   )
   if (response.error || !response.data) throw response.error ?? new Error('No data')
-  items.value = response.data.items.slice(0, pageSize)
-  nextCursor.value = response.data.items.length > pageSize ? items.value.at(-1)?.id : undefined
+  items.value = response.data.items
+  nextCursor.value = response.data.nextCursor
 }
 
 async function list(cursor?: string) {

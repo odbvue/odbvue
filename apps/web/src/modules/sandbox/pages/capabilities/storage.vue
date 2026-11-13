@@ -199,14 +199,14 @@ async function run(action: string, call: () => Promise<void>) {
 }
 
 async function load(cursor?: string) {
-  const query = new URLSearchParams({ limit: String(pageSize + 1) })
+  const query = new URLSearchParams({ limit: String(pageSize) })
   if (cursor) query.set('cursor', cursor)
   const response = await http.get<components['schemas']['SandboxListStorageResponse']>(
     `/sandbox/storage?${query}`,
   )
   if (response.error || !response.data) throw new Error('Files could not be loaded.')
-  items.value = response.data.items.slice(0, pageSize)
-  nextCursor.value = response.data.items.length > pageSize ? items.value.at(-1)?.id : undefined
+  items.value = response.data.items
+  nextCursor.value = response.data.nextCursor
 }
 
 const list = (cursor?: string) => run('list', () => load(cursor))

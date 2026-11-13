@@ -722,6 +722,8 @@ export interface components {
         };
         SandboxListSettingsResponse: {
             items: components["schemas"]["SandboxListSettingsItemsItem"][];
+            /** @description Opaque continuation token; absent when pagination is exhausted. */
+            nextCursor?: string;
         };
         SandboxReadSettingResponse: {
             value: string;
@@ -741,6 +743,8 @@ export interface components {
         };
         SandboxListAuditResponse: {
             items: components["schemas"]["SandboxListAuditItemsItem"][];
+            /** @description Opaque continuation token; absent when pagination is exhausted. */
+            nextCursor?: string;
         };
         SandboxAuditInfoResponse: Record<string, never>;
         SandboxAuditWarnResponse: Record<string, never>;
@@ -756,6 +760,8 @@ export interface components {
         };
         SandboxListStorageResponse: {
             items: components["schemas"]["SandboxListStorageItemsItem"][];
+            /** @description Opaque continuation token; absent when pagination is exhausted. */
+            nextCursor?: string;
         };
         SandboxUploadStorageResponse: {
             id: string;
@@ -781,6 +787,8 @@ export interface components {
         };
         SandboxListEmailsResponse: {
             items: components["schemas"]["SandboxListEmailsItemsItem"][];
+            /** @description Opaque continuation token; absent when pagination is exhausted. */
+            nextCursor?: string;
         };
         SandboxRetryEmailResponse: Record<string, never>;
         SandboxListAclItemsItem: {
@@ -810,6 +818,8 @@ export interface components {
         };
         AdminListUsersResponse: {
             items: components["schemas"]["AdminListUsersItemsItem"][];
+            /** @description Opaque continuation token; absent when pagination is exhausted. */
+            nextCursor?: string;
         };
         AdminGetUserItemsItem: {
             id: string;
@@ -1423,6 +1433,13 @@ export interface operations {
                     "application/json": components["schemas"]["SandboxListSettingsResponse"];
                 };
             };
+            /** @description Invalid limit, cursor, or cursor query context */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Authentication required */
             401: {
                 headers: {
@@ -1573,6 +1590,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SandboxListAuditResponse"];
                 };
+            };
+            /** @description Invalid limit, cursor, or cursor query context */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Authentication required */
             401: {
@@ -1731,6 +1755,13 @@ export interface operations {
                     "application/json": components["schemas"]["SandboxListStorageResponse"];
                 };
             };
+            /** @description Invalid limit, cursor, or cursor query context */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Authentication required */
             401: {
                 headers: {
@@ -1853,6 +1884,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SandboxListEmailsResponse"];
                 };
+            };
+            /** @description Invalid limit, cursor, or cursor query context */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Authentication required */
             401: {
@@ -2234,6 +2272,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AdminListUsersResponse"];
                 };
+            };
+            /** @description Invalid limit, cursor, or cursor query context */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Authentication required */
             401: {

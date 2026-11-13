@@ -220,7 +220,7 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
     'list_settings',
     {
       in: {
-        after: odbSettings.types.id,
+        after: odbType.json(),
         limit: odbType.integer(),
       },
       out: { items: odbType.resultset() },
@@ -303,7 +303,7 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
     'list_audit',
     {
       in: {
-        after: odbAudit.types.id,
+        after: odbType.json(),
         limit: odbType.integer(),
       },
       out: { items: odbType.resultset() },
@@ -356,7 +356,7 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
     {
       in: {
         ownerId: odbStorage.types.ownerId,
-        after: odbStorage.types.id,
+        after: odbType.json(),
         limit: odbType.integer(),
       },
       out: { items: odbType.resultset() },
@@ -493,7 +493,7 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
   const listEmails = pkg.proc(
     'list_emails',
     {
-      in: { after: odbEmails.types.id, limit: odbType.integer() },
+      in: { after: odbType.json(), limit: odbType.integer() },
       out: { items: odbType.resultset() },
     },
     ({ params: { after, limit, items }, body }) => body.call(odbEmails.list(after, limit, items)),

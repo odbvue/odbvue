@@ -128,7 +128,23 @@ export function generateApplicationsOpenApi(
             name: param.name,
             in: location,
             required: location === 'path',
-            schema: openApiSchema(param.paramType, param.odbType),
+            schema:
+              endpoint.cursorPage && param.name === 'limit'
+                ? {
+                    ...openApiSchema(param.paramType, param.odbType),
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: endpoint.cursorPage.maxLimit,
+                    default: endpoint.cursorPage.defaultLimit,
+                  }
+                : endpoint.cursorPage && param.name === 'cursor'
+                  ? {
+                      type: 'string',
+                      maxLength: 4000,
+                      description:
+                        'Opaque continuation token. Reuse only with the same query and authenticated user.',
+                    }
+                  : openApiSchema(param.paramType, param.odbType),
           }
         })
       const bodyParams = endpoint.params.filter(
@@ -172,6 +188,13 @@ export function generateApplicationsOpenApi(
       }
 
       const responseName = `${operationName}Response`
+      if (endpoint.cursorPage) {
+        outputs.nextCursor = {
+          type: 'string',
+          description: 'Opaque continuation token; absent when pagination is exhausted.',
+        }
+        outputs.items = { ...outputs.items, maxItems: endpoint.cursorPage.maxLimit }
+      }
       schemas[responseName] = objectSchema(outputs, requiredOutputs)
 
       paths[path] ??= {}
@@ -205,6 +228,9 @@ export function generateApplicationsOpenApi(
             }
           : {}),
         responses: {
+          ...(endpoint.cursorPage
+            ? { '400': { description: 'Invalid limit, cursor, or cursor query context' } }
+            : {}),
           ...(endpoint.auth !== 'anonymous'
             ? { '401': { description: 'Authentication required' } }
             : {}),

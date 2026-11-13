@@ -32,6 +32,7 @@ import { odbTypeFromPlsql, oracleParameterName, ordsTypeFromPlsql, type OdbType 
 import { Column, type ColumnNode } from './column.js'
 import { odbQuery } from '../query/index.js'
 import type { Insertable, Table } from './table.js'
+import type { CursorPageOptions, CursorQueryMetadata } from '../pagination.js'
 import {
   ODB_ERROR_CODE_PATTERN,
   ODB_ERROR_NUMBER,
@@ -46,6 +47,7 @@ export type AnyQueryBuilder = {
   toSQL(): string
   toCursorSQL?(): string
   selectedColumns?(): ColumnNode[] | undefined
+  cursorPagination?(): CursorQueryMetadata | undefined
 }
 
 export type DynamicSqlBinding =
@@ -326,6 +328,7 @@ export type ProcedureBodyNode = {
   localFunctions?: FunctionNode[]
   statements: StatementNode[]
   resultSets?: Record<string, OrdsResultColumnNode[]>
+  paginations?: Record<string, CursorQueryMetadata>
   exceptionHandlers?: ExceptionHandlerNode[]
 }
 
@@ -337,6 +340,7 @@ export type ServiceNode = {
   /** Streamed media type. `application/json` with JSON-typed outputs emits native JSON fields. */
   responseMediaType?: string
   responseStatus?: number
+  pagination?: CursorPageOptions
   module?: string
   basePath?: string
   paramTypes?: Record<string, OrdsParamType>
@@ -463,6 +467,7 @@ export class ProcedureBody {
   private _statements: StatementNode[] = []
   private _returnCounter = 0
   private _cursorResultColumns = new Map<string, OrdsResultColumnNode[]>()
+  private _cursorPaginations = new Map<string, CursorQueryMetadata>()
   private _exceptionHandlers: ExceptionHandlerNode[] = []
   private _exceptions: ExceptionDeclarationNode[] = []
   private _loopIndices = new Set<string>()
@@ -625,6 +630,9 @@ export class ProcedureBody {
         cursor,
         columns.map((column) => ({ ...column })),
       )
+    }
+    for (const [cursor, metadata] of Object.entries(statement.paginations ?? {})) {
+      this._cursorPaginations.set(cursor, structuredClone(metadata))
     }
     this._statements.push({ kind: 'call', sql: statement.toSQL() })
     return this
@@ -792,6 +800,8 @@ export class ProcedureBody {
   openFor(cursor: string | PlsqlReference, qb: AnyQueryBuilder): this {
     const cursorName = typeof cursor === 'string' ? cursor : cursor.name
     const columns = qb.selectedColumns?.()
+    const pagination = qb.cursorPagination?.()
+    if (pagination) this._cursorPaginations.set(cursorName.toUpperCase(), pagination)
     if (columns) {
       this._cursorResultColumns.set(
         cursorName.toUpperCase(),
@@ -826,6 +836,8 @@ export class ProcedureBody {
     for (const [name, columns] of child._cursorResultColumns) {
       this._cursorResultColumns.set(name, columns)
     }
+    for (const [name, metadata] of child._cursorPaginations)
+      this._cursorPaginations.set(name, metadata)
     return child._statements
   }
 
@@ -1041,6 +1053,10 @@ export class ProcedureBody {
     return this._cursorResultColumns.get(cursor.toUpperCase())
   }
 
+  cursorPagination(cursor: string): CursorQueryMetadata | undefined {
+    return this._cursorPaginations.get(cursor.toUpperCase())
+  }
+
   toNode(): ProcedureBodyNode {
     this.validateLoopIndices()
     return {
@@ -1053,6 +1069,9 @@ export class ProcedureBody {
       localFunctions:
         this._localFunctions.length > 0 ? this._localFunctions.map((fn) => fn.toNode()) : undefined,
       statements: [...this._statements],
+      ...(this._cursorPaginations.size
+        ? { paginations: Object.fromEntries(this._cursorPaginations) }
+        : {}),
       resultSets:
         this._cursorResultColumns.size > 0
           ? Object.fromEntries(
@@ -1143,12 +1162,16 @@ export type OrdsServiceDefinition = {
   paramTypes?: Record<string, OrdsParamType>
   /** HTTP parameter bindings, grouped by transport and keyed by public name. */
   params?: OrdsServiceParameterGroups
+  /** Limit overrides for services whose typed query uses paginate(). */
+  pagination?: CursorPageOptions
 }
 
 /** Defaults applied to every ORDS service declared by a package. */
 export type OdbPackageOptions = {
   /** ORDS module base path. Individual services can override this value. */
   basePath?: string
+  /** Defaults inherited by services that enable cursor pagination. */
+  pagination?: CursorPageOptions
 }
 
 export type OrdsServiceParameterGroups = {
@@ -1229,6 +1252,10 @@ export class ProcedureDefinition<TParameters extends ProcedureParameters> {
   /** @internal Typed cursor columns per parameter position (undefined for non-cursors). */
   cursorColumnsByPosition(): (OrdsResultColumnNode[] | undefined)[] {
     return this.procedure.cursorColumnsByPosition()
+  }
+
+  cursorPaginationsForArguments(args: string[]): Record<string, CursorQueryMetadata> {
+    return this.procedure.cursorPaginationsForArguments(args)
   }
 
   /** @internal Emit the procedure application node. */
@@ -1334,6 +1361,23 @@ function buildOrdsEndpoint(
     )
   }
 
+  const paginatedOutputs = endpoint
+    .toNode()
+    .params.filter(
+      (param) =>
+        param.sourceType === 'RESPONSE' &&
+        procedure.body?.paginations?.[param.plsqlArg.toUpperCase()],
+    )
+  if (paginatedOutputs.length) {
+    const items = paginatedOutputs[0]!
+    if (paginatedOutputs.length !== 1 || items.name !== 'items') {
+      throw new Error('Paginated services must expose one paginated resultset named items.')
+    }
+    endpoint.cursorPage(
+      service.pagination ?? {},
+      procedure.body!.paginations![items.plsqlArg.toUpperCase()]!,
+    )
+  }
   return endpoint
 }
 
@@ -1507,12 +1551,32 @@ export class Procedure {
       basePath: basePath ? normalizeBasePath(basePath) : undefined,
       paramTypes: definition.paramTypes ? { ...definition.paramTypes } : undefined,
       params: definition.params ? { ...definition.params } : undefined,
+      ...(definition.pagination || this.serviceDefaults.pagination
+        ? {
+            pagination: { ...this.serviceDefaults.pagination, ...definition.pagination },
+          }
+        : {}),
     }
     return this
   }
 
   cursorColumnsByPosition(): (OrdsResultColumnNode[] | undefined)[] {
     return this._params.map((p) => this._body?.cursorResultColumns(p.name))
+  }
+
+  cursorPaginationsForArguments(args: string[]): Record<string, CursorQueryMetadata> {
+    const result: Record<string, CursorQueryMetadata> = {}
+    this._params.forEach((param, index) => {
+      const metadata = this._body?.cursorPagination(param.name)
+      const output = args[index]
+      if (!metadata || output === undefined) return
+      const cursor = args[this._params.findIndex((input) => input.name === metadata.cursor)]
+      const limit = args[this._params.findIndex((input) => input.name === metadata.limit)]
+      if (cursor === undefined || limit === undefined)
+        throw new Error('Paginated calls require cursor and limit arguments.')
+      result[output.toUpperCase()] = { ...structuredClone(metadata), cursor, limit }
+    })
+    return result
   }
 
   toNode(): ProcedureNode {
@@ -1712,6 +1776,7 @@ export class PackageImpl<
       return new PlsqlStatement(
         `${this.name}.${member.name}(${rendered})`,
         Object.keys(cursors).length > 0 ? cursors : undefined,
+        member.cursorPaginationsForArguments(renderedArgs),
       ) as PackageMemberReturnValue<PackageMemberDefinition>
     }
     return new PlsqlExpression(

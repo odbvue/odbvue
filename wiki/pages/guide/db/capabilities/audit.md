@@ -51,6 +51,14 @@ body.raw(odbAudit.log("'INFO'", "'job finished'", 'v_attributes', 'systimestamp'
 
 ## The `odb_audit_logs` Table
 
+`odbAudit.list(after, limit, items)` uses a decoded timestamp/ID cursor tuple,
+ordered newest first with an ID tie-breaker. It fetches the displayed limit plus
+one lookahead row. Delegating services automatically return `{ items, nextCursor? }`;
+clients request the displayed size and forward opaque tokens unchanged. The
+tuple carries timestamp precision directly, so pagination does not require the
+previous audit record to still exist. Shared defaults are 25/100, with optional
+package or service `pagination` overrides.
+
 | Column               | OTel field        | Notes                                                   |
 | -------------------- | ----------------- | ------------------------------------------------------- |
 | `id`                 | —                 | `CHAR(32)` primary key, `lower(sys_guid())`             |

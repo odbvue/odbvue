@@ -39,8 +39,8 @@ describe('Settings', () => {
     expect(sql).toContain(
       'OPEN p_items FOR SELECT id AS "id", CASE WHEN secret = \'Y\' THEN TO_CLOB(\'********\') ELSE value END AS "value", meta AS "meta" FROM odb_settings_store',
     )
-    expect(sql).toContain('p_after IS NULL OR id > p_after')
-    expect(sql).toContain('ORDER BY id ASC FETCH FIRST NVL(p_limit, 50) ROWS ONLY')
+    expect(sql).toContain("id > JSON_VALUE(p_after, '$[0]'")
+    expect(sql).toContain('ORDER BY id ASC FETCH FIRST NVL(p_limit, 25) + 1 ROWS ONLY')
     expect(sql).toContain(
       'INTO l_stored_value, p_meta, l_secret FROM odb_settings_store WHERE id = p_id',
     )

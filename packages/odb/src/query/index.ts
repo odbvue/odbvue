@@ -1,5 +1,8 @@
 import { Column, type ColumnNode } from '../schema/column.js'
 import { toCamelCase } from '../model.js'
+import { Param } from '../schema/attribute.js'
+import { CURSOR_PAGE_DEFAULTS } from '../constants.js'
+import { cursorValueSql, type CursorQueryMetadata } from '../pagination.js'
 import {
   type ColumnKeyOf,
   type Insertable,
@@ -30,6 +33,7 @@ type SqlPredicate = { toSQL(): string; toQuerySQL?(): string }
 type OrderByClause = {
   column: string
   direction: 'asc' | 'desc'
+  metadata?: ColumnNode
 }
 
 type JoinClause = {
@@ -113,6 +117,7 @@ export class SelectQueryBuilder<
   private _nowait = false
   private _into?: string
   private _schema?: string
+  private _pagination?: CursorQueryMetadata
 
   constructor(private readonly _table: string | NamedRef) {}
 
@@ -256,12 +261,101 @@ export class SelectQueryBuilder<
   orderBy(column: TableColumn<TTable>, direction?: 'asc' | 'desc'): this
   orderBy(column: string, direction?: 'asc' | 'desc'): this
   orderBy(column: string | ColumnLike, direction: 'asc' | 'desc' = 'asc'): this {
-    this._orderBy.push({ column: typeof column === 'string' ? column : column.name, direction })
+    if (this._pagination) throw new Error('Declare ordering before paginate().')
+    this._orderBy.push({
+      column: typeof column === 'string' ? column : column.name,
+      direction,
+      metadata: column instanceof Column ? column.toNode() : undefined,
+    })
     return this
+  }
+
+  /** Keyset pagination derived from typed ordering, ending in a unique non-null tie-breaker. */
+  paginate(params: { cursor: Param<'CLOB'>; limit: Param<'NUMBER'> | Param<'PLS_INTEGER'> }): this {
+    if (
+      this._pagination ||
+      this._limit !== undefined ||
+      this._joins.length ||
+      !(this._table instanceof Table)
+    ) {
+      throw new Error(
+        'paginate() requires a single-table query without an existing limit or pagination.',
+      )
+    }
+    if (params.cursor.toNode().odbType !== 'json')
+      throw new Error('Pagination cursor must use odbType.json().')
+    if (!this._orderBy.length && this._table instanceof Table) {
+      const primaryKeys = this._table.toNode().columns.filter((column) => column.options.primaryKey)
+      if (primaryKeys.length === 1) {
+        const key = primaryKeys[0]!
+        this._orderBy.push({ column: key.name, direction: 'asc', metadata: key })
+      }
+    }
+    const selected = this.selectedColumns()
+    const last = this._orderBy.at(-1)?.metadata
+    const primaryKeys = this._table.toNode().columns.filter((column) => column.options.primaryKey)
+    const uniqueOrder =
+      last?.options.unique ||
+      (last?.options.primaryKey &&
+        primaryKeys.every((key) => this._orderBy.some((item) => item.column === key.name)))
+    if (!last || last.options.nullable !== false || !uniqueOrder) {
+      throw new Error('Pagination ordering must end in a unique non-null typed column.')
+    }
+    const order = this._orderBy.map((item) => {
+      const column = item.metadata
+      if (
+        !column ||
+        column.options.nullable !== false ||
+        !['guid', 'string', 'number', 'timestamp', 'date', 'boolean'].includes(column.type) ||
+        !selected?.some((value) => value.name === column.name && value.type === column.type) ||
+        (this._columns.length > 0 && !this._columns.includes(column.name)) ||
+        (column.type === 'string' && (column.options.length ?? 4000) > 1000)
+      )
+        throw new Error(
+          'Pagination requires selected, non-null typed ordering columns; string keys must be at most 1000 characters.',
+        )
+      return {
+        name: column.name,
+        type: column.type,
+        direction: item.direction,
+        length: column.options.length,
+      }
+    })
+    if (new Set(order.map((column) => column.name)).size !== order.length) {
+      throw new Error('Pagination ordering cannot repeat a column.')
+    }
+    const cursor = params.cursor.toSQL()
+    const terms = order.map((column, index) =>
+      [
+        ...order
+          .slice(0, index)
+          .map(
+            (previous, previousIndex) =>
+              `${previous.name} = ${cursorValueSql(cursor, previousIndex, previous)}`,
+          ),
+        `${column.name} ${column.direction === 'asc' ? '>' : '<'} ${cursorValueSql(cursor, index, column)}`,
+      ]
+        .map((term) => `(${term})`)
+        .join(' AND '),
+    )
+    this._where.push({
+      kind: 'raw',
+      sql: `(${cursor} IS NULL OR (${terms.map((term) => `(${term})`).join(' OR ')}))`,
+    })
+    this._limit = {
+      toSQL: () => `NVL(${params.limit.toSQL()}, ${CURSOR_PAGE_DEFAULTS.defaultLimit}) + 1`,
+    }
+    this._pagination = { cursor: params.cursor.name, limit: params.limit.name, order }
+    return this
+  }
+
+  cursorPagination(): CursorQueryMetadata | undefined {
+    return this._pagination ? structuredClone(this._pagination) : undefined
   }
 
   /** Limit rows by a literal count or a PL/SQL expression such as a procedure parameter. */
   limit(n: number | { toSQL(): string }): this {
+    if (this._pagination) throw new Error('paginate() owns the query limit.')
     this._limit = n
     return this
   }

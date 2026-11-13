@@ -4,7 +4,6 @@ import {
   defineMigration,
   defineService,
   odbEnv,
-  odbLiteral,
   odbOracle,
   odbPackage,
   odbQuery,
@@ -29,21 +28,17 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
     'list_users',
     {
       in: {
-        after: odbType.guid(),
+        after: odbType.json(),
         limit: odbType.integer(),
         search: odbType.string(256),
       },
       out: { items: odbType.resultset() },
     },
     ({ params: { after, limit, search, items }, body }) => {
-      body.ifThen(cond.or([cond.lt(limit, 1), cond.gt(limit, 101)]), (invalid) =>
-        invalid.invalid('ADMIN_LIMIT_INVALID'),
-      )
       const term = odbOracle.lower(odbOracle.trim(search))
       body.openFor(
         items,
         userQuery()
-          .where(cond.or([cond.isNull(after), cond.gt(authUsers.id, after)]))
           .where(
             cond.or([
               cond.isNull(term),
@@ -52,7 +47,7 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
             ]),
           )
           .orderBy(authUsers.id)
-          .limit(odbOracle.nvl(limit, odbLiteral(26))),
+          .paginate({ cursor: after, limit }),
       )
     },
   )

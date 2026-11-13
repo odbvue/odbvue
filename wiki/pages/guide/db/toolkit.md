@@ -158,4 +158,67 @@ Existing services that delegate to capability list procedures inherit explicit
 JSON serialization after database redeployment; no per-service migration changes
 or client-side snake_case mapping are needed.
 
+## Cursor pagination
+
+Declare ordering once in a typed query and finish with `paginate()`. The cursor
+input is `odbType.json()` internally; ORDS exposes an opaque string, validates
+it, and passes the decoded ordering tuple to the procedure.
+
+```ts
+const list = pkg.proc(
+  'list_users',
+  {
+    in: { after: odbType.json(), limit: odbType.integer() },
+    out: { items: odbType.resultset() },
+  },
+  ({ params, body }) =>
+    body.openFor(
+      params.items,
+      odbQuery()
+        .selectFrom(users)
+        .select([users.id, users.createdAt])
+        .orderBy(users.createdAt, 'desc')
+        .orderBy(users.id, 'desc')
+        .paginate({ cursor: params.after, limit: params.limit }),
+    ),
+)
+defineService(list, {
+  auth: 'authenticated',
+  method: 'GET',
+  path: '/users',
+  query: { cursor: list.parameters.after, limit: list.parameters.limit },
+  response: { items: list.parameters.items },
+})
+```
+
+The public response is `{ items: T[], nextCursor?: string }`. Request `limit`
+means displayed rows. The query fetches one extra row internally; the framework
+handler returns at most `limit`, builds continuation from the last displayed
+tuple, and omits `nextCursor` when exhausted. Delegated capability calls retain
+their query pagination metadata.
+Services infer this contract automatically from `paginate()`; ordinary queries,
+including detail lookups, remain unpaginated. There is no service enable flag.
+
+`CURSOR_PAGE_DEFAULTS`, defined once in `packages/odb/src/constants.ts` and
+re-exported by the public API and pagination module, supplies page size 25 and maximum 100. Set `odbPackage(name, { pagination: { defaultLimit: 50 } }, build)` for
+package-wide defaults, or `pagination: { maxLimit: 200 }` for a service override.
+No service needs to repeat keys or limits.
+
+The helper supports typed, single-table queries and selected, non-null ordering
+columns of string, GUID, number, boolean, date or timestamp type. Ordering must
+end in a unique non-null tie-breaker; all columns of a composite primary key
+must be included. With no ordering, a single primary key can be inferred.
+Nullable sort keys, joins, raw ordering expressions and oversized string keys
+are rejected explicitly rather than guessed. Add ordering before `paginate()`;
+the helper owns the query limit. Timestamp cursors retain microsecond precision.
+
+Tokens are versioned and bound to the endpoint, ordering, authenticated user,
+and other query inputs; page size can change without changing the boundary.
+Malformed or incompatible cursors and invalid limits return HTTP 400.
+Tokens are encoded, not encrypted or signed, and never replace authorization.
+The encoded token is limited to 4000 characters; an oversized boundary raises
+an explicit `CURSOR_TOO_LARGE` error. Clients must restart pagination when
+search, filters or sorting changes. Keyset ordering avoids offset drift, but
+does not provide a snapshot when records change between requests.
+
 The web app consumes this manifest through `openapi-typescript`; see [Consuming Web Services](/guide/web/consuming-web-services#generated-ords-types).

@@ -22,15 +22,14 @@ describe('Storage', () => {
     expect(sql.match(/owner_id = p_owner_id/g)).toHaveLength(3)
     expect(sql).toContain('SQL%ROWCOUNT = 0')
     expect(sql).toContain('STORAGE_FILE_NOT_FOUND')
-    expect(sql).toContain('p_after IS NULL OR id > p_after')
-    expect(sql).toContain('FETCH FIRST NVL(p_limit, 50) ROWS ONLY')
+    expect(sql).toContain("id > JSON_VALUE(p_after, '$[0]'")
+    expect(sql).toContain('FETCH FIRST NVL(p_limit, 25) + 1 ROWS ONLY')
   })
 
-  it('validates filenames, metadata, pagination and server-computed byte sizes', () => {
+  it('validates filenames, metadata and server-computed byte sizes', () => {
     expect(sql).toContain('STORAGE_FILENAME_INVALID')
     expect(sql).toContain('STORAGE_MIME_TYPE_INVALID')
     expect(sql).toContain('STORAGE_META_INVALID')
-    expect(sql).toContain('STORAGE_LIMIT_INVALID')
     expect(sql).toContain('l_file_size := DBMS_LOB.GETLENGTH(p_content)')
     expect(sql).toContain(`l_file_size > ${odbStorage.maxFileBytes}`)
     expect(sql).toContain('STORAGE_CONTENT_REQUIRED')

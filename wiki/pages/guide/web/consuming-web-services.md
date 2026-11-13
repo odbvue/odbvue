@@ -23,3 +23,31 @@ handler validates the JSON and streams it without ORDS quoting the fields.
 Other JSON-typed OUT fields retain ORDS's JSON-string transport; the HTTP client
 decodes these using OpenAPI's `x-odb-type: json` metadata and leaves native values
 unchanged.
+
+## Server-backed lists
+
+```ts
+import { useCursorQuery, useHttp } from '@/capabilities/http'
+import type { components } from '@/api/openapi.generated'
+
+const http = useHttp()
+const users = useCursorQuery({
+  fetch: ({ signal, ...query }) =>
+    http.get<components['schemas']['AdminListUsersResponse']>('/admin/users', { query, signal }),
+})
+await users.load({ limit: 25 })
+await users.load({ limit: 25, cursor: users.nextCursor.value })
+```
+
+`CursorPage<T>` is `{ items: T[], nextCursor?: string }`. Pass the displayed
+limit, and forward the server cursor unchanged. Missing continuation means the
+list is exhausted; clients do not request extra rows or construct cursor keys.
+The composable manages cancellation, stale responses, loading, error state and
+scope disposal. Bind its refs to `VOvTable` and adapt the table fetch event to
+`load({ cursor, limit, search })`.
+
+Use the error ref for inline feedback, or pass an `onError` callback such as
+`() => ui.error('admin.loadUsersError')`, where `ui = useUi()`, for global
+feedback. Cancellation and stale failures do not notify. Avoid displaying both
+unless duplicate feedback is intentional. HTTP errors still enter the normal
+error-capture pipeline.

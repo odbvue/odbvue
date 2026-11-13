@@ -43,8 +43,11 @@ const user: components['schemas']['AdminListUsersItemsItem'] = {
   createdAt: '2026-01-01T10:00:00Z',
   updatedAt: '2026-01-02T10:00:00Z',
 }
-const result = (items: (typeof user)[] = [user]): HttpResponse<{ items: (typeof user)[] }> => ({
-  data: { items },
+const result = (
+  items: (typeof user)[] = [user],
+  nextCursor?: string,
+): HttpResponse<components['schemas']['AdminListUsersResponse']> => ({
+  data: { items, nextCursor },
   error: null,
   status: 200,
   headers: null,
@@ -128,12 +131,12 @@ describe('admin page metadata', () => {
 })
 
 describe('admin users list', () => {
-  it('displays five users on desktop and mobile, requesting a sixth only for pagination', async () => {
-    const records = Array.from({ length: 6 }, (_, index) => ({
+  it('requests five displayed users and uses backend-owned continuation on desktop and mobile', async () => {
+    const records = Array.from({ length: 5 }, (_, index) => ({
       ...user,
       id: String(index).padStart(32, '0'),
     }))
-    get.mockResolvedValue(result(records))
+    get.mockResolvedValue(result(records, 'opaque-next-page'))
     const { wrapper } = await setup()
     const component = wrapper.findComponent(table)
     const options: OvTableOptions = component.props('options')
@@ -143,10 +146,10 @@ describe('admin users list', () => {
     await flushPromises()
     expect(get).toHaveBeenLastCalledWith(
       '/admin/users',
-      expect.objectContaining({ query: { cursor: undefined, limit: 6, search: undefined } }),
+      expect.objectContaining({ query: { cursor: undefined, limit: 5, search: undefined } }),
     )
-    expect(component.props('items')).toEqual(records.slice(0, 5))
-    expect(component.props('nextCursor')).toBe(records[4]?.id)
+    expect(component.props('items')).toEqual(records)
+    expect(component.props('nextCursor')).toBe('opaque-next-page')
   })
 
   it.each([true, false])('renders enabled=%s with the correct status', async (enabled) => {
@@ -171,25 +174,25 @@ describe('admin users list', () => {
     expect(cell.text()).not.toContain(messages[enabled ? 'admin.disabled' : 'admin.enabled'])
   })
 
-  it('uses the table cursor, search and one extra row to paginate without skipping users', async () => {
+  it('passes opaque continuation unchanged with the same normalized search', async () => {
     const second = { ...user, id: 'B'.repeat(32), username: 'bob@example.test' }
-    get.mockResolvedValue(result([user, second]))
+    get.mockResolvedValue(result([user], 'opaque-user-cursor'))
     const { wrapper } = await setup()
     const component = wrapper.findComponent(table)
     component.vm.$emit('fetch', [], undefined, 1, ' ada ')
     await flushPromises()
     expect(get).toHaveBeenLastCalledWith(
       '/admin/users',
-      expect.objectContaining({ query: { cursor: undefined, limit: 2, search: 'ada' } }),
+      expect.objectContaining({ query: { cursor: undefined, limit: 1, search: 'ada' } }),
     )
     expect(component.props('items')).toEqual([user])
-    expect(component.props('nextCursor')).toBe(user.id)
+    expect(component.props('nextCursor')).toBe('opaque-user-cursor')
     get.mockResolvedValue(result([second]))
-    component.vm.$emit('fetch', [], user.id, 1, ' ada ')
+    component.vm.$emit('fetch', [], 'opaque-user-cursor', 1, ' ada ')
     await flushPromises()
     expect(get).toHaveBeenLastCalledWith(
       '/admin/users',
-      expect.objectContaining({ query: { cursor: user.id, limit: 2, search: 'ada' } }),
+      expect.objectContaining({ query: { cursor: 'opaque-user-cursor', limit: 1, search: 'ada' } }),
     )
     expect(component.props('items')).toEqual([second])
     expect(component.props('nextCursor')).toBeUndefined()

@@ -40,8 +40,6 @@ const http = useHttp()
 const { items, nextCursor, loading, loaded, error, load } = useCursorQuery({
   fetch: ({ signal, ...query }) =>
     http.get<components['schemas']['AdminListUsersResponse']>('/admin/users', { query, signal }),
-  select: (response) => response.items,
-  getCursor: (user) => user.id,
 })
 
 const options = computed<OvTableOptions>(() => ({

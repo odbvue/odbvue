@@ -66,13 +66,13 @@ HTTP exposure, authorization, and mapping ODB errors to HTTP responses belong to
 
 ## Procedures
 
-| Procedure     | Parameters                                                | Behavior                                                                                                                                                                                                  |
-| ------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list`        | `p_after` IN, `p_limit` IN, `p_items` OUT `SYS_REFCURSOR` | Up to `p_limit` rows (`NULL` = 50) ordered by `id`, starting after `p_after` (`NULL` for the first page). Columns: `id`, `value`, `meta`. Callers detect a further page by requesting `p_limit + 1` rows. |
-| `read`        | `p_id` IN, `p_value` OUT, `p_meta` OUT                    | Reads one setting, decrypting secrets; raises the ODB `NOT_FOUND` error if it does not exist.                                                                                                             |
-| `read_masked` | `p_id` IN, `p_value` OUT, `p_meta` OUT                    | Reads one setting, returning `********` for secrets without loading the key.                                                                                                                              |
-| `write`       | `p_id`, `p_value`, `p_meta` IN                            | Creates or updates a setting. A `NULL` `p_meta` keeps existing metadata (`{}` on create).                                                                                                                 |
-| `remove`      | `p_id` IN                                                 | Deletes a setting.                                                                                                                                                                                        |
+| Procedure     | Parameters                                                     | Behavior                                                                                                                                                                                                 |
+| ------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list`        | `p_after` IN JSON, `p_limit` IN, `p_items` OUT `SYS_REFCURSOR` | Ordered by `id`, after a decoded cursor tuple (`NULL` for the first page). Returns the displayed limit plus one lookahead row (`NULL` limit uses the shared default 25). Columns: `id`, `value`, `meta`. |
+| `read`        | `p_id` IN, `p_value` OUT, `p_meta` OUT                         | Reads one setting, decrypting secrets; raises the ODB `NOT_FOUND` error if it does not exist.                                                                                                            |
+| `read_masked` | `p_id` IN, `p_value` OUT, `p_meta` OUT                         | Reads one setting, returning `********` for secrets without loading the key.                                                                                                                             |
+| `write`       | `p_id`, `p_value`, `p_meta` IN                                 | Creates or updates a setting. A `NULL` `p_meta` keeps existing metadata (`{}` on create).                                                                                                                |
+| `remove`      | `p_id` IN                                                      | Deletes a setting.                                                                                                                                                                                       |
 
 `meta` is JSON text for presentation or validation hints (label, type, and so on).
 `meta.secret` is reserved: `'Y'` marks an encrypted secret; omitted, `null`, or
@@ -118,21 +118,14 @@ Settings uses database-native keyset pagination:
 odbSettings.list(after, limit, items)
 ```
 
-- `after` is the last setting ID from the previous page.
-- `limit` controls the maximum number of rows returned.
+- `after` is a decoded JSON ordering tuple, or `NULL` for the first page.
+- `limit` is the displayed page size; the query fetches one additional row.
 - `items` is the result set.
 
-The capability does not define HTTP pagination semantics such as query parameters or opaque cursors. Application services may translate their public pagination contract into `after` and `limit`.
-
-Requesting one extra row lets the application determine whether another page exists:
-
-```ts
-const pageSize = 10
-
-body.call(odbSettings.list(after, pageSize + 1, items))
-```
-
-If more than `pageSize` rows come back, the application returns the first `pageSize` rows and uses the last returned ID as the next `after`.
+Pagination is inferred automatically on a delegating service. The framework preserves the
+capability's typed pagination metadata, validates opaque public tokens, trims
+lookahead, and returns `{ items, nextCursor? }`. Neither the page nor the service
+needs to derive a cursor from an ID. See [Cursor pagination](../toolkit.md#cursor-pagination).
 
 ## Expose Settings Over ORDS
 
@@ -174,7 +167,7 @@ The `odbSettings` helpers return typed calls for `body.call(...)`:
 ```ts
 body.call(odbSettings.write(id, value)) // keeps existing meta
 body.call(odbSettings.write(id, value, metaJson))
-body.call(odbSettings.list(after, limit, items)) // limit NULL = default 50
+body.call(odbSettings.list(after, limit, items)) // decoded tuple; displayed limit
 body.call(odbSettings.remove(id))
 ```
 

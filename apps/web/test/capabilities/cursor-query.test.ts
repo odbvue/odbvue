@@ -1,30 +1,32 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, isReadonly } from 'vue'
-import { useCursorQuery, type CursorQueryOptions } from '@/capabilities/http/cursor-query'
+import {
+  useCursorQuery,
+  type CursorPage,
+  type CursorQueryOptions,
+} from '@/capabilities/http/cursor-query'
 import type { HttpResponse } from '@/capabilities/http/core'
 import { createState } from '@/capabilities/state'
 import { useUi } from '@/capabilities/ui/store'
 
 type Item = { id: string }
-type Response = { items: Item[] }
-const response = (items: Item[]): HttpResponse<Response> => ({
-  data: { items },
+type Response = CursorPage<Item>
+const response = (items: Item[], nextCursor?: string): HttpResponse<Response> => ({
+  data: { items, nextCursor },
   error: null,
   status: 200,
   headers: null,
 })
 const scopes: ReturnType<typeof effectScope>[] = []
 
-function setup(overrides: Partial<CursorQueryOptions<Response, Item>> = {}) {
+function setup(overrides: Partial<CursorQueryOptions<Item>> = {}) {
   const scope = effectScope()
   scopes.push(scope)
-  const fetch = vi.fn<CursorQueryOptions<Response, Item>['fetch']>().mockResolvedValue(response([]))
+  const fetch = vi.fn<CursorQueryOptions<Item>['fetch']>().mockResolvedValue(response([]))
   const onError = vi.fn<(error: Error) => void>()
   const query = scope.run(() =>
     useCursorQuery({
       fetch,
-      select: (data) => data.items,
-      getCursor: (item) => item.id,
       onError,
       ...overrides,
     }),
@@ -37,7 +39,7 @@ afterEach(() => {
 })
 
 describe('useCursorQuery', () => {
-  it('exposes readonly idle state and normalizes search while requesting one lookahead row', async () => {
+  it('requests the displayed limit and preserves an opaque backend cursor without deriving it', async () => {
     const { query, fetch } = setup()
     expect(query.items.value).toEqual([])
     expect(query.loaded.value).toBe(false)
@@ -46,16 +48,16 @@ describe('useCursorQuery', () => {
     for (const state of [query.items, query.nextCursor, query.loaded, query.loading, query.error]) {
       expect(isReadonly(state)).toBe(true)
     }
-    fetch.mockResolvedValue(response([{ id: 'a' }, { id: 'b' }, { id: 'c' }]))
+    fetch.mockResolvedValue(response([{ id: 'a' }, { id: 'b' }], 'opaque-continuation'))
     await query.load({ cursor: 'previous', limit: 2, search: ' ada ' })
     expect(fetch).toHaveBeenCalledWith({
       cursor: 'previous',
-      limit: 3,
+      limit: 2,
       search: 'ada',
       signal: expect.any(AbortSignal),
     })
     expect(query.items.value).toEqual([{ id: 'a' }, { id: 'b' }])
-    expect(query.nextCursor.value).toBe('b')
+    expect(query.nextCursor.value).toBe('opaque-continuation')
     expect(query.loaded.value).toBe(true)
     expect(query.loading.value).toBe(false)
   })
@@ -72,7 +74,7 @@ describe('useCursorQuery', () => {
 
   it('clears previous rows and cursors while a new page is loading', async () => {
     const { query, fetch } = setup()
-    fetch.mockResolvedValueOnce(response([{ id: 'a' }, { id: 'b' }]))
+    fetch.mockResolvedValueOnce(response([{ id: 'a' }], 'opaque-continuation'))
     await query.load({ limit: 1 })
     const pending = Promise.withResolvers<HttpResponse<Response>>()
     fetch.mockReturnValueOnce(pending.promise)
@@ -157,7 +159,7 @@ describe('useCursorQuery', () => {
     expect(fetch).toHaveBeenCalledTimes(action === 'cancel' ? 2 : 1)
   })
 
-  it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER])(
+  it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
     'reports invalid limit %s without fetching',
     async (limit) => {
       const { query, fetch, onError } = setup()
@@ -169,21 +171,30 @@ describe('useCursorQuery', () => {
     },
   )
 
-  it('reports selection and cursor errors without publishing partial rows', async () => {
-    const error = new Error('Invalid records')
-    const { query, onError } = setup({
-      select: () => {
-        throw error
-      },
-    })
-    await query.load({ limit: 1 })
-    expect(query.error.value).toBe(error)
-    expect(onError).toHaveBeenCalledExactlyOnceWith(error)
-    const other = setup({ getCursor: () => '' })
-    other.fetch.mockResolvedValue(response([{ id: 'a' }, { id: 'b' }]))
-    await other.query.load({ limit: 1 })
-    expect(other.query.error.value?.message).toContain('non-empty cursor')
-    expect(other.query.items.value).toEqual([])
+  it.each([
+    response([{ id: 'a' }, { id: 'b' }]),
+    response([{ id: 'a' }], ''),
+    response([{ id: 'a' }], '   '),
+    response([], 'opaque'),
+    response([{ id: 'a' }], 'previous'),
+  ])('rejects invalid page contracts without publishing partial rows', async (result) => {
+    const { query, fetch, onError } = setup()
+    fetch.mockResolvedValueOnce(result)
+    await query.load({ cursor: 'previous', limit: 1 })
+    expect(query.error.value?.message).toBe('Invalid cursor page response')
+    expect(onError).toHaveBeenCalledExactlyOnceWith(query.error.value)
+    expect(query.items.value).toEqual([])
+    expect(query.nextCursor.value).toBeUndefined()
+  })
+
+  it('does not infer exhaustion from the number of returned items', async () => {
+    const { query, fetch } = setup()
+    fetch.mockResolvedValueOnce(response([{ id: 'a' }], 'opaque'))
+    await query.load({ limit: 5 })
+    expect(query.nextCursor.value).toBe('opaque')
+    fetch.mockResolvedValueOnce(response([{ id: 'b' }]))
+    await query.load({ cursor: 'opaque', limit: 1 })
+    expect(query.nextCursor.value).toBeUndefined()
   })
 
   it('integrates opt-in localized UI feedback without displaying backend messages', async () => {

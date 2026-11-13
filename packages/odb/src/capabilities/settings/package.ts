@@ -1,7 +1,7 @@
 import { cond, odbLiteral, PlsqlExpression } from '../../schema/attribute.js'
 import { odbPackage, odbType } from '../../schema/package.js'
 import { odbQuery } from '../../query/index.js'
-import { DEFAULT_LIMIT, PACKAGE_NAME } from './constants.js'
+import { PACKAGE_NAME } from './constants.js'
 import { settingsStore } from './tables.js'
 import { settingsTypes } from './types.js'
 import { settingsEncryption } from './encryption.js'
@@ -11,11 +11,11 @@ import { VALUE_LENGTH } from './constants.js'
 /** PL/SQL API for the settings store. Callers own authorization and transactions. */
 export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
   const { encrypt, decrypt } = settingsEncryption(pkg)
-  /** Settings ordered by id after `after` (null for the start); `limit` null means the default page size. */
+  /** Settings ordered by id after a decoded cursor tuple, including one lookahead row. */
   const list = pkg.proc(
     'list',
     {
-      in: { after: settingsStore.id, limit: odbType.integer() },
+      in: { after: odbType.json(), limit: odbType.integer() },
       out: { items: odbType.resultset() },
     },
     ({ params: { after, limit, items }, body }) => {
@@ -34,9 +34,8 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
             settingsStore.value,
           )
           .select(settingsStore.meta)
-          .where(cond.or([cond.isNull(after), cond.gt(settingsStore.id, after)]))
           .orderBy(settingsStore.id)
-          .limit(odbOracle.nvl(limit, odbLiteral(DEFAULT_LIMIT))),
+          .paginate({ cursor: after, limit }),
       )
     },
   )

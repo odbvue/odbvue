@@ -75,22 +75,25 @@ body.call(odbStorage.list(ownerId, after, limit, items))
 ```
 
 - `after = NULL` starts from the first page.
-- `limit = NULL` uses 50 rows; explicit limits must be from 1 through 101.
+- `after` otherwise contains the decoded JSON ordering tuple.
+- Public limits default to 25 and range from 1 through 100, with service overrides.
 - Rows are ordered by file ID, not creation time.
-- Request one extra row to detect another page. For a page size of 50, request 51 rows, display the first 50, and use the last displayed ID as the next cursor when the extra row exists.
+- Request the displayed page size. The typed query fetches lookahead and
+  automatically lets the framework trim it and return an opaque `nextCursor`.
 
-The result set contains `id`, `file_name`, `mime_type`, `file_size`, `meta`, and `created_at`. ORDS emits these cursor fields in snake case. The sandbox page maps them to camel case for display.
+The result set contains `id`, `file_name`, `mime_type`, `file_size`, `meta`, and
+`created_at`. The typed ORDS handler emits camelCase JSON fields directly.
 
 ## Sandbox HTTP Contract
 
 The sandbox migration exposes the following authenticated routes:
 
-| Method   | Route                                  | Result                                                                                   |
-| -------- | -------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `POST`   | `/sandbox/storage`                     | Upload a file; returns JSON `{ "id": "..." }`.                                           |
-| `GET`    | `/sandbox/storage?limit=51&cursor=...` | List the current user's files as `{ "items": [...] }`. Omit `cursor` for the first page. |
-| `GET`    | `/sandbox/storage/:id`                 | Download a binary attachment, not a JSON/Base64 response.                                |
-| `DELETE` | `/sandbox/storage/:id`                 | Delete a file belonging to the current user.                                             |
+| Method   | Route                                  | Result                                                                                      |
+| -------- | -------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `POST`   | `/sandbox/storage`                     | Upload a file; returns JSON `{ "id": "..." }`.                                              |
+| `GET`    | `/sandbox/storage?limit=50&cursor=...` | List files as `{ "items": [...], "nextCursor"?: "..." }`. Omit `cursor` for the first page. |
+| `GET`    | `/sandbox/storage/:id`                 | Download a binary attachment, not a JSON/Base64 response.                                   |
+| `DELETE` | `/sandbox/storage/:id`                 | Delete a file belonging to the current user.                                                |
 
 All routes require `Authorization: Bearer <accessToken>`. The web development proxy prefixes them with `/api`.
 

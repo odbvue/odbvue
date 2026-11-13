@@ -1,6 +1,8 @@
 export * from './schema/schema.js'
 export * from './application.js'
 export type { ServiceAuthorization } from './ords.js'
+export { CURSOR_PAGE_DEFAULTS } from './constants.js'
+export type { CursorPageOptions } from './pagination.js'
 export * from './schema/column.js'
 export * from './schema/table.js'
 export * from './schema/attribute.js'

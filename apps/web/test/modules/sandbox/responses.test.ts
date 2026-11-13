@@ -63,7 +63,7 @@ describe('sandbox camelCase service responses', () => {
       .find((candidate) => candidate.text() === 'Load')!
       .trigger('click')
     await flushPromises()
-    expect(get).toHaveBeenCalledWith('/sandbox/audit?limit=51')
+    expect(get).toHaveBeenCalledWith('/sandbox/audit?limit=50')
     const cells = wrapper.get('tbody tr').findAll('td')
     expect(cells[0]!.text()).toBe(new Date(timestamp).toLocaleString())
     expect(cells[1]!.text()).toBe('WARN')
@@ -77,7 +77,8 @@ describe('sandbox camelCase service responses', () => {
     get
       .mockResolvedValueOnce({
         data: {
-          items: Array.from({ length: 51 }, (_, index) => ({
+          nextCursor: 'opaque-file-cursor',
+          items: Array.from({ length: 50 }, (_, index) => ({
             id: `file-${index}`,
             fileName: `report-${index}.pdf`,
             mimeType: 'application/pdf',
@@ -91,7 +92,7 @@ describe('sandbox camelCase service responses', () => {
       .mockResolvedValueOnce({ data: { items: [] }, error: null })
     const wrapper = mount(Storage, { global: { stubs } })
     await flushPromises()
-    expect(get).toHaveBeenCalledWith('/sandbox/storage?limit=51')
+    expect(get).toHaveBeenCalledWith('/sandbox/storage?limit=50')
     expect(wrapper.findAll('tbody tr')).toHaveLength(50)
     const cells = wrapper.get('tbody tr').findAll('td')
     expect(cells[0]!.text()).toBe('report-0.pdf')
@@ -103,7 +104,7 @@ describe('sandbox camelCase service responses', () => {
       .find((candidate) => candidate.text() === 'Next')!
       .trigger('click')
     await flushPromises()
-    expect(get).toHaveBeenLastCalledWith('/sandbox/storage?limit=51&cursor=file-49')
+    expect(get).toHaveBeenLastCalledWith('/sandbox/storage?limit=50&cursor=opaque-file-cursor')
     expect(wrapper.text()).toContain('No files.')
     wrapper.unmount()
   })

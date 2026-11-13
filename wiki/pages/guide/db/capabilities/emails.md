@@ -163,7 +163,11 @@ connection around DATA acceptance can leave delivery uncertain; check provider
 logs before retrying an ambiguous failure. `S` means accepted by the SMTP server,
 not proof of arrival in the recipient's inbox.
 
-`list` uses an ID cursor, ordered ascending, with a default limit of 50 and maximum 101. Authorization belongs to callers; the framework package is not HTTP-specific.
+`list` uses a decoded JSON ID tuple, ordered ascending, and fetches the displayed
+limit plus one lookahead row. Services automatically infer public
+`{ items, nextCursor? }` responses. Shared limits default to 25/100 and can be
+overridden; clients pass opaque continuation tokens unchanged. Authorization
+belongs to callers; the framework package is not HTTP-specific.
 
 ## Sandbox
 
@@ -172,7 +176,7 @@ All email services require the `admin` role:
 - `POST /sandbox/emails`: `{ address, name, subject, content, priority, attachmentId }`
   queues, commits, and sends; returns `{ id }` only when SMTP accepts the message.
   `name` and `attachmentId` may be null. Attachments must belong to the signed-in user.
-- `GET /sandbox/emails?limit=51&cursor=...`: delivery history without message bodies.
+- `GET /sandbox/emails?limit=50&cursor=...`: delivery history without message bodies.
 - `POST /sandbox/emails/:id/send`: send/retry an existing message.
 
 The Emails page sends HTML with an optional file (up to the Storage limit of

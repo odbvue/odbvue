@@ -55,20 +55,10 @@ export const odbAuditPackage = odbPackage('odb_audit', (pkg) => {
   const list = pkg.proc(
     'list',
     {
-      in: { after: auditTypes.id, limit: odbType.integer() },
+      in: { after: odbType.json(), limit: odbType.integer() },
       out: { items: odbType.resultset() },
     },
     ({ params: { after, limit, items }, body }) => {
-      const { afterTimestamp } = body.variables({ afterTimestamp: odbType.timestamp() })
-      body.ifThen(cond.isNotNull(after), (then) => {
-        then.query(
-          odbQuery()
-            .selectFrom(auditLogs)
-            .select([auditLogs.observedTimestamp])
-            .into(afterTimestamp)
-            .where(cond.eq(auditLogs.id, after)),
-        )
-      })
       body.openFor(
         items,
         odbQuery()
@@ -81,21 +71,10 @@ export const odbAuditPackage = odbPackage('odb_audit', (pkg) => {
             auditLogs.body,
             auditLogs.attributes,
           ])
-          .where(
-            cond.or([
-              cond.isNull(after),
-              cond.lt(auditLogs.observedTimestamp, afterTimestamp),
-              cond.and([
-                cond.eq(auditLogs.observedTimestamp, afterTimestamp),
-                cond.lt(auditLogs.id, after),
-              ]),
-            ]),
-          )
           .orderBy(auditLogs.observedTimestamp, 'desc')
           .orderBy(auditLogs.id, 'desc')
-          .limit(odbOracle.nvl(limit, odbLiteral(50))),
+          .paginate({ cursor: after, limit }),
       )
-      body.when('NO_DATA_FOUND', (handler) => handler.notFound('AUDIT_CURSOR_NOT_FOUND'))
     },
   )
 

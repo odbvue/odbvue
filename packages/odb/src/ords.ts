@@ -10,6 +10,8 @@ import {
 import type { ColumnType } from './schema/column.js'
 import { ODB_ERROR_NUMBER, ODB_ERROR_STATUS } from './schema/errors.js'
 import { odbHttp } from './helpers/http/http.js'
+import { CURSOR_PAGE_DEFAULTS } from './constants.js'
+import { cursorValueSql, type CursorPageOptions, type CursorQueryMetadata } from './pagination.js'
 
 export type OrdsHttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
@@ -85,6 +87,7 @@ export type OrdsEndpointNode = {
   auth?: ServiceAuthorization
   responseMediaType?: string
   responseStatus?: number
+  cursorPage?: Required<CursorPageOptions> & CursorQueryMetadata
   comment?: string
 }
 
@@ -173,6 +176,50 @@ export class OrdsEndpoint {
   private _responseMediaType?: string
   private _responseStatus?: number
   private _contextUserId?: string
+  private _cursorPage?: Required<CursorPageOptions> & CursorQueryMetadata
+
+  cursorPage(options: CursorPageOptions, metadata: CursorQueryMetadata): this {
+    const defaultLimit = options.defaultLimit ?? CURSOR_PAGE_DEFAULTS.defaultLimit
+    const maxLimit = options.maxLimit ?? CURSOR_PAGE_DEFAULTS.maxLimit
+    if (
+      !Number.isSafeInteger(defaultLimit) ||
+      !Number.isSafeInteger(maxLimit) ||
+      defaultLimit < 1 ||
+      maxLimit < defaultLimit ||
+      maxLimit >= 2147483647
+    )
+      throw new Error('Cursor page limits must be positive integers with defaultLimit <= maxLimit.')
+    const items = this._params.find((p) => p.name === 'items' && p.direction === 'OUT')
+    const cursor = this._params.find((p) => p.name === 'cursor' && p.direction === 'IN')
+    const limit = this._params.find((p) => p.name === 'limit' && p.direction === 'IN')
+    if (
+      this.effectiveMethod !== 'GET' ||
+      !this.nativeJsonResponse ||
+      this.nativeCursorOutputs.length !== 1 ||
+      items?.paramType !== 'RESULTSET' ||
+      !cursor ||
+      !limit ||
+      this.paramSourceType(cursor) !== 'URI' ||
+      this.paramSourceType(limit) !== 'URI' ||
+      limit.odbType !== 'number' ||
+      cursor.odbType !== 'json' ||
+      !metadata.order.length ||
+      cursor.plsqlArg.toUpperCase() !== metadata.cursor.toUpperCase() ||
+      limit.plsqlArg.toUpperCase() !== metadata.limit.toUpperCase() ||
+      metadata.order.some(
+        (column) =>
+          !items.resultColumns?.some(
+            (item) => item.name === column.name && item.type === column.type && !item.nullable,
+          ),
+      ) ||
+      this._params.some((p) => p.name === 'nextCursor')
+    )
+      throw new Error(
+        'Cursor pages require GET query cursor/limit and typed items from a matching paginated query.',
+      )
+    this._cursorPage = { ...structuredClone(metadata), defaultLimit, maxLimit }
+    return this
+  }
 
   contextUserId(parameter: string): this {
     this._contextUserId = parameter.toUpperCase()
@@ -367,15 +414,93 @@ export class OrdsEndpoint {
                 : value
       return `${sqlStr(oracleParameterName(column.name, { stripPrefix: false }))} VALUE ${expression}`
     })
+    const keyValues = this._cursorPage?.order.map((key) => {
+      const index = columns.findIndex((column) => column.name === key.name)
+      const value = `${name}_column_${index}`
+      return key.type === 'guid'
+        ? `RTRIM(${value})`
+        : key.type === 'timestamp'
+          ? `TO_CHAR(${value}, 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"')`
+          : key.type === 'date'
+            ? `TO_CHAR(${value}, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`
+            : value
+    })
     return [
       `LOOP FETCH ${name} INTO ${columns.map((_column, index) => `${name}_column_${index}`).join(', ')};`,
       `EXIT WHEN ${name}%NOTFOUND;`,
+      ...(this._cursorPage
+        ? [
+            `IF ${name}_array.get_size() >= v_page_limit THEN`,
+            "IF LENGTHB(v_page_boundary) > 1966 THEN raise_application_error(-20999, 'ODB_HTTP|500|CURSOR_TOO_LARGE'); END IF;",
+            "v_page_next_cursor := 'v1.' || v_page_scope || '.' || RAWTOHEX(UTL_I18N.STRING_TO_RAW(v_page_boundary, 'AL32UTF8'));",
+            'EXIT;',
+            'END IF;',
+          ]
+        : []),
       `SELECT JSON_OBJECT(${values.join(', ')} NULL ON NULL RETURNING CLOB STRICT) INTO v_json_row FROM dual;`,
       `${name}_array.append(JSON_OBJECT_T.parse(v_json_row));`,
+      ...(this._cursorPage
+        ? [
+            `SELECT JSON_ARRAY(${keyValues?.join(', ')} NULL ON NULL RETURNING VARCHAR2(4000) STRICT) INTO v_page_boundary FROM dual;`,
+          ]
+        : []),
       'END LOOP;',
       `CLOSE ${name};`,
       `${name}_json := ${name}_array.to_clob();`,
     ]
+  }
+
+  private get cursorPageSetup(): string {
+    if (!this._cursorPage) return ''
+    const cursor = this._params.find((p) => p.name === 'cursor')!
+    const limit = this._params.find((p) => p.name === 'limit')!
+    const invalidCursor = "raise_application_error(-20999, 'ODB_HTTP|400|CURSOR_INVALID');"
+    const invalidLimit = "raise_application_error(-20999, 'ODB_HTTP|400|CURSOR_LIMIT_INVALID');"
+    const query = this._params.filter(
+      (p) =>
+        p.direction === 'IN' &&
+        p !== cursor &&
+        p !== limit &&
+        p.plsqlArg.toUpperCase() !== this._contextUserId,
+    )
+    const scope = [
+      `'endpoint' VALUE ${sqlStr(JSON.stringify([this.module, this.effectivePattern, this.procedureName, this._cursorPage.order]))}`,
+      `'subject' VALUE ${this._auth !== undefined && this._auth !== 'anonymous' ? 'v_auth_user_id' : 'NULL'}`,
+      ...query.map((p) => `${sqlStr(p.name)} VALUE :${p.bindVariable}`),
+    ].join(', ')
+    return (
+      [
+        `BEGIN v_page_limit := NVL(:${limit.bindVariable}, ${this._cursorPage.defaultLimit});`,
+        `EXCEPTION WHEN VALUE_ERROR OR INVALID_NUMBER THEN ${invalidLimit} END;`,
+        `IF v_page_limit < 1 OR v_page_limit > ${this._cursorPage.maxLimit} OR v_page_limit <> TRUNC(v_page_limit) THEN ${invalidLimit} END IF;`,
+        `SELECT LOWER(RAWTOHEX(STANDARD_HASH(JSON_OBJECT(${scope} NULL ON NULL RETURNING VARCHAR2(4000) STRICT), 'SHA256'))) INTO v_page_scope FROM dual;`,
+        `BEGIN v_page_token := :${cursor.bindVariable};`,
+        `IF v_page_token IS NOT NULL THEN`,
+        `IF NOT REGEXP_LIKE(v_page_token, '^v1\\.[0-9a-f]{64}\\.([0-9A-F]{2})+$', 'c') OR SUBSTR(v_page_token, 4, 64) <> v_page_scope THEN ${invalidCursor} END IF;`,
+        "v_page_after := UTL_I18N.RAW_TO_CHAR(HEXTORAW(SUBSTR(v_page_token, 69)), 'AL32UTF8');",
+        `IF v_page_after IS NULL OR RAWTOHEX(UTL_I18N.STRING_TO_RAW(v_page_after, 'AL32UTF8')) <> SUBSTR(v_page_token, 69) THEN ${invalidCursor} END IF;`,
+        `SELECT CASE WHEN v_page_after IS JSON STRICT THEN 1 ELSE 0 END INTO v_page_valid FROM dual;`,
+        `IF v_page_valid <> 1 OR NOT REGEXP_LIKE(v_page_after, '^[[:space:]]*\\[') THEN ${invalidCursor} END IF;`,
+        'v_page_keys := JSON_ARRAY_T.parse(v_page_after);',
+        `IF v_page_keys.get_size() <> ${this._cursorPage.order.length} THEN ${invalidCursor} END IF;`,
+        ...this._cursorPage.order.flatMap((key, index) => [
+          `v_page_key := v_page_keys.get(${index});`,
+          `IF NOT v_page_key.${key.type === 'number' || key.type === 'boolean' ? 'is_number' : 'is_string'}() THEN ${invalidCursor} END IF;`,
+          `SELECT ${cursorValueSql('v_page_after', index, key, 'NULL')} INTO v_page_validate_${index} FROM dual;`,
+          `IF v_page_validate_${index} IS NULL THEN ${invalidCursor} END IF;`,
+          ...(key.type === 'guid'
+            ? [
+                `IF NOT REGEXP_LIKE(v_page_validate_${index}, '^[0-9A-Fa-f]{32}$', 'c') THEN ${invalidCursor} END IF;`,
+              ]
+            : []),
+          ...(key.type === 'boolean'
+            ? [`IF v_page_validate_${index} NOT IN (0, 1) THEN ${invalidCursor} END IF;`]
+            : []),
+        ]),
+        'END IF;',
+        `EXCEPTION WHEN VALUE_ERROR THEN ${invalidCursor} END;`,
+      ].join(' ') + ' '
+    )
   }
 
   private get handlerSource(): string {
@@ -384,21 +509,42 @@ export class OrdsEndpoint {
     )
     const args = this._params
       .map((p) =>
-        this.nativeOutputName(p)
-          ? `${p.plsqlArg.toLowerCase()} => ${this.nativeOutputName(p)}`
-          : p.plsqlArg.toUpperCase() === this._contextUserId
-            ? `${p.plsqlArg.toLowerCase()} => v_auth_user_id`
-            : this.paramSourceType(p) === 'BODY' && p.odbType === 'blob'
-              ? `${p.plsqlArg.toLowerCase()} => v_binary_body`
-              : p.plsqlArg.toUpperCase() === 'P_BODY'
-                ? `${p.plsqlArg.toLowerCase()} => :body`
-                : this.paramSourceType(p) === 'BODY'
-                  ? `${p.plsqlArg.toLowerCase()} => ${jsonValueExpression(p)}`
-                  : `${p.plsqlArg.toLowerCase()} => :${p.bindVariable}`,
+        this._cursorPage && p.name === 'cursor'
+          ? `${p.plsqlArg.toLowerCase()} => v_page_after`
+          : this._cursorPage && p.name === 'limit'
+            ? `${p.plsqlArg.toLowerCase()} => v_page_limit`
+            : this.nativeOutputName(p)
+              ? `${p.plsqlArg.toLowerCase()} => ${this.nativeOutputName(p)}`
+              : p.plsqlArg.toUpperCase() === this._contextUserId
+                ? `${p.plsqlArg.toLowerCase()} => v_auth_user_id`
+                : this.paramSourceType(p) === 'BODY' && p.odbType === 'blob'
+                  ? `${p.plsqlArg.toLowerCase()} => v_binary_body`
+                  : p.plsqlArg.toUpperCase() === 'P_BODY'
+                    ? `${p.plsqlArg.toLowerCase()} => :body`
+                    : this.paramSourceType(p) === 'BODY'
+                      ? `${p.plsqlArg.toLowerCase()} => ${jsonValueExpression(p)}`
+                      : `${p.plsqlArg.toLowerCase()} => :${p.bindVariable}`,
       )
       .join(', ')
     const protectedEndpoint = this._auth !== undefined && this._auth !== 'anonymous'
     const declarations = [
+      ...(this._cursorPage
+        ? [
+            'v_page_limit NUMBER;',
+            'v_page_token VARCHAR2(4000);',
+            'v_page_scope VARCHAR2(64);',
+            'v_page_after VARCHAR2(32767);',
+            'v_page_boundary VARCHAR2(32767);',
+            'v_page_next_cursor VARCHAR2(4000);',
+            'v_page_keys JSON_ARRAY_T;',
+            'v_page_key JSON_ELEMENT_T;',
+            'v_page_valid NUMBER;',
+            ...this._cursorPage.order.map(
+              (key, index) =>
+                `v_page_validate_${index} ${emitOracleType(key.type, { length: key.length ?? 4000 })};`,
+            ),
+          ]
+        : []),
       ...this._params.flatMap((p) => {
         const name = this.nativeOutputName(p)
         if (!name) return []
@@ -482,7 +628,7 @@ export class OrdsEndpoint {
             )
             .join(
               ', ',
-            )} RETURNING CLOB STRICT) RETURNING CLOB ASCII) INTO v_json_response FROM dual;`,
+            )}${this._cursorPage ? ", 'nextCursor' VALUE v_page_next_cursor ABSENT ON NULL" : ''} RETURNING CLOB STRICT) RETURNING CLOB ASCII) INTO v_json_response FROM dual;`,
           "owa_util.mime_header('application/json', FALSE);",
           ...this._params
             .filter((p) => p.direction === 'OUT' && this.paramSourceType(p) === 'HEADER')
@@ -499,7 +645,7 @@ export class OrdsEndpoint {
           'END LOOP;',
         ].join(' ')
       : ''
-    const call = `${normalizeBody}${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args});${this._responseStatus === undefined ? '' : ` :status_code := ${this._responseStatus};`}${jsonResponse ? ` ${jsonResponse}` : ''}`
+    const call = `${normalizeBody}${this.cursorPageSetup}${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args});${this._responseStatus === undefined ? '' : ` :status_code := ${this._responseStatus};`}${jsonResponse ? ` ${jsonResponse}` : ''}`
     const envelope = "'ODB_HTTP\\|([4-5][0-9]{2})\\|([A-Z][A-Z0-9_]{0,99})'"
     const status = `REGEXP_SUBSTR(SQLERRM, ${envelope}, 1, 1, NULL, 1)`
     const code = `REGEXP_SUBSTR(SQLERRM, ${envelope}, 1, 1, NULL, 2)`
@@ -560,10 +706,16 @@ export class OrdsEndpoint {
       source: this.handlerSource,
       params: this._params
         .filter((p) => p.plsqlArg.toUpperCase() !== this._contextUserId)
-        .map((p) => p.toNode(this.paramSourceType(p))),
+        .map((p) => {
+          const node = p.toNode(this.paramSourceType(p))
+          return this._cursorPage && p.name === 'cursor'
+            ? { ...node, odbType: 'string' as const }
+            : node
+        }),
       auth: this._auth,
       responseMediaType: this._responseMediaType,
       responseStatus: this._responseStatus,
+      ...(this._cursorPage ? { cursorPage: { ...this._cursorPage } } : {}),
       comment: this._comment,
     }
   }
@@ -629,7 +781,7 @@ export class OrdsEndpoint {
           `    p_name               => '${p.name}',`,
           `    p_bind_variable_name => '${p.bindVariable}',`,
           `    p_source_type        => '${this.paramSourceType(p)}',`,
-          `    p_param_type         => '${p.paramType}',`,
+          `    p_param_type         => '${this._cursorPage && p.name === 'limit' ? 'STRING' : p.paramType}',`,
           `    p_access_method      => '${p.direction}',`,
           `    p_comments           => ${sqlStr(p.comment)}`,
           `  );`,

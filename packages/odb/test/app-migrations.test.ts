@@ -51,11 +51,11 @@ describe('app-owned ORDS migrations', () => {
       expect(node.source).toContain("WHEN 1 THEN 'true' WHEN 0 THEN 'false'")
     }
     const sql = migration.compile().up().join('\n')
-    expect(sql).toContain('ADMIN_LIMIT_INVALID')
-    expect(sql).toContain('p_limit < 1')
-    expect(sql).toContain('p_limit > 101')
-    expect(sql).toContain('FETCH FIRST NVL(p_limit, 26) ROWS ONLY')
-    expect(sql).toContain('id > p_after')
+    expect(sql).toContain('CURSOR_LIMIT_INVALID')
+    expect(sql).toContain('v_page_limit < 1')
+    expect(sql).toContain('v_page_limit > 100')
+    expect(sql).toContain('FETCH FIRST NVL(p_limit, 25) + 1 ROWS ONLY')
+    expect(sql).toContain("id > JSON_VALUE(p_after, '$[0]'")
     expect(sql).toContain('ORDER BY id ASC')
     expect(sql).toContain('INSTR(LOWER(username), LOWER(TRIM(p_search)))')
     expect(sql).toContain('INSTR(LOWER(display_name), LOWER(TRIM(p_search)))')
@@ -841,7 +841,7 @@ describe('app-owned ORDS migrations', () => {
     ])
 
     const sql = migration.compile().up().join('\n')
-    expect(sql).toContain('list_settings(p_after => :after')
+    expect(sql).toContain('list_settings(p_after => v_page_after')
   })
 
   it('seeds an admin grant without an unprivileged test user after identity installation', async () => {
