@@ -38,16 +38,14 @@ export function useCursorQuery<Item>(options: CursorQueryOptions<Item>) {
     loading.value = false
   }
 
-  async function load(params: CursorQueryParams) {
-    if (disposed) return
+  async function load(params: CursorQueryParams): Promise<boolean> {
+    if (disposed) return false
     cancel()
     const currentRequest = requestId
     const currentController = new AbortController()
     controller = currentController
     loading.value = true
     error.value = undefined
-    items.value = []
-    nextCursor.value = undefined
     let failure: Error | undefined
 
     try {
@@ -60,7 +58,7 @@ export function useCursorQuery<Item>(options: CursorQueryOptions<Item>) {
         search: params.search?.trim() || undefined,
         signal: currentController.signal,
       })
-      if (currentRequest !== requestId) return
+      if (currentRequest !== requestId) return false
       if (response.error) throw response.error
       if (response.data === null) throw new Error('Cursor query response has no data')
 
@@ -78,7 +76,7 @@ export function useCursorQuery<Item>(options: CursorQueryOptions<Item>) {
       items.value = page.items
       nextCursor.value = page.nextCursor
     } catch (cause) {
-      if (currentRequest !== requestId) return
+      if (currentRequest !== requestId) return false
       failure = cause instanceof Error ? cause : new Error(String(cause))
       error.value = failure
     } finally {
@@ -90,6 +88,7 @@ export function useCursorQuery<Item>(options: CursorQueryOptions<Item>) {
     }
 
     if (failure) options.onError?.(failure)
+    return !failure && currentRequest === requestId
   }
 
   onScopeDispose(() => {

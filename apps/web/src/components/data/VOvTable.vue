@@ -233,14 +233,14 @@
                         v-if="hasPrevPage || hasNextPage"
                         icon="$mdiChevronLeft"
                         :title="t('previous')"
-                        :disabled="!hasPrevPage"
+                        :disabled="busy || !hasPrevPage"
                         @click="fetch('prev')"
                       />
                       <v-btn
                         v-if="hasPrevPage || hasNextPage"
                         icon="$mdiChevronRight"
                         :title="t('next')"
-                        :disabled="!hasNextPage"
+                        :disabled="busy || !hasNextPage"
                         @click="fetch('next')"
                       />
                     </v-col>
@@ -249,6 +249,7 @@
                         v-if="canRefresh"
                         icon="$mdiRefresh"
                         :title="t('refresh')"
+                        :disabled="busy"
                         @click="fetch()"
                       />
                       <v-btn
@@ -324,7 +325,7 @@
         </v-card>
       </v-dialog>
 
-      <v-overlay :model-value="loading" persistent contained class="align-center justify-center">
+      <v-overlay :model-value="busy" persistent contained class="align-center justify-center">
         <v-progress-circular indeterminate />
       </v-overlay>
     </v-container>
@@ -480,6 +481,7 @@ const emits = defineEmits<{
     search?: string,
     filter?: OvFilterValue,
     sort?: string,
+    complete?: (success: boolean) => void,
   ): void
 }>()
 
@@ -497,6 +499,11 @@ watch(
 const page = computed(() => pageItems(localData.value, itemsPerPage.value))
 const pageCursor = ref<string | undefined>(undefined)
 const cursorStack = ref<(string | undefined)[]>([])
+const fetching = ref(false)
+const busy = computed(() => loading || fetching.value)
+let fetchId = 0
+let finishFetch: ((success: boolean) => void) | undefined
+let committedQuery: string | undefined
 const itemsPerPage = computed(() => {
   if (mobile.value) return options.mobileItemsPerPage ?? 1
   return options.itemsPerPage || 10
@@ -507,9 +514,7 @@ const canRefresh = computed(() => options.canRefresh ?? true)
 const emptyRowsCount = computed(() => emptyRowCount(page.value.length, itemsPerPage.value))
 
 watch(mobile, () => {
-  cursorStack.value = []
-  pageCursor.value = undefined
-  fetch()
+  fetch('first')
 })
 
 const columns = computed(() => {
@@ -934,26 +939,45 @@ async function handleTableAction(actionName: string) {
   } else await emits('action', actionName, localData.value, formData.value, onActionComplete)
 }
 
-async function fetch(action?: 'first' | 'next' | 'prev') {
-  if (action === 'first') {
-    cursorStack.value = []
-    pageCursor.value = undefined
-  } else if (action === 'next') {
-    cursorStack.value.push(pageCursor.value)
-    pageCursor.value = nextCursor
-  } else if (action === 'prev') {
-    pageCursor.value = cursorStack.value.pop()
+function fetch(action?: 'first' | 'next' | 'prev'): Promise<boolean> {
+  if (action !== 'first' && busy.value) return Promise.resolve(false)
+  const limit = itemsPerPage.value
+  const search = searchValue.value
+  const filter = filterValue.value
+  const sort = sortValue.value
+  const query = JSON.stringify([limit, search?.trim() || undefined, filter, sort])
+  const reset = action === 'first' || (committedQuery !== undefined && committedQuery !== query)
+  let cursor = reset ? undefined : pageCursor.value
+  const stack = reset ? [] : [...cursorStack.value]
+  if (!reset && action === 'next') {
+    if (!hasNextPage.value) return Promise.resolve(false)
+    stack.push(cursor)
+    cursor = nextCursor
+  } else if (!reset && action === 'prev') {
+    if (!hasPrevPage.value) return Promise.resolve(false)
+    cursor = stack.pop()
   }
 
-  await emits(
-    'fetch',
-    localData.value,
-    pageCursor.value,
-    itemsPerPage.value,
-    searchValue.value,
-    filterValue.value,
-    sortValue.value,
-  )
+  finishFetch?.(false)
+  const currentFetch = ++fetchId
+  fetching.value = true
+  return new Promise<boolean>((resolve) => {
+    let completed = false
+    const complete = (success: boolean) => {
+      if (completed || currentFetch !== fetchId) return
+      completed = true
+      if (success) {
+        pageCursor.value = cursor
+        cursorStack.value = stack
+        committedQuery = query
+      }
+      fetching.value = false
+      finishFetch = undefined
+      resolve(success)
+    }
+    finishFetch = complete
+    emits('fetch', localData.value, cursor, limit, search, filter, sort, complete)
+  })
 }
 
 defineExpose({
@@ -1016,6 +1040,8 @@ function restoreState(): boolean {
 }
 
 onBeforeUnmount(() => {
+  finishFetch?.(false)
+  fetchId++
   saveState()
 })
 

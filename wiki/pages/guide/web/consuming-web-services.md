@@ -44,7 +44,19 @@ limit, and forward the server cursor unchanged. Missing continuation means the
 list is exhausted; clients do not request extra rows or construct cursor keys.
 The composable manages cancellation, stale responses, loading, error state and
 scope disposal. Bind its refs to `VOvTable` and adapt the table fetch event to
-`load({ cursor, limit, search })`.
+`load({ cursor, limit, search })`. `load()` resolves to true only for a successful
+current request, and false for errors, cancellation or superseded requests.
+It retains the last successful rows and continuation while loading and on
+failure.
+
+```ts
+async function fetchUsers(data, cursor, limit, search, filter, sort, complete) {
+  complete?.(await users.load({ cursor, limit, search }))
+}
+```
+
+Always invoke the table completion callback; it commits cursor history only
+after success and unlocks navigation after either outcome.
 
 Use the error ref for inline feedback, or pass an `onError` callback such as
 `() => ui.error('admin.loadUsersError')`, where `ui = useUi()`, for global

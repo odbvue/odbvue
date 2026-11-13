@@ -23,6 +23,7 @@ definePage({
 const loading = ref(false)
 const data = ref<OvTableData[]>([])
 const nextCursor = ref<string | undefined>(undefined)
+let requestId = 0
 
 import jsonData from './table.json'
 
@@ -50,9 +51,15 @@ async function fetch(
   search?: string,
   filter?: OvFilterValue,
   sort?: string,
+  complete?: (success: boolean) => void,
 ) {
+  const currentRequest = ++requestId
   loading.value = true
   await new Promise((resolve) => setTimeout(resolve, 1500))
+  if (currentRequest !== requestId) {
+    complete?.(false)
+    return
+  }
 
   let newData = jsonData
 
@@ -93,6 +100,7 @@ async function fetch(
   nextCursor.value = start + pageItems.length < newData.length ? String(start + limit) : undefined
   console.log('fetch', data.value, nextCursor.value)
   loading.value = false
+  complete?.(true)
 }
 
 const options = ref<OvTableOptions>({

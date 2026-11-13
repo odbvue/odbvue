@@ -52,14 +52,14 @@ const options = ref<OvTableOptions>({
 
 | Event    | Payload                                              | Description                                |
 | -------- | ---------------------------------------------------- | ------------------------------------------ |
-| `fetch`  | `(data, nextCursor, limit, search?, filter?, sort?)` | Requests the next table page or a refetch. |
+| `fetch`  | `(data, cursor, limit, search?, filter?, sort?, complete?)` | Requests a page; call `complete(success)` after fetching. |
 | `action` | `(name, data, value?, callback?)`                    | Emitted for table, row, and cell actions.  |
 
 ### Exposed
 
 | Method    | Type                  | Description                                    |
 | --------- | --------------------- | ---------------------------------------------- |
-| `fetch()` | `() => Promise<void>` | Triggers a fetch with the current table state. |
+| `fetch()` | `(action?: 'first' \| 'next' \| 'prev') => Promise<boolean>` | Resolves true only when the requested page succeeds. |
 
 ### Slots
 
@@ -89,6 +89,7 @@ const options = ref<OvTableOptions>({
 - On mobile, the table switches to a stacked layout and uses `mobileItemsPerPage` when provided.
 - Column and action formatting use `OvFieldFormat` and `OvActionFormat` under the hood.
 - Row expansion only appears when the `expand` slot is provided.
+- Enable remote sorting only when the fetch handler and endpoint implement the requested ordering.
   name: 'add',
   format: { icon: '$mdiPlus', text: 'Add' },
     form: {
@@ -132,16 +133,29 @@ Tables are paginated with configurable items per page:
 
 ```typescript
 {
-  itemsPerPage: 10,    // Items to display per page
-  currentPage: 1       // Starting page
+  itemsPerPage: 10     // Items to display per page
 }
 ````
 
 Navigation buttons appear in the table footer:
 
-- **Previous** - Disabled on first page
-- **Next** - Disabled when fewer items than limit returned
+- **Previous** - Disabled on the first page or while loading
+- **Next** - Disabled without a server continuation cursor or while loading
 - **Refresh** - Appears when `canRefresh: true`
+
+The fetch handler must call the supplied completion callback exactly once:
+`complete?.(await query.load({ cursor, limit, search }))` when using
+`useCursorQuery()`. Vue event emission does not await the handler's promise.
+Publish rows and `nextCursor` before reporting success; report false on failure
+and display the error through the normal application feedback mechanism.
+
+Cursor history changes only after success. Keep the last successful rows and
+continuation on failure so Next/Previous can retry the same request. Navigation
+and refresh are blocked while fetching; a first-page request (search, filter,
+sort or responsive page-size change) can supersede a pending request. Fetch
+handlers must ignore superseded responses, as `useCursorQuery()` does.
+Changed query parameters reset pagination, including retries after a failed
+search, rather than reusing a cursor from the previous query.
 
 ### Data Format
 

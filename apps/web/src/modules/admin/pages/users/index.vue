@@ -24,7 +24,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useCursorQuery, useHttp } from '@/capabilities/http'
 import type { components } from '@/api/openapi.generated'
-import type { OvTableData, OvTableOptions } from '@/components/api'
+import type { OvFilterValue, OvTableData, OvTableOptions } from '@/components/api'
 
 definePage({
   meta: {
@@ -82,12 +82,16 @@ const options = computed<OvTableOptions>(() => ({
   ],
 }))
 
-function fetchUsers(
+async function fetchUsers(
   _data: OvTableData[],
   cursor: string | undefined,
   limit: number,
   search?: string,
+  _filter?: OvFilterValue,
+  _sort?: string,
+  complete?: (success: boolean) => void,
 ) {
-  return load({ cursor, limit, search })
+  const success = await load({ cursor, limit, search })
+  complete?.(success)
 }
 </script>

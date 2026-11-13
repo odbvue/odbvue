@@ -49,7 +49,7 @@ describe('useCursorQuery', () => {
       expect(isReadonly(state)).toBe(true)
     }
     fetch.mockResolvedValue(response([{ id: 'a' }, { id: 'b' }], 'opaque-continuation'))
-    await query.load({ cursor: 'previous', limit: 2, search: ' ada ' })
+    expect(await query.load({ cursor: 'previous', limit: 2, search: ' ada ' })).toBe(true)
     expect(fetch).toHaveBeenCalledWith({
       cursor: 'previous',
       limit: 2,
@@ -72,7 +72,7 @@ describe('useCursorQuery', () => {
     expect(fetch.mock.calls[0]?.[0].search).toBeUndefined()
   })
 
-  it('clears previous rows and cursors while a new page is loading', async () => {
+  it('preserves the successful page and cursor during loading and after failure', async () => {
     const { query, fetch } = setup()
     fetch.mockResolvedValueOnce(response([{ id: 'a' }], 'opaque-continuation'))
     await query.load({ limit: 1 })
@@ -80,11 +80,16 @@ describe('useCursorQuery', () => {
     fetch.mockReturnValueOnce(pending.promise)
     const load = query.load({ cursor: 'a', limit: 1 })
     expect(query.loading.value).toBe(true)
-    expect(query.items.value).toEqual([])
-    expect(query.nextCursor.value).toBeUndefined()
-    pending.resolve(response([{ id: 'b' }]))
-    await load
+    expect(query.items.value).toEqual([{ id: 'a' }])
+    expect(query.nextCursor.value).toBe('opaque-continuation')
+    pending.reject(new Error('Failed'))
+    expect(await load).toBe(false)
+    expect(query.items.value).toEqual([{ id: 'a' }])
+    expect(query.nextCursor.value).toBe('opaque-continuation')
+    fetch.mockResolvedValueOnce(response([{ id: 'b' }]))
+    expect(await query.load({ cursor: 'opaque-continuation', limit: 1 })).toBe(true)
     expect(query.items.value).toEqual([{ id: 'b' }])
+    expect(query.nextCursor.value).toBeUndefined()
   })
 
   it.each(['returned', 'rejected', 'missing data'] as const)(
@@ -100,7 +105,7 @@ describe('useCursorQuery', () => {
           status: 503,
           headers: null,
         })
-      await query.load({ limit: 1 })
+      expect(await query.load({ limit: 1 })).toBe(false)
       expect(query.error.value).toBeInstanceOf(Error)
       if (kind !== 'missing data') expect(query.error.value).toBe(error)
       expect(query.items.value).toEqual([])
@@ -129,13 +134,13 @@ describe('useCursorQuery', () => {
       else if (kind === 'returned error')
         first.resolve({ data: null, error, status: 500, headers: null })
       else first.resolve(response([{ id: 'old' }]))
-      await old
+      expect(await old).toBe(false)
       expect(query.loading.value).toBe(true)
       expect(query.loaded.value).toBe(false)
       expect(query.error.value).toBeUndefined()
       expect(onError).not.toHaveBeenCalled()
       second.resolve(response([{ id: 'current' }]))
-      await current
+      expect(await current).toBe(true)
       expect(query.items.value).toEqual([{ id: 'current' }])
     },
   )
@@ -150,7 +155,7 @@ describe('useCursorQuery', () => {
     expect(fetch.mock.calls[0]?.[0].signal.aborted).toBe(true)
     expect(query.loading.value).toBe(false)
     pending.reject(new DOMException('Aborted', 'AbortError'))
-    await load
+    expect(await load).toBe(false)
     expect(query.items.value).toEqual([])
     expect(query.error.value).toBeUndefined()
     expect(query.loaded.value).toBe(false)
