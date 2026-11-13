@@ -42,6 +42,13 @@ the same key. Prefer `await ui.loading.run('orders.save', () => save())` when no
 additional cleanup is needed. It returns the action's result and releases loading
 on success, rejection, or a synchronous throw.
 
+For an operation that should report errors to the user rather than reject, use
+`await ui.run('orders.save', () => save())`. It preserves existing notifications
+on start, returns the result on success, and shows an error alert and returns
+`undefined` on failure. Error alerts replace the current notification; call
+`ui.clear()` explicitly if an initiating action should dismiss existing feedback.
+Operations and their notifications may finish after a page is left.
+
 `loading.active.value` tracks all activity. `loading.has('auth.login')` tracks a
 specific operation; `loading.has('auth')` also includes descendant keys such as
 `auth.profile`. Application auth operations register their activity automatically.

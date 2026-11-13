@@ -151,7 +151,7 @@ beforeEach(() => {
 afterEach(() => {
   wrappers.splice(0).forEach((wrapper) => wrapper.unmount())
   expect(ui.loading.active.value).toBe(false)
-  expect(ui.notification.value).toBeUndefined()
+  ui.clear()
   vi.unstubAllGlobals()
 })
 
@@ -307,6 +307,14 @@ describe('admin users list', () => {
 })
 
 describe('admin user details', () => {
+  it('preserves unrelated feedback when loading and leaving the page', async () => {
+    ui.success('Other operation completed')
+    const { wrapper } = await setup(true)
+    expect(ui.notification.value?.message).toBe('Other operation completed')
+    wrapper.unmount()
+    expect(ui.notification.value?.message).toBe('Other operation completed')
+  })
+
   it('loads the selected account into a static view in a single Details tab', async () => {
     const { wrapper, router } = await setup(true)
     expect(get).toHaveBeenCalledWith(`/admin/users/${user.id}`)
@@ -350,7 +358,7 @@ describe('admin user details', () => {
     expect(wrapper.findComponent(view).exists()).toBe(false)
   })
 
-  it('reacts to a changed route and discards a late response for the previous user', async () => {
+  it('reloads on route changes but allows a late response to replace the newer user', async () => {
     let resolveFirst!: (response: ReturnType<typeof result>) => void
     get.mockReturnValueOnce(
       new Promise((resolve) => {
@@ -365,17 +373,17 @@ describe('admin user details', () => {
     await router.push(`/admin/users/${next.id}`)
     await flushPromises()
     expect(ui.loading.has('admin.users.details')).toBe(true)
-    resolveFirst(failure(500))
+    resolveFirst(result([{ ...user }]))
     await flushPromises()
     expect(ui.loading.active.value).toBe(false)
-    expect(wrapper.findComponent(view).props('data')).toEqual(next)
-    expect(wrapper.get('h3').text()).toBe(next.username)
-    expect(getBreadcrumbOverride(router).value?.title).toBe(next.displayName)
+    expect(wrapper.findComponent(view).props('data')).toEqual(user)
+    expect(wrapper.get('h3').text()).toBe(user.username)
+    expect(getBreadcrumbOverride(router).value?.title).toBe(user.displayName)
     expect(get.mock.calls[0]).toHaveLength(1)
     expect(ui.notification.value).toBeUndefined()
   })
 
-  it('tracks a detail request until completion after unmount and ignores its late response', async () => {
+  it('tracks a detail request until completion after unmount and reports its failure', async () => {
     let resolveRequest!: (response: ReturnType<typeof result>) => void
     get.mockReturnValue(
       new Promise((resolve) => {
@@ -389,8 +397,32 @@ describe('admin user details', () => {
     resolveRequest(failure(500))
     await flushPromises()
     expect(ui.loading.active.value).toBe(false)
-    expect(ui.notification.value).toBeUndefined()
+    expect(ui.notification.value?.message).toBe('admin.loadUserError')
   })
+
+  it.each(['route change', 'unmount'] as const)(
+    'reports a thrown detail error after %s',
+    async (change) => {
+      const request = Promise.withResolvers<ReturnType<typeof result>>()
+      get.mockReturnValueOnce(request.promise)
+      const { wrapper, router } = await setup(true)
+      if (change === 'unmount') {
+        wrapper.unmount()
+      } else {
+        const next = { ...user, id: 'B'.repeat(32) }
+        get.mockResolvedValue(result([next]))
+        await router.push(`/admin/users/${next.id}`)
+        await flushPromises()
+      }
+      request.reject(new Error('Late network failure'))
+      await flushPromises()
+      expect(ui.notification.value?.message).toBe('Late network failure')
+      expect(ui.loading.active.value).toBe(false)
+      if (change === 'route change') {
+        expect(wrapper.findComponent(view).props('data').id).toBe('B'.repeat(32))
+      }
+    },
+  )
 
   it('reports thrown detail requests and releases app loading', async () => {
     get.mockRejectedValue(new Error('Network failed'))
@@ -482,7 +514,7 @@ describe('admin user details', () => {
     },
   )
 
-  it('requires a fresh confirmation to retry a failure and clears the alert when saving', async () => {
+  it('requires a fresh confirmation to retry a failure and preserves feedback while saving', async () => {
     put.mockRejectedValue(failure(500).error)
     const { wrapper } = await setup(true)
     await wrapper
@@ -508,7 +540,7 @@ describe('admin user details', () => {
     )
     await wrapper.get('[role="dialog"]').findAll('button')[1]!.trigger('click')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
-    expect(ui.notification.value).toBeUndefined()
+    expect(ui.notification.value?.message).toBe('Request failed')
     expect(ui.loading.has('admin.users.status')).toBe(true)
     resolveMutation(result([{ ...user, enabled: false }]))
     await flushPromises()
