@@ -296,14 +296,18 @@ describe('admin users list', () => {
     )
   })
 
-  it('reports empty results and completes failures without publishing a page', async () => {
+  it('completes empty searches without notifications and reports failures', async () => {
     get.mockResolvedValue(result([]))
     const { wrapper } = await setup()
-    const first = fetchUsers(wrapper)
+    const first = fetchUsers(wrapper, { search: 'missing' })
     await flushPromises()
-    expect(ui.notification.value).toMatchObject({ type: 'info', message: 'admin.noUsers' })
+    expect(ui.notification.value).toBeUndefined()
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
     expect(first.complete).toHaveBeenCalledExactlyOnceWith({ items: [], nextCursor: undefined })
+    const second = fetchUsers(wrapper, { search: 'still missing' })
+    await flushPromises()
+    expect(ui.notification.value).toBeUndefined()
+    expect(second.complete).toHaveBeenCalledExactlyOnceWith({ items: [], nextCursor: undefined })
     get.mockResolvedValue(failure(403))
     const { complete } = fetchUsers(wrapper)
     await flushPromises()

@@ -77,7 +77,6 @@ async function fetchUsers({ cursor, limit, search, signal, complete }: OvTableFe
     )
     if (signal.aborted) return
     if (error || !data) throw new Error('admin.loadUsersError')
-    if (!data.items.length) ui.info('admin.noUsers')
     return data
   })
   complete(result.ok ? result.data : undefined)
