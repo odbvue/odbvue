@@ -192,7 +192,11 @@ describe('admin users list', () => {
     get.mockReturnValue(pending.promise)
     ui.success('Other operation completed')
     const { wrapper } = await setup()
-    wrapper.findComponent(table).vm.$emit('fetch', [], undefined, 5, 'ada')
+    wrapper.findComponent(table).vm.$emit('fetch', {
+      limit: 5,
+      search: 'ada',
+      complete: vi.fn<(success: boolean) => void>(),
+    })
     expect(ui.notification.value?.message).toBe('Other operation completed')
     pending.resolve(result())
     await flushPromises()
@@ -212,7 +216,8 @@ describe('admin users list', () => {
     const options: OvTableOptions = component.props('options')
     expect(options.itemsPerPage).toBe(5)
     expect(options.mobileItemsPerPage).toBe(5)
-    component.vm.$emit('fetch', [], undefined, options.itemsPerPage)
+    const complete = vi.fn<(success: boolean) => void>()
+    component.vm.$emit('fetch', { limit: options.itemsPerPage, complete })
     await flushPromises()
     expect(get).toHaveBeenLastCalledWith(
       '/admin/users',
@@ -220,6 +225,7 @@ describe('admin users list', () => {
     )
     expect(component.props('items')).toEqual(records)
     expect(component.props('nextCursor')).toBe('opaque-next-page')
+    expect(complete).toHaveBeenCalledExactlyOnceWith(true)
   })
 
   it.each([true, false])('renders enabled=%s with the correct status', async (enabled) => {
@@ -249,7 +255,11 @@ describe('admin users list', () => {
     get.mockResolvedValue(result([user], 'opaque-user-cursor'))
     const { wrapper } = await setup()
     const component = wrapper.findComponent(table)
-    component.vm.$emit('fetch', [], undefined, 1, ' ada ')
+    component.vm.$emit('fetch', {
+      limit: 1,
+      search: ' ada ',
+      complete: vi.fn<(success: boolean) => void>(),
+    })
     await flushPromises()
     expect(get).toHaveBeenLastCalledWith(
       '/admin/users',
@@ -258,7 +268,12 @@ describe('admin users list', () => {
     expect(component.props('items')).toEqual([user])
     expect(component.props('nextCursor')).toBe('opaque-user-cursor')
     get.mockResolvedValue(result([second]))
-    component.vm.$emit('fetch', [], 'opaque-user-cursor', 1, ' ada ')
+    component.vm.$emit('fetch', {
+      cursor: 'opaque-user-cursor',
+      limit: 1,
+      search: ' ada ',
+      complete: vi.fn<(success: boolean) => void>(),
+    })
     await flushPromises()
     expect(get).toHaveBeenLastCalledWith(
       '/admin/users',
@@ -275,16 +290,22 @@ describe('admin users list', () => {
     get.mockResolvedValue(result([]))
     const { wrapper } = await setup()
     const component = wrapper.findComponent(table)
-    component.vm.$emit('fetch', [], undefined, 25, '')
+    component.vm.$emit('fetch', {
+      limit: 25,
+      search: '',
+      complete: vi.fn<(success: boolean) => void>(),
+    })
     await flushPromises()
     expect(ui.notification.value).toMatchObject({ type: 'info', message: 'admin.noUsers' })
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
     get.mockResolvedValue(failure(403))
-    component.vm.$emit('fetch', [], undefined, 25)
+    const complete = vi.fn<(success: boolean) => void>()
+    component.vm.$emit('fetch', { limit: 25, complete })
     await flushPromises()
     expect(ui.notification.value).toMatchObject({ type: 'error', message: 'admin.loadUsersError' })
     expect(component.props('items')).toEqual([])
     expect(component.props('loading')).toBe(false)
+    expect(complete).toHaveBeenCalledExactlyOnceWith(false)
     expect(ui.loading.active.value).toBe(false)
   })
 
@@ -296,7 +317,10 @@ describe('admin users list', () => {
       }),
     )
     const { wrapper } = await setup()
-    wrapper.findComponent(table).vm.$emit('fetch', [], undefined, 5)
+    wrapper.findComponent(table).vm.$emit('fetch', {
+      limit: 5,
+      complete: vi.fn<(success: boolean) => void>(),
+    })
     expect(ui.loading.has('admin.users.list')).toBe(true)
     wrapper.unmount()
     expect(ui.loading.active.value).toBe(false)
@@ -315,9 +339,17 @@ describe('admin users list', () => {
     )
     const { wrapper } = await setup()
     const component = wrapper.findComponent(table)
-    component.vm.$emit('fetch', [], undefined, 25, 'old')
+    component.vm.$emit('fetch', {
+      limit: 25,
+      search: 'old',
+      complete: vi.fn<(success: boolean) => void>(),
+    })
     expect(ui.loading.active.value).toBe(true)
-    component.vm.$emit('fetch', [], undefined, 25, 'new')
+    component.vm.$emit('fetch', {
+      limit: 25,
+      search: 'new',
+      complete: vi.fn<(success: boolean) => void>(),
+    })
     await flushPromises()
     expect(ui.loading.active.value).toBe(false)
     resolveFirst(failure(500))
@@ -328,6 +360,30 @@ describe('admin users list', () => {
 })
 
 describe('admin user details', () => {
+  it('disables the status action only for status loading', async () => {
+    const { wrapper } = await setup(true)
+    const disable = () =>
+      wrapper.findAll('button').find((button) => button.text() === messages['admin.disableUser'])!
+    const finishList = ui.loading.start('admin.users.list')
+    const finishDetails = ui.loading.start('admin.users.details')
+    try {
+      await flushPromises()
+      expect(disable().attributes('disabled')).toBeUndefined()
+      const finishStatus = ui.loading.start('admin.users.status')
+      try {
+        await flushPromises()
+        expect(disable().attributes('disabled')).toBeDefined()
+      } finally {
+        finishStatus()
+      }
+      await flushPromises()
+      expect(disable().attributes('disabled')).toBeUndefined()
+    } finally {
+      finishList()
+      finishDetails()
+    }
+  })
+
   it('preserves unrelated feedback when loading and leaving the page', async () => {
     ui.success('Other operation completed')
     const { wrapper } = await setup(true)
@@ -686,7 +742,7 @@ describe('admin user details', () => {
     expect(put).not.toHaveBeenCalled()
   })
 
-  it('lets a write finish after unmount and reports its failure through ui.run', async () => {
+  it('lets a write finish after unmount and reports its failure through ui.action', async () => {
     get.mockResolvedValue(result([{ ...user, enabled: false }]))
     let rejectMutation!: (cause: Error) => void
     put.mockReturnValue(

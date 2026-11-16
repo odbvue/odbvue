@@ -72,19 +72,8 @@ const tab = ref('details')
 const id = computedRouteParam(useRoute(), 'id')
 const user = ref<components['schemas']['AdminGetUserItemsItem']>()
 const isSelf = computed(() => user.value?.id === auth.user.value?.id)
-const busy = computed(() => ui.loading.has('admin.users'))
+const busy = computed(() => ui.loading.has('admin.users.status'))
 watchEffect(() => routing.setBreadcrumb(user.value?.displayName?.trim() || user.value?.username))
-
-onMounted(() => {
-  void ui.run('admin.users.details', async () => {
-    const { data, error, status } = await http.get<components['schemas']['AdminGetUserResponse']>(
-      `/admin/users/${encodeURIComponent(id.value)}`,
-    )
-    if (error) throw new Error(status === 404 ? 'admin.userNotFound' : 'admin.loadUserError')
-    user.value = data?.items[0]
-    if (!user.value) throw new Error('admin.userNotFound')
-  })
-})
 
 const options = computed<OvViewOptions>(() => ({
   cols: 2,
@@ -109,17 +98,29 @@ const options = computed<OvViewOptions>(() => ({
   ],
 }))
 
+async function loadUser() {
+  await ui.action('admin.users.details', async () => {
+    const { data, error, status } = await http.get<components['schemas']['AdminGetUserResponse']>(
+      `/admin/users/${encodeURIComponent(id.value)}`,
+    )
+    if (error) throw new Error(status === 404 ? 'admin.userNotFound' : 'admin.loadUserError')
+    user.value = data?.items[0]
+    if (!user.value) throw new Error('admin.userNotFound')
+  })
+}
+
 async function setEnabled(enabled: boolean) {
   const account = user.value
   if (!account || busy.value) return
   if (!enabled && isSelf.value) return ui.error('admin.cannotDisableSelf')
-  await ui.run('admin.users.status', async () => {
+  await ui.action('admin.users.status', async () => {
     await http.putOrThrow(`/admin/users/${encodeURIComponent(account.id)}/status`, { enabled })
     account.enabled = enabled
     ui.success(enabled ? 'admin.userEnabled' : 'admin.userDisabled')
   })
 }
 
+onMounted(loadUser)
 onUnmounted(() => {
   routing.setBreadcrumb()
 })

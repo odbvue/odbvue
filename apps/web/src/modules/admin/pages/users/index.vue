@@ -18,7 +18,7 @@ import { useI18n } from 'vue-i18n'
 import { useCursorQuery, useHttp } from '@/capabilities/http'
 import { useUi } from '@/capabilities/ui'
 import type { components } from '@/api/openapi.generated'
-import type { OvFilterValue, OvTableData, OvTableOptions } from '@/components/api'
+import type { OvTableOptions, OvTableFetchRequest } from '@/components/api'
 
 definePage({
   meta: {
@@ -32,13 +32,6 @@ definePage({
 const { t } = useI18n()
 const http = useHttp()
 const ui = useUi()
-const { items, nextCursor, loading, load } = useCursorQuery({
-  loadingKey: 'admin.users.list',
-  fetch: ({ signal, ...query }) =>
-    http.get<components['schemas']['AdminListUsersResponse']>('/admin/users', { query, signal }),
-  onError: () => ui.error('admin.loadUsersError'),
-})
-
 const options = computed<OvTableOptions>(() => ({
   key: 'id',
   itemsPerPage: 5,
@@ -79,17 +72,16 @@ const options = computed<OvTableOptions>(() => ({
   ],
 }))
 
-async function fetchUsers(
-  _data: OvTableData[],
-  cursor: string | undefined,
-  limit: number,
-  search?: string,
-  _filter?: OvFilterValue,
-  _sort?: string,
-  complete?: (success: boolean) => void,
-) {
+const { items, nextCursor, loading, load } = useCursorQuery({
+  loadingKey: 'admin.users.list',
+  fetch: ({ signal, ...query }) =>
+    http.get<components['schemas']['AdminListUsersResponse']>('/admin/users', { query, signal }),
+  onError: () => ui.error('admin.loadUsersError'),
+})
+
+async function fetchUsers({ cursor, limit, search, complete }: OvTableFetchRequest) {
   const success = await load({ cursor, limit, search })
   if (success && !items.value.length) ui.info('admin.noUsers')
-  complete?.(success)
+  complete(success)
 }
 </script>

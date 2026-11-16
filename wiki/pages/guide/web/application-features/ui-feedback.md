@@ -43,9 +43,10 @@ additional cleanup is needed. It returns the action's result and releases loadin
 on success, rejection, or a synchronous throw.
 
 For an operation that should report errors to the user rather than reject, use
-`await ui.run('orders.save', () => save())`. It preserves existing notifications
+`await ui.action('orders.save', () => save())`. It executes an application action with
+named loading and automatic error notification. It preserves existing notifications
 on start, returns the result on success, and shows an error alert and returns
-`undefined` on failure. Error alerts replace the current notification; call
+`undefined` on failure, so awaiting it does not guarantee success. Error alerts replace the current notification; call
 `ui.clear()` explicitly if an initiating action should dismiss existing feedback.
 Operations and their notifications may finish after a page is left.
 

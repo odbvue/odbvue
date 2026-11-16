@@ -4,7 +4,7 @@ import { defineComponent, h } from 'vue'
 import { VBtn } from 'vuetify/components'
 import VOvTable from '@/components/data/VOvTable.vue'
 import { globalPlugins } from '../../support/components.setup'
-import type { OvFilterValue, OvTableOptions, OvTableData } from '@/components'
+import type { OvTableOptions, OvTableData, OvTableFetchRequest } from '@/components'
 import { useCursorQuery, type CursorQueryOptions } from '@/capabilities/http/cursor-query'
 import type { HttpResponse } from '@/capabilities/http/core'
 
@@ -49,16 +49,8 @@ async function mountCursorTable() {
             items: query.items.value,
             nextCursor: query.nextCursor.value,
             loading: query.loading.value,
-            onFetch: async (
-              _data: OvTableData[],
-              cursor: string | undefined,
-              limit: number,
-              search?: string,
-              _filter?: OvFilterValue,
-              _sort?: string,
-              complete?: (success: boolean) => void,
-            ) => {
-              complete?.(await query.load({ cursor, limit, search }))
+            onFetch: async ({ cursor, limit, search, complete }: OvTableFetchRequest) => {
+              complete(await query.load({ cursor, limit, search }))
             },
           })
       },
@@ -324,8 +316,23 @@ describe('VOvTable', () => {
     expect(wrapper.html()).toContain('edit')
   })
 
-  it('emits fetch on mount', () => {
-    const wrapper = mountTable(baseOptions, [])
-    expect(wrapper.emitted('fetch')).toBeTruthy()
+  it('emits a single fetch request object on mount', () => {
+    const wrapper = mountTable({
+      ...baseOptions,
+      search: { value: 'Alice' },
+      filter: { fields: [{ type: 'text', name: 'status', value: 'active' }] },
+      sort: [{ name: 'name', value: 'desc' }],
+    })
+    const events = wrapper.emitted('fetch')!
+    expect(events[0]).toHaveLength(1)
+    expect(events[0]?.[0]).toEqual({
+      cursor: undefined,
+      limit: 10,
+      search: 'Alice',
+      filter: { status: ['active'] },
+      sort: '-name',
+      complete: expect.any(Function),
+    })
+    wrapper.unmount()
   })
 })

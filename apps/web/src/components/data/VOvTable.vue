@@ -364,6 +364,7 @@ import {
   type OvFormOptions,
   type OvFormData,
   type OvFilterValue,
+  type OvTableFetchRequest,
   type OvFormat,
   type OvViewOptions,
   type OvFormFieldError,
@@ -473,16 +474,7 @@ const emits = defineEmits<{
     value?: unknown,
     callback?: (errors?: OvFormFieldError[], shouldRefetch?: boolean) => void,
   ): void
-  (
-    event: 'fetch',
-    data: OvTableData[],
-    nextCursor: string | undefined,
-    limit: number,
-    search?: string,
-    filter?: OvFilterValue,
-    sort?: string,
-    complete?: (success: boolean) => void,
-  ): void
+  (event: 'fetch', request: OvTableFetchRequest): void
 }>()
 
 const { mobile } = useDisplay()
@@ -976,7 +968,7 @@ function fetch(action?: 'first' | 'next' | 'prev'): Promise<boolean> {
       resolve(success)
     }
     finishFetch = complete
-    emits('fetch', localData.value, cursor, limit, search, filter, sort, complete)
+    emits('fetch', { cursor, limit, search, filter, sort, complete })
   })
 }
 

@@ -9,7 +9,7 @@ describe('keyed UI loading', () => {
     const ui = useUi(createState())
     ui.error('Old error')
     const pending = Promise.withResolvers<number>()
-    const running = ui.run('save', () => pending.promise)
+    const running = ui.action('save', () => pending.promise)
     expect(ui.loading.has('save')).toBe(true)
     expect(ui.notification.value).toMatchObject({ type: 'error', message: 'Old error' })
     pending.resolve(42)
@@ -20,9 +20,9 @@ describe('keyed UI loading', () => {
 
   it('preserves a completed operation notification when an unrelated operation starts', async () => {
     const ui = useUi(createState())
-    await ui.run('save', () => ui.success('Saved'))
+    await ui.action('save', () => ui.success('Saved'))
     const refresh = Promise.withResolvers<void>()
-    const pending = ui.run('refresh', () => refresh.promise)
+    const pending = ui.action('refresh', () => refresh.promise)
     expect(ui.loading.has('refresh')).toBe(true)
     expect(ui.notification.value).toMatchObject({ type: 'success', message: 'Saved' })
     refresh.resolve()
@@ -36,7 +36,7 @@ describe('keyed UI loading', () => {
       const ui = useUi(createState())
       ui.success('Previous notification')
       await expect(
-        ui.run('save', () => {
+        ui.action('save', () => {
           if (kind === 'sync') throw new Error('Save failed')
           return Promise.reject(new Error('Save failed'))
         }),

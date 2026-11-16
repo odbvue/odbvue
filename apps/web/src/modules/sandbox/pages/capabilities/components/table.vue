@@ -11,7 +11,7 @@
 </template>
 
 <script setup lang="ts">
-import type { OvFilterValue, OvTableData, OvTableOptions } from '@/components'
+import type { OvTableData, OvTableOptions, OvTableFetchRequest } from '@/components'
 
 definePage({
   meta: {
@@ -44,20 +44,12 @@ function action(actionName: string, actionData: unknown, value?: unknown) {
   }
 }
 
-async function fetch(
-  _items: OvTableData[],
-  cursor: string | undefined,
-  limit: number,
-  search?: string,
-  filter?: OvFilterValue,
-  sort?: string,
-  complete?: (success: boolean) => void,
-) {
+async function fetch({ cursor, limit, search, filter, sort, complete }: OvTableFetchRequest) {
   const currentRequest = ++requestId
   loading.value = true
   await new Promise((resolve) => setTimeout(resolve, 1500))
   if (currentRequest !== requestId) {
-    complete?.(false)
+    complete(false)
     return
   }
 
@@ -100,7 +92,7 @@ async function fetch(
   nextCursor.value = start + pageItems.length < newData.length ? String(start + limit) : undefined
   console.log('fetch', data.value, nextCursor.value)
   loading.value = false
-  complete?.(true)
+  complete(true)
 }
 
 const options = ref<OvTableOptions>({

@@ -50,8 +50,10 @@ It retains the last successful rows and continuation while loading and on
 failure.
 
 ```ts
-async function fetchUsers(data, cursor, limit, search, filter, sort, complete) {
-  complete?.(await users.load({ cursor, limit, search }))
+import type { OvTableFetchRequest } from '@/components'
+
+async function fetchUsers({ cursor, limit, search, complete }: OvTableFetchRequest) {
+  complete(await users.load({ cursor, limit, search }))
 }
 ```
 

@@ -50,15 +50,18 @@ const options = ref<OvTableOptions>({
 
 ### Emits
 
-| Event    | Payload                                              | Description                                |
-| -------- | ---------------------------------------------------- | ------------------------------------------ |
-| `fetch`  | `(data, cursor, limit, search?, filter?, sort?, complete?)` | Requests a page; call `complete(success)` after fetching. |
-| `action` | `(name, data, value?, callback?)`                    | Emitted for table, row, and cell actions.  |
+| Event    | Payload                           | Description                                               |
+| -------- | --------------------------------- | --------------------------------------------------------- |
+| `fetch`  | `OvTableFetchRequest`             | Requests a page; call `complete(success)` after fetching. |
+| `action` | `(name, data, value?, callback?)` | Emitted for table, row, and cell actions.                 |
+
+`OvTableFetchRequest` is exported from `@/components` and contains `cursor?`, `limit`,
+`search?`, `filter?`, `sort?`, and a required `complete(success: boolean)` callback.
 
 ### Exposed
 
-| Method    | Type                  | Description                                    |
-| --------- | --------------------- | ---------------------------------------------- |
+| Method    | Type                                                         | Description                                          |
+| --------- | ------------------------------------------------------------ | ---------------------------------------------------- |
 | `fetch()` | `(action?: 'first' \| 'next' \| 'prev') => Promise<boolean>` | Resolves true only when the requested page succeeds. |
 
 ### Slots
@@ -144,7 +147,7 @@ Navigation buttons appear in the table footer:
 - **Refresh** - Appears when `canRefresh: true`
 
 The fetch handler must call the supplied completion callback exactly once:
-`complete?.(await query.load({ cursor, limit, search }))` when using
+`complete(await query.load({ cursor, limit, search }))` when using
 `useCursorQuery()`. Vue event emission does not await the handler's promise.
 Publish rows and `nextCursor` before reporting success; report false on failure
 and display the error through the normal application feedback mechanism.
@@ -358,19 +361,19 @@ const {
 
 ### Simple mutations
 
-For a simple update, call HTTP directly and use `ui.run` for loading and error feedback:
+For a simple update, call HTTP directly and use `ui.action` for loading and error feedback:
 
 ```typescript
 const http = useHttp()
 const ui = useUi()
 
 async function updateSetting(id: string, value: string) {
-  await ui.run('settings.update', async () => {
+  await ui.action('settings.update', async () => {
     await http.putOrThrow(`/settings/${encodeURIComponent(id)}`, { value })
     ui.success('settings.updated')
   })
 }
 ```
 
-`putOrThrow` throws on HTTP failure; `ui.run` reports the error and releases loading.
+`putOrThrow` throws on HTTP failure; `ui.action` reports the error and releases loading.
 Use `ui.loading.run` instead if the caller needs the error to propagate.

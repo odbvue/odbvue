@@ -303,6 +303,15 @@ type OvTableSort = {
 
 export type OvFilterValue = Record<string, string[]>
 
+export interface OvTableFetchRequest {
+  cursor?: string
+  limit: number
+  search?: string
+  filter?: OvFilterValue
+  sort?: string
+  complete: (success: boolean) => void
+}
+
 export type OvTableOptions = {
   key: string
   columns: OvTableColumn[]
