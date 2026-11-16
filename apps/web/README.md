@@ -220,18 +220,17 @@ choose their feedback.
 
 ## Server-backed lists
 
-Use `useCursorQuery` from `@/capabilities/http` for server-backed tables. Supply
-`fetch` (returning `HttpResponse<CursorPage<T>>`). Call
-`load({ cursor, limit, search })` from the table's fetch handler. The composable
-trims search, requests exactly the displayed `limit`, exposes readonly `items`, `nextCursor`,
-`loading`, `loaded`, and `error` refs, and cancels superseded requests and scope
-disposal. `cancel()` also invalidates late responses. Rows and errors clear at
-the start of each load; `loaded` means a request has settled, including failures.
+Use `<v-ov-table :options="options" @fetch="fetchUsers" />` for server-backed tables.
+The table owns fetched rows, continuation, local loading, search normalization,
+cursor validation, and navigation history. The page's fetch handler makes the HTTP
+request inside `ui.action()` and calls `complete(result.ok ? result.data : undefined)`.
+No list-state composable or `items`, `nextCursor`, and `loading` bindings are required.
 The backend returns `{ items, nextCursor? }`: at most `limit` rows, and no
 `nextCursor` when exhausted. Clients pass continuation tokens unchanged; they
 never derive them from IDs or slice away lookahead rows. Invalid response shapes
-are reported as query errors rather than silently normalized.
-`VOvTable` retains navigation/presentation; the composable owns request state.
+are logged as errors and rejected without replacing the displayed page.
+The optional `items`, `nextCursor`, and `loading` props remain available for
+supplied data or external overrides.
 
 Database services infer the contract from a typed query's
 `paginate({ cursor, limit })`, which derives keyset predicates and composite
@@ -242,13 +241,14 @@ from a single primary key. Tokens are bound to the endpoint, ordering, query and
 authenticated user. Changing search/filter/sort requires restarting from the
 first page. This does not provide snapshot consistency across requests.
 
-Errors remain available for inline feedback (as on the admin users page).
-For global feedback instead, pass
-`onError: () => ui.error('admin.loadUsersError')`, where `ui = useUi()`.
-This callback runs only for current failures, never cancellation or stale results.
-Do not also show an inline error unless duplicate feedback is intentional.
-HTTP errors continue to use the existing error-capture pipeline; the composable
-does not import UI or automatically display backend error messages.
+The fetch request includes an `AbortSignal`; forward it to HTTP and check
+`signal.aborted` before error or empty-list feedback. Superseding a request or
+unmounting aborts it and immediately settles table navigation; late and duplicate
+completions are ignored. The table retains its last successful rows and continuation
+on failure. Named app loading follows `ui.action()` until HTTP settles, including
+when a transport ignores abort.
+The page owns localization and notifications; the table does not import HTTP or UI
+capabilities. HTTP errors continue to use the existing error-capture pipeline.
 
 Use HTTPS in production and a compatible API origin so the browser can send the refresh cookie.
 If developing through Vite's `/api` proxy, verify that the browser accepts the secure cookie

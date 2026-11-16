@@ -303,13 +303,19 @@ type OvTableSort = {
 
 export type OvFilterValue = Record<string, string[]>
 
+export interface OvTablePage {
+  items: OvTableData[]
+  nextCursor?: string
+}
+
 export interface OvTableFetchRequest {
   cursor?: string
   limit: number
   search?: string
   filter?: OvFilterValue
   sort?: string
-  complete: (success: boolean) => void
+  signal: AbortSignal
+  complete: (page?: OvTablePage) => void
 }
 
 export type OvTableOptions = {

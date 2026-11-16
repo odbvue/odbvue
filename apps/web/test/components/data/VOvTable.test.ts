@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { defineComponent, h } from 'vue'
 import { VBtn } from 'vuetify/components'
 import VOvTable from '@/components/data/VOvTable.vue'
 import { globalPlugins } from '../../support/components.setup'
-import type { OvTableOptions, OvTableData, OvTableFetchRequest } from '@/components'
-import { useCursorQuery, type CursorQueryOptions } from '@/capabilities/http/cursor-query'
+import type { OvTableOptions, OvTableData, OvTableFetchRequest, OvTablePage } from '@/components'
 import type { HttpResponse } from '@/capabilities/http/core'
+import { useUi } from '@/capabilities/ui'
+import { createState } from '@/capabilities/state'
 
 function mountTable(options: OvTableOptions, items: OvTableData[] = []) {
   return mount(VOvTable, {
@@ -37,31 +37,40 @@ const cursorPage = (name: string, nextCursor?: string): PageResponse => ({
 })
 
 async function mountCursorTable() {
-  const fetch = vi.fn<CursorQueryOptions<OvTableData>['fetch']>()
+  const fetch = vi.fn<(request: Omit<OvTableFetchRequest, 'complete'>) => Promise<PageResponse>>()
   fetch.mockResolvedValueOnce(cursorPage('Alice', 'after-alice'))
-  const wrapper = mount(
-    defineComponent({
-      setup() {
-        const query = useCursorQuery({ fetch })
-        return () =>
-          h(VOvTable, {
-            options: { ...baseOptions, search: {} },
-            items: query.items.value,
-            nextCursor: query.nextCursor.value,
-            loading: query.loading.value,
-            onFetch: async ({ cursor, limit, search, complete }: OvTableFetchRequest) => {
-              complete(await query.load({ cursor, limit, search }))
-            },
-          })
+  const ui = useUi(createState())
+  const wrapper = mount(VOvTable, {
+    props: {
+      options: { ...baseOptions, search: {} },
+      onFetch: async ({ complete, ...request }: OvTableFetchRequest) => {
+        const result = await ui.action('test.table', async () => {
+          const response = await fetch(request)
+          if (request.signal.aborted) return
+          if (response.error) throw response.error
+          if (!response.data) throw new Error('Missing page')
+          return response.data
+        })
+        complete(result.ok ? result.data : undefined)
       },
-    }),
-    { global: { plugins: globalPlugins } },
-  )
+    },
+    global: { plugins: globalPlugins },
+  })
   await flushPromises()
-  const table = wrapper.findComponent(VOvTable)
+  const table = wrapper
   const button = (icon: string) =>
     table.findAllComponents(VBtn).find((btn) => btn.props('icon') === icon)!
   return { wrapper, table, fetch, button }
+}
+
+function mountManagedTable(options: OvTableOptions = baseOptions) {
+  const onFetch = vi.fn<(request: OvTableFetchRequest) => void>()
+  const wrapper = mount(VOvTable, {
+    props: { options, onFetch },
+    global: { plugins: globalPlugins },
+  })
+  const request = () => onFetch.mock.lastCall![0]
+  return { wrapper, onFetch, request }
 }
 
 describe('VOvTable', () => {
@@ -89,6 +98,133 @@ describe('VOvTable', () => {
   })
 
   describe('VOvTable cursor navigation', () => {
+    it('still accepts externally supplied rows and continuation overrides', async () => {
+      const { wrapper, request } = mountManagedTable()
+      try {
+        request().complete({ items: [{ name: 'Fetched' }] })
+        await wrapper.setProps({
+          items: [{ name: 'External' }],
+          nextCursor: 'external-cursor',
+        })
+        expect(wrapper.text()).toContain('External')
+        expect(wrapper.text()).not.toContain('Fetched')
+        const next = wrapper.vm.fetch('next')
+        expect(request().cursor).toBe('external-cursor')
+        request().complete()
+        expect(await next).toBe(false)
+        expect(wrapper.text()).toContain('External')
+      } finally {
+        wrapper.unmount()
+      }
+    })
+
+    it('owns page data and continuation and ignores duplicate completions', async () => {
+      const { wrapper, request } = mountManagedTable()
+      try {
+        const first = request()
+        first.complete({ items: [{ name: 'Alice' }], nextCursor: 'opaque' })
+        first.complete({ items: [{ name: 'Duplicate' }] })
+        await flushPromises()
+        expect(wrapper.text()).toContain('Alice')
+        expect(wrapper.text()).not.toContain('Duplicate')
+        const next = wrapper.vm.fetch('next')
+        expect(request().cursor).toBe('opaque')
+        request().complete({ items: [{ name: 'Bob' }] })
+        expect(await next).toBe(true)
+        await flushPromises()
+        expect(wrapper.text()).toContain('Bob')
+        expect(wrapper.text()).not.toContain('Alice')
+        expect(await wrapper.vm.fetch('next')).toBe(false)
+      } finally {
+        wrapper.unmount()
+      }
+    })
+
+    it('normalizes search and ignores late completions after supersession or unmount', async () => {
+      const { wrapper, request } = mountManagedTable({ ...baseOptions, search: {} })
+      const initial = request()
+      const latest = wrapper.vm.fetch('first')
+      expect(initial.signal.aborted).toBe(true)
+      initial.complete({ items: [{ name: 'Stale' }] })
+      request().complete({ items: [{ name: 'Current' }] })
+      expect(await latest).toBe(true)
+      await wrapper.find('input').setValue('  ada  ')
+      await wrapper.find('input').trigger('keydown', { key: 'Enter' })
+      expect(request().search).toBe('ada')
+      const pending = request()
+      wrapper.unmount()
+      expect(pending.signal.aborted).toBe(true)
+      pending.complete({ items: [{ name: 'Late' }] })
+      expect(await wrapper.vm.fetch()).toBe(false)
+    })
+
+    it.each([
+      { items: Array.from({ length: 11 }, () => ({ name: 'Overflow' })) },
+      { items: [{ name: 'Invalid' }], nextCursor: '' },
+      { items: [{ name: 'Invalid' }], nextCursor: '   ' },
+      { items: [], nextCursor: 'opaque' },
+    ] satisfies OvTablePage[])('rejects invalid pages without publishing rows', async (page) => {
+      const report = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { wrapper, request } = mountManagedTable()
+      try {
+        request().complete({ items: [{ name: 'Alice' }], nextCursor: 'opaque' })
+        const next = wrapper.vm.fetch('next')
+        request().complete(page)
+        expect(await next).toBe(false)
+        await flushPromises()
+        expect(report).toHaveBeenCalledWith('Invalid table page response', page)
+        expect(wrapper.text()).toContain('Alice')
+        const retry = wrapper.vm.fetch('next')
+        expect(request().cursor).toBe('opaque')
+        request().complete()
+        expect(await retry).toBe(false)
+      } finally {
+        wrapper.unmount()
+        report.mockRestore()
+      }
+    })
+
+    it('rejects a repeated cursor and accepts a short nonterminal page', async () => {
+      const report = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { wrapper, request } = mountManagedTable()
+      try {
+        request().complete({ items: [{ name: 'Alice' }], nextCursor: 'opaque' })
+        const next = wrapper.vm.fetch('next')
+        request().complete({ items: [{ name: 'Invalid' }], nextCursor: 'opaque' })
+        expect(await next).toBe(false)
+        expect(report).toHaveBeenCalledOnce()
+        const retry = wrapper.vm.fetch('next')
+        request().complete({ items: [{ name: 'Bob' }], nextCursor: 'another' })
+        expect(await retry).toBe(true)
+        const last = wrapper.vm.fetch('next')
+        expect(request().cursor).toBe('another')
+        request().complete({ items: [] })
+        expect(await last).toBe(true)
+      } finally {
+        wrapper.unmount()
+        report.mockRestore()
+      }
+    })
+
+    it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
+      'reports invalid page limit %s without emitting a request',
+      (limit) => {
+        const report = vi.spyOn(console, 'error').mockImplementation(() => {})
+        const { wrapper, onFetch } = mountManagedTable({
+          ...baseOptions,
+          itemsPerPage: limit,
+          mobileItemsPerPage: limit,
+        })
+        try {
+          expect(onFetch).not.toHaveBeenCalled()
+          expect(report).toHaveBeenCalledWith('Table page limit must be a positive safe integer')
+        } finally {
+          wrapper.unmount()
+          report.mockRestore()
+        }
+      },
+    )
+
     it('keeps the successful page after failed Next, retries the same cursor, then returns Previous', async () => {
       const { wrapper, table, fetch, button } = await mountCursorTable()
       try {
@@ -331,6 +467,7 @@ describe('VOvTable', () => {
       search: 'Alice',
       filter: { status: ['active'] },
       sort: '-name',
+      signal: expect.any(AbortSignal),
       complete: expect.any(Function),
     })
     wrapper.unmount()

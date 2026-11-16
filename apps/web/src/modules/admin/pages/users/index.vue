@@ -2,9 +2,6 @@
   <v-container>
     <v-ov-table
       :options="options"
-      :items="items"
-      :next-cursor="nextCursor"
-      :loading="loading"
       title="admin.users"
       description="admin.usersDescription"
       @fetch="fetchUsers"
@@ -15,7 +12,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useCursorQuery, useHttp } from '@/capabilities/http'
+import { useHttp } from '@/capabilities/http'
 import { useUi } from '@/capabilities/ui'
 import type { components } from '@/api/openapi.generated'
 import type { OvTableOptions, OvTableFetchRequest } from '@/components/api'
@@ -72,16 +69,17 @@ const options = computed<OvTableOptions>(() => ({
   ],
 }))
 
-const { items, nextCursor, loading, load } = useCursorQuery({
-  loadingKey: 'admin.users.list',
-  fetch: ({ signal, ...query }) =>
-    http.get<components['schemas']['AdminListUsersResponse']>('/admin/users', { query, signal }),
-  onError: () => ui.error('admin.loadUsersError'),
-})
-
-async function fetchUsers({ cursor, limit, search, complete }: OvTableFetchRequest) {
-  const success = await load({ cursor, limit, search })
-  if (success && !items.value.length) ui.info('admin.noUsers')
-  complete(success)
+async function fetchUsers({ cursor, limit, search, signal, complete }: OvTableFetchRequest) {
+  const result = await ui.action('admin.users.list', async () => {
+    const { data, error } = await http.get<components['schemas']['AdminListUsersResponse']>(
+      '/admin/users',
+      { query: { cursor, limit, search }, signal },
+    )
+    if (signal.aborted) return
+    if (error || !data) throw new Error('admin.loadUsersError')
+    if (!data.items.length) ui.info('admin.noUsers')
+    return data
+  })
+  complete(result.ok ? result.data : undefined)
 }
 </script>

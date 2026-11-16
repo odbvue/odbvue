@@ -27,41 +27,50 @@ unchanged.
 ## Server-backed lists
 
 ```ts
-import { useCursorQuery, useHttp } from '@/capabilities/http'
+import { useHttp } from '@/capabilities/http'
+import { useUi } from '@/capabilities/ui'
 import type { components } from '@/api/openapi.generated'
 
 const http = useHttp()
-const users = useCursorQuery({
-  fetch: ({ signal, ...query }) =>
-    http.get<components['schemas']['AdminListUsersResponse']>('/admin/users', { query, signal }),
-})
-await users.load({ limit: 25 })
-await users.load({ limit: 25, cursor: users.nextCursor.value })
+const ui = useUi()
 ```
 
-`CursorPage<T>` is `{ items: T[], nextCursor?: string }`. Pass the displayed
-limit, and forward the server cursor unchanged. Missing continuation means the
-list is exhausted; clients do not request extra rows or construct cursor keys.
-The composable manages cancellation, stale responses, loading, error state and
-scope disposal. Bind its refs to `VOvTable` and adapt the table fetch event to
-`load({ cursor, limit, search })`. `load()` resolves to true only for a successful
-current request, and false for errors, cancellation or superseded requests.
-It retains the last successful rows and continuation while loading and on
-failure.
+Bind only options and the fetch handler:
+
+```vue
+<v-ov-table :options="options" @fetch="fetchUsers" />
+```
+
+The table owns rows, local loading, normalized search, cancellation, and cursor
+history. Its page shape is `{ items, nextCursor? }` (`OvTablePage`).
+Forward the displayed limit and server cursor unchanged. Missing continuation means
+the list is exhausted; clients do not request extra rows or construct cursor keys.
 
 ```ts
 import type { OvTableFetchRequest } from '@/components'
 
-async function fetchUsers({ cursor, limit, search, complete }: OvTableFetchRequest) {
-  complete(await users.load({ cursor, limit, search }))
+async function fetchUsers({ cursor, limit, search, signal, complete }: OvTableFetchRequest) {
+  const result = await ui.action('admin.users.list', async () => {
+    const { data, error } = await http.get<components['schemas']['AdminListUsersResponse']>(
+      '/admin/users',
+      { query: { cursor, limit, search }, signal },
+    )
+    if (signal.aborted) return
+    if (error || !data) throw new Error('admin.loadUsersError')
+    if (!data.items.length) ui.info('admin.noUsers')
+    return data
+  })
+  complete(result.ok ? result.data : undefined)
 }
 ```
 
-Always invoke the table completion callback; it commits cursor history only
-after success and unlocks navigation after either outcome.
+Always invoke the completion callback. `complete(page)` publishes the page and
+commits cursor history; `complete(undefined)` finishes without changing the last
+successful rows or continuation. The table rejects invalid pages with an error log.
 
-Use the error ref for inline feedback, or pass an `onError` callback such as
-`() => ui.error('admin.loadUsersError')`, where `ui = useUi()`, for global
-feedback. Cancellation and stale failures do not notify. Avoid displaying both
-unless duplicate feedback is intentional. HTTP errors still enter the normal
-error-capture pipeline.
+The page owns named app loading and notifications through `ui.action()`.
+Forward the provided signal and check it before notifying; supersession and unmount
+abort the signal. The table settles cancelled navigation immediately and ignores late
+or duplicate completions, even if a transport ignores abort. App loading remains
+tracked until the HTTP action settles. The table does not import HTTP or UI
+capabilities. HTTP errors still enter the normal error-capture pipeline.

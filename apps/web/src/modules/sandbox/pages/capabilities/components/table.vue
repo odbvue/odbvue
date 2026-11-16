@@ -1,12 +1,5 @@
 <template>
-  <v-ov-table
-    :options
-    :items="data"
-    :loading
-    :next-cursor="nextCursor"
-    @fetch="fetch"
-    @action="action"
-  />
+  <v-ov-table :options :loading @fetch="fetch" @action="action" />
   <v-checkbox v-model="loading" label="Loading" class="ma-1" />
 </template>
 
@@ -21,9 +14,6 @@ definePage({
 })
 
 const loading = ref(false)
-const data = ref<OvTableData[]>([])
-const nextCursor = ref<string | undefined>(undefined)
-let requestId = 0
 
 import jsonData from './table.json'
 
@@ -44,12 +34,18 @@ function action(actionName: string, actionData: unknown, value?: unknown) {
   }
 }
 
-async function fetch({ cursor, limit, search, filter, sort, complete }: OvTableFetchRequest) {
-  const currentRequest = ++requestId
-  loading.value = true
+async function fetch({
+  cursor,
+  limit,
+  search,
+  filter,
+  sort,
+  signal,
+  complete,
+}: OvTableFetchRequest) {
   await new Promise((resolve) => setTimeout(resolve, 1500))
-  if (currentRequest !== requestId) {
-    complete(false)
+  if (signal.aborted) {
+    complete()
     return
   }
 
@@ -88,11 +84,10 @@ async function fetch({ cursor, limit, search, filter, sort, complete }: OvTableF
 
   const start = cursor ? Number(cursor) : 0
   const pageItems = newData.slice(start, start + limit)
-  data.value = pageItems
-  nextCursor.value = start + pageItems.length < newData.length ? String(start + limit) : undefined
-  console.log('fetch', data.value, nextCursor.value)
-  loading.value = false
-  complete(true)
+  complete({
+    items: pageItems,
+    nextCursor: start + pageItems.length < newData.length ? String(start + limit) : undefined,
+  })
 }
 
 const options = ref<OvTableOptions>({

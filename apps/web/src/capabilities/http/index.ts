@@ -2,12 +2,6 @@ import { createHttpClient, type HttpClient, type HttpClientOptions } from './cor
 import { http } from '../client.js'
 
 export * from './core.js'
-export {
-  useCursorQuery,
-  type CursorPage,
-  type CursorQueryParams,
-  type CursorQueryOptions,
-} from './cursor-query.js'
 export { http }
 
 export function useHttp(clientOptions?: HttpClientOptions): HttpClient {

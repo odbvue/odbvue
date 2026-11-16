@@ -14,14 +14,7 @@
 
 ```vue
 <template>
-  <v-ov-table
-    :options="options"
-    :items="items"
-    :loading="loading"
-    :next-cursor="nextCursor"
-    @fetch="fetch"
-    @action="action"
-  />
+  <v-ov-table :options="options" @fetch="fetch" @action="action" />
 </template>
 
 <script setup lang="ts">
@@ -38,25 +31,27 @@ const options = ref<OvTableOptions>({
 
 ### Props
 
-| Prop          | Type             | Default     | Description                                               |
-| ------------- | ---------------- | ----------- | --------------------------------------------------------- |
-| `options`     | `OvTableOptions` | required    | Table layout, columns, search, filter, sort, and actions. |
-| `items`       | `OvTableData[]`  | `[]`        | Current page of rows supplied by the parent.              |
-| `nextCursor`  | `string`         | `undefined` | Cursor for the next page.                                 |
-| `loading`     | `boolean`        | `false`     | Shows the loading overlay.                                |
-| `title`       | `string`         | -           | Optional title above the table.                           |
-| `description` | `string`         | -           | Optional description above the table.                     |
-| `stateKey`    | `string`         | -           | Persists table state to `sessionStorage` under this key.  |
+| Prop          | Type             | Default     | Description                                                   |
+| ------------- | ---------------- | ----------- | ------------------------------------------------------------- |
+| `options`     | `OvTableOptions` | required    | Table layout, columns, search, filter, sort, and actions.     |
+| `items`       | `OvTableData[]`  | `[]`        | Optional supplied rows; fetched pages are managed internally. |
+| `nextCursor`  | `string`         | `undefined` | Optional external continuation override.                      |
+| `loading`     | `boolean`        | `false`     | Additional external loading; fetch loading is automatic.      |
+| `title`       | `string`         | -           | Optional title above the table.                               |
+| `description` | `string`         | -           | Optional description above the table.                         |
+| `stateKey`    | `string`         | -           | Persists table state to `sessionStorage` under this key.      |
 
 ### Emits
 
-| Event    | Payload                           | Description                                               |
-| -------- | --------------------------------- | --------------------------------------------------------- |
-| `fetch`  | `OvTableFetchRequest`             | Requests a page; call `complete(success)` after fetching. |
-| `action` | `(name, data, value?, callback?)` | Emitted for table, row, and cell actions.                 |
+| Event    | Payload                           | Description                                                      |
+| -------- | --------------------------------- | ---------------------------------------------------------------- |
+| `fetch`  | `OvTableFetchRequest`             | Requests a page; call `complete(page)` or `complete(undefined)`. |
+| `action` | `(name, data, value?, callback?)` | Emitted for table, row, and cell actions.                        |
 
 `OvTableFetchRequest` is exported from `@/components` and contains `cursor?`, `limit`,
-`search?`, `filter?`, `sort?`, and a required `complete(success: boolean)` callback.
+`search?`, `filter?`, `sort?`, an abort `signal`, and a required
+`complete(page?: OvTablePage)` callback. `OvTablePage` is `{ items: OvTableData[], nextCursor?: string }`.
+Return the whole page through completion instead of maintaining page state in the parent.
 
 ### Exposed
 
@@ -146,17 +141,23 @@ Navigation buttons appear in the table footer:
 - **Next** - Disabled without a server continuation cursor or while loading
 - **Refresh** - Appears when `canRefresh: true`
 
-The fetch handler must call the supplied completion callback exactly once:
-`complete(await query.load({ cursor, limit, search }))` when using
-`useCursorQuery()`. Vue event emission does not await the handler's promise.
-Publish rows and `nextCursor` before reporting success; report false on failure
-and display the error through the normal application feedback mechanism.
+The fetch handler must call the supplied completion callback exactly once.
+Make the HTTP request inside `ui.action()` and return its page, then call
+`complete(result.ok ? result.data : undefined)`. Vue event emission does not await
+the handler's promise. `complete(page)` publishes rows and continuation together;
+`complete(undefined)` leaves the last successful page unchanged.
+Forward `signal` to HTTP and check `signal.aborted` before notifications.
+Search is trimmed, with blank search represented as `undefined`.
+Invalid page sizes, oversized pages, blank or repeated continuation tokens, and
+continuation on an empty page are logged as errors and cannot commit navigation.
 
 Cursor history changes only after success. Keep the last successful rows and
 continuation on failure so Next/Previous can retry the same request. Navigation
 and refresh are blocked while fetching; a first-page request (search, filter,
-sort or responsive page-size change) can supersede a pending request. Fetch
-handlers must ignore superseded responses, as `useCursorQuery()` does.
+sort or responsive page-size change) can supersede a pending request. The table
+aborts pending signals and settles navigation on supersession and unmount.
+Late and duplicate completions are ignored. The table stays independent of
+HTTP endpoints and UI notifications.
 Changed query parameters reset pagination, including retries after a failed
 search, rather than reusing a cursor from the previous query.
 

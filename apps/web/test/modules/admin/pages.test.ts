@@ -16,7 +16,7 @@ import Users from '@/modules/admin/pages/users/index.vue'
 import UserDetails from '@/modules/admin/pages/users/[id].vue'
 import App from '@/app/App.vue'
 import messages from '@/modules/admin/i18n/en.json'
-import { renderViewItem, type OvTableOptions } from '@/components/api'
+import { renderViewItem, type OvTableOptions, type OvTableFetchRequest } from '@/components/api'
 
 const { get, put, authUser } = vi.hoisted(() => ({
   get: vi.fn<HttpClient['get']>(),
@@ -38,7 +38,7 @@ vi.mock('@/app/layouts/FullscreenLayout.vue', () => ({
 
 const table = defineComponent({
   name: 'VOvTable',
-  props: ['items', 'options', 'nextCursor', 'loading'],
+  props: ['options'],
   emits: ['fetch'],
   template: '<div data-testid="users-table" />',
 })
@@ -187,16 +187,27 @@ describe('admin page metadata', () => {
 })
 
 describe('admin users list', () => {
+  function fetchUsers(
+    wrapper: ReturnType<typeof mount>,
+    params: Partial<Pick<OvTableFetchRequest, 'cursor' | 'limit' | 'search'>> = {},
+  ) {
+    const complete = vi.fn<OvTableFetchRequest['complete']>()
+    const controller = new AbortController()
+    wrapper.findComponent(table).vm.$emit('fetch', {
+      limit: 5,
+      ...params,
+      signal: controller.signal,
+      complete,
+    } satisfies OvTableFetchRequest)
+    return { complete, controller }
+  }
+
   it('preserves unrelated feedback during searches and after unmount', async () => {
     const pending = Promise.withResolvers<ReturnType<typeof result>>()
     get.mockReturnValue(pending.promise)
     ui.success('Other operation completed')
     const { wrapper } = await setup()
-    wrapper.findComponent(table).vm.$emit('fetch', {
-      limit: 5,
-      search: 'ada',
-      complete: vi.fn<(success: boolean) => void>(),
-    })
+    fetchUsers(wrapper, { search: 'ada' })
     expect(ui.notification.value?.message).toBe('Other operation completed')
     pending.resolve(result())
     await flushPromises()
@@ -216,16 +227,16 @@ describe('admin users list', () => {
     const options: OvTableOptions = component.props('options')
     expect(options.itemsPerPage).toBe(5)
     expect(options.mobileItemsPerPage).toBe(5)
-    const complete = vi.fn<(success: boolean) => void>()
-    component.vm.$emit('fetch', { limit: options.itemsPerPage, complete })
+    const { complete, controller } = fetchUsers(wrapper)
     await flushPromises()
-    expect(get).toHaveBeenLastCalledWith(
-      '/admin/users',
-      expect.objectContaining({ query: { cursor: undefined, limit: 5, search: undefined } }),
-    )
-    expect(component.props('items')).toEqual(records)
-    expect(component.props('nextCursor')).toBe('opaque-next-page')
-    expect(complete).toHaveBeenCalledExactlyOnceWith(true)
+    expect(get).toHaveBeenLastCalledWith('/admin/users', {
+      query: { cursor: undefined, limit: 5, search: undefined },
+      signal: controller.signal,
+    })
+    expect(complete).toHaveBeenCalledExactlyOnceWith({
+      items: records,
+      nextCursor: 'opaque-next-page',
+    })
   })
 
   it.each([true, false])('renders enabled=%s with the correct status', async (enabled) => {
@@ -250,66 +261,58 @@ describe('admin users list', () => {
     expect(cell.text()).not.toContain(messages[enabled ? 'admin.disabled' : 'admin.enabled'])
   })
 
-  it('passes opaque continuation unchanged with the same normalized search', async () => {
+  it('forwards opaque continuation and table-normalized search and completes with the page', async () => {
     const second = { ...user, id: 'B'.repeat(32), username: 'bob@example.test' }
     get.mockResolvedValue(result([user], 'opaque-user-cursor'))
     const { wrapper } = await setup()
     const component = wrapper.findComponent(table)
-    component.vm.$emit('fetch', {
-      limit: 1,
-      search: ' ada ',
-      complete: vi.fn<(success: boolean) => void>(),
-    })
+    const first = fetchUsers(wrapper, { limit: 1, search: 'ada' })
     await flushPromises()
     expect(get).toHaveBeenLastCalledWith(
       '/admin/users',
       expect.objectContaining({ query: { cursor: undefined, limit: 1, search: 'ada' } }),
     )
-    expect(component.props('items')).toEqual([user])
-    expect(component.props('nextCursor')).toBe('opaque-user-cursor')
+    expect(first.complete).toHaveBeenCalledExactlyOnceWith({
+      items: [user],
+      nextCursor: 'opaque-user-cursor',
+    })
     get.mockResolvedValue(result([second]))
-    component.vm.$emit('fetch', {
+    const secondRequest = fetchUsers(wrapper, {
       cursor: 'opaque-user-cursor',
       limit: 1,
-      search: ' ada ',
-      complete: vi.fn<(success: boolean) => void>(),
+      search: 'ada',
     })
     await flushPromises()
     expect(get).toHaveBeenLastCalledWith(
       '/admin/users',
       expect.objectContaining({ query: { cursor: 'opaque-user-cursor', limit: 1, search: 'ada' } }),
     )
-    expect(component.props('items')).toEqual([second])
-    expect(component.props('nextCursor')).toBeUndefined()
+    expect(secondRequest.complete).toHaveBeenCalledExactlyOnceWith({
+      items: [second],
+      nextCursor: undefined,
+    })
     expect(component.props('options').columns.at(-1).actions[0].format.to).toBe(
       '/admin/users/{{value}}',
     )
   })
 
-  it('shows empty results and reports request failures rather than retaining stale data', async () => {
+  it('reports empty results and completes failures without publishing a page', async () => {
     get.mockResolvedValue(result([]))
     const { wrapper } = await setup()
-    const component = wrapper.findComponent(table)
-    component.vm.$emit('fetch', {
-      limit: 25,
-      search: '',
-      complete: vi.fn<(success: boolean) => void>(),
-    })
+    const first = fetchUsers(wrapper)
     await flushPromises()
     expect(ui.notification.value).toMatchObject({ type: 'info', message: 'admin.noUsers' })
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(first.complete).toHaveBeenCalledExactlyOnceWith({ items: [], nextCursor: undefined })
     get.mockResolvedValue(failure(403))
-    const complete = vi.fn<(success: boolean) => void>()
-    component.vm.$emit('fetch', { limit: 25, complete })
+    const { complete } = fetchUsers(wrapper)
     await flushPromises()
     expect(ui.notification.value).toMatchObject({ type: 'error', message: 'admin.loadUsersError' })
-    expect(component.props('items')).toEqual([])
-    expect(component.props('loading')).toBe(false)
-    expect(complete).toHaveBeenCalledExactlyOnceWith(false)
+    expect(complete).toHaveBeenCalledExactlyOnceWith(undefined)
     expect(ui.loading.active.value).toBe(false)
   })
 
-  it('uses app loading during list requests and releases it on unmount without late feedback', async () => {
+  it('tracks app loading until a cancelled request settles without late feedback after unmount', async () => {
     let resolveRequest!: (response: ReturnType<typeof result>) => void
     get.mockReturnValue(
       new Promise((resolve) => {
@@ -317,20 +320,19 @@ describe('admin users list', () => {
       }),
     )
     const { wrapper } = await setup()
-    wrapper.findComponent(table).vm.$emit('fetch', {
-      limit: 5,
-      complete: vi.fn<(success: boolean) => void>(),
-    })
+    const { complete, controller } = fetchUsers(wrapper)
     expect(ui.loading.has('admin.users.list')).toBe(true)
+    controller.abort()
     wrapper.unmount()
-    expect(ui.loading.active.value).toBe(false)
     expect(get.mock.calls[0]?.[1]?.signal?.aborted).toBe(true)
     resolveRequest(failure(500))
     await flushPromises()
+    expect(ui.loading.active.value).toBe(false)
+    expect(complete).toHaveBeenCalledExactlyOnceWith(undefined)
     expect(ui.notification.value).toBeUndefined()
   })
 
-  it('ignores stale requests after a newer search completes', async () => {
+  it('ignores a cancelled failure after a newer search completes', async () => {
     let resolveFirst!: (response: ReturnType<typeof result>) => void
     get.mockReturnValueOnce(
       new Promise((resolve) => {
@@ -338,24 +340,79 @@ describe('admin users list', () => {
       }),
     )
     const { wrapper } = await setup()
-    const component = wrapper.findComponent(table)
-    component.vm.$emit('fetch', {
-      limit: 25,
-      search: 'old',
-      complete: vi.fn<(success: boolean) => void>(),
-    })
+    const old = fetchUsers(wrapper, { search: 'old' })
     expect(ui.loading.active.value).toBe(true)
-    component.vm.$emit('fetch', {
-      limit: 25,
-      search: 'new',
-      complete: vi.fn<(success: boolean) => void>(),
-    })
+    old.controller.abort()
+    const current = fetchUsers(wrapper, { search: 'new' })
     await flushPromises()
-    expect(ui.loading.active.value).toBe(false)
+    expect(current.complete).toHaveBeenCalledExactlyOnceWith({
+      items: [user],
+      nextCursor: undefined,
+    })
     resolveFirst(failure(500))
     await flushPromises()
-    expect(component.props('items')).toEqual([user])
+    expect(old.complete).toHaveBeenCalledExactlyOnceWith(undefined)
+    expect(ui.loading.active.value).toBe(false)
     expect(ui.notification.value).toBeUndefined()
+  })
+
+  it('does not report an empty list for a superseded request', async () => {
+    const stale = Promise.withResolvers<ReturnType<typeof result>>()
+    const current = Promise.withResolvers<ReturnType<typeof result>>()
+    get.mockReturnValueOnce(stale.promise).mockReturnValueOnce(current.promise)
+    const { wrapper } = await setup()
+    const old = fetchUsers(wrapper, { search: 'old' })
+    old.controller.abort()
+    const { complete } = fetchUsers(wrapper, { search: 'new' })
+    await flushPromises()
+    expect(ui.notification.value).toBeUndefined()
+    expect(ui.loading.has('admin.users.list')).toBe(true)
+    expect(complete).not.toHaveBeenCalled()
+    stale.resolve(result([]))
+    await flushPromises()
+    expect(ui.notification.value).toBeUndefined()
+    expect(old.complete).toHaveBeenCalledExactlyOnceWith(undefined)
+    current.resolve(result())
+    await flushPromises()
+    expect(complete).toHaveBeenCalledExactlyOnceWith({
+      items: [user],
+      nextCursor: undefined,
+    })
+  })
+
+  it.each([403, 404, 500])(
+    'reports a localized %s failure and settles table fetching',
+    async (status) => {
+      get.mockResolvedValueOnce(failure(status))
+      const { wrapper } = await setup()
+      const { complete } = fetchUsers(wrapper)
+      await flushPromises()
+      expect(complete).toHaveBeenCalledExactlyOnceWith(undefined)
+      expect(ui.notification.value).toMatchObject({
+        type: 'error',
+        message: 'admin.loadUsersError',
+      })
+      expect(ui.loading.active.value).toBe(false)
+    },
+  )
+
+  it('reports missing data as a load error', async () => {
+    get.mockResolvedValueOnce({ data: null, error: null, status: 204, headers: null })
+    const { wrapper } = await setup()
+    const { complete } = fetchUsers(wrapper)
+    await flushPromises()
+    expect(complete).toHaveBeenCalledExactlyOnceWith(undefined)
+    expect(ui.notification.value?.message).toBe('admin.loadUsersError')
+  })
+
+  it('reports unexpected thrown errors and releases loading', async () => {
+    get.mockRejectedValueOnce(new Error('Network failed'))
+    const { wrapper } = await setup()
+    const { complete } = fetchUsers(wrapper)
+    await flushPromises()
+    expect(complete).toHaveBeenCalledExactlyOnceWith(undefined)
+    expect(ui.notification.value?.message).toBe('Network failed')
+    expect(ui.loading.active.value).toBe(false)
   })
 })
 

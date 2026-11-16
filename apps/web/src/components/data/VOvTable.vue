@@ -365,6 +365,7 @@ import {
   type OvFormData,
   type OvFilterValue,
   type OvTableFetchRequest,
+  type OvTablePage,
   type OvFormat,
   type OvViewOptions,
   type OvFormFieldError,
@@ -481,6 +482,7 @@ const { mobile } = useDisplay()
 const slots = useSlots()
 
 const localData = ref(items)
+const localNextCursor = ref(nextCursor)
 watch(
   () => items,
   (newItems) => {
@@ -488,19 +490,26 @@ watch(
   },
   { deep: true },
 )
+watch(
+  () => nextCursor,
+  (value) => {
+    localNextCursor.value = value
+  },
+)
 const page = computed(() => pageItems(localData.value, itemsPerPage.value))
 const pageCursor = ref<string | undefined>(undefined)
 const cursorStack = ref<(string | undefined)[]>([])
 const fetching = ref(false)
 const busy = computed(() => loading || fetching.value)
 let fetchId = 0
-let finishFetch: ((success: boolean) => void) | undefined
+let finishFetch: (() => void) | undefined
+let disposed = false
 let committedQuery: string | undefined
 const itemsPerPage = computed(() => {
   if (mobile.value) return options.mobileItemsPerPage ?? 1
-  return options.itemsPerPage || 10
+  return options.itemsPerPage ?? 10
 })
-const hasNextPage = computed(() => !!nextCursor)
+const hasNextPage = computed(() => !!localNextCursor.value)
 const hasPrevPage = computed(() => cursorStack.value.length > 0)
 const canRefresh = computed(() => options.canRefresh ?? true)
 const emptyRowsCount = computed(() => emptyRowCount(page.value.length, itemsPerPage.value))
@@ -932,32 +941,57 @@ async function handleTableAction(actionName: string) {
 }
 
 function fetch(action?: 'first' | 'next' | 'prev'): Promise<boolean> {
+  if (disposed) return Promise.resolve(false)
   if (action !== 'first' && busy.value) return Promise.resolve(false)
   const limit = itemsPerPage.value
-  const search = searchValue.value
+  if (!Number.isSafeInteger(limit) || limit < 1) {
+    console.error('Table page limit must be a positive safe integer')
+    return Promise.resolve(false)
+  }
+  const search = searchValue.value?.trim() || undefined
   const filter = filterValue.value
   const sort = sortValue.value
-  const query = JSON.stringify([limit, search?.trim() || undefined, filter, sort])
+  const query = JSON.stringify([limit, search, filter, sort])
   const reset = action === 'first' || (committedQuery !== undefined && committedQuery !== query)
   let cursor = reset ? undefined : pageCursor.value
   const stack = reset ? [] : [...cursorStack.value]
   if (!reset && action === 'next') {
     if (!hasNextPage.value) return Promise.resolve(false)
     stack.push(cursor)
-    cursor = nextCursor
+    cursor = localNextCursor.value
   } else if (!reset && action === 'prev') {
     if (!hasPrevPage.value) return Promise.resolve(false)
     cursor = stack.pop()
   }
 
-  finishFetch?.(false)
+  finishFetch?.()
   const currentFetch = ++fetchId
+  const controller = new AbortController()
   fetching.value = true
   return new Promise<boolean>((resolve) => {
     let completed = false
-    const complete = (success: boolean) => {
+    const complete = (result?: OvTablePage) => {
       if (completed || currentFetch !== fetchId) return
       completed = true
+      let success = false
+      if (result !== undefined) {
+        if (
+          !result ||
+          !Array.isArray(result.items) ||
+          result.items.length > limit ||
+          (result.nextCursor !== undefined &&
+            (typeof result.nextCursor !== 'string' ||
+              !result.nextCursor.trim() ||
+              !result.items.length ||
+              result.nextCursor === cursor))
+        ) {
+          console.error('Invalid table page response', result)
+        } else {
+          localData.value = result.items
+          localNextCursor.value = result.nextCursor
+          success = true
+        }
+      }
       if (success) {
         pageCursor.value = cursor
         cursorStack.value = stack
@@ -967,8 +1001,11 @@ function fetch(action?: 'first' | 'next' | 'prev'): Promise<boolean> {
       finishFetch = undefined
       resolve(success)
     }
-    finishFetch = complete
-    emits('fetch', { cursor, limit, search, filter, sort, complete })
+    finishFetch = () => {
+      controller.abort()
+      complete()
+    }
+    emits('fetch', { cursor, limit, search, filter, sort, signal: controller.signal, complete })
   })
 }
 
@@ -1032,7 +1069,8 @@ function restoreState(): boolean {
 }
 
 onBeforeUnmount(() => {
-  finishFetch?.(false)
+  disposed = true
+  finishFetch?.()
   fetchId++
   saveState()
 })
