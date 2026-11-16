@@ -45,10 +45,22 @@ on success, rejection, or a synchronous throw.
 For an operation that should report errors to the user rather than reject, use
 `await ui.action('orders.save', () => save())`. It executes an application action with
 named loading and automatic error notification. It preserves existing notifications
-on start, returns the result on success, and shows an error alert and returns
-`undefined` on failure, so awaiting it does not guarantee success. Error alerts replace the current notification; call
+on start, returns `{ ok: true, data }` on success, and shows an error alert and returns
+`{ ok: false, error }` on failure. The exported `UiActionResult<T>` type represents
+these outcomes and preserves the original error as `unknown`. A successful action
+may return `undefined` as its data; check `ok` rather than the data to detect success.
+Error alerts replace the current notification; call
 `ui.clear()` explicitly if an initiating action should dismiss existing feedback.
 Operations and their notifications may finish after a page is left.
+
+```ts
+const result = await ui.action('orders.save', () => save())
+if (!result.ok) return
+// Continue only after a successful save.
+```
+
+Callers that need no follow-up work can ignore the result. Use `ui.loading.run()`
+instead when errors should propagate to the caller.
 
 `loading.active.value` tracks all activity. `loading.has('auth.login')` tracks a
 specific operation; `loading.has('auth')` also includes descendant keys such as

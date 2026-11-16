@@ -13,7 +13,7 @@ describe('keyed UI loading', () => {
     expect(ui.loading.has('save')).toBe(true)
     expect(ui.notification.value).toMatchObject({ type: 'error', message: 'Old error' })
     pending.resolve(42)
-    await expect(running).resolves.toBe(42)
+    await expect(running).resolves.toEqual({ ok: true, data: 42 })
     expect(ui.notification.value).toMatchObject({ type: 'error', message: 'Old error' })
     expect(ui.loading.active.value).toBe(false)
   })
@@ -26,7 +26,7 @@ describe('keyed UI loading', () => {
     expect(ui.loading.has('refresh')).toBe(true)
     expect(ui.notification.value).toMatchObject({ type: 'success', message: 'Saved' })
     refresh.resolve()
-    await pending
+    await expect(pending).resolves.toEqual({ ok: true, data: undefined })
     expect(ui.notification.value).toMatchObject({ type: 'success', message: 'Saved' })
   })
 
@@ -35,16 +35,31 @@ describe('keyed UI loading', () => {
     async (kind) => {
       const ui = useUi(createState())
       ui.success('Previous notification')
+      const error = new Error('Save failed')
       await expect(
         ui.action('save', () => {
-          if (kind === 'sync') throw new Error('Save failed')
-          return Promise.reject(new Error('Save failed'))
+          if (kind === 'sync') throw error
+          return Promise.reject(error)
         }),
-      ).resolves.toBeUndefined()
+      ).resolves.toEqual({ ok: false, error })
       expect(ui.notification.value).toMatchObject({ type: 'error', message: 'Save failed' })
       expect(ui.loading.active.value).toBe(false)
     },
   )
+
+  it('distinguishes a successful undefined result from rejection with undefined', async () => {
+    const ui = useUi(createState())
+    await expect(ui.action('save', () => undefined)).resolves.toEqual({
+      ok: true,
+      data: undefined,
+    })
+    await expect(ui.action('save', () => Promise.reject(undefined))).resolves.toEqual({
+      ok: false,
+      error: undefined,
+    })
+    expect(ui.notification.value).toMatchObject({ type: 'error', message: 'undefined' })
+    expect(ui.loading.active.value).toBe(false)
+  })
 
   it('counts same-key operations and releases each at most once', () => {
     const loading = createLoading()

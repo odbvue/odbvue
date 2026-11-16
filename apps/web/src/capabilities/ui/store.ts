@@ -9,6 +9,8 @@ export interface AlertOptions {
 
 export type UiNotificationType = 'info' | 'success' | 'warning' | 'error'
 
+export type UiActionResult<T> = { ok: true; data: T } | { ok: false; error: unknown }
+
 export interface UiNotification {
   type: UiNotificationType
   message: string
@@ -90,13 +92,13 @@ export function useUi(state: Pinia = pinia) {
     notification: readonly(notification),
     snackbar: readonly(snackbar),
     clear: store.clearAll,
-    /** Runs an action with named loading and error notification; returns undefined on failure. */
-    action: async <T>(key: string, action: () => T | Promise<T>): Promise<T | undefined> => {
+    /** Runs an action with named loading and error notification; check ok before using data. */
+    action: async <T>(key: string, action: () => T | Promise<T>): Promise<UiActionResult<T>> => {
       try {
-        return await store.runLoading(key, action)
+        return { ok: true, data: await store.runLoading(key, action) }
       } catch (error) {
         store.show('error', messageFrom(error), 'alert')
-        return undefined
+        return { ok: false, error }
       }
     },
     info: (message: string, options?: AlertOptions) =>

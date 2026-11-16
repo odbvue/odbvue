@@ -70,15 +70,14 @@ a returned record or refresh timestamps. The existing backend response stays com
 `putOrThrow()` returns response data (including `null` for 204), or throws the normalized
 HTTP error; ordinary `http.put()` still returns the response object.
 `ui.action()` preserves existing feedback when it starts, tracks named loading, and reports
-thrown errors as alerts without rejecting. It returns `undefined` on failure, so awaiting it
-does not guarantee success. An error alert replaces the current notification.
+thrown errors as alerts without rejecting. It returns `{ ok: true, data }` on success
+or `{ ok: false, error }` on failure. Check `ok` when subsequent work depends on success;
+a successful action may return `undefined` as its data. An error alert replaces the current notification.
 Call `ui.clear()` explicitly when appropriate, or use `ui.loading.run()` when error
 propagation is needed instead.
 App-level loading blocks duplicate submissions. Writes continue to completion even
 after navigation, without signals or cancellation bookkeeping. Their success or error
 notifications are operation-wide and may appear after leaving the page.
-[useMutation](./src/capabilities/http/mutation.ts) remains available for workflows that need
-reactive mutation state and cancellation; simple updates need no mutation-specific composable.
 The [Details page](./src/modules/admin/pages/users/[id].vue) owns detail fetching,
 using a direct `http.get()` inside `ui.action()`, with no fetch composable.
 It loads details on mount. The router creates a fresh page when the path changes;

@@ -8,7 +8,6 @@ export {
   type CursorQueryParams,
   type CursorQueryOptions,
 } from './cursor-query.js'
-export { useMutation, type MutationOptions } from './mutation.js'
 export { http }
 
 export function useHttp(clientOptions?: HttpClientOptions): HttpClient {
