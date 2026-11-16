@@ -95,6 +95,60 @@ describe('HTTP capability', () => {
     })
   })
 
+  it('does not report aborted requests through the global error callback', async () => {
+    const onError = vi.fn<NonNullable<import('@/capabilities/http').HttpConfiguration['onError']>>()
+    const controller = new AbortController()
+    const fetch = vi.fn<FetchMock>(
+      (_input, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))
+        }),
+    )
+    const http = useHttp({ fetch, configuration: { onError } })
+
+    const request = http.get('/users', { signal: controller.signal })
+    controller.abort()
+    const result = await request
+
+    expect(fetch).toHaveBeenCalledOnce()
+    expect(result).toMatchObject({
+      data: null,
+      error: expect.any(Error),
+      status: null,
+      headers: null,
+    })
+    expect(onError).not.toHaveBeenCalled()
+  })
+
+  it('reports non-abort failures even if the request signal has been aborted', async () => {
+    const onError = vi.fn<NonNullable<import('@/capabilities/http').HttpConfiguration['onError']>>()
+    const controller = new AbortController()
+    const http = useHttp({
+      fetch: vi.fn<FetchMock>(async () => {
+        controller.abort()
+        throw new TypeError('Network unavailable')
+      }),
+      configuration: { onError },
+    })
+
+    const result = await http.get('/users', { signal: controller.signal, retry: 0 })
+
+    expect(onError).toHaveBeenCalledExactlyOnceWith(result.error)
+  })
+
+  it('reports timeouts through the global error callback', async () => {
+    const onError = vi.fn<NonNullable<import('@/capabilities/http').HttpConfiguration['onError']>>()
+    const timeout = Object.assign(new Error('Request timed out'), { name: 'TimeoutError' })
+    const http = useHttp({
+      fetch: vi.fn<FetchMock>(() => Promise.reject(timeout)),
+      configuration: { onError },
+    })
+
+    const result = await http.get('/users', { retry: 0 })
+
+    expect(onError).toHaveBeenCalledExactlyOnceWith(result.error)
+  })
+
   it.each([
     [99, false],
     [100, true],

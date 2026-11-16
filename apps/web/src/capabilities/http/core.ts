@@ -32,6 +32,7 @@ export interface HttpRefreshFailureContext {
   options?: HttpRequestOptions
 }
 export interface HttpConfiguration {
+  /** Called for request failures other than aborts. */
   onError?: (error: HttpError) => void
   getAccessToken?: () => string | null | undefined
   slowRequestThresholdMs?: number
@@ -122,6 +123,18 @@ function createHttpError(error: unknown, request: string, status: number | null)
   })
 }
 
+function isAbortError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  if ('name' in error && error.name === 'AbortError') return true
+  return (
+    'cause' in error &&
+    !!error.cause &&
+    typeof error.cause === 'object' &&
+    'name' in error.cause &&
+    error.cause.name === 'AbortError'
+  )
+}
+
 function retryDelay(context: FetchContext): number {
   const retryAfter = context.response?.headers.get('Retry-After')
   if (retryAfter) {
@@ -207,7 +220,7 @@ async function executeRequest<T>(
       }
     }
     const httpError = createHttpError(error, request, status)
-    configuration.onError?.(httpError)
+    if (!isAbortError(error)) configuration.onError?.(httpError)
     return { data: null, error: httpError, status, headers: null }
   }
 }

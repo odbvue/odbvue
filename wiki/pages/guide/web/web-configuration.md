@@ -62,7 +62,7 @@ Use `useAuth()` directly rather than wrapping it in an application store or addi
 
 On initial navigation, the authentication guard fetches anonymous `/auth/config` alongside sending the refresh cookie to `/auth/refresh`, then fetches protected `/auth/me` if refresh succeeds. Configuration is the direct flat boolean object `{ password, ldap, google, signup, twoFactor }`; `/auth/me` returns the user object directly, without a wrapper. Auth's idempotent `restore()` shares one promise across concurrent calls and subsequent navigations, including restoration failures. The reactive auth `ready` flag controls login UI, not bootstrap. Read shared deployment capabilities from the readonly `auth.config.value` ref; it is null before configuration loads and retained across logout. `refreshUser()` reloads the current user. The HTTP service adds the access token to protected requests and refreshes it when needed. Set `http.openapi` to the generated database OpenAPI document to distinguish protected operations from anonymous ones.
 
-Vue and router errors are captured explicitly in `main.ts`, and HTTP errors use an `onError` callback. Error reporting is separate from user notifications: user-facing flows decide when to show localized feedback.
+Vue and router errors are captured explicitly in `main.ts`, and HTTP errors use an `onError` callback. `AbortError` failures retain the normal error response but do not invoke `onError`. Error reporting is separate from user notifications: user-facing flows decide when to show localized feedback.
 
 ```ts
 import { useAuth } from '@/capabilities/auth'
