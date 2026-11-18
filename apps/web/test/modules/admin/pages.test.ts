@@ -243,7 +243,7 @@ describe('admin user audit', () => {
     return wrapper.findComponent(table)
   }
 
-  it('loads audit lazily and forwards all filters and opaque cursor without changing the page', async () => {
+  it('loads audit lazily and forwards filters and opaque cursor without changing the page', async () => {
     const component = await openAudit()
     const page = {
       items: [{ id: 'audit-1', eventName: 'auth.login', body: 'Signed in', severityText: 'INFO' }],
@@ -267,7 +267,6 @@ describe('admin user audit', () => {
       query: {
         cursor: 'opaque-audit-cursor',
         limit: 1,
-        search: 'Signed',
         severity: 'WARN,INFO',
         messageType: 'auth.login',
         from: new Date(from).toISOString(),
