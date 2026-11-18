@@ -1,5 +1,5 @@
 <template>
-  <v-ov-table :key="userId" :options="options" @fetch="fetchAudit" />
+  <v-ov-table :key="user.id" :options="options" @fetch="fetchAudit" />
 </template>
 
 <script setup lang="ts">
@@ -8,7 +8,18 @@ import { useUi } from '@/capabilities/ui'
 import type { components } from '@/api/openapi.generated'
 import type { OvTableFetchRequest, OvTableOptions } from '@/components/api'
 
-const props = defineProps<{ userId: string }>()
+definePage({
+  meta: {
+    title: 'admin.audit',
+    access: ['admin'],
+    navigation: false,
+  },
+})
+
+const props = defineProps<{
+  user: components['schemas']['AdminGetUserItemsItem']
+  isSelf: boolean
+}>()
 const http = useHttp()
 const ui = useUi()
 const { t } = useI18n()
@@ -68,7 +79,7 @@ async function fetchAudit({ cursor, limit, filter, signal, complete }: OvTableFe
     const to = utcTimestamp(filter?.to?.[0])
     if (from && to && from > to) throw new Error('admin.auditInvalidInterval')
     const { data, error } = await http.get<components['schemas']['AdminListUserAuditResponse']>(
-      `/admin/users/${encodeURIComponent(props.userId)}/audit`,
+      `/admin/users/${encodeURIComponent(props.user.id)}/audit`,
       {
         query: {
           cursor,

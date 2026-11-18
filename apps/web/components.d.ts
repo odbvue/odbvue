@@ -13,9 +13,6 @@ declare module 'vue' {
   export interface GlobalComponents {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
-    UserAudit: typeof import('./src/modules/admin/components/UserAudit.vue')['default']
-    UserDetails: typeof import('./src/modules/admin/components/UserDetails.vue')['default']
-    UserPermissions: typeof import('./src/modules/admin/components/UserPermissions.vue')['default']
     VOvChart: typeof import('./src/components/data/VOvChart.vue')['default']
     VOvDialog: typeof import('./src/components/overlays/VOvDialog.vue')['default']
     VOvEditor: typeof import('./src/components/forms/VOvEditor.vue')['default']

@@ -41,9 +41,10 @@ Capabilities must not import app pages, layouts, or modules. Build-time
 plugins stay outside browser source. The generated ORDS types are artifacts of
 the database contract, not a hand-maintained API layer.
 
-The Admin module exposes read-only user browsing at `/admin/users` and
-`/admin/users/:id`, using `v-ov-table` and a static `v-ov-view` inside a single
-Details tab. Both pages and the
+The Admin module exposes user browsing at `/admin/users` and user tabs at
+`/admin/users/:id` (details), `/admin/users/:id/permissions`, and
+`/admin/users/:id/audit`. The list uses `v-ov-table` and details use a static
+`v-ov-view`. These pages and the
 `GET /admin/users` and `GET /admin/users/:id` services require the `admin` role.
 Migration `00000000000003_admin` owns the blue/green `pck_admin` package.
 Apply it through the normal `ov db migrate` workflow before using the module;

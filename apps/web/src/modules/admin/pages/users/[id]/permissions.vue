@@ -51,11 +51,22 @@ type RolePage =
   | components['schemas']['AdminListUserRolesResponse']
   | components['schemas']['AdminListAvailableUserRolesResponse']
 
-const props = defineProps<{ userId: string; isSelf: boolean }>()
+definePage({
+  meta: {
+    title: 'admin.permissions',
+    access: ['admin'],
+    navigation: false,
+  },
+})
+
+const props = defineProps<{
+  user: components['schemas']['AdminGetUserItemsItem']
+  isSelf: boolean
+}>()
 const { t } = useI18n()
 const http = useHttp()
 const ui = useUi()
-const endpoint = computed(() => `/admin/users/${encodeURIComponent(props.userId)}/roles`)
+const endpoint = computed(() => `/admin/users/${encodeURIComponent(props.user.id)}/roles`)
 const assignedArea = useTemplateRef('assigned-area')
 const assignedTable = useTemplateRef('assigned')
 const showAvailable = ref(false)

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { createI18n } from 'vue-i18n'
@@ -6,7 +6,9 @@ import { VBtn, VDialog, VSelect, VTab } from 'vuetify/components'
 import type { HttpClient, HttpResponse } from '@/capabilities/http'
 import { useUi } from '@/capabilities/ui'
 import UserDetails from '@/modules/admin/pages/users/[id].vue'
-import UserAudit from '@/modules/admin/components/UserAudit.vue'
+import UserAudit from '@/modules/admin/pages/users/[id]/audit.vue'
+import UserDetailsTab from '@/modules/admin/pages/users/[id]/index.vue'
+import UserPermissionsTab from '@/modules/admin/pages/users/[id]/permissions.vue'
 import VOvForm from '@/components/forms/VOvForm.vue'
 import VOvView from '@/components/data/VOvView.vue'
 import VOvTable from '@/components/data/VOvTable.vue'
@@ -22,6 +24,10 @@ vi.mock('@/capabilities/http', async (importOriginal) => ({
 vi.mock('@/capabilities/auth', () => ({
   useAuth: () => ({ user: { value: { id: 'another-admin' } } }),
 }))
+
+beforeEach(() => {
+  vi.stubGlobal('definePage', vi.fn<() => void>())
+})
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -59,7 +65,17 @@ describe('admin user details view', () => {
           headers: null,
         })
       const wrapper = mount(UserAudit, {
-        props: { userId: 'user-1' },
+        props: {
+          user: {
+            id: 'user-1',
+            username: 'test',
+            displayName: null,
+            enabled: true,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+          },
+          isSelf: false,
+        },
         attachTo: document.body,
         global: {
           plugins: [
@@ -143,7 +159,6 @@ describe('admin user details view', () => {
   )
 
   it('renders static user data and populated timestamps before opening Permissions', async () => {
-    vi.stubGlobal('definePage', vi.fn<() => void>())
     const user = {
       id: '5ff809b391110087e0630205590ae5a6',
       username: 'admin@odbvue.com',
@@ -162,25 +177,40 @@ describe('admin user details view', () => {
       history: createMemoryHistory(),
       routes: [
         { path: '/admin/users', component: {} },
-        { path: '/admin/users/:id', component: UserDetails },
+        {
+          path: '/admin/users/:id',
+          component: UserDetails,
+          children: [
+            { path: '', name: '/admin/users/[id]/', component: UserDetailsTab },
+            {
+              path: 'permissions',
+              name: '/admin/users/[id]/permissions',
+              component: UserPermissionsTab,
+            },
+            { path: 'audit', name: '/admin/users/[id]/audit', component: UserAudit },
+          ],
+        },
       ],
     })
     await router.push(`/admin/users/${user.id}`)
-    const wrapper = mount(UserDetails, {
-      attachTo: document.body,
-      global: {
-        plugins: [
-          router,
-          createI18n({
-            legacy: false,
-            locale: 'en',
-            messages: { en: messages },
-            missing: () => {},
-          }),
-        ],
-        stubs: { VIcon: true },
+    const wrapper = mount(
+      { template: '<RouterView />' },
+      {
+        attachTo: document.body,
+        global: {
+          plugins: [
+            router,
+            createI18n({
+              legacy: false,
+              locale: 'en',
+              messages: { en: messages },
+              missing: () => {},
+            }),
+          ],
+          stubs: { VIcon: true },
+        },
       },
-    })
+    )
     try {
       await flushPromises()
       const view = wrapper.findComponent(VOvView)
@@ -190,6 +220,8 @@ describe('admin user details view', () => {
       const tabs = wrapper.findAllComponents(VTab)
       expect(tabs.map((tab) => tab.props('value'))).toEqual(['details', 'permissions', 'audit'])
       expect(tabs[0]?.text()).toBe(messages['admin.details'])
+      expect(tabs[1]?.attributes('href')).toBe(`/admin/users/${user.id}/permissions`)
+      expect(tabs[1]?.attributes('disabled')).toBeUndefined()
       expect(view.text()).toContain(user.id)
       expect(view.text()).toContain(user.username)
       expect(view.text()).toContain(user.displayName)
@@ -208,8 +240,17 @@ describe('admin user details view', () => {
         status: 200,
         headers: null,
       })
-      await tabs[1]?.trigger('click')
+      const permissionsNavigation = new Promise<void>((resolve) => {
+        const remove = router.afterEach(() => {
+          remove()
+          resolve()
+        })
+      })
+      await tabs[1]?.trigger('click', { button: 0 })
+      await permissionsNavigation
       await flushPromises()
+      expect(router.currentRoute.value.path).toBe(`/admin/users/${user.id}/permissions`)
+      expect(tabs[1]?.attributes('aria-selected')).toBe('true')
       expect(get).toHaveBeenCalledWith(`/admin/users/${user.id}/roles`, expect.any(Object))
       const assigned = wrapper.getComponent(VOvTable)
       expect(assigned.find('h3').exists()).toBe(false)
@@ -280,8 +321,16 @@ describe('admin user details view', () => {
         status: 200,
         headers: null,
       })
-      await tabs[2]!.trigger('click')
+      const auditNavigation = new Promise<void>((resolve) => {
+        const removeHook = router.afterEach(() => {
+          removeHook()
+          resolve()
+        })
+      })
+      await tabs[2]!.trigger('click', { button: 0 })
+      await auditNavigation
       await flushPromises()
+      expect(tabs[2]?.attributes('aria-selected')).toBe('true')
       expect(get).toHaveBeenLastCalledWith(
         `/admin/users/${user.id}/audit`,
         expect.objectContaining({

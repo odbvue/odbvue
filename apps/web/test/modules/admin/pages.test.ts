@@ -14,6 +14,9 @@ import { useUi } from '@/capabilities/ui'
 import type { components } from '@/api/openapi.generated'
 import Users from '@/modules/admin/pages/users/index.vue'
 import UserDetails from '@/modules/admin/pages/users/[id].vue'
+import UserDetailsTab from '@/modules/admin/pages/users/[id]/index.vue'
+import UserPermissionsTab from '@/modules/admin/pages/users/[id]/permissions.vue'
+import UserAuditTab from '@/modules/admin/pages/users/[id]/audit.vue'
 import Roles from '@/modules/admin/pages/roles/index.vue'
 import App from '@/app/App.vue'
 import messages from '@/modules/admin/i18n/en.json'
@@ -58,6 +61,11 @@ const view = defineComponent({
   props: ['options', 'data'],
   template: '<div data-testid="user-details" />',
 })
+const tabs = defineComponent({
+  name: 'VTabs',
+  props: ['modelValue'],
+  template: '<div><slot /></div>',
+})
 const container = { template: '<div><slot /></div>' }
 const alert = {
   props: ['text', 'role'],
@@ -94,17 +102,33 @@ const pages = import.meta.glob<string>('@/modules/admin/pages/**/*.vue', {
 const wrappers: ReturnType<typeof mount>[] = []
 const ui = useUi()
 
-async function setup(page: boolean | 'roles' = false) {
+async function setup(page: boolean | 'roles' | 'permissions' | 'audit' = false) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
       { path: '/admin/users', component: Users },
-      { path: '/admin/users/:id', component: UserDetails },
+      {
+        path: '/admin/users/:id',
+        component: UserDetails,
+        children: [
+          { path: '', name: '/admin/users/[id]/', component: UserDetailsTab },
+          {
+            path: 'permissions',
+            name: '/admin/users/[id]/permissions',
+            component: UserPermissionsTab,
+          },
+          { path: 'audit', name: '/admin/users/[id]/audit', component: UserAuditTab },
+        ],
+      },
       { path: '/admin/roles', component: Roles },
     ],
   })
   await router.push(
-    page === 'roles' ? '/admin/roles' : page ? `/admin/users/${user.id}` : '/admin/users',
+    page === 'roles'
+      ? '/admin/roles'
+      : page
+        ? `/admin/users/${user.id}${page === 'permissions' || page === 'audit' ? `/${page}` : ''}`
+        : '/admin/users',
   )
   const wrapper = mount(App, {
     global: {
@@ -112,11 +136,12 @@ async function setup(page: boolean | 'roles' = false) {
       stubs: {
         VOvTable: table,
         VOvView: view,
-        VTabs: {
-          emits: ['update:modelValue'],
-          template: `<div @click="$emit('update:modelValue', $event.target.value)"><slot /></div>`,
+        VTabs: tabs,
+        VTab: {
+          props: ['to', 'disabled'],
+          template:
+            '<button role="tab" :disabled="disabled" @click="$router.push(to)"><slot /></button>',
         },
-        VTab: { template: '<button role="tab"><slot /></button>' },
         VTabsWindow: container,
         VTabsWindowItem: container,
         VContainer: container,
@@ -213,16 +238,16 @@ afterEach(() => {
 
 describe('admin page metadata', () => {
   it('discovers the landing page, users list, user details, and roles list', () => {
-    expect(Object.keys(pages)).toHaveLength(4)
+    expect(Object.keys(pages)).toHaveLength(7)
   })
 
   it.each(Object.entries(pages))('restricts %s to administrators', (path, source) => {
     const metadata = source.match(/definePage\(\{\s*meta:\s*\{([\s\S]*?)\n\s*\},?\s*\}\)/)?.[1]
     expect(metadata).toMatch(/\baccess:\s*\[\s*'admin'\s*\]/)
     expect(metadata).toMatch(
-      path.endsWith('/[id].vue') ? /\bnavigation:\s*false/ : /\bnavigation:\s*true/,
+      path.includes('/[id]') ? /\bnavigation:\s*false/ : /\bnavigation:\s*true/,
     )
-    const policy = { access: ['admin'] as ['admin'], navigation: !path.endsWith('/[id].vue') }
+    const policy = { access: ['admin'] as ['admin'], navigation: !path.includes('/[id]') }
     const session = (authenticated: boolean, admin: boolean): PageAuth => ({
       authenticated: computed(() => authenticated),
       hasRole: (role) => admin && role === 'admin',
@@ -240,6 +265,7 @@ describe('admin user audit', () => {
     const { wrapper } = await setup(true)
     expect(wrapper.findComponent(table).exists()).toBe(false)
     await wrapper.get('button[role="tab"][value="audit"]').trigger('click')
+    await flushPromises()
     return wrapper.findComponent(table)
   }
 
@@ -292,7 +318,7 @@ describe('admin user audit', () => {
       complete,
     } satisfies OvTableFetchRequest)
     await flushPromises()
-    expect(get).toHaveBeenCalledTimes(1)
+    expect(get).toHaveBeenCalledTimes(2)
     expect(complete).toHaveBeenCalledExactlyOnceWith()
     expect(ui.notification.value).toMatchObject({
       type: 'error',
@@ -618,6 +644,49 @@ describe('admin roles list', () => {
 })
 
 describe('admin user details', () => {
+  it.each(['permissions', 'audit'] as const)(
+    'opens %s directly and loads only its content',
+    async (selected) => {
+      const { wrapper } = await setup(selected)
+      expect(wrapper.findComponent(tabs).props('modelValue')).toBe(selected)
+      expect(wrapper.findAllComponents(table)).toHaveLength(1)
+      expect(get).toHaveBeenCalledExactlyOnceWith(`/admin/users/${user.id}`)
+    },
+  )
+
+  it('updates the URL and follows browser back and forward', async () => {
+    const { wrapper, router } = await setup(true)
+    await wrapper.get('button[role="tab"][value="audit"]').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe(`/admin/users/${user.id}/audit`)
+    expect(wrapper.findComponent(tabs).props('modelValue')).toBe('audit')
+
+    const back = new Promise<void>((resolve) => {
+      const remove = router.afterEach(() => {
+        remove()
+        resolve()
+      })
+    })
+    router.back()
+    await back
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe(`/admin/users/${user.id}`)
+    expect(wrapper.findComponent(tabs).props('modelValue')).toBe('details')
+    expect(wrapper.findComponent(table).exists()).toBe(false)
+
+    const forward = new Promise<void>((resolve) => {
+      const remove = router.afterEach(() => {
+        remove()
+        resolve()
+      })
+    })
+    router.forward()
+    await forward
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe(`/admin/users/${user.id}/audit`)
+    expect(wrapper.findComponent(tabs).props('modelValue')).toBe('audit')
+  })
+
   it('disables the status action only for status loading', async () => {
     const { wrapper } = await setup(true)
     const disable = () =>
@@ -681,6 +750,7 @@ describe('admin user details', () => {
     const path = `/admin/users/${user.id}/roles`
     const { wrapper } = await setup(true)
     await wrapper.get('button[role="tab"][value="permissions"]').trigger('click')
+    await flushPromises()
     const assigned = wrapper.findComponent(table)
     const assignedCursor = 'opaque-assigned-cursor'
     const assignedPage = { items: [{ role: 'reader' }], nextCursor: 'opaque-assigned-next' }
@@ -701,7 +771,7 @@ describe('admin user details', () => {
     })
     expect(completeAssigned).toHaveBeenCalledExactlyOnceWith(assignedPage)
     expect(wrapper.findAllComponents(table)).toHaveLength(1)
-    expect(get).toHaveBeenCalledTimes(2)
+    expect(get).toHaveBeenCalledTimes(3)
 
     assigned.vm.$emit('action', 'admin.addRole', [], {})
     await flushPromises()
@@ -744,6 +814,7 @@ describe('admin user details', () => {
     async (outcome) => {
       const { wrapper } = await setup(true)
       await wrapper.get('button[role="tab"][value="permissions"]').trigger('click')
+      await flushPromises()
       wrapper.findComponent(table).vm.$emit('action', 'admin.addRole', [], {})
       await flushPromises()
       const available = wrapper.get('[role="dialog"]').findComponent(table)
@@ -780,6 +851,7 @@ describe('admin user details', () => {
   it('reports an assigned list reload failure globally but ignores an aborted load', async () => {
     const { wrapper } = await setup(true)
     await wrapper.get('button[role="tab"][value="permissions"]').trigger('click')
+    await flushPromises()
     const assigned = wrapper.findComponent(table)
     const complete = vi.fn<OvTableFetchRequest['complete']>()
     const controller = new AbortController()
@@ -819,6 +891,7 @@ describe('admin user details', () => {
   it('confirms removal and refreshes the assigned table after saving', async () => {
     const { wrapper } = await setup(true)
     await wrapper.get('button[role="tab"][value="permissions"]').trigger('click')
+    await flushPromises()
     const editor = { role: 'editor' }
     putRole.mockResolvedValueOnce({ data: null, error: null, status: 204, headers: null })
     wrapper.findComponent(table).vm.$emit('action', 'admin.removeRole', [editor], editor)
@@ -837,6 +910,7 @@ describe('admin user details', () => {
   it('closes the confirmation during removal, blocks a second submission, and alerts on failure', async () => {
     const { wrapper } = await setup(true)
     await wrapper.get('button[role="tab"][value="permissions"]').trigger('click')
+    await flushPromises()
     const assigned = wrapper.findComponent(table)
     const editor = { role: 'editor' }
     const remove = () => assigned.vm.$emit('action', 'admin.removeRole', [editor], editor)
@@ -870,6 +944,7 @@ describe('admin user details', () => {
     authUser.value = { id: user.id }
     const { wrapper } = await setup(true)
     await wrapper.get('button[role="tab"][value="permissions"]').trigger('click')
+    await flushPromises()
     const admin = { role: 'admin' }
     wrapper.findComponent(table).vm.$emit('action', 'admin.removeRole', [admin], admin)
     await flushPromises()

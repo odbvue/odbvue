@@ -85,6 +85,29 @@ declare module 'vue-router/auto-routes' {
       '/admin/users/:id',
       { id: ParamValue<true> },
       { id: ParamValue<false> },
+      | '/admin/users/[id]/'
+      | '/admin/users/[id]/audit'
+      | '/admin/users/[id]/permissions'
+    >,
+    '/admin/users/[id]/': RouteRecordInfo<
+      '/admin/users/[id]/',
+      '/admin/users/:id',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
+      | never
+    >,
+    '/admin/users/[id]/audit': RouteRecordInfo<
+      '/admin/users/[id]/audit',
+      '/admin/users/:id/audit',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
+      | never
+    >,
+    '/admin/users/[id]/permissions': RouteRecordInfo<
+      '/admin/users/[id]/permissions',
+      '/admin/users/:id/permissions',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
       | never
     >,
     '/confirm-email': RouteRecordInfo<
@@ -414,10 +437,37 @@ declare module 'vue-router/auto-routes' {
     'src/modules/admin/pages/users/[id].vue': {
       routes:
         | '/admin/users/[id]'
+        | '/admin/users/[id]/'
+        | '/admin/users/[id]/audit'
+        | '/admin/users/[id]/permissions'
+      views:
+        | 'default'
+      pathParamNames:
+        | 'id'
+    }
+    'src/modules/admin/pages/users/[id]/index.vue': {
+      routes:
+        | '/admin/users/[id]/'
       views:
         | never
       pathParamNames:
-        | 'id'
+        | never
+    }
+    'src/modules/admin/pages/users/[id]/audit.vue': {
+      routes:
+        | '/admin/users/[id]/audit'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/modules/admin/pages/users/[id]/permissions.vue': {
+      routes:
+        | '/admin/users/[id]/permissions'
+      views:
+        | never
+      pathParamNames:
+        | never
     }
     'src/app/pages/confirm-email.vue': {
       routes:

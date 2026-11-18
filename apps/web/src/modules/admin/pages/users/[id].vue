@@ -1,33 +1,29 @@
 <template>
   <v-container>
     <h3 v-if="user">{{ user.username }}</h3>
-    <v-tabs v-model="tab">
-      <v-tab value="details">{{ t('admin.details') }}</v-tab>
-      <v-tab value="permissions" :disabled="!user">{{ t('admin.permissions') }}</v-tab>
-      <v-tab value="audit" :disabled="!user">{{ t('admin.audit') }}</v-tab>
+    <v-tabs :model-value="tab">
+      <v-tab value="details" :to="tabLocation('details')" exact>{{ t('admin.details') }}</v-tab>
+      <v-tab value="permissions" :to="tabLocation('permissions')" :disabled="!user" exact>
+        {{ t('admin.permissions') }}
+      </v-tab>
+      <v-tab value="audit" :to="tabLocation('audit')" :disabled="!user" exact>
+        {{ t('admin.audit') }}
+      </v-tab>
     </v-tabs>
-    <v-tabs-window v-model="tab">
-      <v-tabs-window-item value="details">
-        <UserDetails
-          v-if="user"
-          :key="user.id"
-          :user="user"
-          :is-self="isSelf"
-          @update:enabled="updateEnabled"
-        />
-      </v-tabs-window-item>
-      <v-tabs-window-item value="permissions">
-        <UserPermissions v-if="user && permissionsOpened" :user-id="user.id" :is-self="isSelf" />
-      </v-tabs-window-item>
-      <v-tabs-window-item value="audit">
-        <UserAudit v-if="user && auditOpened" :key="user.id" :user-id="user.id" />
-      </v-tabs-window-item>
-    </v-tabs-window>
+    <RouterView v-slot="{ Component }">
+      <component
+        :is="Component"
+        v-if="user"
+        :user="user"
+        :is-self="isSelf"
+        @update:enabled="updateEnabled"
+      />
+    </RouterView>
   </v-container>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuth } from '@/capabilities/auth'
@@ -35,9 +31,6 @@ import { useHttp } from '@/capabilities/http'
 import { computedRouteParam, useRouting } from '@/capabilities/routing'
 import { useUi } from '@/capabilities/ui'
 import type { components } from '@/api/openapi.generated'
-import UserDetails from '@/modules/admin/components/UserDetails.vue'
-import UserPermissions from '@/modules/admin/components/UserPermissions.vue'
-import UserAudit from '@/modules/admin/components/UserAudit.vue'
 
 definePage({
   meta: {
@@ -53,14 +46,28 @@ const http = useHttp()
 const auth = useAuth()
 const routing = useRouting()
 const ui = useUi()
-const tab = ref('details')
-const permissionsOpened = ref(false)
-const auditOpened = ref(false)
-watch(tab, (value) => {
-  if (value === 'permissions') permissionsOpened.value = true
-  if (value === 'audit') auditOpened.value = true
+const route = useRoute()
+const id = computedRouteParam(route, 'id')
+const tabRoutes = {
+  details: '/admin/users/[id]/',
+  permissions: '/admin/users/[id]/permissions',
+  audit: '/admin/users/[id]/audit',
+} as const
+const tab = computed(() => {
+  if (route.name === tabRoutes.permissions) return 'permissions'
+  if (route.name === tabRoutes.audit) return 'audit'
+  return 'details'
 })
-const id = computedRouteParam(useRoute(), 'id')
+
+function tabLocation(value: 'details' | 'permissions' | 'audit') {
+  return {
+    name: tabRoutes[value],
+    params: { id: id.value },
+    query: route.query,
+    hash: route.hash,
+  }
+}
+
 const user = ref<components['schemas']['AdminGetUserItemsItem']>()
 const isSelf = computed(() => user.value?.id === auth.user.value?.id)
 watchEffect(() => routing.setBreadcrumb(user.value?.displayName?.trim() || user.value?.username))

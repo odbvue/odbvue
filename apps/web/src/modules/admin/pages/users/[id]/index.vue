@@ -35,6 +35,14 @@ import { useUi } from '@/capabilities/ui'
 import type { components } from '@/api/openapi.generated'
 import type { OvViewOptions } from '@/components/api'
 
+definePage({
+  meta: {
+    title: 'admin.userDetails',
+    access: ['admin'],
+    navigation: false,
+  },
+})
+
 const props = defineProps<{
   user: components['schemas']['AdminGetUserItemsItem']
   isSelf: boolean
