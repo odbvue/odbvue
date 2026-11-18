@@ -16,7 +16,6 @@
   "admin.auditInfo": "Information",
   "admin.auditFrom": "Von",
   "admin.auditTo": "Bis",
-  "admin.searchAudit": "Meldungen durchsuchen",
   "admin.apply": "Anwenden",
   "admin.loadAuditError": "Aktivitäten konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
   "admin.auditInvalidInterval": "Geben Sie einen gültigen Zeitraum ein, dessen Beginn vor dem Ende liegt.",

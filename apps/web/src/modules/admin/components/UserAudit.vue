@@ -11,12 +11,11 @@ import type { OvTableFetchRequest, OvTableOptions } from '@/components/api'
 const props = defineProps<{ userId: string }>()
 const http = useHttp()
 const ui = useUi()
+const { t } = useI18n()
 
-const options: OvTableOptions = {
+const options = computed<OvTableOptions>(() => ({
   key: 'id',
-  search: { placeholder: 'admin.searchAudit' },
   columns: [
-    { name: 'eventTimestamp', label: 'admin.auditTime', format: { tsFormat: 'datetime' } },
     {
       name: 'severityText',
       label: 'admin.auditSeverity',
@@ -26,7 +25,7 @@ const options: OvTableOptions = {
         { rules: { type: 'equals', params: 'INFO' }, color: 'info', icon: '$mdiInformation' },
       ],
     },
-    { name: 'eventName', label: 'admin.auditMessageType' },
+    { name: 'eventTimestamp', label: 'admin.auditTime', format: { tsFormat: 'datetime' } },
     { name: 'body', label: 'admin.auditMessage' },
     { name: 'attributes', label: 'admin.auditAttributes', maxLength: 0 },
   ],
@@ -37,9 +36,9 @@ const options: OvTableOptions = {
         name: 'severity',
         label: 'admin.auditSeverity',
         items: [
-          { title: 'admin.auditError', value: 'ERROR' },
-          { title: 'admin.auditWarn', value: 'WARN' },
-          { title: 'admin.auditInfo', value: 'INFO' },
+          { title: t('admin.auditError'), value: 'ERROR' },
+          { title: t('admin.auditWarn'), value: 'WARN' },
+          { title: t('admin.auditInfo'), value: 'INFO' },
         ],
         multiple: true,
         clearable: true,
@@ -53,7 +52,7 @@ const options: OvTableOptions = {
     actionCancel: 'admin.cancel',
     cols: 2,
   },
-}
+}))
 
 function utcTimestamp(value?: string) {
   if (!value) return undefined
@@ -62,14 +61,7 @@ function utcTimestamp(value?: string) {
   return date.toISOString()
 }
 
-async function fetchAudit({
-  cursor,
-  limit,
-  search,
-  filter,
-  signal,
-  complete,
-}: OvTableFetchRequest) {
+async function fetchAudit({ cursor, limit, filter, signal, complete }: OvTableFetchRequest) {
   if (signal.aborted) return complete()
   const result = await ui.action('admin.users.audit.list', async () => {
     const from = utcTimestamp(filter?.from?.[0])
@@ -81,11 +73,10 @@ async function fetchAudit({
         query: {
           cursor,
           limit,
-          search,
           severity: filter?.severity?.filter(Boolean).join(',') || undefined,
+          messageType: filter?.messageType?.[0] || undefined,
           from,
           to,
-          messageType: filter?.messageType?.[0] || undefined,
         },
         signal,
       },

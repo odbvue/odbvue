@@ -16,7 +16,6 @@
   "admin.auditInfo": "Information",
   "admin.auditFrom": "Du",
   "admin.auditTo": "Au",
-  "admin.searchAudit": "Rechercher dans les messages",
   "admin.apply": "Appliquer",
   "admin.loadAuditError": "Impossible de charger les activités. Veuillez réessayer.",
   "admin.auditInvalidInterval": "Saisissez une période valide dont le début précède la fin.",
