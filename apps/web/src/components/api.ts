@@ -332,7 +332,9 @@ export type OvTableOptions = {
   singleSort?: boolean
   actions?: OvAction[]
   actionFormat?: OvFormat | OvFormat[]
+  /** Rows per page on desktop (default: 5). */
   itemsPerPage?: number
+  /** Rows per page on mobile (default: 1). */
   mobileItemsPerPage?: number
   canRefresh?: boolean
   maxLength?: number
@@ -468,12 +470,16 @@ export const OvActionFormat = (
   actionFormat?: OvFormat | OvFormat[],
   t?: (key: string) => string,
 ) => {
-  if (typeof action === 'string') return { name: action, text: action }
+  if (typeof action === 'string') {
+    return { name: action, text: t ? t(action) : action, title: undefined }
+  }
   const fmt = OvFieldFormat(value, action.format)
   const actionFmt = OvFieldFormat(value, actionFormat)
-  fmt.text = fmt.icon ? undefined : fmt.text || action.name
+  const text = (typeof fmt.text === 'string' && fmt.text) || action.name
+  fmt.text = fmt.icon ? undefined : t ? t(text) : text
   fmt.name = action.name
   fmt.title = action.title ? (t ? t(action.title) : action.title) : undefined
+  if (fmt.icon && fmt.title) fmt['aria-label'] = fmt.title
   return { ...actionFmt, ...fmt }
 }
 
@@ -752,7 +758,10 @@ export const renderViewItem = (
                               const p = mi.props as Record<string, unknown>
                               return h(VListItem as Component, {
                                 ...(p.icon ? { prependIcon: p.icon as string } : {}),
-                                title: (p.text as string) || mi.actionObj.name,
+                                title:
+                                  (p.text as string) ||
+                                  options?.t?.(mi.actionObj.name) ||
+                                  mi.actionObj.name,
                                 ...(p.title ? { title: p.title as string } : {}),
                                 ...(mi.isNavigationAction
                                   ? { to: p.to, href: p.href, target: p.target }

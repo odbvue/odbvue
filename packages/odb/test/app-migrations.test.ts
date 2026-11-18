@@ -34,9 +34,16 @@ describe('app-owned ORDS migrations', () => {
   it('exposes admin user services with bounded search and safe typed fields', async () => {
     const { adminPackage, migration } = await migrations['00000000000003-admin']()
     const endpoints = compileApplicationEndpoints(adminPackage.application())
-    expect(endpoints).toHaveLength(3)
-    expect(endpoints.map((endpoint) => endpoint.toNode().method)).toEqual(['GET', 'GET', 'PUT'])
-    for (const endpoint of endpoints) {
+    expect(endpoints.map((endpoint) => endpoint.toNode().method)).toEqual([
+      'GET',
+      'GET',
+      'PUT',
+      'GET',
+      'GET',
+      'GET',
+      'PUT',
+    ])
+    for (const endpoint of endpoints.slice(0, 3)) {
       const node = endpoint.toNode()
       expect(node.source).toContain("odb_auth.has_role(v_auth_user_id, 'admin')")
       const columns = node.params.find((param) => param.resultColumns?.length)?.resultColumns
@@ -73,17 +80,64 @@ describe('app-owned ORDS migrations', () => {
       '/admin/users',
       '/admin/users/{id}',
       '/admin/users/{id}/status',
+      '/admin/roles',
+      '/admin/users/{id}/roles',
+      '/admin/users/{id}/roles/available',
     ])
     expect(document.paths['/admin/users']?.get?.parameters.map((param) => param.name)).toEqual([
       'cursor',
       'limit',
       'search',
     ])
+    expect(document.paths['/admin/roles']?.get?.parameters).toMatchObject([
+      { name: 'cursor', in: 'query', required: false },
+      { name: 'limit', in: 'query', required: false },
+      { name: 'search', in: 'query', required: false },
+    ])
+    expect(sql).toContain('LOWER(TRIM(p_search)) IS NULL')
+    expect(sql).toContain('INSTR(LOWER(role), LOWER(TRIM(p_search)))')
+    expect(sql).toContain('INSTR(LOWER(description), LOWER(TRIM(p_search)))')
+    expect(sql).toContain("role > JSON_VALUE(p_after, '$[0]'")
     for (const path of Object.values(document.paths)) {
       for (const operation of Object.values(path)) {
         expect(operation.security).toEqual([{ bearerAuth: [] }])
       }
     }
+  })
+
+  it('gates role services to admins and preserves existing grants on repeated adds', async () => {
+    const { adminPackage, migration } = await migrations['00000000000003-admin']()
+    const [catalog, grants, available, mutation] = compileApplicationEndpoints(
+      adminPackage.application(),
+    )
+      .slice(3)
+      .map((endpoint) => endpoint.toNode())
+    for (const node of [catalog, grants, available, mutation]) {
+      expect(node?.source).toContain("odb_auth.has_role(v_auth_user_id, 'admin')")
+    }
+    expect(catalog?.source).toContain("'description' VALUE")
+    expect(catalog?.source).toContain("'nextCursor' VALUE")
+    expect(grants?.source).toContain("'validFrom' VALUE")
+    expect(grants?.source).toContain("'validTo' VALUE")
+    expect(grants?.source).toContain("'nextCursor' VALUE")
+    expect(available?.source).toContain("'nextCursor' VALUE")
+    expect(mutation?.source).toContain('p_actor_id => v_auth_user_id')
+    expect(mutation?.source).toContain('p_assigned =>')
+    expect(mutation?.source).toContain(':status_code := 204')
+    expect(mutation?.source).not.toContain('SYS_REFCURSOR')
+    const sql = migration.compile().up().join('\n')
+    expect(sql).toContain("p_id = p_actor_id AND p_role = 'admin' AND p_assigned = FALSE")
+    expect(sql).toContain('ADMIN_SELF_ROLE_REMOVAL_FORBIDDEN')
+    expect(sql).toContain('ADMIN_ROLE_NOT_FOUND')
+    expect(sql).toMatch(
+      /MERGE INTO odb_auth_user_roles[^\n]+WHEN NOT MATCHED THEN INSERT \(user_id, role\)/,
+    )
+    expect(sql.match(/MERGE INTO odb_auth_user_roles[^\n]+/)?.[0]).not.toContain('WHEN MATCHED')
+    expect(sql).toContain('odb_auth.revoke_role(p_id, p_role)')
+    expect(sql).toContain('ORDER BY user_id ASC, role ASC')
+    expect(sql).toContain(
+      'NOT EXISTS (SELECT 1 FROM odb_auth_user_roles ur WHERE (ur.user_id = p_id AND ur.role = odb_auth_roles.role))',
+    )
   })
 
   it('sets an explicit boolean status with trusted actor context and revokes sessions on disable', async () => {

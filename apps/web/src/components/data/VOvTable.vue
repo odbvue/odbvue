@@ -507,7 +507,7 @@ let disposed = false
 let committedQuery: string | undefined
 const itemsPerPage = computed(() => {
   if (mobile.value) return options.mobileItemsPerPage ?? 1
-  return options.itemsPerPage ?? 10
+  return options.itemsPerPage ?? 5
 })
 const hasNextPage = computed(() => !!localNextCursor.value)
 const hasPrevPage = computed(() => cursorStack.value.length > 0)
@@ -566,11 +566,13 @@ const actions = computed(() => {
 
   for (const action of options.actions || []) {
     const actionObj = typeof action === 'string' ? { name: action } : action
-    const props = OvActionFormat(undefined, action, options.actionFormat)
-    const text = props.text ? t(String(props.text)) : undefined
-    const actionTitle =
-      typeof actionObj !== 'string' && actionObj.title ? t(actionObj.title) : undefined
-    const item = { name: props.name as string, props, text, title: actionTitle }
+    const props = OvActionFormat(undefined, action, options.actionFormat, t)
+    const item = {
+      name: actionObj.name,
+      props,
+      text: typeof props.text === 'string' ? props.text : undefined,
+      title: typeof props.title === 'string' ? props.title : undefined,
+    }
 
     if (actionObj.group) {
       grouped.push(item)

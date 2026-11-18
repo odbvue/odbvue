@@ -3,48 +3,27 @@
     <h3 v-if="user">{{ user.username }}</h3>
     <v-tabs v-model="tab">
       <v-tab value="details">{{ t('admin.details') }}</v-tab>
+      <v-tab value="permissions" :disabled="!user">{{ t('admin.permissions') }}</v-tab>
     </v-tabs>
     <v-tabs-window v-model="tab">
       <v-tabs-window-item value="details">
-        <template v-if="user">
-          <v-ov-view :key="user.id" :options="options" :data="user" />
-          <v-card
-            :key="user.id"
-            variant="flat"
-            :title="t('admin.accountAccess')"
-            :subtitle="t(user.enabled ? 'admin.disableDescription' : 'admin.enableDescription')"
-            :text="user.enabled && isSelf ? t('admin.cannotDisableSelf') : undefined"
-          >
-            <v-card-actions>
-              <v-btn v-if="user.enabled" color="warning" :disabled="busy || isSelf">
-                {{ t('admin.disableUser') }}
-                <v-ov-dialog
-                  activator="parent"
-                  :title="t('admin.confirmDisableUser')"
-                  :content="t('admin.disableConfirmation', { username: user.username })"
-                  :actions="[
-                    'admin.cancel',
-                    { name: 'admin.disableUser', format: { color: 'warning' } },
-                  ]"
-                  action-cancel="admin.cancel"
-                  action-submit="admin.disableUser"
-                  max-width="480"
-                  @submit="setEnabled(false)"
-                />
-              </v-btn>
-              <v-btn v-else color="success" :disabled="busy" @click="setEnabled(true)">
-                {{ t('admin.enableUser') }}
-              </v-btn>
-            </v-card-actions>
-          </v-card>
-        </template>
+        <UserDetails
+          v-if="user"
+          :key="user.id"
+          :user="user"
+          :is-self="isSelf"
+          @update:enabled="updateEnabled"
+        />
+      </v-tabs-window-item>
+      <v-tabs-window-item value="permissions">
+        <UserPermissions v-if="user && permissionsOpened" :user-id="user.id" :is-self="isSelf" />
       </v-tabs-window-item>
     </v-tabs-window>
   </v-container>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuth } from '@/capabilities/auth'
@@ -52,7 +31,8 @@ import { useHttp } from '@/capabilities/http'
 import { computedRouteParam, useRouting } from '@/capabilities/routing'
 import { useUi } from '@/capabilities/ui'
 import type { components } from '@/api/openapi.generated'
-import type { OvViewOptions } from '@/components/api'
+import UserDetails from '@/modules/admin/components/UserDetails.vue'
+import UserPermissions from '@/modules/admin/components/UserPermissions.vue'
 
 definePage({
   meta: {
@@ -69,34 +49,14 @@ const auth = useAuth()
 const routing = useRouting()
 const ui = useUi()
 const tab = ref('details')
+const permissionsOpened = ref(false)
+watch(tab, (value) => {
+  if (value === 'permissions') permissionsOpened.value = true
+})
 const id = computedRouteParam(useRoute(), 'id')
 const user = ref<components['schemas']['AdminGetUserItemsItem']>()
 const isSelf = computed(() => user.value?.id === auth.user.value?.id)
-const busy = computed(() => ui.loading.has('admin.users.status'))
 watchEffect(() => routing.setBreadcrumb(user.value?.displayName?.trim() || user.value?.username))
-
-const options = computed<OvViewOptions>(() => ({
-  cols: 2,
-  items: [
-    { name: 'id', label: t('admin.userId') },
-    { name: 'username', label: t('admin.username') },
-    { name: 'displayName', label: t('admin.displayName') },
-    {
-      name: 'enabled',
-      label: t('admin.status'),
-      format: [
-        {
-          rules: { type: 'equals', params: 'true' },
-          text: t('admin.enabled'),
-          color: 'success',
-        },
-        { text: t('admin.disabled'), color: 'warning' },
-      ],
-    },
-    { name: 'createdAt', label: t('admin.createdAt'), format: { tsFormat: 'datetime' } },
-    { name: 'updatedAt', label: t('admin.updatedAt'), format: { tsFormat: 'datetime' } },
-  ],
-}))
 
 async function loadUser() {
   await ui.action('admin.users.details', async () => {
@@ -109,15 +69,8 @@ async function loadUser() {
   })
 }
 
-async function setEnabled(enabled: boolean) {
-  const account = user.value
-  if (!account || busy.value) return
-  if (!enabled && isSelf.value) return ui.error('admin.cannotDisableSelf')
-  await ui.action('admin.users.status', async () => {
-    await http.putOrThrow(`/admin/users/${encodeURIComponent(account.id)}/status`, { enabled })
-    account.enabled = enabled
-    ui.success(enabled ? 'admin.userEnabled' : 'admin.userDisabled')
-  })
+function updateEnabled(enabled: boolean) {
+  if (user.value) user.value.enabled = enabled
 }
 
 onMounted(loadUser)

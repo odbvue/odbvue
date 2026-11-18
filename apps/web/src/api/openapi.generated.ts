@@ -658,6 +658,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List roles with case-insensitive role name or description search */
+        get: operations["admin_list_roles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{id}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List a user’s role assignments and their validity dates */
+        get: operations["admin_list_user_roles"];
+        /** Add or remove a role assignment without changing existing validity dates */
+        put: operations["admin_set_user_role"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{id}/roles/available": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search for roles not already assigned to this user */
+        get: operations["admin_list_available_user_roles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -864,6 +916,38 @@ export interface components {
         AdminSetUserEnabledResponse: {
             items: components["schemas"]["AdminSetUserEnabledItemsItem"][];
         };
+        AdminListRolesItemsItem: {
+            role: string;
+            description?: string | null;
+        };
+        AdminListRolesResponse: {
+            items: components["schemas"]["AdminListRolesItemsItem"][];
+            /** @description Opaque continuation token; absent when pagination is exhausted. */
+            nextCursor?: string;
+        };
+        AdminListUserRolesItemsItem: {
+            userId: string;
+            role: string;
+            /** Format: date-time */
+            validFrom: string;
+            /** Format: date-time */
+            validTo?: string | null;
+        };
+        AdminListUserRolesResponse: {
+            items: components["schemas"]["AdminListUserRolesItemsItem"][];
+            /** @description Opaque continuation token; absent when pagination is exhausted. */
+            nextCursor?: string;
+        };
+        AdminListAvailableUserRolesItemsItem: {
+            role: string;
+            description?: string | null;
+        };
+        AdminListAvailableUserRolesResponse: {
+            items: components["schemas"]["AdminListAvailableUserRolesItemsItem"][];
+            /** @description Opaque continuation token; absent when pagination is exhausted. */
+            nextCursor?: string;
+        };
+        AdminSetUserRoleResponse: Record<string, never>;
     };
     responses: never;
     parameters: never;
@@ -2387,6 +2471,188 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AdminSetUserEnabledResponse"];
                 };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient authorization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    admin_list_roles: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminListRolesResponse"];
+                };
+            };
+            /** @description Invalid limit, cursor, or cursor query context */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient authorization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    admin_list_user_roles: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                search?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminListUserRolesResponse"];
+                };
+            };
+            /** @description Invalid limit, cursor, or cursor query context */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient authorization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    admin_set_user_role: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    role?: string;
+                    assigned?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSetUserRoleResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient authorization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    admin_list_available_user_roles: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                search?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminListAvailableUserRolesResponse"];
+                };
+            };
+            /** @description Invalid limit, cursor, or cursor query context */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Authentication required */
             401: {

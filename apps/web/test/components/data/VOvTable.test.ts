@@ -74,6 +74,23 @@ function mountManagedTable(options: OvTableOptions = baseOptions) {
 }
 
 describe('VOvTable', () => {
+  it.each([
+    { width: 1440, limit: 5 },
+    { width: 480, limit: 1 },
+  ])('requests $limit rows by default at viewport width $width', ({ width, limit }) => {
+    const originalWidth = window.innerWidth
+    window.innerWidth = width
+    window.dispatchEvent(new Event('resize'))
+    const { wrapper, request } = mountManagedTable({ key: 'name', columns: [{ name: 'name' }] })
+    try {
+      expect(request().limit).toBe(limit)
+    } finally {
+      wrapper.unmount()
+      window.innerWidth = originalWidth
+      window.dispatchEvent(new Event('resize'))
+    }
+  })
+
   it('formats raw timestamp columns through the shared renderer', () => {
     const timestamp = '2026-11-11T03:03:34.956221Z'
     const wrapper = mountTable(

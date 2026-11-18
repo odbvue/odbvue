@@ -14,18 +14,20 @@ import { useUi } from '@/capabilities/ui'
 import type { components } from '@/api/openapi.generated'
 import Users from '@/modules/admin/pages/users/index.vue'
 import UserDetails from '@/modules/admin/pages/users/[id].vue'
+import Roles from '@/modules/admin/pages/roles/index.vue'
 import App from '@/app/App.vue'
 import messages from '@/modules/admin/i18n/en.json'
 import { renderViewItem, type OvTableOptions, type OvTableFetchRequest } from '@/components/api'
 
-const { get, put, authUser } = vi.hoisted(() => ({
+const { get, put, putRole, authUser } = vi.hoisted(() => ({
   get: vi.fn<HttpClient['get']>(),
   put: vi.fn<HttpClient['putOrThrow']>(),
+  putRole: vi.fn<HttpClient['put']>(),
   authUser: { value: { id: 'C'.repeat(32) } },
 }))
 vi.mock('@/capabilities/http', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/capabilities/http')>()),
-  useHttp: () => ({ get, putOrThrow: put }),
+  useHttp: () => ({ get, put: putRole, putOrThrow: put }),
 }))
 vi.mock('@/capabilities/client', () => ({ http: { get } }))
 vi.mock('@/capabilities/auth', () => ({ useAuth: () => ({ user: authUser }) }))
@@ -38,17 +40,24 @@ vi.mock('@/app/layouts/FullscreenLayout.vue', () => ({
 
 const table = defineComponent({
   name: 'VOvTable',
-  props: ['options'],
-  emits: ['fetch'],
+  props: ['options', 'title'],
+  emits: ['fetch', 'action'],
+  setup(_props, { expose }) {
+    expose({ fetch: refetchTable })
+  },
   template: '<div data-testid="users-table" />',
 })
+const refetchTable = vi.fn<(action: string) => Promise<boolean>>().mockResolvedValue(true)
 const view = defineComponent({
   name: 'VOvView',
   props: ['options', 'data'],
   template: '<div data-testid="user-details" />',
 })
 const container = { template: '<div><slot /></div>' }
-const alert = { props: ['text'], template: '<div role="alert">{{ text }}</div>' }
+const alert = {
+  props: ['text', 'role'],
+  template: '<div :role="role ?? \'alert\'">{{ text }}</div>',
+}
 const user: components['schemas']['AdminListUsersItemsItem'] = {
   id: 'A'.repeat(32),
   username: 'ada@example.test',
@@ -80,22 +89,28 @@ const pages = import.meta.glob<string>('@/modules/admin/pages/**/*.vue', {
 const wrappers: ReturnType<typeof mount>[] = []
 const ui = useUi()
 
-async function setup(details = false) {
+async function setup(page: boolean | 'roles' = false) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
       { path: '/admin/users', component: Users },
       { path: '/admin/users/:id', component: UserDetails },
+      { path: '/admin/roles', component: Roles },
     ],
   })
-  await router.push(details ? `/admin/users/${user.id}` : '/admin/users')
+  await router.push(
+    page === 'roles' ? '/admin/roles' : page ? `/admin/users/${user.id}` : '/admin/users',
+  )
   const wrapper = mount(App, {
     global: {
       plugins: [router, createI18n({ legacy: false, locale: 'en', messages: { en: messages } })],
       stubs: {
         VOvTable: table,
         VOvView: view,
-        VTabs: container,
+        VTabs: {
+          emits: ['update:modelValue'],
+          template: `<div @click="$emit('update:modelValue', $event.target.value)"><slot /></div>`,
+        },
         VTab: { template: '<button role="tab"><slot /></button>' },
         VTabsWindow: container,
         VTabsWindowItem: container,
@@ -106,14 +121,22 @@ async function setup(details = false) {
           template: '<button :disabled="disabled"><slot /></button>',
         },
         VOvDialog: {
-          props: ['title', 'content', 'actions', 'actionCancel', 'actionSubmit'],
+          props: [
+            'modelValue',
+            'activator',
+            'title',
+            'content',
+            'actions',
+            'actionCancel',
+            'actionSubmit',
+          ],
           emits: ['update:modelValue', 'submit', 'cancel'],
-          setup() {
+          setup(props) {
             const open = ref(false)
             const root = ref<HTMLElement>()
             let activator: HTMLElement | null | undefined
             const activate = () => {
-              open.value = true
+              if (props.activator) open.value = true
             }
             onMounted(() => {
               activator = root.value?.parentElement
@@ -123,11 +146,12 @@ async function setup(details = false) {
             return { open, root }
           },
           template: `
-            <span ref="root"><div v-if="open" role="dialog" @click.stop>
+            <span ref="root"><div v-if="open || modelValue" role="dialog" @click.stop>
               {{ title }}{{ content }}
               <button v-for="action in actions" @click="
                 $emit((typeof action === 'string' ? action : action.name) === actionSubmit ? 'submit' : 'cancel');
-                open = false
+                open = false;
+                $emit('update:modelValue', false)
               ">{{ $t(typeof action === 'string' ? action : action.name) }}</button>
               <slot name="content" /><slot name="actions" />
             </div></span>`,
@@ -139,6 +163,22 @@ async function setup(details = false) {
         VCardText: container,
         VCardActions: container,
         VProgressLinear: true,
+        VList: container,
+        VListItem: {
+          props: ['title', 'subtitle'],
+          template:
+            '<div>{{ title }} {{ subtitle }}<slot name="subtitle" /><slot name="append" /></div>',
+        },
+        VForm: { template: '<form><slot /></form>' },
+        VAutocomplete: {
+          props: ['items', 'modelValue'],
+          emits: ['update:modelValue'],
+          template: `
+            <select :value="modelValue" @change="$emit('update:modelValue', $event.target.value)">
+              <option value=""></option>
+              <option v-for="item in items" :key="item">{{ item }}</option>
+            </select>`,
+        },
       },
     },
   })
@@ -153,6 +193,8 @@ beforeEach(() => {
   get.mockReset()
   get.mockImplementation(async () => result([{ ...user }]))
   put.mockReset()
+  putRole.mockReset()
+  refetchTable.mockClear()
   authUser.value = { id: 'C'.repeat(32) }
 })
 afterEach(() => {
@@ -163,8 +205,8 @@ afterEach(() => {
 })
 
 describe('admin page metadata', () => {
-  it('discovers the landing page, users list and user details', () => {
-    expect(Object.keys(pages)).toHaveLength(3)
+  it('discovers the landing page, users list, user details, and roles list', () => {
+    expect(Object.keys(pages)).toHaveLength(4)
   })
 
   it.each(Object.entries(pages))('restricts %s to administrators', (path, source) => {
@@ -420,6 +462,63 @@ describe('admin users list', () => {
   })
 })
 
+describe('admin roles list', () => {
+  function fetchRoles(wrapper: ReturnType<typeof mount>, search: string, cursor?: string) {
+    const complete = vi.fn<OvTableFetchRequest['complete']>()
+    const { signal } = new AbortController()
+    wrapper.findComponent(table).vm.$emit('fetch', {
+      search,
+      cursor,
+      limit: 5,
+      signal,
+      complete,
+    } satisfies OvTableFetchRequest)
+    return { complete, signal }
+  }
+
+  it('forwards search, limit, and opaque server cursors without repaginating', async () => {
+    const editors = Array.from({ length: 5 }, (_, index) => ({
+      role: `editor-${index + 1}`,
+      description: null,
+    }))
+    const contributor = { role: 'contributor', description: 'Can edit content' }
+    const cursor = 'opaque-role-cursor'
+    const firstPage = { items: editors, nextCursor: cursor }
+    const lastPage = { items: [contributor] }
+    get
+      .mockResolvedValueOnce({ ...result(), data: firstPage })
+      .mockResolvedValueOnce({ ...result(), data: lastPage })
+    const { wrapper } = await setup('roles')
+    const first = fetchRoles(wrapper, 'EDIT')
+    await flushPromises()
+    expect(get).toHaveBeenCalledWith('/admin/roles', {
+      query: { cursor: undefined, limit: 5, search: 'EDIT' },
+      signal: first.signal,
+    })
+    expect(first.complete).toHaveBeenCalledExactlyOnceWith(firstPage)
+    const second = fetchRoles(wrapper, 'EDIT', cursor)
+    await flushPromises()
+    expect(get).toHaveBeenLastCalledWith('/admin/roles', {
+      query: { cursor, limit: 5, search: 'EDIT' },
+      signal: second.signal,
+    })
+    expect(second.complete).toHaveBeenCalledExactlyOnceWith(lastPage)
+    get.mockResolvedValueOnce({ ...result(), data: { items: [] } })
+    const empty = fetchRoles(wrapper, 'no match')
+    await flushPromises()
+    expect(empty.complete).toHaveBeenCalledExactlyOnceWith({ items: [] })
+  })
+
+  it('reports catalog load failures without presenting them as empty search results', async () => {
+    get.mockResolvedValueOnce(failure(500))
+    const { wrapper } = await setup('roles')
+    const { complete } = fetchRoles(wrapper, '')
+    await flushPromises()
+    expect(complete).toHaveBeenCalledExactlyOnceWith(undefined)
+    expect(ui.notification.value?.message).toBe('admin.loadRolesError')
+  })
+})
+
 describe('admin user details', () => {
   it('disables the status action only for status loading', async () => {
     const { wrapper } = await setup(true)
@@ -453,14 +552,17 @@ describe('admin user details', () => {
     expect(ui.notification.value?.message).toBe('Other operation completed')
   })
 
-  it('loads the selected account into a static view in a single Details tab', async () => {
+  it('loads account details without fetching role assignments until requested', async () => {
     const { wrapper, router } = await setup(true)
     expect(get).toHaveBeenCalledWith(`/admin/users/${user.id}`)
     const component = wrapper.findComponent(view)
     expect(component.props('data')).toEqual(user)
     expect(wrapper.get('h3').text()).toBe(user.username)
-    expect(wrapper.findAll('[role="tab"]')).toHaveLength(1)
-    expect(wrapper.get('[role="tab"]').text()).toBe(messages['admin.details'])
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual([
+      messages['admin.details'],
+      messages['admin.permissions'],
+    ])
+    expect(get).toHaveBeenCalledTimes(1)
     expect(component.props('options').items).toHaveLength(6)
     expect(component.props('options').actions).toBeUndefined()
     expect(wrapper.find('input, textarea, select, form').exists()).toBe(false)
@@ -476,6 +578,120 @@ describe('admin user details', () => {
     expect(getBreadcrumbOverride(router).value?.title).toBe(user.username)
   })
 
+  it('opens the available table on demand and adds a role from a later page without loading the catalog', async () => {
+    const path = `/admin/users/${user.id}/roles`
+    const { wrapper } = await setup(true)
+    await wrapper.get('button[role="tab"][value="permissions"]').trigger('click')
+    const assigned = wrapper.findComponent(table)
+    const assignedCursor = 'opaque-assigned-cursor'
+    const assignedPage = { items: [{ role: 'reader' }], nextCursor: 'opaque-assigned-next' }
+    const completeAssigned = vi.fn<OvTableFetchRequest['complete']>()
+    const { signal } = new AbortController()
+    get.mockResolvedValueOnce({ ...result(), data: assignedPage })
+    assigned.vm.$emit('fetch', {
+      cursor: assignedCursor,
+      search: 'read',
+      limit: 5,
+      signal,
+      complete: completeAssigned,
+    })
+    await flushPromises()
+    expect(get).toHaveBeenLastCalledWith(path, {
+      query: { cursor: assignedCursor, limit: 5, search: 'read' },
+      signal,
+    })
+    expect(completeAssigned).toHaveBeenCalledExactlyOnceWith(assignedPage)
+    expect(wrapper.findAllComponents(table)).toHaveLength(1)
+    expect(get).toHaveBeenCalledTimes(2)
+
+    assigned.vm.$emit('action', 'admin.addRole', [], {})
+    await flushPromises()
+    const available = wrapper.get('[role="dialog"]').findComponent(table)
+    const editor = { role: 'editor', description: 'Can edit content' }
+    const page = { items: [editor], nextCursor: 'opaque-available-next' }
+    const complete = vi.fn<OvTableFetchRequest['complete']>()
+    get.mockResolvedValueOnce({ ...result(), data: page })
+    available.vm.$emit('fetch', {
+      cursor: 'opaque-available-cursor',
+      limit: 1,
+      search: 'edit',
+      signal,
+      complete,
+    })
+    await flushPromises()
+    expect(get).toHaveBeenLastCalledWith(`${path}/available`, {
+      query: { cursor: 'opaque-available-cursor', limit: 1, search: 'edit' },
+      signal,
+    })
+    expect(complete).toHaveBeenCalledExactlyOnceWith(page)
+    const saved = Promise.withResolvers<HttpResponse<unknown>>()
+    putRole.mockReturnValueOnce(saved.promise)
+    refetchTable.mockImplementationOnce(async () => {
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+      return true
+    })
+    available.vm.$emit('action', 'admin.addRole', page.items, editor)
+    await flushPromises()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    expect(ui.loading.active.value).toBe(false)
+    expect(refetchTable).not.toHaveBeenCalled()
+    saved.resolve({ data: null, error: null, status: 204, headers: null })
+    await flushPromises()
+    expect(putRole).toHaveBeenCalledExactlyOnceWith(path, { role: 'editor', assigned: true })
+    expect(refetchTable).toHaveBeenCalledExactlyOnceWith('first')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(ui.notification.value).toMatchObject({ type: 'success', message: 'admin.roleAdded' })
+  })
+
+  it('closes the picker on failure to display the page error and does not reload roles', async () => {
+    const { wrapper } = await setup(true)
+    await wrapper.get('button[role="tab"][value="permissions"]').trigger('click')
+    wrapper.findComponent(table).vm.$emit('action', 'admin.addRole', [], {})
+    await flushPromises()
+    const available = wrapper.get('[role="dialog"]').findComponent(table)
+    const editor = { role: 'editor' }
+
+    putRole.mockResolvedValueOnce(failure(500))
+    available.vm.$emit('action', 'admin.addRole', [editor], editor)
+    await flushPromises()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(refetchTable).not.toHaveBeenCalled()
+    expect(ui.notification.value).toMatchObject({
+      type: 'error',
+      message: 'admin.updateRoleError',
+    })
+  })
+
+  it('confirms removal and refreshes the assigned table after saving', async () => {
+    const { wrapper } = await setup(true)
+    await wrapper.get('button[role="tab"][value="permissions"]').trigger('click')
+    const editor = { role: 'editor' }
+    putRole.mockResolvedValueOnce({ data: null, error: null, status: 204, headers: null })
+    wrapper.findComponent(table).vm.$emit('action', 'admin.removeRole', [editor], editor)
+    await flushPromises()
+    expect(putRole).not.toHaveBeenCalled()
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Remove the editor role')
+    await wrapper.get('[role="dialog"] button:last-of-type').trigger('click')
+    await flushPromises()
+    expect(putRole).toHaveBeenCalledExactlyOnceWith(`/admin/users/${user.id}/roles`, {
+      role: 'editor',
+      assigned: false,
+    })
+    expect(refetchTable).toHaveBeenCalledExactlyOnceWith('first')
+  })
+
+  it('does not offer to remove the signed-in user’s admin role', async () => {
+    authUser.value = { id: user.id }
+    const { wrapper } = await setup(true)
+    await wrapper.get('button[role="tab"][value="permissions"]').trigger('click')
+    const admin = { role: 'admin' }
+    wrapper.findComponent(table).vm.$emit('action', 'admin.removeRole', [admin], admin)
+    await flushPromises()
+    expect(ui.notification.value?.message).toBe('admin.cannotRemoveOwnAdmin')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(putRole).not.toHaveBeenCalled()
+  })
+
   it.each([404, 500])('reports a %s response', async (status) => {
     get.mockResolvedValue(failure(status))
     const { wrapper } = await setup(true)
@@ -483,6 +699,7 @@ describe('admin user details', () => {
       type: 'error',
       message: status === 404 ? 'admin.userNotFound' : 'admin.loadUserError',
     })
+
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
     expect(ui.loading.active.value).toBe(false)
     expect(wrapper.findComponent(view).exists()).toBe(false)

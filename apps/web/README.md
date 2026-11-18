@@ -78,8 +78,10 @@ propagation is needed instead.
 App-level loading blocks duplicate submissions. Writes continue to completion even
 after navigation, without signals or cancellation bookkeeping. Their success or error
 notifications are operation-wide and may appear after leaving the page.
-The [Details page](./src/modules/admin/pages/users/[id].vue) owns detail fetching,
+The [user route](./src/modules/admin/pages/users/[id].vue) owns detail fetching,
 using a direct `http.get()` inside `ui.action()`, with no fetch composable.
+The [Details tab component](./src/modules/admin/components/UserDetails.vue) renders the account
+and emits the new status to the route after a successful update.
 It loads details on mount. The router creates a fresh page when the path changes;
 query and hash changes keep the same page. Requests are not cancelled,
 so errors from a page that has been left can still appear as global notifications.
@@ -90,6 +92,22 @@ The admin-only `PUT /admin/users/{id}/status` accepts `{ "enabled": true | false
 and returns the same safe user fields as Details. The existing
 [admin migration](../db/src/migrations/00000000000003-admin.ts) must be redeployed;
 regenerate the deployed OpenAPI manifest and web types after deployment.
+
+The **Permissions** tab shows a searchable table of assigned roles and validity dates. Its
+**Add role** (+) table action opens a searchable table of roles not already assigned. Add one role
+at a time; the picker closes after the save attempt so feedback is visible on the page, and focus
+returns to the **Add role** button. Loading and retry feedback for the available list stay inside
+the picker. Both tables use server-side cursor paging; neither loads the full catalog. Admins can remove assignments after
+confirmation, but cannot remove their own `admin` role.
+
+**Admin → Roles** is a read-only table searchable by role name or description, with five roles per
+page on desktop and one on mobile.
+`GET /admin/roles` accepts `cursor`, `limit`, and an optional `search` for a case-insensitive
+substring match on either field. The table sends the server's `nextCursor` as `cursor` to load the
+next page. The Permissions tables use `GET /admin/users/{id}/roles` and
+`GET /admin/users/{id}/roles/available` with the same paging parameters. Changes send
+`{ "role": "...", "assigned": true | false }` to `PUT /admin/users/{id}/roles`; it returns
+`204 No Content` and the UI reloads the assigned roles table.
 
 ## Authentication
 
