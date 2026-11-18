@@ -39,7 +39,7 @@ import {
   type AuthConfig,
   type AuthFeature,
 } from './settings.js'
-/** Install after `odbRateLimit`, `odbSettings`, `odbLob` and `odbStorage`. */
+/** Install after `odbAudit`, `odbRateLimit`, `odbSettings`, `odbLob` and `odbStorage`. */
 export const odbAuth = {
   password: {
     change(userId: PlsqlRenderable, currentPassword: PlsqlRenderable, password: PlsqlRenderable) {

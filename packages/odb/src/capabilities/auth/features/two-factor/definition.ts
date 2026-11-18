@@ -1,4 +1,5 @@
 import { type PackageImpl, odbType } from '../../../../schema/package.js'
+import { ODB_ERROR_NUMBER } from '../../../../schema/errors.js'
 import {
   cond,
   odbLiteral,
@@ -98,6 +99,11 @@ export function defineAuthTwoFactor(
         tokenHash: odbAuthCrypto.hashToken(challenge),
         secret: encrypted,
         expiresAt: odbOracle.plus(odbOracle.sysTimestamp(), odbOracle.interval.seconds(300)),
+      })
+      body.auditEvent('Two-factor challenge started', {
+        'user.id': userId,
+        'event.name': odbLiteral('auth.two_factor.start'),
+        'event.outcome': odbLiteral('success'),
       })
       body.whenOthers((handler) => {
         handler.rollback('odb_auth_begin_login')
@@ -327,6 +333,11 @@ export function defineAuthTwoFactor(
                   })
                   .where(cond.eq(authChallenges.userId, userId)),
               )
+              recovery.auditEvent('Recovery code consumed; authenticator enrollment required', {
+                'user.id': userId,
+                'event.name': odbLiteral('auth.two_factor.recover'),
+                'event.outcome': odbLiteral('success'),
+              })
               recovery.return()
             },
             (totp) => {
@@ -362,10 +373,25 @@ export function defineAuthTwoFactor(
       body.call(odbRateLimitApi.success(odbLiteral('AUTH_2FA_START_USER'), userId))
       body.when('NO_DATA_FOUND', (invalid) => {
         invalid.rollback('odb_auth_verify_factor')
+        invalid.auditWarn('Two-factor verification rejected', {
+          'user.id': userId,
+          'event.name': odbLiteral('auth.two_factor.verify'),
+          'event.outcome': odbLiteral('failure'),
+        })
         invalid.unauthorized('TWO_FACTOR_INVALID')
       })
       body.whenOthers((handler) => {
         handler.rollback('odb_auth_verify_factor')
+        const attributes = {
+          'user.id': userId,
+          'event.name': odbLiteral('auth.two_factor.verify'),
+          'event.outcome': odbLiteral('failure'),
+        }
+        handler.ifThen(
+          cond.eq(new PlsqlExpression('NUMBER', 'SQLCODE'), ODB_ERROR_NUMBER),
+          (rejected) => rejected.auditWarn('Two-factor verification rejected', attributes),
+          (failed) => failed.auditError('Two-factor verification failed', attributes),
+        )
         handler.raise()
       })
     },

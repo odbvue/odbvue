@@ -53,7 +53,7 @@ additional public database packages.
 
 ## Install
 
-Install it through a migration after `odbRateLimit`, `odbSettings`, `odbLob` and `odbStorage`.
+Install it through a migration after `odbAudit`, `odbRateLimit`, `odbSettings`, `odbLob` and `odbStorage`.
 Settings requires `odbAudit`. JWT configuration is loaded from Settings at runtime;
 there is no built-in signing key, environment fallback, or package-embedded secret.
 The schema also needs a direct `EXECUTE ON SYS.DBMS_LDAP` grant before compiling

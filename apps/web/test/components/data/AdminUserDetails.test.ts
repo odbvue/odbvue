@@ -2,14 +2,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { createI18n } from 'vue-i18n'
-import { VBtn, VDialog, VTab } from 'vuetify/components'
+import { VBtn, VDialog, VSelect, VTab } from 'vuetify/components'
 import type { HttpClient, HttpResponse } from '@/capabilities/http'
 import { useUi } from '@/capabilities/ui'
 import UserDetails from '@/modules/admin/pages/users/[id].vue'
+import UserAudit from '@/modules/admin/components/UserAudit.vue'
 import VOvForm from '@/components/forms/VOvForm.vue'
 import VOvView from '@/components/data/VOvView.vue'
 import VOvTable from '@/components/data/VOvTable.vue'
 import messages from '@/modules/admin/i18n/en.json'
+import sharedMessages from '@/app/i18n/en.json'
 
 const { get } = vi.hoisted(() => ({ get: vi.fn<HttpClient['get']>() }))
 vi.mock('@/capabilities/client', () => ({ http: { get } }))
@@ -26,6 +28,120 @@ afterEach(() => {
 })
 
 describe('admin user details view', () => {
+  it.each([
+    { field: 'severity', value: ['WARN'], query: { severity: 'WARN' } },
+    { field: 'messageType', value: 'auth.login', query: { messageType: 'auth.login' } },
+    {
+      field: 'from',
+      value: '2026-11-01T10:00',
+      query: { from: new Date('2026-11-01T10:00').toISOString() },
+    },
+    {
+      field: 'to',
+      value: '2026-11-18T12:00',
+      query: { to: new Date('2026-11-18T12:00').toISOString() },
+    },
+  ])(
+    'applies the audit $field filter through the actual table form',
+    async ({ field, value, query }) => {
+      get.mockReset()
+      get
+        .mockResolvedValueOnce({
+          data: { items: [{ id: 'entry-1', body: 'Initial entry', severityText: 'INFO' }] },
+          error: null,
+          status: 200,
+          headers: null,
+        })
+        .mockResolvedValue({
+          data: { items: [] },
+          error: null,
+          status: 200,
+          headers: null,
+        })
+      const wrapper = mount(UserAudit, {
+        props: { userId: 'user-1' },
+        attachTo: document.body,
+        global: {
+          plugins: [
+            createI18n({
+              legacy: false,
+              locale: 'en',
+              messages: { en: { ...sharedMessages, ...messages } },
+              missing: () => {},
+            }),
+          ],
+          stubs: { VIcon: true },
+        },
+      })
+      try {
+        await flushPromises()
+        expect(wrapper.text()).toContain('Initial entry')
+        const filterButton = wrapper
+          .findAllComponents(VBtn)
+          .find((button) => button.props('icon') === '$mdiFilterPlus')!
+        await filterButton.trigger('click')
+        await flushPromises()
+        const form = wrapper.getComponent(VOvForm)
+        if (field === 'severity') {
+          form.getComponent(VSelect).vm.$emit('update:modelValue', value)
+        } else {
+          await form.get(`input[id="${field}"]`).setValue(value)
+        }
+        const apply = wrapper
+          .findAllComponents(VBtn)
+          .find((button) => button.text() === messages['admin.apply'])!
+        await apply.trigger('click')
+        await flushPromises()
+        expect(get).toHaveBeenLastCalledWith(
+          '/admin/users/user-1/audit',
+          expect.objectContaining({
+            query: expect.objectContaining({ cursor: undefined, ...query }),
+          }),
+        )
+        expect(wrapper.text()).not.toContain('Initial entry')
+        get.mockResolvedValueOnce({
+          data: { items: [{ id: 'entry-1', body: 'Initial entry', severityText: 'INFO' }] },
+          error: null,
+          status: 200,
+          headers: null,
+        })
+        if (field === 'severity' || field === 'messageType') {
+          await filterButton.trigger('click')
+          await flushPromises()
+          const reopened = wrapper.getComponent(VOvForm)
+          if (field === 'severity') {
+            reopened.getComponent(VSelect).vm.$emit('update:modelValue', null)
+          } else {
+            await reopened.get('input[id="messageType"]').setValue('')
+          }
+          await wrapper
+            .findAllComponents(VBtn)
+            .find((button) => button.text() === messages['admin.apply'])!
+            .trigger('click')
+        } else {
+          await wrapper.get('.v-chip__close').trigger('click')
+        }
+        await flushPromises()
+        expect(get).toHaveBeenLastCalledWith(
+          '/admin/users/user-1/audit',
+          expect.objectContaining({
+            query: expect.objectContaining({
+              cursor: undefined,
+              severity: undefined,
+              messageType: undefined,
+              from: undefined,
+              to: undefined,
+            }),
+          }),
+        )
+        expect(wrapper.text()).toContain('Initial entry')
+      } finally {
+        wrapper.unmount()
+        useUi().clear()
+      }
+    },
+  )
+
   it('renders static user data and populated timestamps before opening Permissions', async () => {
     vi.stubGlobal('definePage', vi.fn<() => void>())
     const user = {
@@ -72,7 +188,7 @@ describe('admin user details view', () => {
       expect(wrapper.findComponent(VOvForm).exists()).toBe(false)
       expect(wrapper.get('h3').text()).toBe(user.username)
       const tabs = wrapper.findAllComponents(VTab)
-      expect(tabs.map((tab) => tab.props('value'))).toEqual(['details', 'permissions'])
+      expect(tabs.map((tab) => tab.props('value'))).toEqual(['details', 'permissions', 'audit'])
       expect(tabs[0]?.text()).toBe(messages['admin.details'])
       expect(view.text()).toContain(user.id)
       expect(view.text()).toContain(user.username)
@@ -156,6 +272,22 @@ describe('admin user details view', () => {
         .find((button) => button.props('icon') === '$mdiPlus')
       expect(assign?.attributes('title')).toBe(messages['admin.addRole'])
       expect(assign?.attributes('aria-label')).toBe(messages['admin.addRole'])
+
+      picker!.vm.$emit('update:modelValue', false)
+      get.mockResolvedValueOnce({
+        data: { items: [] },
+        error: null,
+        status: 200,
+        headers: null,
+      })
+      await tabs[2]!.trigger('click')
+      await flushPromises()
+      expect(get).toHaveBeenLastCalledWith(
+        `/admin/users/${user.id}/audit`,
+        expect.objectContaining({
+          query: expect.objectContaining({ limit: 1 }),
+        }),
+      )
     } finally {
       wrapper.unmount()
       useUi().clear()

@@ -42,6 +42,7 @@ describe('app-owned ORDS migrations', () => {
       'GET',
       'GET',
       'PUT',
+      'GET',
     ])
     for (const endpoint of endpoints.slice(0, 3)) {
       const node = endpoint.toNode()
@@ -83,6 +84,7 @@ describe('app-owned ORDS migrations', () => {
       '/admin/roles',
       '/admin/users/{id}/roles',
       '/admin/users/{id}/roles/available',
+      '/admin/users/{id}/audit',
     ])
     expect(document.paths['/admin/users']?.get?.parameters.map((param) => param.name)).toEqual([
       'cursor',
@@ -101,6 +103,57 @@ describe('app-owned ORDS migrations', () => {
     for (const path of Object.values(document.paths)) {
       for (const operation of Object.values(path)) {
         expect(operation.security).toEqual([{ bearerAuth: [] }])
+      }
+    }
+  })
+
+  it('filters user audit in SQL before a stable newest-first cursor page', async () => {
+    const { adminPackage, migration } = await migrations['00000000000003-admin']()
+    const endpoint = compileApplicationEndpoints(adminPackage.application()).at(-1)!.toNode()
+    expect(endpoint.source).toContain("odb_auth.has_role(v_auth_user_id, 'admin')")
+    expect(endpoint.source).toContain("'nextCursor' VALUE")
+    const sql = migration.compile().up().join('\n')
+    const start = sql.indexOf('PROCEDURE list_user_audit', sql.indexOf('PACKAGE BODY'))
+    const procedure = sql.slice(start, sql.indexOf('END list_user_audit;', start))
+    expect(procedure).toContain('(user_id = p_id OR target_user_id = p_id)')
+    expect(procedure).toContain("INSTR(',' || p_severity || ',', ',' || severity_text || ',') > 0")
+    expect(procedure).toContain('event_timestamp >= l_from_timestamp')
+    expect(procedure).toContain('event_timestamp <= l_to_timestamp')
+    expect(procedure).toContain('INSTR(LOWER(event_name), LOWER(TRIM(p_message_type)))')
+    expect(procedure).toContain('INSTR(LOWER(body), LOWER(TRIM(p_search)))')
+    expect(procedure).toContain('ADMIN_AUDIT_SEVERITY_INVALID')
+    expect(procedure).toContain('ADMIN_AUDIT_DATE_INVALID')
+    expect(procedure).toContain('ADMIN_AUDIT_INTERVAL_INVALID')
+    expect(procedure).toContain('ORDER BY observed_timestamp DESC, id DESC')
+    expect(procedure).toContain('FETCH FIRST NVL(p_limit, 25) + 1 ROWS ONLY')
+    expect(procedure.indexOf('user_id = p_id')).toBeLessThan(procedure.indexOf('FETCH FIRST'))
+    expect(sql).toContain("'target.user.id', p_id")
+    expect(sql).toContain("'user.id', p_actor_id")
+    expect(sql).toContain("'event.name', 'admin.user.role'")
+    expect(sql).toContain("'event.name', 'admin.user.status'")
+  })
+
+  it('audits every exposed mutation without copying credentials or request bodies', async () => {
+    for (const loadModule of Object.values(migrations).slice(1)) {
+      for (const app of (await loadModule()).migration.applications()) {
+        for (const endpoint of compileApplicationEndpoints(app)) {
+          const node = endpoint.toNode()
+          if (node.method === 'GET') continue
+          const auditCalls = node.source.match(/odb_audit\.log\([^;]+/g) ?? []
+          expect(auditCalls.length).toBe(4)
+          expect(auditCalls[0]).toContain("'INFO'")
+          expect(auditCalls[0]).toContain("'event.outcome', 'success'")
+          expect(auditCalls[1]).toContain("'WARN' ELSE 'ERROR'")
+          expect(auditCalls.at(-1)).toContain("'ERROR'")
+          for (const call of auditCalls) {
+            expect(call).not.toMatch(/v_body|:body|p_password|p_refresh_token|:cookie|:code/i)
+            expect(call).toContain("'event.name'")
+            expect(call).toContain("'http.request.method'")
+          }
+          if (node.auth !== 'anonymous') {
+            expect(auditCalls[0]).toContain("'user.id', v_auth_user_id")
+          }
+        }
       }
     }
   })
@@ -900,9 +953,12 @@ describe('app-owned ORDS migrations', () => {
     const migration = await load('00000000000002-sandbox')
     const sql = migration.compile().up().join('\n')
     expect(sql).toContain('odb_audit.list(p_after, p_limit, p_items)')
-    expect(sql).toContain('odb_audit.info(p_message)')
-    expect(sql).toContain('odb_audit.warn(p_message)')
-    expect(sql).toMatch(/WHEN OTHERS THEN\s+odb_audit.error\(p_message\);\s+RAISE;/)
+    for (const severity of ['info', 'warn', 'error']) {
+      expect(sql).toContain(
+        `odb_audit.${severity}(p_message, odb_audit.attributes('user.id', p_user_id, 'event.name', 'sandbox.audit.${severity}'))`,
+      )
+    }
+    expect(sql).toMatch(/WHEN OTHERS THEN\s+odb_audit.error\(p_message,[^\n]+;\s+RAISE;/)
     expect(sql).toContain('SANDBOX_AUDIT_ERROR')
     expect(sql).toContain('AUDIT_MESSAGE_REQUIRED')
     expect(sql).not.toContain('odb_audit_logs')

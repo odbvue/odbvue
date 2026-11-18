@@ -42,6 +42,11 @@ export function defineAuthSessions(pkg: PackageImpl) {
       })
       body.set(accessToken, odbAuthJwt.createAccessToken(userId, sessionId, tokenVersion))
       body.set(refreshToken, newRefreshToken)
+      body.auditEvent('Signed in', {
+        'user.id': userId,
+        'event.name': odbLiteral('auth.login'),
+        'event.outcome': odbLiteral('success'),
+      })
       body.when('NO_DATA_FOUND', (handler) => handler.unauthorized())
     })
   })
@@ -107,6 +112,11 @@ export function defineAuthSessions(pkg: PackageImpl) {
             .set({ revokedAt: odbOracle.sysTimestamp() })
             .where(cond.eq(authSessions.id, sessionId)),
         )
+        then.auditWarn('Refresh token replay rejected', {
+          'user.id': userId,
+          'event.name': odbLiteral('auth.refresh'),
+          'event.outcome': odbLiteral('failure'),
+        })
         then.unauthorized()
       })
       statements.set(newRefreshToken, odbAuthCrypto.randomToken(odbLiteral(REFRESH_TOKEN_BYTES)))
@@ -122,6 +132,11 @@ export function defineAuthSessions(pkg: PackageImpl) {
       )
       statements.set(accessToken, odbAuthJwt.createAccessToken(userId, sessionId, tokenVersion))
       statements.set(nextRefreshToken, newRefreshToken)
+      statements.auditEvent('Session refreshed', {
+        'user.id': userId,
+        'event.name': odbLiteral('auth.refresh'),
+        'event.outcome': odbLiteral('success'),
+      })
       statements.when('NO_DATA_FOUND', (handler) => handler.unauthorized())
     },
   )
@@ -131,6 +146,26 @@ export function defineAuthSessions(pkg: PackageImpl) {
     'logout',
     { in: { refreshToken: authTypes.refreshToken } },
     ({ params: { refreshToken }, body: statements }) => {
+      statements.forQuery(
+        'session_to_revoke',
+        odbQuery()
+          .selectFrom(authSessions)
+          .select(authSessions.userId)
+          .where(
+            cond.and([
+              cond.eq(authSessions.refreshTokenHash, odbAuthCrypto.hashToken(refreshToken)),
+              cond.isNull(authSessions.revokedAt),
+            ]),
+          )
+          .forUpdate(),
+        (session, loop) => {
+          loop.auditEvent('Signed out', {
+            'user.id': session.column('user_id'),
+            'event.name': odbLiteral('auth.logout'),
+            'event.outcome': odbLiteral('success'),
+          })
+        },
+      )
       statements.ifThen(cond.isNotNull(refreshToken), (then) =>
         then.query(
           odbQuery()

@@ -3,12 +3,14 @@ import {
   authSessions,
   authRoles,
   authUserRoles,
+  auditLogs,
   cond,
   defineMigration,
   defineService,
   odbEnv,
   odbAuth,
   odbOracle,
+  odbLiteral,
   odbPackage,
   odbQuery,
   odbType,
@@ -160,6 +162,12 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
                 cond.and([cond.eq(authSessions.userId, id), cond.isNull(authSessions.revokedAt)]),
               ),
           )
+        })
+        changed.auditEvent('User account status changed', {
+          'user.id': actorId,
+          'target.user.id': id,
+          'event.name': odbLiteral('admin.user.status'),
+          enabled: requestedEnabled,
         })
       })
       body.openFor(items, userQuery().where(cond.eq(authUsers.id, id)))
@@ -365,6 +373,18 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
         },
         (remove) => remove.call(odbAuth.role.revoke(id, role)),
       )
+      const attributes = {
+        'user.id': actorId,
+        'target.user.id': id,
+        'event.name': odbLiteral('admin.user.role'),
+        'event.outcome': odbLiteral('success'),
+        role,
+      }
+      body.ifThen(
+        cond.eq(assigned, true),
+        (added) => added.auditEvent('User role assigned', attributes),
+        (removed) => removed.auditEvent('User role removed', attributes),
+      )
       body.when('NO_DATA_FOUND', (missing) => missing.notFound('ADMIN_USER_NOT_FOUND'))
     },
   )
@@ -379,6 +399,137 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
     context: { userId: setUserRole.parameters.actorId },
     body: { role: setUserRole.parameters.role, assigned: setUserRole.parameters.assigned },
     responseStatus: 204,
+  })
+
+  const listUserAudit = pkg.proc(
+    'list_user_audit',
+    {
+      in: {
+        id: odbType.guid(),
+        ...rolePageInputs,
+        severity: odbType.string(64),
+        from: odbType.string(24),
+        to: odbType.string(24),
+        messageType: odbType.string(255),
+      },
+      out: { items: odbType.resultset() },
+    },
+    ({ params: { id, after, limit, search, severity, from, to, messageType, items }, body }) => {
+      const { foundId, fromTimestamp, toTimestamp } = body.variables({
+        foundId: authUsers.id,
+        fromTimestamp: odbType.timestamp(),
+        toTimestamp: odbType.timestamp(),
+      })
+      body.query(findUserId(id).into(foundId))
+      body.ifThen(
+        cond.and([
+          cond.isNotNull(severity),
+          cond.not(cond.regexpLike(severity, '^(ERROR|WARN|INFO)(,(ERROR|WARN|INFO))*$')),
+        ]),
+        (invalid) => invalid.invalid('ADMIN_AUDIT_SEVERITY_INVALID'),
+      )
+      body.block((dates) => {
+        for (const [value, target] of [
+          [from, fromTimestamp],
+          [to, toTimestamp],
+        ] as const) {
+          dates.ifThen(
+            cond.and([
+              cond.isNotNull(value),
+              cond.not(
+                cond.regexpLike(
+                  value,
+                  '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.][0-9]{3}Z$',
+                ),
+              ),
+            ]),
+            (invalid) => invalid.invalid('ADMIN_AUDIT_DATE_INVALID'),
+          )
+          dates.set(
+            target,
+            plsqlExpr.call(
+              'TIMESTAMP',
+              'TO_TIMESTAMP',
+              value,
+              odbLiteral('FXYYYY-MM-DD"T"HH24:MI:SS.FF3"Z"'),
+            ),
+          )
+        }
+        dates.whenOthers((invalid) => invalid.invalid('ADMIN_AUDIT_DATE_INVALID'))
+      })
+      body.ifThen(cond.gt(fromTimestamp, toTimestamp), (invalid) =>
+        invalid.invalid('ADMIN_AUDIT_INTERVAL_INVALID'),
+      )
+      const term = odbOracle.lower(odbOracle.trim(search))
+      const type = odbOracle.lower(odbOracle.trim(messageType))
+      body.openFor(
+        items,
+        odbQuery()
+          .selectFrom(auditLogs)
+          .select([
+            auditLogs.id,
+            auditLogs.observedTimestamp,
+            auditLogs.eventTimestamp,
+            auditLogs.severityText,
+            auditLogs.eventName,
+            auditLogs.body,
+            auditLogs.userId,
+            auditLogs.targetUserId,
+            auditLogs.attributes,
+          ])
+          .where(
+            cond.and([
+              cond.or([cond.eq(auditLogs.userId, id), cond.eq(auditLogs.targetUserId, id)]),
+              cond.or([
+                cond.isNull(severity),
+                cond.gt(
+                  odbOracle.instr(
+                    plsqlExpr.concat(',', severity, ','),
+                    plsqlExpr.concat(',', auditLogs.severityText, ','),
+                  ),
+                  0,
+                ),
+              ]),
+              cond.or([
+                cond.isNull(fromTimestamp),
+                cond.gte(auditLogs.eventTimestamp, fromTimestamp),
+              ]),
+              cond.or([cond.isNull(toTimestamp), cond.lte(auditLogs.eventTimestamp, toTimestamp)]),
+              cond.or([
+                cond.isNull(type),
+                cond.gt(odbOracle.instr(odbOracle.lower(auditLogs.eventName), type), 0),
+              ]),
+              cond.or([
+                cond.isNull(term),
+                cond.gt(odbOracle.instr(odbOracle.lower(auditLogs.body), term), 0),
+              ]),
+            ]),
+          )
+          .orderBy(auditLogs.observedTimestamp, 'desc')
+          .orderBy(auditLogs.id, 'desc')
+          .paginate({ cursor: after, limit }),
+      )
+      body.when('NO_DATA_FOUND', (missing) => missing.notFound('ADMIN_USER_NOT_FOUND'))
+    },
+  )
+  defineService(listUserAudit, {
+    auth: { roles: ['admin'] },
+    module: 'admin',
+    basePath: '/admin',
+    method: 'GET',
+    path: '/users/:id/audit',
+    summary: 'List activity by or affecting a user, filtered before cursor pagination',
+    uri: { id: listUserAudit.parameters.id },
+    query: {
+      cursor: listUserAudit.parameters.after,
+      limit: listUserAudit.parameters.limit,
+      search: listUserAudit.parameters.search,
+      severity: listUserAudit.parameters.severity,
+      from: listUserAudit.parameters.from,
+      to: listUserAudit.parameters.to,
+      messageType: listUserAudit.parameters.messageType,
+    },
+    response: { items: listUserAudit.parameters.items },
   })
 
   return {}

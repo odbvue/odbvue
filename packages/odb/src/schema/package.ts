@@ -719,7 +719,7 @@ export class ProcedureBody {
   ): this {
     const body = `'${message.replace(/'/g, "''")}'`
     const args = attributes ? `${body}, ${renderAuditAttributes(attributes)}` : body
-    return this.raw(`odb_audit.${severity}(${args})`)
+    return this.call(new PlsqlStatement(`odb_audit.${severity}(${args})`))
   }
 
   /** `odb_audit.debug(<message>[, <attributes>])` */

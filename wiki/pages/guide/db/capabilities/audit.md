@@ -73,6 +73,43 @@ package or service `pagination` overrides.
 
 The `log` procedure enriches `attributes` with OTel semantic-convention keys when available: `service.name`, `http.request.method`, `url.path`, `user_agent.original`, `client.address`, and `exception.message` / `exception.stacktrace` when called inside an exception handler.
 
+## User Activity
+
+Generated `defineService` handlers audit every POST, PUT, and DELETE outcome.
+Successful calls produce INFO records, rejected requests (4xx) WARN records, and
+server failures ERROR records. The event type is `<module>.<procedure>`.
+Records contain the server-verified `user.id` when authenticated, `event.name`,
+`event.outcome`, HTTP method and status, but never copy request bodies, passwords,
+cookies, tokens, or response credentials. Install `odbAudit` before the API packages.
+
+Authentication also records user-linked domain events after resolving the account:
+login (including Google, LDAP, and completed two-factor verification), logout,
+refresh, signup/confirmation, password recovery/reset, and Google identity linking.
+An unresolved anonymous request is not attributed to an arbitrary user.
+Anonymous recovery/signup requests use `target.user.id` rather than claiming the
+requester is authenticated. Admin status and role changes include both the actor
+and affected user.
+
+`user_id`, `target_user_id`, and `event_name` are generated projections of JSON
+attributes, not additional OTel LogRecord fields. User/time indexes accelerate
+activity queries; JSON remains their source of truth. `target.user.id` and
+`event.outcome` are application conventions, not claims of standardized OTel
+semantic keys. `event.name` is the application's message-type attribute; an OTLP
+exporter would map it to the LogRecord EventName field. These storage projections
+do not change the OTel logical data model.
+
+The admin user's Audit tab lists events performed by or affecting that account,
+newest first. `GET /admin/users/:id/audit` is admin-only and filters in SQL before
+cursor pagination. It accepts `severity` (comma-separated INFO/WARN/ERROR),
+`messageType` (case-insensitive event-name substring), `search` (message substring),
+and inclusive `from`/`to` UTC timestamps in `YYYY-MM-DDTHH:mm:ss.SSSZ` format.
+Invalid severities, timestamps and reversed intervals return 422.
+The table forwards opaque `cursor` tokens and `{ items, nextCursor }` unchanged.
+
+Service outcome records and domain events describe different layers. As with all
+audit calls, they survive a later caller rollback; a successful procedure call is
+not proof that an enclosing transaction was eventually committed.
+
 ## Expression Helpers
 
 | Helper                                       | PL/SQL                      | Notes                                     |

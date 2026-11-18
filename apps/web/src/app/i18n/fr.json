@@ -1,4 +1,8 @@
 {
+  "copy.to.clipboard": "Copier dans le presse-papiers",
+  "close": "Fermer",
+  "filter": "Filtrer",
+  "attributes": "Attributs",
   "home.title": "Accueil",
   "home.description": "Bienvenue à OdbVue",
   "auth.login": "Connexion",

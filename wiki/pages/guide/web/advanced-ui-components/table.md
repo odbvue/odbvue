@@ -84,6 +84,8 @@ Return the whole page through completion instead of maintaining page state in th
 ### Notes
 
 - Search, filter, sort, and page state can be persisted with `stateKey`.
+- Apply commits filter values and requests the first page. Clearing a field or
+  removing its chip removes that filter from the next request.
 - On mobile, the table switches to a stacked layout and uses `mobileItemsPerPage` when provided.
 - Column and action formatting use `OvFieldFormat` and `OvActionFormat` under the hood.
 - Row expansion only appears when the `expand` slot is provided.

@@ -136,6 +136,11 @@ export function defineAuthSignup(
             expiresAt: odbOracle.plus(odbOracle.sysTimestamp(), odbOracle.interval.days(1)),
           }),
       )
+      body.auditEvent('Signup requested', {
+        'target.user.id': userId,
+        'event.name': odbLiteral('auth.signup'),
+        'event.outcome': odbLiteral('success'),
+      })
       body.when('DUP_VAL_ON_INDEX', (handler) => {
         handler.rollback('odb_password_signup')
         handler.conflict('SIGNUP_EMAIL_EXISTS')
@@ -200,6 +205,11 @@ export function defineAuthSignup(
       body.query(
         odbQuery().deleteFrom(authConfirmations).where(cond.eq(authConfirmations.userId, userId)),
       )
+      body.auditEvent('Email confirmed', {
+        'user.id': userId,
+        'event.name': odbLiteral('auth.signup.confirm'),
+        'event.outcome': odbLiteral('success'),
+      })
       body.when('NO_DATA_FOUND', (handler) => handler.invalid('CONFIRMATION_INVALID'))
     },
   )

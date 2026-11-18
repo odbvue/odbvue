@@ -107,6 +107,32 @@ describe('service authorization generation', () => {
 })
 
 describe('odbAuth framework package', () => {
+  it('links session and anonymous account lifecycle events to resolved users without secrets', () => {
+    const sql = odbAuth.toSQLUp()
+    for (const event of [
+      'auth.login',
+      'auth.logout',
+      'auth.refresh',
+      'auth.signup',
+      'auth.signup.confirm',
+      'auth.password.recover',
+      'auth.password.reset',
+      'auth.google.link',
+      'auth.two_factor.start',
+      'auth.two_factor.recover',
+      'auth.two_factor.verify',
+    ]) {
+      expect(sql).toContain(`'event.name', '${event}'`)
+    }
+    expect(sql).toContain("odb_audit.info('Signed in', odb_audit.attributes('user.id', p_user_id")
+    expect(sql).toContain("'user.id', session_to_revoke.user_id")
+    expect(sql).toContain("odb_audit.warn('Sign-in rejected'")
+    const calls = sql.match(/odb_audit\.(info|warn)\([^;]+/g) ?? []
+    for (const call of calls) {
+      expect(call).not.toMatch(/password_hash|refresh_token|p_password|p_token|setup_secret/)
+    }
+  })
+
   it('preserves the declared foreign keys in fresh installs', () => {
     const install = odbAuth.toSQLUp({ schema: 'APP' })
     const constraints = [

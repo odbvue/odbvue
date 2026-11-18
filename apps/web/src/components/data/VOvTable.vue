@@ -685,7 +685,7 @@ const filterValue = computed(() => {
 async function handleFilterRemove(filterName: string, removedFilterValue?: unknown) {
   if (!options.filter) return
 
-  const selectedFilterField = options.filter.fields.find((f) => f.name === filterName)
+  const selectedFilterField = filterField.value.find((f) => f.name === filterName)
   if (!selectedFilterField) return
 
   if (Array.isArray(selectedFilterField.value)) {
@@ -721,7 +721,7 @@ function handleFilterShow() {
     formOptions.value.actionCancel = 'cancel'
   }
 
-  formData.value = options.filter.fields.reduce((acc, field) => {
+  formData.value = filterField.value.reduce((acc, field) => {
     acc[field.name] = field.value
     return acc
   }, {} as OvFormData)
@@ -885,9 +885,13 @@ function handleFilterCardMouseDown(event: Event) {
 async function handleFormSubmit(actionData: OvFormData) {
   if (formIsFilter.value) {
     Object.entries(actionData).forEach(([fieldName, fieldValue]) => {
-      if (fieldValue === undefined) return
-      const selectedFilterField = options.filter?.fields.find((f) => f.name === fieldName)
-      if (selectedFilterField) selectedFilterField.value = fieldValue
+      const selectedFilterField = filterField.value.find((f) => f.name === fieldName)
+      if (selectedFilterField) {
+        selectedFilterField.value =
+          fieldValue === undefined || fieldValue === null || fieldValue === ''
+            ? undefined
+            : fieldValue
+      }
     })
     await fetch('first')
     form.value = false

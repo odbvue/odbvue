@@ -4,6 +4,7 @@
     <v-tabs v-model="tab">
       <v-tab value="details">{{ t('admin.details') }}</v-tab>
       <v-tab value="permissions" :disabled="!user">{{ t('admin.permissions') }}</v-tab>
+      <v-tab value="audit" :disabled="!user">{{ t('admin.audit') }}</v-tab>
     </v-tabs>
     <v-tabs-window v-model="tab">
       <v-tabs-window-item value="details">
@@ -17,6 +18,9 @@
       </v-tabs-window-item>
       <v-tabs-window-item value="permissions">
         <UserPermissions v-if="user && permissionsOpened" :user-id="user.id" :is-self="isSelf" />
+      </v-tabs-window-item>
+      <v-tabs-window-item value="audit">
+        <UserAudit v-if="user && auditOpened" :key="user.id" :user-id="user.id" />
       </v-tabs-window-item>
     </v-tabs-window>
   </v-container>
@@ -33,6 +37,7 @@ import { useUi } from '@/capabilities/ui'
 import type { components } from '@/api/openapi.generated'
 import UserDetails from '@/modules/admin/components/UserDetails.vue'
 import UserPermissions from '@/modules/admin/components/UserPermissions.vue'
+import UserAudit from '@/modules/admin/components/UserAudit.vue'
 
 definePage({
   meta: {
@@ -50,8 +55,10 @@ const routing = useRouting()
 const ui = useUi()
 const tab = ref('details')
 const permissionsOpened = ref(false)
+const auditOpened = ref(false)
 watch(tab, (value) => {
   if (value === 'permissions') permissionsOpened.value = true
+  if (value === 'audit') auditOpened.value = true
 })
 const id = computedRouteParam(useRoute(), 'id')
 const user = ref<components['schemas']['AdminGetUserItemsItem']>()

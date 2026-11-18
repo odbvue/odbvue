@@ -39,17 +39,44 @@ function resolveI18nScopeFromPathname(pathname: string): I18nScope {
 
   const [moduleName = '', ...pageSegments] = normalizedPath.replace(/^\//, '').split('/')
   const moduleRoot = path.resolve(process.cwd(), 'src', 'modules', moduleName)
-  if (isDirectory(moduleRoot)) {
-    return {
-      type: 'page',
-      pageDir:
-        pageSegments.length === 0 ? moduleRoot : path.resolve(moduleRoot, 'pages', ...pageSegments),
+  const isModule = isDirectory(moduleRoot)
+  const pagesRoot = isModule
+    ? path.join(moduleRoot, 'pages')
+    : path.resolve(process.cwd(), 'src', 'app', 'pages')
+  const segments = isModule ? pageSegments : [moduleName, ...pageSegments]
+  while (segments.length) {
+    const pageDir = path.resolve(pagesRoot, ...segments)
+    if (
+      ['.vue', '.md'].some(
+        (extension) =>
+          existsSync(`${pageDir}${extension}`) ||
+          existsSync(path.join(pageDir, `index${extension}`)),
+      )
+    ) {
+      return { type: 'page', pageDir }
     }
+    segments.pop()
   }
 
-  const pagesRoot = path.resolve(process.cwd(), 'src', 'app', 'pages')
-  const pageDir = path.resolve(pagesRoot, normalizedPath.replace(/^\//, ''))
-  return isDirectory(pageDir) ? { type: 'page', pageDir } : { type: 'page', pageDir }
+  return isModule ? { type: 'page', pageDir: moduleRoot } : { type: 'shared' }
+}
+
+function catalogPatterns(appLocalesDir: string): string[] {
+  return [
+    `src/app/${appLocalesDir}/**/*.json`,
+    'src/app/pages/**/i18n/**/*.json',
+    'src/modules/*/i18n/**/*.json',
+    'src/modules/*/pages/**/i18n/**/*.json',
+  ]
+}
+
+function translationKeys(messages: unknown, prefix = ''): string[] {
+  if (!messages || typeof messages !== 'object' || Array.isArray(messages)) {
+    return prefix ? [prefix] : []
+  }
+  return Object.entries(messages).flatMap(([key, value]) =>
+    translationKeys(value, prefix ? `${prefix}.${key}` : key),
+  )
 }
 
 function getScopeKey(scope: I18nScope): string {
@@ -71,15 +98,7 @@ function getI18nPath(
 
 /** Adds OdbVue's generated-message and missing-key development plugins. */
 export function odbVueI18nPlugin(options: OdbVueI18nViteOptions = {}): PluginOption[] {
-  const {
-    appLocalesDir = 'i18n',
-    include = [
-      `src/app/${appLocalesDir}/**/*.json`,
-      'src/app/pages/**/i18n/**/*.json',
-      'src/modules/*/i18n/**/*.json',
-      'src/modules/*/pages/**/i18n/**/*.json',
-    ],
-  } = options
+  const { appLocalesDir = 'i18n', include = catalogPatterns(appLocalesDir) } = options
   return [VueI18nPlugin({ include }), i18nDevPlugin(options), i18nInventoryPlugin(options)]
 }
 
@@ -152,11 +171,13 @@ export function i18nDevPlugin(options: OdbVueI18nViteOptions = {}): Plugin {
     flushDelay = 500,
     i18nDir = 'i18n',
     appLocalesDir = 'i18n',
+    include = catalogPatterns(appLocalesDir),
   } = options
   const supportedLocales = new Set(locales)
   const i18nCache: I18nCache = new Map()
   let timer: NodeJS.Timeout | null = null
   let flushTimer: NodeJS.Timeout | null = null
+  let dumping = false
 
   function scheduleDump() {
     if (flushTimer) clearTimeout(flushTimer)
@@ -167,39 +188,63 @@ export function i18nDevPlugin(options: OdbVueI18nViteOptions = {}): Plugin {
   }
 
   async function dumpI18nData() {
-    if (i18nCache.size === 0) return
+    if (i18nCache.size === 0 || dumping) return
 
-    const fileGroups = new Map<string, Record<string, string>>()
-    for (const [, item] of i18nCache) {
-      const filePath = getI18nPath(item.scope, item.locale, i18nDir, appLocalesDir)
-      if (!fileGroups.has(filePath)) fileGroups.set(filePath, {})
-      fileGroups.get(filePath)![item.key] = item.value
-    }
-
-    await Promise.allSettled(
-      Array.from(fileGroups.entries()).map(async ([filePath, translations]) => {
-        const dir = path.dirname(filePath)
-        if (!existsSync(dir)) await fs.mkdir(dir, { recursive: true })
-
-        const currentData: Record<string, string> = existsSync(filePath)
-          ? JSON.parse(await fs.readFile(filePath, 'utf-8'))
-          : {}
-        const missingEntries = Object.fromEntries(
-          Object.entries(translations).filter(([key]) => currentData[key] === undefined),
+    dumping = true
+    try {
+      const knownKeys = new Map<string, Set<string>>()
+      for await (const file of fs.glob(include, { cwd: process.cwd() })) {
+        const locale = path.basename(file, '.json')
+        const keys = knownKeys.get(locale) ?? new Set<string>()
+        const messages: Record<string, unknown> = JSON.parse(
+          await fs.readFile(path.resolve(process.cwd(), file), 'utf-8'),
         )
+        for (const key of translationKeys(messages)) keys.add(key)
+        knownKeys.set(locale, keys)
+      }
 
-        if (Object.keys(missingEntries).length > 0) {
-          const tempPath = `${filePath}.tmp`
-          await fs.writeFile(
-            tempPath,
-            JSON.stringify({ ...currentData, ...missingEntries }, null, 2),
+      const pending = new Map(i18nCache)
+      const fileGroups = new Map<string, Record<string, string>>()
+      for (const [, item] of pending) {
+        if (knownKeys.get(item.locale)?.has(item.key)) continue
+        const filePath = getI18nPath(item.scope, item.locale, i18nDir, appLocalesDir)
+        if (!fileGroups.has(filePath)) fileGroups.set(filePath, {})
+        fileGroups.get(filePath)![item.key] = item.value
+      }
+
+      await Promise.all(
+        Array.from(fileGroups.entries()).map(async ([filePath, translations]) => {
+          const dir = path.dirname(filePath)
+
+          const currentData: Record<string, string> = existsSync(filePath)
+            ? JSON.parse(await fs.readFile(filePath, 'utf-8'))
+            : {}
+          const missingEntries = Object.fromEntries(
+            Object.entries(translations).filter(([key]) => currentData[key] === undefined),
           )
-          await fs.rename(tempPath, filePath)
-          console.log(`✅ [i18n] Updated: ${path.relative(process.cwd(), filePath)}`)
-        }
-      }),
-    )
-    i18nCache.clear()
+
+          if (Object.keys(missingEntries).length > 0) {
+            if (!existsSync(dir)) await fs.mkdir(dir, { recursive: true })
+            const tempPath = `${filePath}.tmp`
+            await fs.writeFile(
+              tempPath,
+              JSON.stringify({ ...currentData, ...missingEntries }, null, 2),
+            )
+            await fs.rename(tempPath, filePath)
+            console.log(`✅ [i18n] Updated: ${path.relative(process.cwd(), filePath)}`)
+          }
+        }),
+      )
+      for (const [key, item] of pending) {
+        if (i18nCache.get(key) === item) i18nCache.delete(key)
+      }
+    } catch (error) {
+      console.error('❌ [i18n] Unable to write missing translations:', error)
+      return
+    } finally {
+      dumping = false
+    }
+    if (i18nCache.size) scheduleDump()
   }
 
   return {

@@ -255,6 +255,11 @@ export function defineAuthGoogle(
           handler.ifThen(cond.ne(owner, userId), (then) => then.conflict('GOOGLE_IDENTITY_EXISTS'))
         })
       })
+      body.auditEvent('Google identity linked', {
+        'user.id': userId,
+        'event.name': odbLiteral('auth.google.link'),
+        'event.outcome': odbLiteral('success'),
+      })
     },
   )
 

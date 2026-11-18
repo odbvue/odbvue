@@ -20,6 +20,9 @@ export const auditLogs = odbTable('odb_audit_logs', (t) => ({
   severityText: t.string(SEVERITY_TEXT_LENGTH).notNull().default('INFO'),
   body: t.string(BODY_LENGTH).notNull(),
   attributes: t.json(),
+  userId: t.string(SERVICE_ATTRIBUTE_LENGTH).generatedAs(serviceAttribute('user.id')),
+  targetUserId: t.string(SERVICE_ATTRIBUTE_LENGTH).generatedAs(serviceAttribute('target.user.id')),
+  eventName: t.string(SERVICE_ATTRIBUTE_LENGTH).generatedAs(serviceAttribute('event.name')),
   serviceName: t.string(SERVICE_ATTRIBUTE_LENGTH).generatedAs(serviceAttribute('service.name')),
   serviceVersion: t
     .string(SERVICE_ATTRIBUTE_LENGTH)
@@ -29,4 +32,14 @@ export const auditLogs = odbTable('odb_audit_logs', (t) => ({
     expression.in(columns.severityText, SEVERITY_TEXTS),
   )
   .index('odb_audit_logs_ix_event', (columns) => [columns.eventTimestamp])
+  .index('odb_audit_logs_ix_user', (columns) => [
+    columns.userId,
+    columns.observedTimestamp,
+    columns.id,
+  ])
+  .index('odb_audit_logs_ix_target', (columns) => [
+    columns.targetUserId,
+    columns.observedTimestamp,
+    columns.id,
+  ])
   .comment('OpenTelemetry-aligned audit logs')

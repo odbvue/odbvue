@@ -147,6 +147,11 @@ export function defineAuthLogin(
           cond.isNull(userId),
         ]),
         (then) => {
+          then.auditWarn('Sign-in rejected', {
+            'user.id': userId,
+            'event.name': odbLiteral('auth.login'),
+            'event.outcome': odbLiteral('failure'),
+          })
           then.unauthorized('INVALID_CREDENTIALS')
         },
       )

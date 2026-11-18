@@ -17,7 +17,12 @@ import UserDetails from '@/modules/admin/pages/users/[id].vue'
 import Roles from '@/modules/admin/pages/roles/index.vue'
 import App from '@/app/App.vue'
 import messages from '@/modules/admin/i18n/en.json'
-import { renderViewItem, type OvTableOptions, type OvTableFetchRequest } from '@/components/api'
+import {
+  renderViewItem,
+  type OvTableOptions,
+  type OvTableFetchRequest,
+  type OvFilterValue,
+} from '@/components/api'
 
 const { get, put, putRole, authUser } = vi.hoisted(() => ({
   get: vi.fn<HttpClient['get']>(),
@@ -227,6 +232,98 @@ describe('admin page metadata', () => {
     expect(canAccessPage(policy, session(true, false))).toBe(false)
     expect(canAccessPage(policy, session(true, true))).toBe(true)
     expect(canShowPage(policy, session(true, true))).toBe(policy.navigation)
+  })
+})
+
+describe('admin user audit', () => {
+  async function openAudit() {
+    const { wrapper } = await setup(true)
+    expect(wrapper.findComponent(table).exists()).toBe(false)
+    await wrapper.get('button[role="tab"][value="audit"]').trigger('click')
+    return wrapper.findComponent(table)
+  }
+
+  it('loads audit lazily and forwards all filters and opaque cursor without changing the page', async () => {
+    const component = await openAudit()
+    const page = {
+      items: [{ id: 'audit-1', eventName: 'auth.login', body: 'Signed in', severityText: 'INFO' }],
+      nextCursor: 'opaque-audit-next',
+    }
+    get.mockResolvedValueOnce({ ...result(), data: page })
+    const complete = vi.fn<OvTableFetchRequest['complete']>()
+    const { signal } = new AbortController()
+    const from = '2026-11-01T10:00'
+    const to = '2026-11-18T12:00'
+    component.vm.$emit('fetch', {
+      cursor: 'opaque-audit-cursor',
+      limit: 1,
+      search: 'Signed',
+      filter: { severity: ['WARN', 'INFO'], messageType: ['auth.login'], from: [from], to: [to] },
+      signal,
+      complete,
+    } satisfies OvTableFetchRequest)
+    await flushPromises()
+    expect(get).toHaveBeenLastCalledWith(`/admin/users/${user.id}/audit`, {
+      query: {
+        cursor: 'opaque-audit-cursor',
+        limit: 1,
+        search: 'Signed',
+        severity: 'WARN,INFO',
+        messageType: 'auth.login',
+        from: new Date(from).toISOString(),
+        to: new Date(to).toISOString(),
+      },
+      signal,
+    })
+    expect(complete).toHaveBeenCalledExactlyOnceWith(page)
+    expect(component.props('options').itemsPerPage).toBeUndefined()
+    expect(component.props('options').mobileItemsPerPage).toBeUndefined()
+  })
+
+  it.each<OvFilterValue>([
+    { from: ['invalid-date'] },
+    { from: ['2026-11-18T12:00'], to: ['2026-11-01T10:00'] },
+  ])('reports an invalid interval without making a request: %j', async (filter) => {
+    const component = await openAudit()
+    const complete = vi.fn<OvTableFetchRequest['complete']>()
+    component.vm.$emit('fetch', {
+      limit: 5,
+      filter,
+      signal: new AbortController().signal,
+      complete,
+    } satisfies OvTableFetchRequest)
+    await flushPromises()
+    expect(get).toHaveBeenCalledTimes(1)
+    expect(complete).toHaveBeenCalledExactlyOnceWith()
+    expect(ui.notification.value).toMatchObject({
+      type: 'error',
+      message: 'admin.auditInvalidInterval',
+    })
+  })
+
+  it('reports load failures but ignores failures from cancelled requests', async () => {
+    const component = await openAudit()
+    const complete = vi.fn<OvTableFetchRequest['complete']>()
+    get.mockResolvedValueOnce(failure(403))
+    component.vm.$emit('fetch', {
+      limit: 5,
+      signal: new AbortController().signal,
+      complete,
+    } satisfies OvTableFetchRequest)
+    await flushPromises()
+    expect(ui.notification.value).toMatchObject({ type: 'error', message: 'admin.loadAuditError' })
+    expect(complete).toHaveBeenCalledExactlyOnceWith()
+    ui.clear()
+    complete.mockClear()
+    const pending = Promise.withResolvers<HttpResponse<unknown>>()
+    get.mockReturnValueOnce(pending.promise)
+    const controller = new AbortController()
+    component.vm.$emit('fetch', { limit: 5, signal: controller.signal, complete })
+    controller.abort()
+    pending.resolve(failure(500))
+    await flushPromises()
+    expect(complete).toHaveBeenCalledExactlyOnceWith()
+    expect(ui.notification.value).toBeUndefined()
   })
 })
 
@@ -563,6 +660,7 @@ describe('admin user details', () => {
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual([
       messages['admin.details'],
       messages['admin.permissions'],
+      messages['admin.audit'],
     ])
     expect(get).toHaveBeenCalledTimes(1)
     expect(component.props('options').items).toHaveLength(6)

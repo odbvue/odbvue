@@ -527,6 +527,12 @@ export class OrdsEndpoint {
       )
       .join(', ')
     const protectedEndpoint = this._auth !== undefined && this._auth !== 'anonymous'
+    const auditMutation = this._auth !== undefined && this.effectiveMethod !== 'GET'
+    const auditEvent = `${this.module}.${this.procedureName.toLowerCase()}`
+    const audit = (severity: string, outcome: string, responseStatus: string) =>
+      auditMutation
+        ? `odb_audit.log(${severity}, ${sqlStr(auditEvent)}, odb_audit.attributes('user.id', ${protectedEndpoint ? 'v_auth_user_id' : 'NULL'}, 'event.name', ${sqlStr(auditEvent)}, 'event.outcome', ${sqlStr(outcome)}, 'http.request.method', ${sqlStr(this.effectiveMethod)}, 'http.response.status_code', TO_CHAR(${responseStatus}))); `
+        : ''
     const declarations = [
       ...(this._cursorPage
         ? [
@@ -645,12 +651,17 @@ export class OrdsEndpoint {
           'END LOOP;',
         ].join(' ')
       : ''
-    const call = `${normalizeBody}${this.cursorPageSetup}${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args});${this._responseStatus === undefined ? '' : ` :status_code := ${this._responseStatus};`}${jsonResponse ? ` ${jsonResponse}` : ''}`
+    const call = `${normalizeBody}${this.cursorPageSetup}${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args});${this._responseStatus === undefined ? '' : ` :status_code := ${this._responseStatus};`}${jsonResponse ? ` ${jsonResponse}` : ''} ${audit("'INFO'", 'success', String(this._responseStatus ?? 200))}`
     const envelope = "'ODB_HTTP\\|([4-5][0-9]{2})\\|([A-Z][A-Z0-9_]{0,99})'"
     const status = `REGEXP_SUBSTR(SQLERRM, ${envelope}, 1, 1, NULL, 1)`
     const code = `REGEXP_SUBSTR(SQLERRM, ${envelope}, 1, 1, NULL, 2)`
     const explicitResponse = [
       `:status_code := TO_NUMBER(${status});`,
+      audit(
+        `CASE WHEN TO_NUMBER(${status}) < 500 THEN 'WARN' ELSE 'ERROR' END`,
+        'failure',
+        `TO_NUMBER(${status})`,
+      ),
       "owa_util.mime_header('application/json', FALSE);",
       'owa_util.http_header_close;',
       `htp.p(JSON_OBJECT('code' VALUE ${code}));`,
@@ -663,12 +674,14 @@ export class OrdsEndpoint {
       .join(' ')
     const odbErrorResponse = [
       `:status_code := CASE ${odbKind} ${odbStatus} ELSE 500 END;`,
+      audit(`CASE WHEN :status_code < 500 THEN 'WARN' ELSE 'ERROR' END`, 'failure', ':status_code'),
       "owa_util.mime_header('application/json', FALSE);",
       'owa_util.http_header_close;',
       `htp.p(JSON_OBJECT('code' VALUE ${odbCode}));`,
     ].join(' ')
     const fallbackResponse = [
       ':status_code := 500;',
+      audit("'ERROR'", 'failure', '500'),
       "owa_util.mime_header('application/json', FALSE);",
       'owa_util.http_header_close;',
       `htp.p('{"code":"INTERNAL_SERVER_ERROR"}');`,

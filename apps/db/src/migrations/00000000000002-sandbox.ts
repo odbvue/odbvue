@@ -3,6 +3,7 @@ import {
   defineMigration,
   defineService,
   odbAudit,
+  odbAuditPackage,
   odbAuth,
   odbEnv,
   odbHttp,
@@ -12,6 +13,7 @@ import {
   odbEmails,
   odbAcl,
   odbOracle,
+  odbLiteral,
   odbType,
   PlsqlStatement,
   type Package,
@@ -324,19 +326,25 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
   for (const severity of ['info', 'warn', 'error'] as const) {
     const writeAudit = pkg.proc(
       `audit_${severity}`,
-      { in: { message: odbAudit.types.body } },
-      ({ params: { message }, body }) => {
+      { in: { message: odbAudit.types.body, userId: odbAuth.types.userId } },
+      ({ params: { message, userId }, body }) => {
+        const attributes = odbAuditPackage.attributes(
+          odbLiteral('user.id'),
+          userId,
+          odbLiteral('event.name'),
+          odbLiteral(`sandbox.audit.${severity}`),
+        )
         body.ifThen(cond.isNull(message), (then) => then.invalid('AUDIT_MESSAGE_REQUIRED'))
         if (severity === 'error') {
           body.block((inner) => {
             inner.invalid('SANDBOX_AUDIT_ERROR')
             inner.whenOthers((handler) => {
-              handler.call(odbAudit.error(message))
+              handler.call(odbAudit.error(message, attributes))
               handler.call(new PlsqlStatement('RAISE'))
             })
           })
         } else {
-          body.call(odbAudit[severity](message))
+          body.call(odbAudit[severity](message, attributes))
         }
       },
     )
@@ -349,6 +357,7 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
           ? 'Raise and audit a sandbox error'
           : `Write an audit ${severity} entry`,
       body: { message: writeAudit.parameters.message },
+      context: { userId: writeAudit.parameters.userId },
     })
   }
   const listStorage = pkg.proc(

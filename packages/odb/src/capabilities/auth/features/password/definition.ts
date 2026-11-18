@@ -84,6 +84,11 @@ export function defineAuthPassword(
             expiresAt: odbOracle.plus(odbOracle.sysTimestamp(), odbOracle.interval.seconds(3600)),
           }),
       )
+      body.auditEvent('Password recovery requested', {
+        'target.user.id': userId,
+        'event.name': odbLiteral('auth.password.recover'),
+        'event.outcome': odbLiteral('success'),
+      })
     },
   )
 
@@ -181,6 +186,11 @@ export function defineAuthPassword(
         odbQuery().deleteFrom(authChallenges).where(cond.eq(authChallenges.userId, userId)),
       )
       body.call(odbRateLimitApi.success(odbLiteral('AUTH_LOGIN_USERNAME'), odbOracle.lower(email)))
+      body.auditEvent('Password reset', {
+        'user.id': userId,
+        'event.name': odbLiteral('auth.password.reset'),
+        'event.outcome': odbLiteral('success'),
+      })
       body.when('NO_DATA_FOUND', (handler) => handler.invalid('PASSWORD_RESET_INVALID'))
     },
   )

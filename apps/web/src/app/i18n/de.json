@@ -1,4 +1,8 @@
 {
+  "copy.to.clipboard": "In die Zwischenablage kopieren",
+  "close": "Schließen",
+  "filter": "Filtern",
+  "attributes": "Attribute",
   "home.title": "Startseite",
   "home.description": "Willkommen bei OdbVue",
   "auth.login": "Anmelden",
