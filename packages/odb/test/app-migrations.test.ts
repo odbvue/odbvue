@@ -162,28 +162,63 @@ describe('app-owned ORDS migrations', () => {
     )
   })
 
-  it('audits every exposed mutation without copying credentials or request bodies', async () => {
+  it('automatically audits only exceptions mapped to 5xx on both reads and mutations', async () => {
+    const failureMessages = new Map([
+      ['auth.refresh', 'Refresh failed'],
+      ['auth.change_password', 'Change password failed'],
+      ['admin.list_audit', 'List audit failed'],
+    ])
+    const checkedEvents = new Set<string>()
     for (const loadModule of Object.values(migrations).slice(1)) {
       for (const app of (await loadModule()).migration.applications()) {
         for (const endpoint of compileApplicationEndpoints(app)) {
           const node = endpoint.toNode()
-          if (node.method === 'GET') continue
-          const auditCalls = node.source.match(/odb_audit\.log\([^;]+/g) ?? []
-          expect(auditCalls.length).toBe(4)
-          expect(auditCalls[0]).toContain("'INFO'")
-          expect(auditCalls[0]).toContain("'event.outcome', 'success'")
-          expect(auditCalls[1]).toContain("'WARN' ELSE 'ERROR'")
-          expect(auditCalls.at(-1)).toContain("'ERROR'")
-          for (const call of auditCalls) {
-            expect(call).not.toMatch(/v_body|:body|p_password|p_refresh_token|:cookie|:code/i)
-            expect(call).toContain("'event.name'")
-            expect(call).toContain("'http.request.method'")
+          const [normalPath, exceptionPath] = node.source.split('EXCEPTION WHEN OTHERS THEN ')
+          expect(normalPath).not.toContain('odb_audit.log(')
+          expect(exceptionPath.match(/odb_audit\.log\(/g)).toHaveLength(1)
+          const [audit] =
+            exceptionPath.match(
+              /IF :status_code BETWEEN 500 AND 599 THEN odb_audit\.log\([^;]+; END IF;/,
+            ) ?? []
+          expect(audit).toBeDefined()
+          const event = `${node.module}.${node.procedureName.toLowerCase()}`
+          const failureMessage = failureMessages.get(event)
+          if (failureMessage) {
+            checkedEvents.add(event)
+            expect(audit).toContain(`odb_audit.log('ERROR', '${failureMessage}'`)
           }
-          if (node.auth !== 'anonymous') {
-            expect(auditCalls[0]).toContain("'user.id', v_auth_user_id")
-          }
+          expect(audit).not.toMatch(/v_body|:body|p_password|p_refresh_token|:cookie|:code/i)
+          expect(audit).toContain(
+            `'user.id', ${node.auth === 'anonymous' ? 'NULL' : 'v_auth_user_id'}`,
+          )
+          expect(audit).toContain(`'event.name', '${event}'`)
+          expect(audit).toContain("'event.outcome', 'failure'")
+          expect(audit).toContain(`'http.request.method', '${node.method}'`)
+          expect(audit).toContain("'http.response.status_code', TO_CHAR(:status_code)")
+          expect(audit).toContain(
+            "'exception.stacktrace', SUBSTR(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, 1, 2000)",
+          )
+          const response = exceptionPath.slice(exceptionPath.indexOf(audit) + audit.length)
+          expect(response).toContain("htp.p(JSON_OBJECT('code' VALUE v_error_code))")
+          expect(response).not.toMatch(/SQLERRM|BACKTRACE|stacktrace/i)
         }
       }
+    }
+    expect(checkedEvents).toEqual(new Set(failureMessages.keys()))
+  })
+
+  it('preserves readable, user-linked session events in the auth package', async () => {
+    const domain = (await load('00000000000000-bootstrap')).compile().up().join('\n')
+    for (const [message, actor] of [
+      ['Signed in', 'p_user_id'],
+      ['Two-factor challenge started', 'l_user_id'],
+      ['Recovery code consumed; authenticator enrollment required', 'l_user_id'],
+      ['Session refreshed', 'l_user_id'],
+      ['Signed out', 'session_to_revoke.user_id'],
+    ]) {
+      expect(domain).toContain(
+        `odb_audit.info('${message}', odb_audit.attributes('user.id', ${actor}`,
+      )
     }
   })
 

@@ -133,15 +133,16 @@ describe('odbHttp framework package', () => {
   it('maps explicit errors and unexpected exceptions to JSON responses', () => {
     const source = odbOrdsEndpoint('test', 'api', 'limited').toNode().source
 
-    expect(source).toContain('IF SQLCODE = -20999 THEN')
+    expect(source).toMatch(/IF SQLCODE = -20999 AND REGEXP_SUBSTR\(SQLERRM, .* IS NOT NULL THEN/)
     expect(source).toContain(':status_code := TO_NUMBER(REGEXP_SUBSTR(SQLERRM')
-    expect(source).toContain("htp.p(JSON_OBJECT('code' VALUE REGEXP_SUBSTR(SQLERRM")
+    expect(source).toContain('v_error_code := REGEXP_SUBSTR(SQLERRM')
     expect(source).not.toContain('RETURNING CLOB')
-    expect(source).toContain('ELSIF SQLCODE = -20998 THEN')
+    expect(source).toMatch(/ELSIF SQLCODE = -20998 AND REGEXP_SUBSTR\(SQLERRM, .* IS NOT NULL THEN/)
     expect(source).toContain("WHEN 'NOT_FOUND' THEN 404")
     expect(source).toContain("WHEN 'CONFLICT' THEN 409")
     expect(source).toContain("WHEN 'UNAUTHORIZED' THEN 401")
     expect(source).toContain(':status_code := 500;')
-    expect(source).toContain(`htp.p('{"code":"INTERNAL_SERVER_ERROR"}');`)
+    expect(source).toContain("v_error_code := 'INTERNAL_SERVER_ERROR';")
+    expect(source).toContain("htp.p(JSON_OBJECT('code' VALUE v_error_code));")
   })
 })

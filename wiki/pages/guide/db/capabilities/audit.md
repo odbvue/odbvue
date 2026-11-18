@@ -75,12 +75,14 @@ The `log` procedure enriches `attributes` with OTel semantic-convention keys whe
 
 ## User Activity
 
-Generated `defineService` handlers audit every POST, PUT, and DELETE outcome.
-Successful calls produce INFO records, rejected requests (4xx) WARN records, and
-server failures ERROR records. The event type is `<module>.<procedure>`.
-Records contain the server-verified `user.id` when authenticated, `event.name`,
-`event.outcome`, HTTP method and status, but never copy request bodies, passwords,
-cookies, tokens, or response credentials. Install `odbAudit` before the API packages.
+Generated `defineService` handlers automatically audit exceptions that result in
+HTTP 5xx responses, for reads as well as mutations. The final exception handler
+records an ERROR with a readable procedure name (for example, `Refresh failed`),
+the event type (`auth.refresh`), HTTP method and status, and the Oracle backtrace
+in `exception.stacktrace`. Records include the server-verified `user.id` when
+available. The handler does not attach request or response payloads, and the
+backtrace stays in audit details rather than in the HTTP response. Install
+`odbAudit` before the API packages.
 
 Authentication also records user-linked domain events after resolving the account:
 login (including Google, LDAP, and completed two-factor verification), logout,
@@ -89,6 +91,12 @@ An unresolved anonymous request is not attributed to an arbitrary user.
 Anonymous recovery/signup requests use `target.user.id` rather than claiming the
 requester is authenticated. Admin status and role changes include both the actor
 and affected user.
+
+Successes and expected rejections (4xx) are business decisions: procedures use
+the `body.audit*` helpers to log the events that matter. For example, a successful
+refresh emits the user-linked `Session refreshed` event, and a sign-out that
+does not match an unrevoked session emits no success event. Existing audit rows
+are not changed.
 
 `user_id`, `target_user_id`, and `event_name` are generated projections of JSON
 attributes, not additional OTel LogRecord fields. User/time indexes accelerate

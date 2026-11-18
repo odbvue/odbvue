@@ -310,7 +310,7 @@ describe('ODB application contract', () => {
       paths: Record<string, Record<string, any>>
     }
 
-    expect(sql).toContain('DECLARE v_body CLOB := :body_text;')
+    expect(sql).toContain('v_body CLOB := :body_text;')
     expect(sql).toContain(
       "p_username => JSON_VALUE(v_body, ''$.username'' RETURNING VARCHAR2(32767))",
     )

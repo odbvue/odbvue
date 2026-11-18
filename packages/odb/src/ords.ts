@@ -527,13 +527,18 @@ export class OrdsEndpoint {
       )
       .join(', ')
     const protectedEndpoint = this._auth !== undefined && this._auth !== 'anonymous'
-    const auditMutation = this._auth !== undefined && this.effectiveMethod !== 'GET'
     const auditEvent = `${this.module}.${this.procedureName.toLowerCase()}`
-    const audit = (severity: string, outcome: string, responseStatus: string) =>
-      auditMutation
-        ? `odb_audit.log(${severity}, ${sqlStr(auditEvent)}, odb_audit.attributes('user.id', ${protectedEndpoint ? 'v_auth_user_id' : 'NULL'}, 'event.name', ${sqlStr(auditEvent)}, 'event.outcome', ${sqlStr(outcome)}, 'http.request.method', ${sqlStr(this.effectiveMethod)}, 'http.response.status_code', TO_CHAR(${responseStatus}))); `
-        : ''
+    const operation = toKebabCase(this.procedureName).replace(/-/g, ' ')
+    const failureMessage = `${operation.charAt(0).toUpperCase()}${operation.slice(1)} failed`
+    const auditServerError =
+      this._auth === undefined
+        ? ''
+        : `IF :status_code BETWEEN 500 AND 599 THEN odb_audit.log('ERROR', ${sqlStr(failureMessage)}, odb_audit.attributes('user.id', ${protectedEndpoint ? 'v_auth_user_id' : 'NULL'}, 'event.name', ${sqlStr(auditEvent)}, 'event.outcome', 'failure', 'http.request.method', ${sqlStr(this.effectiveMethod)}, 'http.response.status_code', TO_CHAR(:status_code), 'exception.stacktrace', SUBSTR(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, 1, 2000))); END IF; `
+    const parseJsonBody = this._params.some(
+      (param) => this.paramSourceType(param) === 'BODY' && param.odbType === 'clob',
+    )
     const declarations = [
+      'v_error_code VARCHAR2(100);',
       ...(this._cursorPage
         ? [
             'v_page_limit NUMBER;',
@@ -593,14 +598,10 @@ export class OrdsEndpoint {
       )
         ? ['v_body CLOB := :body_text;']
         : []),
-      ...(this._params.some(
-        (param) => this.paramSourceType(param) === 'BODY' && param.odbType === 'clob',
-      )
-        ? ['v_body_json JSON_OBJECT_T := JSON_OBJECT_T.parse(v_body);']
-        : []),
+      ...(parseJsonBody ? ['v_body_json JSON_OBJECT_T;'] : []),
       ...(protectedEndpoint ? ['v_auth_user_id VARCHAR2(32);'] : []),
     ]
-    const declaration = declarations.length ? `DECLARE ${declarations.join(' ')} ` : ''
+    const declaration = `DECLARE ${declarations.join(' ')} `
     const authorization = protectedEndpoint
       ? `v_auth_user_id := odb_auth.require_user(${odbHttp.bearerToken(':odb_authorization').toSQL()}); `
       : ''
@@ -621,7 +622,9 @@ export class OrdsEndpoint {
       : ''
     const normalizeBody = binaryBody
       ? 'IF v_binary_body IS NULL THEN DBMS_LOB.CREATETEMPORARY(v_binary_body, TRUE, DBMS_LOB.CALL); END IF; '
-      : ''
+      : parseJsonBody
+        ? 'v_body_json := JSON_OBJECT_T.parse(v_body); '
+        : ''
     const jsonResponse = this.nativeJsonResponse
       ? [
           ...this.nativeCursorOutputs.flatMap((p) => this.cursorJsonStatements(p)),
@@ -651,40 +654,25 @@ export class OrdsEndpoint {
           'END LOOP;',
         ].join(' ')
       : ''
-    const call = `${normalizeBody}${this.cursorPageSetup}${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args});${this._responseStatus === undefined ? '' : ` :status_code := ${this._responseStatus};`}${jsonResponse ? ` ${jsonResponse}` : ''} ${audit("'INFO'", 'success', String(this._responseStatus ?? 200))}`
+    const call = `${normalizeBody}${this.cursorPageSetup}${this.packageName.toLowerCase()}.${this.procedureName.toLowerCase()}(${args});${this._responseStatus === undefined ? '' : ` :status_code := ${this._responseStatus};`}${jsonResponse ? ` ${jsonResponse}` : ''}`
     const envelope = "'ODB_HTTP\\|([4-5][0-9]{2})\\|([A-Z][A-Z0-9_]{0,99})'"
     const status = `REGEXP_SUBSTR(SQLERRM, ${envelope}, 1, 1, NULL, 1)`
     const code = `REGEXP_SUBSTR(SQLERRM, ${envelope}, 1, 1, NULL, 2)`
-    const explicitResponse = [
-      `:status_code := TO_NUMBER(${status});`,
-      audit(
-        `CASE WHEN TO_NUMBER(${status}) < 500 THEN 'WARN' ELSE 'ERROR' END`,
-        'failure',
-        `TO_NUMBER(${status})`,
-      ),
-      "owa_util.mime_header('application/json', FALSE);",
-      'owa_util.http_header_close;',
-      `htp.p(JSON_OBJECT('code' VALUE ${code}));`,
-    ].join(' ')
     const odbEnvelope = "'ODB_ERROR\\|([A-Z][A-Z0-9_]{0,99})\\|([A-Z][A-Z0-9_]{0,99})'"
     const odbKind = `REGEXP_SUBSTR(SQLERRM, ${odbEnvelope}, 1, 1, NULL, 1)`
     const odbCode = `REGEXP_SUBSTR(SQLERRM, ${odbEnvelope}, 1, 1, NULL, 2)`
     const odbStatus = Object.entries(ODB_ERROR_STATUS)
       .map(([kind, httpStatus]) => `WHEN '${kind}' THEN ${httpStatus}`)
       .join(' ')
-    const odbErrorResponse = [
-      `:status_code := CASE ${odbKind} ${odbStatus} ELSE 500 END;`,
-      audit(`CASE WHEN :status_code < 500 THEN 'WARN' ELSE 'ERROR' END`, 'failure', ':status_code'),
-      "owa_util.mime_header('application/json', FALSE);",
+    const errorResponse = [
+      `IF SQLCODE = -20999 AND ${status} IS NOT NULL THEN`,
+      `:status_code := TO_NUMBER(${status}); v_error_code := ${code};`,
+      `ELSIF SQLCODE = ${ODB_ERROR_NUMBER} AND ${odbCode} IS NOT NULL THEN`,
+      `:status_code := CASE ${odbKind} ${odbStatus} ELSE 500 END; v_error_code := ${odbCode};`,
+      `ELSE :status_code := 500; v_error_code := 'INTERNAL_SERVER_ERROR'; END IF;`,
+      `${auditServerError}owa_util.mime_header('application/json', FALSE);`,
       'owa_util.http_header_close;',
-      `htp.p(JSON_OBJECT('code' VALUE ${odbCode}));`,
-    ].join(' ')
-    const fallbackResponse = [
-      ':status_code := 500;',
-      audit("'ERROR'", 'failure', '500'),
-      "owa_util.mime_header('application/json', FALSE);",
-      'owa_util.http_header_close;',
-      `htp.p('{"code":"INTERNAL_SERVER_ERROR"}');`,
+      `htp.p(JSON_OBJECT('code' VALUE v_error_code));`,
     ].join(' ')
     const closeCursors = this.nativeCursorOutputs
       .map((p) => {
@@ -692,7 +680,7 @@ export class OrdsEndpoint {
         return `IF ${name}%ISOPEN THEN CLOSE ${name}; END IF;`
       })
       .join(' ')
-    return `${declaration}BEGIN ${authorization}${enforcement}${call} EXCEPTION WHEN OTHERS THEN ${closeCursors ? `${closeCursors} ` : ''}IF SQLCODE = -20999 THEN ${explicitResponse} ELSIF SQLCODE = ${ODB_ERROR_NUMBER} THEN ${odbErrorResponse} ELSE ${fallbackResponse} END IF; END;`
+    return `${declaration}BEGIN ${authorization}${enforcement}${call} EXCEPTION WHEN OTHERS THEN ${closeCursors ? `${closeCursors} ` : ''}${errorResponse} END;`
   }
 
   private paramSourceType(param: OrdsParam): OrdsParamNode['sourceType'] {
