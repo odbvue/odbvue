@@ -46,7 +46,9 @@ The Admin module exposes user browsing at `/admin/users` and user tabs at
 `/admin/users/:id/audit`. The list uses `v-ov-table` and details use a static
 `v-ov-view`. These pages and the
 `GET /admin/users` and `GET /admin/users/:id` services require the `admin` role.
-Migration `00000000000003_admin` owns the blue/green `pck_admin` package.
+Migration `00000000000003_admin` owns the blue/green `pck_admin` package, including
+both audit endpoints. The standalone `/admin/audit` page resolves account names in
+the audit query without a separate database view.
 Apply it through the normal `ov db migrate` workflow before using the module;
 deployment refreshes the OpenAPI manifest consumed by the web application's
 HTTP authentication policy. The list uses an exclusive user-ID cursor,

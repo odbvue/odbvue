@@ -13,6 +13,7 @@ import {
   odbLiteral,
   odbPackage,
   odbQuery,
+  odbTable,
   odbType,
   plsqlExpr,
   type Package,
@@ -532,6 +533,167 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
     response: { items: listUserAudit.parameters.items },
   })
 
+  // Describe the inline query's row shape for typed keyset pagination.
+  const auditEvents = odbTable('audit_events', (t) => ({
+    id: t.guid().primaryKey(),
+    observedTimestamp: t.timestamp().notNull(),
+    eventTimestamp: t.timestamp().notNull(),
+    severityText: t.string(30).notNull(),
+    eventName: t.string(255),
+    body: t.string(2000).notNull(),
+    userId: t.string(255),
+    targetUserId: t.string(255),
+    attributes: t.json(),
+    username: t.string(128),
+    displayName: t.string(256),
+  }))
+
+  function auditEventsQuery() {
+    const logs = auditLogs.as('logs')
+    const actor = authUsers.as('actor')
+    const target = authUsers.as('target')
+    const hasActor = cond.isNotNull(actor.id)
+    return odbQuery()
+      .selectFrom(logs)
+      .leftJoin(actor, cond.eq(actor.id, logs.userId))
+      .leftJoin(target, cond.eq(target.id, logs.targetUserId))
+      .select([
+        logs.id,
+        logs.observedTimestamp,
+        logs.eventTimestamp,
+        logs.severityText,
+        logs.eventName,
+        logs.body,
+        logs.userId,
+        logs.targetUserId,
+        logs.attributes,
+      ])
+      .selectAs(
+        odbOracle.caseWhen(hasActor, actor.username, target.username, 'VARCHAR2'),
+        actor.username,
+      )
+      .selectAs(
+        odbOracle.caseWhen(hasActor, actor.displayName, target.displayName, 'VARCHAR2'),
+        actor.displayName,
+      )
+  }
+
+  const listAudit = pkg.proc(
+    'list_audit',
+    {
+      in: {
+        after: odbType.json(),
+        limit: odbType.integer(),
+        search: odbType.string(256),
+        severity: odbType.string(64),
+        from: odbType.string(24),
+        to: odbType.string(24),
+        messageType: odbType.string(255),
+        userId: odbType.guid(),
+      },
+      out: { items: odbType.resultset() },
+    },
+    ({
+      params: { after, limit, userId, severity, from, to, messageType, search, items },
+      body,
+    }) => {
+      const { fromTimestamp, toTimestamp } = body.variables({
+        fromTimestamp: odbType.timestamp(),
+        toTimestamp: odbType.timestamp(),
+      })
+      body.ifThen(
+        cond.and([
+          cond.isNotNull(severity),
+          cond.not(cond.regexpLike(severity, '^(ERROR|WARN|INFO)(,(ERROR|WARN|INFO))*$')),
+        ]),
+        (invalid) => invalid.invalid('ADMIN_AUDIT_SEVERITY_INVALID'),
+      )
+      body.block((dates) => {
+        for (const [value, target] of [
+          [from, fromTimestamp],
+          [to, toTimestamp],
+        ] as const) {
+          dates.ifThen(
+            cond.and([
+              cond.isNotNull(value),
+              cond.not(
+                cond.regexpLike(
+                  value,
+                  '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.][0-9]{3}Z$',
+                ),
+              ),
+            ]),
+            (invalid) => invalid.invalid('ADMIN_AUDIT_DATE_INVALID'),
+          )
+          dates.set(
+            target,
+            plsqlExpr.call(
+              'TIMESTAMP',
+              'TO_TIMESTAMP',
+              value,
+              odbLiteral('FXYYYY-MM-DD"T"HH24:MI:SS.FF3"Z"'),
+            ),
+          )
+        }
+        dates.whenOthers((invalid) => invalid.invalid('ADMIN_AUDIT_DATE_INVALID'))
+      })
+      body.ifThen(cond.gt(fromTimestamp, toTimestamp), (invalid) =>
+        invalid.invalid('ADMIN_AUDIT_INTERVAL_INVALID'),
+      )
+      const term = odbOracle.lower(odbOracle.trim(search))
+      const type = odbOracle.lower(odbOracle.trim(messageType))
+      const page = odbQuery()
+        .selectFromSubquery(auditEvents, auditEventsQuery())
+        .where(
+          cond.and([
+            cond.or([
+              cond.isNull(userId),
+              cond.eq(auditEvents.userId, userId),
+              cond.eq(auditEvents.targetUserId, userId),
+            ]),
+            cond.or([
+              cond.isNull(severity),
+              cond.gt(
+                odbOracle.instr(
+                  plsqlExpr.concat(',', severity, ','),
+                  plsqlExpr.concat(',', auditEvents.severityText, ','),
+                ),
+                0,
+              ),
+            ]),
+            cond.or([
+              cond.isNull(fromTimestamp),
+              cond.gte(auditEvents.eventTimestamp, fromTimestamp),
+            ]),
+            cond.or([cond.isNull(toTimestamp), cond.lte(auditEvents.eventTimestamp, toTimestamp)]),
+            cond.or([
+              cond.isNull(type),
+              cond.gt(odbOracle.instr(odbOracle.lower(auditEvents.eventName), type), 0),
+            ]),
+            cond.or([
+              cond.isNull(term),
+              cond.gt(odbOracle.instr(odbOracle.lower(auditEvents.body), term), 0),
+            ]),
+          ]),
+        )
+        .orderBy(auditEvents.observedTimestamp, 'desc')
+        .orderBy(auditEvents.id, 'desc')
+        .paginate({ cursor: after, limit })
+      body.openFor(items, page)
+    },
+  )
+  const { after, limit, severity, search, from, to, messageType, userId, items } =
+    listAudit.parameters
+  defineService(listAudit, {
+    auth: { roles: ['admin'] },
+    module: 'admin',
+    basePath: '/admin',
+    method: 'GET',
+    path: '/audit/events',
+    summary: 'List global audit activity, optionally filtered by actor or affected user',
+    query: { cursor: after, limit, severity, search, from, to, messageType, userId },
+    response: { items },
+  })
   return {}
 })
 

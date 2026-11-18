@@ -6,6 +6,7 @@
   "admin.details": "Details",
   "admin.permissions": "Berechtigungen",
   "admin.audit": "Aktivitätsprotokoll",
+  "admin.auditDescription": "Audit-Ereignisse nach Benutzer, Schweregrad, Typ oder Datum durchsuchen und filtern.",
   "admin.auditTime": "Zeitpunkt",
   "admin.auditSeverity": "Schweregrad",
   "admin.auditMessageType": "Meldungstyp",

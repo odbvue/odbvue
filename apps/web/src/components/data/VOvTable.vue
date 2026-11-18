@@ -37,7 +37,7 @@
                         start
                         @click:close="handleFilterRemove(chip.name, chip.value)"
                       >
-                        <strong>{{ chip.value }}</strong
+                        <strong>{{ chip.displayValue ?? chip.value }}</strong
                         >&nbsp;({{ chip.label }})
                       </v-chip>
 
@@ -649,6 +649,7 @@ const filterChips = computed(() => {
       label: t(field.label || field.name),
       icon: '$mdiFilter',
       color: 'primary',
+      displayValue: undefined as string | undefined,
     }
 
     if (Array.isArray(field.value)) {
@@ -657,10 +658,27 @@ const filterChips = computed(() => {
         .map((value) => ({ ...baseChip, value }))
     }
 
+    const configuredField = options.filter?.fields.find((item) => item.name === field.name)
     const displayValue =
-      field.type === 'datetime' ? String(field.value).replace('T', ' ') : field.value
-
-    return field.value !== undefined ? [{ ...baseChip, value: displayValue }] : []
+      configuredField?.type === 'autocomplete' && 'items' in configuredField
+        ? configuredField.items?.find(
+            (item) => typeof item !== 'string' && item.value === field.value,
+          )
+        : undefined
+    return field.value !== undefined
+      ? [
+          {
+            ...baseChip,
+            value: field.value,
+            displayValue:
+              field.type === 'datetime'
+                ? String(field.value).replace('T', ' ')
+                : typeof displayValue === 'object'
+                  ? displayValue.title
+                  : undefined,
+          },
+        ]
+      : []
   })
 })
 
@@ -705,7 +723,11 @@ async function handleFilterRemove(filterName: string, removedFilterValue?: unkno
 
 function handleFilterShow() {
   if (!options.filter) return
-  formOptions.value = JSON.parse(JSON.stringify(options.filter))
+  formOptions.value = {
+    ...options.filter,
+    fields: options.filter.fields.map((field) => ({ ...field })),
+    actions: options.filter.actions?.slice(),
+  }
 
   if (!formOptions.value.actions) {
     formOptions.value.actions = []

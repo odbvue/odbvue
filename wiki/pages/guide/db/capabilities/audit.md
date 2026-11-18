@@ -106,6 +106,13 @@ and inclusive `from`/`to` UTC timestamps in `YYYY-MM-DDTHH:mm:ss.SSSZ` format.
 Invalid severities, timestamps and reversed intervals return 422.
 The table forwards opaque `cursor` tokens and `{ items, nextCursor }` unchanged.
 
+The standalone **Admin → Audit** page uses `GET /admin/audit/events` to list all
+events with the same filters and cursor pagination. It shows the actor's username
+and display name, falling back to the affected account when the actor cannot be
+resolved. Events without a matching account are still listed. The user autocomplete
+searches by username or display name; selecting a user filters for both actions
+they performed and actions that affected them.
+
 Service outcome records and domain events describe different layers. As with all
 audit calls, they survive a later caller rollback; a successful procedure call is
 not proof that an enclosing transaction was eventually committed.

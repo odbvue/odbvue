@@ -37,6 +37,7 @@ type OrderByClause = {
 }
 
 type JoinClause = {
+  keyword: 'JOIN' | 'LEFT JOIN'
   table: string | NamedRef
   on: ExpressionNode
 }
@@ -119,7 +120,10 @@ export class SelectQueryBuilder<
   private _schema?: string
   private _pagination?: CursorQueryMetadata
 
-  constructor(private readonly _table: string | NamedRef) {}
+  constructor(
+    private readonly _table: string | NamedRef,
+    private readonly _sourceQuery?: SelectQuery<unknown>,
+  ) {}
 
   /** Qualify a table reference with the given schema (no-op for raw strings). */
   resolveSchema(schema: string): this {
@@ -127,10 +131,14 @@ export class SelectQueryBuilder<
     return this
   }
 
-  private tableName(): string {
+  private fromSQL(ctx: BindContext | undefined, schema: string | undefined): string {
+    if (this._sourceQuery) {
+      const sourceSql = this._sourceQuery.renderSQL(this._sourceQuery.projectionSQL(), ctx, schema)
+      return `(${sourceSql}) ${refName(this._table)}`
+    }
     if (typeof this._table === 'string') return this._table
-    if (this._table instanceof Table) return this._table.queryName(this._schema)
-    return this._schema ? `${this._schema}.${this._table.name}` : this._table.name
+    if (this._table instanceof Table) return this._table.queryName(schema)
+    return schema ? `${schema}.${this._table.name}` : this._table.name
   }
 
   join<TJoin extends Table<any>>(
@@ -146,20 +154,37 @@ export class SelectQueryBuilder<
     table: string | NamedRef | Table<any>,
     on: ((eb: ExpressionBuilder) => ExpressionNode) | SqlPredicate,
   ): SelectQueryBuilder<any, TResult, THasSelection> {
+    this.addJoin('JOIN', table, on)
+    return this
+  }
+
+  leftJoin<TJoin extends Table<any>>(
+    table: TJoin,
+    on: ((eb: ExpressionBuilder) => ExpressionNode) | SqlPredicate,
+  ): SelectQueryBuilder<TTable | TJoin, TResult, THasSelection> {
+    this.addJoin('LEFT JOIN', table, on)
+    return this as SelectQueryBuilder<TTable | TJoin, TResult, THasSelection>
+  }
+
+  private addJoin(
+    keyword: JoinClause['keyword'],
+    table: string | NamedRef,
+    on: ((eb: ExpressionBuilder) => ExpressionNode) | SqlPredicate,
+  ): void {
     this._joins.push({
-      table: table as string | NamedRef,
+      keyword,
+      table,
       on:
         typeof on === 'function'
           ? on(odbExpr)
           : { kind: 'raw', sql: on.toQuerySQL?.() ?? on.toSQL() },
     })
-    return this as SelectQueryBuilder<any, TResult, THasSelection>
   }
 
-  private joinedTableName(table: string | NamedRef): string {
+  private joinedTableName(table: string | NamedRef, schema: string | undefined): string {
     if (typeof table === 'string') return table
-    if (table instanceof Table) return table.queryName(this._schema)
-    return this._schema ? `${this._schema}.${table.name}` : table.name
+    if (table instanceof Table) return table.queryName(schema)
+    return schema ? `${schema}.${table.name}` : table.name
   }
 
   select<TColumn extends TableColumn<TTable>>(
@@ -378,43 +403,16 @@ export class SelectQueryBuilder<
   }
 
   compile(): CompiledQuery {
-    const bindings: Record<string, unknown> = {}
-    const cols = this._columns.length > 0 ? this._columns.join(', ') : '*'
-    let sql = `SELECT ${cols}`
-
-    if (this._into) {
-      sql += ` INTO ${this._into}`
-    }
-
-    sql += ` FROM ${this.tableName()}`
-
-    const ctx = new BindContext('w')
-    for (const join of this._joins) {
-      sql += ` JOIN ${this.joinedTableName(join.table)} ON ${compileNode(join.on, ctx)}`
-    }
-
-    const whereNode = combinePredicates(this._where)
-    if (whereNode) {
-      sql += ` WHERE ${compileNode(whereNode, ctx)}`
-    }
-    Object.assign(bindings, ctx.bindings)
-
-    if (this._orderBy.length > 0) {
-      const parts = this._orderBy.map((o) => `${o.column} ${o.direction.toUpperCase()}`)
-      sql += ` ORDER BY ${parts.join(', ')}`
-    }
-
-    if (this._limit !== undefined) {
-      sql += ` FETCH FIRST ${this.limitSql()} ROWS ONLY`
-    }
-    if (this._forUpdate) sql += this._nowait ? ' FOR UPDATE NOWAIT' : ' FOR UPDATE'
-
-    return { sql, bindings }
+    const ctx = new BindContext()
+    return { sql: this.renderSQL(this.projectionSQL(), ctx), bindings: ctx.bindings }
   }
 
   toSQL(): string {
-    const cols = this._columns.length > 0 ? this._columns.join(', ') : '*'
-    return this.renderSQL(cols)
+    return this.renderSQL(this.projectionSQL())
+  }
+
+  private projectionSQL(): string {
+    return this._columns.length > 0 ? this._columns.join(', ') : '*'
   }
 
   /** Render typed cursor projections with case-preserving camelCase JSON field names. */
@@ -428,15 +426,17 @@ export class SelectQueryBuilder<
     return this.renderSQL(columns.join(', '))
   }
 
-  private renderSQL(cols: string): string {
+  private renderSQL(cols: string, ctx?: BindContext, inheritedSchema?: string): string {
+    const schema = this._schema ?? inheritedSchema
+    const render = (node: ExpressionNode) => (ctx ? compileNode(node, ctx) : renderNode(node))
     let sql = `SELECT ${cols}`
     if (this._into) sql += ` INTO ${this._into}`
-    sql += ` FROM ${this.tableName()}`
+    sql += ` FROM ${this.fromSQL(ctx, schema)}`
     for (const join of this._joins) {
-      sql += ` JOIN ${this.joinedTableName(join.table)} ON ${renderNode(join.on)}`
+      sql += ` ${join.keyword} ${this.joinedTableName(join.table, schema)} ON ${render(join.on)}`
     }
     const whereNode = combinePredicates(this._where)
-    if (whereNode) sql += ` WHERE ${renderNode(whereNode)}`
+    if (whereNode) sql += ` WHERE ${render(whereNode)}`
     if (this._orderBy.length > 0) {
       const parts = this._orderBy.map((o) => `${o.column} ${o.direction.toUpperCase()}`)
       sql += ` ORDER BY ${parts.join(', ')}`
@@ -855,6 +855,14 @@ export class OdbQuery {
   selectFrom(table: string | NamedRef): SelectQueryBuilder
   selectFrom(table: string | NamedRef | Table<any>): SelectQueryBuilder<any> {
     return new SelectQueryBuilder(table as string | NamedRef)
+  }
+
+  /** Use a typed row descriptor as the alias and column metadata for an inline query. */
+  selectFromSubquery<TTable extends Table<any>>(
+    row: TTable,
+    query: SelectQuery<unknown>,
+  ): SelectQueryBuilder<TTable> {
+    return new SelectQueryBuilder(row, query)
   }
 
   insertInto<TTable extends Table<any>>(table: TTable): InsertQueryBuilder<TTable>

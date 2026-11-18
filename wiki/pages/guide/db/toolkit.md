@@ -208,8 +208,10 @@ The helper supports typed, single-table queries and selected, non-null ordering
 columns of string, GUID, number, boolean, date or timestamp type. Ordering must
 end in a unique non-null tie-breaker; all columns of a composite primary key
 must be included. With no ordering, a single primary key can be inferred.
-Nullable sort keys, joins, raw ordering expressions and oversized string keys
-are rejected explicitly rather than guessed. Add ordering before `paginate()`;
+Nullable sort keys, direct joins, raw ordering expressions and oversized string keys
+are rejected explicitly rather than guessed. For a joined result whose ordering
+keys stay unique, use `selectFromSubquery()` with a typed row descriptor and
+paginate the outer query. Add ordering before `paginate()`;
 the helper owns the query limit. Timestamp cursors retain microsecond precision.
 
 Tokens are versioned and bound to the endpoint, ordering, authenticated user,

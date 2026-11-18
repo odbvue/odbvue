@@ -6,6 +6,7 @@
   "admin.details": "Details",
   "admin.permissions": "Permissions",
   "admin.audit": "Audit",
+  "admin.auditDescription": "Review and filter audit events by user, severity, type, or date.",
   "admin.auditTime": "Time",
   "admin.auditSeverity": "Severity",
   "admin.auditMessageType": "Message type",

@@ -172,6 +172,28 @@ describe('odbQuery', () => {
     })
   })
 
+  it('binds values across a typed inline query with a left join', () => {
+    const logs = odbTable('logs', (t) => ({ id: t.number(), userId: t.number() })).as('l')
+    const users = odbTable('users', (t) => ({ id: t.number() })).as('u')
+    const rows = odbTable('audit_rows', (t) => ({ id: t.number() }))
+    const source = odbQuery()
+      .selectFrom(logs)
+      .leftJoin(users, (e) => e.and([e(users.id, '=', logs.userId), e(users.id, '>', 1)]))
+      .select(logs.id)
+    const query = odbQuery()
+      .selectFromSubquery(rows, source)
+      .resolveSchema('APP')
+      .where(rows.id, '>', 10)
+
+    expect(query.compile()).toEqual({
+      sql: 'SELECT * FROM (SELECT l.id FROM APP.logs l LEFT JOIN APP.users u ON u.id = l.user_id AND u.id > :w0) audit_rows WHERE id > :w1',
+      bindings: { w0: 1, w1: 10 },
+    })
+    expect(query.toCursorSQL()).toBe(
+      'SELECT id AS "id" FROM (SELECT l.id FROM APP.logs l LEFT JOIN APP.users u ON u.id = l.user_id AND u.id > 1) audit_rows WHERE id > 10',
+    )
+  })
+
   it('renders SELECT INTO for multiple typed targets', () => {
     const users = odbTable('APP_USERS', (t) => ({
       id: t.number('ID').notNull(),

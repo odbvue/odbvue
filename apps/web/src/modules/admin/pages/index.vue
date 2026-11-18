@@ -19,6 +19,15 @@
           hover
         />
       </v-col>
+      <v-col cols="12" md="6">
+        <v-card
+          to="/admin/audit"
+          prepend-icon="$mdiClipboardTextClock"
+          :title="t('admin.audit')"
+          :text="t('admin.auditDescription')"
+          hover
+        />
+      </v-col>
     </v-row>
   </v-container>
 </template>

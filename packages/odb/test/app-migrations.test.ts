@@ -43,7 +43,11 @@ describe('app-owned ORDS migrations', () => {
       'GET',
       'PUT',
       'GET',
+      'GET',
     ])
+    expect(new Set(endpoints.map((endpoint) => endpoint.toNode().module))).toEqual(
+      new Set(['admin']),
+    )
     for (const endpoint of endpoints.slice(0, 3)) {
       const node = endpoint.toNode()
       expect(node.source).toContain("odb_auth.has_role(v_auth_user_id, 'admin')")
@@ -85,6 +89,7 @@ describe('app-owned ORDS migrations', () => {
       '/admin/users/{id}/roles',
       '/admin/users/{id}/roles/available',
       '/admin/users/{id}/audit',
+      '/admin/audit/events',
     ])
     expect(document.paths['/admin/users']?.get?.parameters.map((param) => param.name)).toEqual([
       'cursor',
@@ -109,7 +114,9 @@ describe('app-owned ORDS migrations', () => {
 
   it('filters user audit in SQL before a stable newest-first cursor page', async () => {
     const { adminPackage, migration } = await migrations['00000000000003-admin']()
-    const endpoint = compileApplicationEndpoints(adminPackage.application()).at(-1)!.toNode()
+    const endpoint = compileApplicationEndpoints(adminPackage.application())
+      .find((candidate) => candidate.effectivePattern === 'users/:id/audit')!
+      .toNode()
     expect(endpoint.source).toContain("odb_auth.has_role(v_auth_user_id, 'admin')")
     expect(endpoint.source).toContain("'nextCursor' VALUE")
     const sql = migration.compile().up().join('\n')
@@ -131,6 +138,28 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain("'user.id', p_actor_id")
     expect(sql).toContain("'event.name', 'admin.user.role'")
     expect(sql).toContain("'event.name', 'admin.user.status'")
+  })
+
+  it('keeps global audit admin-only and paginates after filtering either user role', async () => {
+    const { adminPackage, migration } = await migrations['00000000000003-admin']()
+    const node = compileApplicationEndpoints(adminPackage.application())
+      .find((endpoint) => endpoint.effectivePattern === 'audit/events')!
+      .toNode()
+    expect(node.source).toContain("odb_auth.has_role(v_auth_user_id, 'admin')")
+    expect(node.source).toContain("'username' VALUE")
+    expect(node.source).toContain("'displayName' VALUE")
+    expect(node.source).toContain("'nextCursor' VALUE")
+    const sql = migration.compile().up().join('\n')
+    expect(sql).not.toContain('CREATE OR REPLACE VIEW')
+    expect(sql).toContain('FROM (SELECT logs.id, logs.observed_timestamp')
+    expect(sql).toContain('LEFT JOIN odb_auth_users actor ON actor.id = logs.user_id')
+    expect(sql).toContain('LEFT JOIN odb_auth_users target ON target.id = logs.target_user_id')
+    expect(sql).toContain(
+      'CASE WHEN actor.id IS NOT NULL THEN actor.display_name ELSE target.display_name END AS display_name',
+    )
+    expect(sql).toMatch(
+      /p_user_id IS NULL OR user_id = p_user_id OR target_user_id = p_user_id[\s\S]*ORDER BY observed_timestamp DESC, id DESC FETCH FIRST/,
+    )
   })
 
   it('audits every exposed mutation without copying credentials or request bodies', async () => {

@@ -6,6 +6,7 @@
   "admin.details": "Détails",
   "admin.permissions": "Autorisations",
   "admin.audit": "Journal d'audit",
+  "admin.auditDescription": "Consulter et filtrer les événements d'audit par utilisateur, gravité, type ou date.",
   "admin.auditTime": "Date et heure",
   "admin.auditSeverity": "Gravité",
   "admin.auditMessageType": "Type de message",

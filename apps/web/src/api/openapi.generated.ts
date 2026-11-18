@@ -727,6 +727,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/audit/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List global audit activity, optionally filtered by actor or affected user */
+        get: operations["admin_list_audit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -980,6 +997,26 @@ export interface components {
         };
         AdminListUserAuditResponse: {
             items: components["schemas"]["AdminListUserAuditItemsItem"][];
+            /** @description Opaque continuation token; absent when pagination is exhausted. */
+            nextCursor?: string;
+        };
+        AdminListAuditItemsItem: {
+            id: string;
+            /** Format: date-time */
+            observedTimestamp: string;
+            /** Format: date-time */
+            eventTimestamp: string;
+            severityText: string;
+            eventName?: string | null;
+            body: string;
+            userId?: string | null;
+            targetUserId?: string | null;
+            attributes?: unknown;
+            username?: string | null;
+            displayName?: string | null;
+        };
+        AdminListAuditResponse: {
+            items: components["schemas"]["AdminListAuditItemsItem"][];
             /** @description Opaque continuation token; absent when pagination is exhausted. */
             nextCursor?: string;
         };
@@ -2731,6 +2768,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminListUserAuditResponse"];
+                };
+            };
+            /** @description Invalid limit, cursor, or cursor query context */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient authorization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    admin_list_audit: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                search?: string;
+                severity?: string;
+                from?: string;
+                to?: string;
+                messageType?: string;
+                userId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminListAuditResponse"];
                 };
             };
             /** @description Invalid limit, cursor, or cursor query context */

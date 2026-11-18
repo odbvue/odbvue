@@ -1,9 +1,16 @@
 import { describe, it, expect, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { VBtn } from 'vuetify/components'
+import VOvForm from '@/components/forms/VOvForm.vue'
 import VOvTable from '@/components/data/VOvTable.vue'
 import { globalPlugins } from '../../support/components.setup'
-import type { OvTableOptions, OvTableData, OvTableFetchRequest, OvTablePage } from '@/components'
+import type {
+  OvFormSelectionField,
+  OvTableOptions,
+  OvTableData,
+  OvTableFetchRequest,
+  OvTablePage,
+} from '@/components'
 import type { HttpResponse } from '@/capabilities/http/core'
 import { useUi } from '@/capabilities/ui'
 import { createState } from '@/capabilities/state'
@@ -74,6 +81,46 @@ function mountManagedTable(options: OvTableOptions = baseOptions) {
 }
 
 describe('VOvTable', () => {
+  it('passes async autocomplete to the filter dialog and uses the selected label on its chip', async () => {
+    const fetchItems = vi
+      .fn<NonNullable<OvFormSelectionField['fetchItems']>>()
+      .mockResolvedValue([{ title: 'Ada (ada@example.test)', value: 'ada-id' }])
+    const wrapper = mount(VOvTable, {
+      props: {
+        items: sampleData,
+        options: {
+          ...baseOptions,
+          filter: {
+            fields: [
+              {
+                type: 'autocomplete',
+                name: 'userId',
+                value: 'ada-id',
+                items: [{ title: 'Ada (ada@example.test)', value: 'ada-id' }],
+                fetchItems,
+              },
+            ],
+          },
+        },
+      },
+      global: {
+        plugins: globalPlugins,
+        stubs: { VDialog: { template: '<div><slot /></div>' } },
+      },
+    })
+    try {
+      expect(wrapper.text()).toContain('Ada (ada@example.test)')
+      expect(wrapper.text()).not.toContain('ada-id')
+      const filterButton = wrapper
+        .findAllComponents(VBtn)
+        .find((button) => button.props('icon') === '$mdiFilterPlus')!
+      await filterButton.trigger('click')
+      expect(wrapper.getComponent(VOvForm).props('options').fields[0]).toMatchObject({ fetchItems })
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it.each([
     { width: 1440, limit: 5 },
     { width: 480, limit: 1 },

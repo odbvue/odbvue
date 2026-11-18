@@ -17,6 +17,7 @@ import UserDetails from '@/modules/admin/pages/users/[id].vue'
 import UserDetailsTab from '@/modules/admin/pages/users/[id]/index.vue'
 import UserPermissionsTab from '@/modules/admin/pages/users/[id]/permissions.vue'
 import UserAuditTab from '@/modules/admin/pages/users/[id]/audit.vue'
+import Audit from '@/modules/admin/pages/audit/index.vue'
 import Roles from '@/modules/admin/pages/roles/index.vue'
 import App from '@/app/App.vue'
 import messages from '@/modules/admin/i18n/en.json'
@@ -25,6 +26,7 @@ import {
   type OvTableOptions,
   type OvTableFetchRequest,
   type OvFilterValue,
+  type OvFormSelectionField,
 } from '@/components/api'
 
 const { get, put, putRole, authUser } = vi.hoisted(() => ({
@@ -102,7 +104,7 @@ const pages = import.meta.glob<string>('@/modules/admin/pages/**/*.vue', {
 const wrappers: ReturnType<typeof mount>[] = []
 const ui = useUi()
 
-async function setup(page: boolean | 'roles' | 'permissions' | 'audit' = false) {
+async function setup(page: boolean | 'roles' | 'permissions' | 'audit' | 'global-audit' = false) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -121,14 +123,17 @@ async function setup(page: boolean | 'roles' | 'permissions' | 'audit' = false) 
         ],
       },
       { path: '/admin/roles', component: Roles },
+      { path: '/admin/audit', component: Audit },
     ],
   })
   await router.push(
-    page === 'roles'
-      ? '/admin/roles'
-      : page
-        ? `/admin/users/${user.id}${page === 'permissions' || page === 'audit' ? `/${page}` : ''}`
-        : '/admin/users',
+    page === 'global-audit'
+      ? '/admin/audit'
+      : page === 'roles'
+        ? '/admin/roles'
+        : page
+          ? `/admin/users/${user.id}${page === 'permissions' || page === 'audit' ? `/${page}` : ''}`
+          : '/admin/users',
   )
   const wrapper = mount(App, {
     global: {
@@ -237,8 +242,8 @@ afterEach(() => {
 })
 
 describe('admin page metadata', () => {
-  it('discovers the landing page, users list, user details, and roles list', () => {
-    expect(Object.keys(pages)).toHaveLength(7)
+  it('discovers the landing page, users list, user details, roles list, and global audit', () => {
+    expect(Object.keys(pages)).toHaveLength(8)
   })
 
   it.each(Object.entries(pages))('restricts %s to administrators', (path, source) => {
@@ -257,6 +262,62 @@ describe('admin page metadata', () => {
     expect(canAccessPage(policy, session(true, false))).toBe(false)
     expect(canAccessPage(policy, session(true, true))).toBe(true)
     expect(canShowPage(policy, session(true, true))).toBe(policy.navigation)
+  })
+})
+
+describe('admin global audit', () => {
+  it('lists unfiltered events and filters by a user selected through username or display name search', async () => {
+    const { wrapper } = await setup('global-audit')
+    const component = wrapper.findComponent(table)
+    const options: OvTableOptions = component.props('options')
+    expect(options.columns).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'username' }),
+        expect.objectContaining({ name: 'displayName' }),
+      ]),
+    )
+    const page = {
+      items: [{ id: 'audit-1', body: 'Signed in', username: user.username }],
+      nextCursor: 'next',
+    }
+    const complete = vi.fn<OvTableFetchRequest['complete']>()
+    const { signal } = new AbortController()
+    get.mockResolvedValueOnce({ ...result(), data: page })
+    component.vm.$emit('fetch', { limit: 5, signal, complete } satisfies OvTableFetchRequest)
+    await flushPromises()
+    expect(get).toHaveBeenLastCalledWith('/admin/audit/events', {
+      query: expect.objectContaining({ userId: undefined, limit: 5 }),
+      signal,
+    })
+    expect(complete).toHaveBeenCalledExactlyOnceWith(page)
+
+    const userFilter = options.filter?.fields.find(
+      (field): field is OvFormSelectionField =>
+        field.type === 'autocomplete' && field.name === 'userId',
+    )
+    expect(await userFilter?.fetchItems?.('Ada')).toEqual([
+      { value: user.id, title: `Ada (${user.username})` },
+    ])
+    expect(get).toHaveBeenLastCalledWith('/admin/users', { query: { search: 'Ada', limit: 25 } })
+
+    get.mockResolvedValueOnce({ ...result(), data: page })
+    component.vm.$emit('fetch', {
+      cursor: 'next',
+      limit: 5,
+      filter: { userId: [user.id], severity: ['INFO'], messageType: ['auth.login'] },
+      signal,
+      complete,
+    } satisfies OvTableFetchRequest)
+    await flushPromises()
+    expect(get).toHaveBeenLastCalledWith('/admin/audit/events', {
+      query: expect.objectContaining({
+        cursor: 'next',
+        userId: user.id,
+        severity: 'INFO',
+        messageType: 'auth.login',
+      }),
+      signal,
+    })
   })
 })
 
