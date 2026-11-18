@@ -628,10 +628,6 @@ describe('admin user details', () => {
     expect(complete).toHaveBeenCalledExactlyOnceWith(page)
     const saved = Promise.withResolvers<HttpResponse<unknown>>()
     putRole.mockReturnValueOnce(saved.promise)
-    refetchTable.mockImplementationOnce(async () => {
-      expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
-      return true
-    })
     available.vm.$emit('action', 'admin.addRole', page.items, editor)
     await flushPromises()
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true)

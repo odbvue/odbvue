@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, useTemplateRef } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useHttp } from '@/capabilities/http'
 import { useUi } from '@/capabilities/ui'
@@ -199,7 +199,6 @@ async function setRole(role: string, assigned: boolean) {
     if (assigned) showAvailable.value = false
     if (!result.ok) return
 
-    if (assigned) await nextTick()
     ui.success(assigned ? 'admin.roleAdded' : 'admin.roleRemoved')
     await assignedTable.value?.fetch('first')
   } finally {
