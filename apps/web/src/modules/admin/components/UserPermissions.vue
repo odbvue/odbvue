@@ -1,5 +1,18 @@
 <template>
   <div ref="assigned-area">
+    <v-alert
+      v-if="assignedLoadFailed"
+      class="mb-3"
+      type="error"
+      variant="tonal"
+      :text="t('admin.loadRolesError')"
+    >
+      <template #append>
+        <v-btn variant="text" @click="assignedTable?.fetch('first')">
+          {{ t('admin.retryRoles') }}
+        </v-btn>
+      </template>
+    </v-alert>
     <v-ov-table
       ref="assigned"
       :options="assignedOptions"
@@ -11,18 +24,11 @@
     v-model="showAvailable"
     :title="t('admin.availableRoles')"
     :persistent="saving"
+    :closeable="!saving"
     scrollable
-    closeable
     @after-leave="restoreAddFocus"
   >
     <template #content>
-      <v-alert
-        v-if="availableSaveError !== undefined"
-        class="mb-3"
-        type="error"
-        variant="tonal"
-        :text="availableSaveErrorMessage"
-      />
       <v-alert
         v-if="availableLoadFailed"
         class="mb-3"
@@ -58,10 +64,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, useTemplateRef } from 'vue'
+import { computed, nextTick, ref, useTemplateRef, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useHttp } from '@/capabilities/http'
-import { useNotificationMessage, useUi } from '@/capabilities/ui'
+import { useUi } from '@/capabilities/ui'
 import type { components, operations } from '@/api/openapi.generated'
 import type { OvTableFetchRequest, OvTableOptions } from '@/components/api'
 
@@ -81,9 +87,8 @@ const assignedArea = useTemplateRef('assigned-area')
 const assignedTable = useTemplateRef('assigned')
 const availableTable = useTemplateRef('available')
 const showAvailable = ref(false)
+const assignedLoadFailed = ref(false)
 const availableLoadFailed = ref(false)
-const availableSaveError = ref<string>()
-const availableSaveErrorMessage = useNotificationMessage(availableSaveError)
 const confirmRemoval = ref(false)
 const roleToRemove = ref('')
 const saving = ref(false)
@@ -148,31 +153,36 @@ const availableOptions = computed<OvTableOptions>(() => ({
   ],
 }))
 
-async function loadRolePage(path: string, { cursor, limit, search, signal }: OvTableFetchRequest) {
-  const { data, error } = await http.get<RolePage>(path, {
-    query: { cursor, limit, search },
-    signal,
-  })
-  if (signal.aborted) return
-  if (error || !data) throw new Error('admin.loadRolesError')
-  return data
-}
-
-async function fetchAssigned(request: OvTableFetchRequest) {
-  const result = await ui.action(`admin.users.roles.list:${endpoint.value}`, () =>
-    loadRolePage(endpoint.value, request),
-  )
-  request.complete(result.ok ? result.data : undefined)
-}
-
-async function fetchAvailable(request: OvTableFetchRequest) {
-  availableLoadFailed.value = false
+async function fetchRolePage(
+  path: string,
+  { cursor, limit, search, signal, complete }: OvTableFetchRequest,
+  failed: Ref<boolean>,
+) {
+  if (signal.aborted) return complete()
+  failed.value = false
+  let page: RolePage | undefined
   try {
-    request.complete(await loadRolePage(`${endpoint.value}/available`, request))
+    const { data, error } = await http.get<RolePage>(path, {
+      query: { cursor, limit, search },
+      signal,
+    })
+    if (!error && data) page = data
   } catch {
-    if (!request.signal.aborted) availableLoadFailed.value = true
-    request.complete()
+    if (!signal.aborted) failed.value = true
+    return complete()
   }
+  if (signal.aborted) return complete()
+  if (page) return complete(page)
+  failed.value = true
+  complete()
+}
+
+function fetchAssigned(request: OvTableFetchRequest) {
+  return fetchRolePage(endpoint.value, request, assignedLoadFailed)
+}
+
+function fetchAvailable(request: OvTableFetchRequest) {
+  return fetchRolePage(`${endpoint.value}/available`, request, availableLoadFailed)
 }
 
 function restoreAddFocus() {
@@ -192,7 +202,6 @@ function onAssignedAction(action: string, _rows: unknown, row?: unknown) {
   if (saving.value) return
   if (action === 'admin.addRole') {
     availableLoadFailed.value = false
-    availableSaveError.value = undefined
     showAvailable.value = true
     return
   }
@@ -204,19 +213,14 @@ function onAssignedAction(action: string, _rows: unknown, row?: unknown) {
   confirmRemoval.value = true
 }
 
-async function onAvailableAction(action: string, _rows: unknown, row?: unknown) {
+function onAvailableAction(action: string, _rows: unknown, row?: unknown) {
   if (action !== 'admin.addRole' || saving.value) return
   const role = roleFromRow(row)
   if (!role) {
     showAvailable.value = false
     return ui.error('admin.updateRoleError')
   }
-  availableSaveError.value = undefined
-  const failure = await setRole(role, true)
-  if (failure) {
-    const { error } = failure
-    availableSaveError.value = error instanceof Error ? error.message : String(error)
-  }
+  return setRole(role, true)
 }
 
 async function setRole(role: string, assigned: boolean) {
@@ -229,12 +233,10 @@ async function setRole(role: string, assigned: boolean) {
       const { error } = await http.put(endpoint.value, payload)
       if (error) throw new Error('admin.updateRoleError')
     })
-    if (!result.ok) return result
+    if (assigned) showAvailable.value = false
+    if (!result.ok) return
 
-    if (assigned) {
-      showAvailable.value = false
-      await nextTick()
-    }
+    if (assigned) await nextTick()
     ui.success(assigned ? 'admin.roleAdded' : 'admin.roleRemoved')
     await assignedTable.value?.fetch('first')
   } finally {

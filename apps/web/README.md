@@ -95,10 +95,11 @@ regenerate the deployed OpenAPI manifest and web types after deployment.
 
 The **Permissions** tab shows a searchable table of assigned roles and validity dates. Its
 **Add role** (+) table action opens a searchable table of roles not already assigned. Add one role
-at a time; the picker closes after the save attempt so feedback is visible on the page, and focus
-returns to the **Add role** button. Loading and retry feedback for the available list stay inside
-the picker. Both tables use server-side cursor paging; neither loads the full catalog. Admins can remove assignments after
-confirmation, but cannot remove their own `admin` role.
+at a time; the picker closes after the save succeeds or fails, and a global alert reports the
+result. Focus returns to the **Add role** button. List errors and manual retries stay beside the
+affected table (inside the picker for available roles). Retrying a list load does not repeat the
+save. Both tables use server-side cursor paging; neither loads the full catalog. Admins can remove
+assignments after confirmation, but cannot remove their own `admin` role.
 
 **Admin → Roles** is a read-only table searchable by role name or description, with five roles per
 page on desktop and one on mobile.
