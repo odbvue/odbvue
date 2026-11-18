@@ -633,7 +633,7 @@ describe('admin user details', () => {
     available.vm.$emit('action', 'admin.addRole', page.items, editor)
     await flushPromises()
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
-    expect(ui.loading.active.value).toBe(false)
+    expect(ui.loading.has('admin.users.roles.save')).toBe(true)
     expect(refetchTable).not.toHaveBeenCalled()
     saved.resolve({ data: null, error: null, status: 204, headers: null })
     await flushPromises()
@@ -643,7 +643,7 @@ describe('admin user details', () => {
     expect(ui.notification.value).toMatchObject({ type: 'success', message: 'admin.roleAdded' })
   })
 
-  it('closes the picker on failure to display the page error and does not reload roles', async () => {
+  it('shows a save failure in the picker and lets the user retry without reopening it', async () => {
     const { wrapper } = await setup(true)
     await wrapper.get('button[role="tab"][value="permissions"]').trigger('click')
     wrapper.findComponent(table).vm.$emit('action', 'admin.addRole', [], {})
@@ -654,12 +654,26 @@ describe('admin user details', () => {
     putRole.mockResolvedValueOnce(failure(500))
     available.vm.$emit('action', 'admin.addRole', [editor], editor)
     await flushPromises()
-    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(wrapper.get('[role="dialog"] [role="alert"]').text()).toBe(
+      messages['admin.updateRoleError'],
+    )
     expect(refetchTable).not.toHaveBeenCalled()
     expect(ui.notification.value).toMatchObject({
       type: 'error',
       message: 'admin.updateRoleError',
     })
+
+    const retry = Promise.withResolvers<HttpResponse<unknown>>()
+    putRole.mockReturnValueOnce(retry.promise)
+    available.vm.$emit('action', 'admin.addRole', [editor], editor)
+    await flushPromises()
+    expect(wrapper.get('[role="dialog"]').find('[role="alert"]').exists()).toBe(false)
+    expect(refetchTable).not.toHaveBeenCalled()
+    retry.resolve({ data: null, error: null, status: 204, headers: null })
+    await flushPromises()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(refetchTable).toHaveBeenCalledExactlyOnceWith('first')
+    expect(ui.notification.value).toMatchObject({ type: 'success', message: 'admin.roleAdded' })
   })
 
   it('confirms removal and refreshes the assigned table after saving', async () => {

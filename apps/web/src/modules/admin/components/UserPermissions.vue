@@ -17,6 +17,13 @@
   >
     <template #content>
       <v-alert
+        v-if="availableSaveError !== undefined"
+        class="mb-3"
+        type="error"
+        variant="tonal"
+        :text="availableSaveErrorMessage"
+      />
+      <v-alert
         v-if="availableLoadFailed"
         class="mb-3"
         type="error"
@@ -51,10 +58,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref, useTemplateRef } from 'vue'
+import { computed, nextTick, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useHttp } from '@/capabilities/http'
-import { useUi } from '@/capabilities/ui'
+import { useNotificationMessage, useUi } from '@/capabilities/ui'
 import type { components, operations } from '@/api/openapi.generated'
 import type { OvTableFetchRequest, OvTableOptions } from '@/components/api'
 
@@ -75,11 +82,11 @@ const assignedTable = useTemplateRef('assigned')
 const availableTable = useTemplateRef('available')
 const showAvailable = ref(false)
 const availableLoadFailed = ref(false)
+const availableSaveError = ref<string>()
+const availableSaveErrorMessage = useNotificationMessage(availableSaveError)
 const confirmRemoval = ref(false)
 const roleToRemove = ref('')
 const saving = ref(false)
-let disposed = false
-onUnmounted(() => (disposed = true))
 
 const assignedOptions = computed<OvTableOptions>(() => ({
   key: 'role',
@@ -185,6 +192,7 @@ function onAssignedAction(action: string, _rows: unknown, row?: unknown) {
   if (saving.value) return
   if (action === 'admin.addRole') {
     availableLoadFailed.value = false
+    availableSaveError.value = undefined
     showAvailable.value = true
     return
   }
@@ -196,14 +204,19 @@ function onAssignedAction(action: string, _rows: unknown, row?: unknown) {
   confirmRemoval.value = true
 }
 
-function onAvailableAction(action: string, _rows: unknown, row?: unknown) {
+async function onAvailableAction(action: string, _rows: unknown, row?: unknown) {
   if (action !== 'admin.addRole' || saving.value) return
   const role = roleFromRow(row)
   if (!role) {
     showAvailable.value = false
     return ui.error('admin.updateRoleError')
   }
-  return setRole(role, true)
+  availableSaveError.value = undefined
+  const failure = await setRole(role, true)
+  if (failure) {
+    const { error } = failure
+    availableSaveError.value = error instanceof Error ? error.message : String(error)
+  }
 }
 
 async function setRole(role: string, assigned: boolean) {
@@ -211,29 +224,19 @@ async function setRole(role: string, assigned: boolean) {
   if (!assigned && props.isSelf && role === 'admin') return ui.error('admin.cannotRemoveOwnAdmin')
   saving.value = true
   try {
-    const save = async () => {
+    const result = await ui.action('admin.users.roles.save', async () => {
       const payload: RoleUpdate = { role, assigned }
       const { error } = await http.put(endpoint.value, payload)
       if (error) throw new Error('admin.updateRoleError')
-    }
-
-    try {
-      if (assigned) await save()
-      else await ui.loading.run('admin.users.roles.save', save)
-    } catch (error) {
-      if (assigned) showAvailable.value = false
-      ui.error(error)
-      return
-    }
+    })
+    if (!result.ok) return result
 
     if (assigned) {
       showAvailable.value = false
       await nextTick()
     }
     ui.success(assigned ? 'admin.roleAdded' : 'admin.roleRemoved')
-    if (!disposed) {
-      await assignedTable.value?.fetch('first')
-    }
+    await assignedTable.value?.fetch('first')
   } finally {
     saving.value = false
   }
