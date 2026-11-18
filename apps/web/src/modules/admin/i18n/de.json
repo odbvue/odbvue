@@ -21,7 +21,6 @@
   "admin.removeRoleConfirmation": "Die Rolle {role} von diesem Benutzer entfernen?",
   "admin.cannotRemoveOwnAdmin": "Sie können Ihre eigene Admin-Rolle nicht entfernen.",
   "admin.loadRolesError": "Rollen konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
-  "admin.retryRoles": "Erneut versuchen",
   "admin.updateRoleError": "Die Rollenzuweisung konnte nicht aktualisiert werden. Bitte versuchen Sie es erneut.",
   "admin.roleAdded": "Rolle hinzugefügt.",
   "admin.roleRemoved": "Rolle entfernt.",

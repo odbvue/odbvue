@@ -21,7 +21,6 @@
   "admin.removeRoleConfirmation": "Retirer le rôle {role} à cet utilisateur ?",
   "admin.cannotRemoveOwnAdmin": "Vous ne pouvez pas retirer votre propre rôle administrateur.",
   "admin.loadRolesError": "Impossible de charger les rôles. Veuillez réessayer.",
-  "admin.retryRoles": "Réessayer",
   "admin.updateRoleError": "Impossible de modifier l'attribution du rôle. Veuillez réessayer.",
   "admin.roleAdded": "Rôle ajouté.",
   "admin.roleRemoved": "Rôle retiré.",

@@ -1,18 +1,5 @@
 <template>
   <div ref="assigned-area">
-    <v-alert
-      v-if="assignedLoadFailed"
-      class="mb-3"
-      type="error"
-      variant="tonal"
-      :text="t('admin.loadRolesError')"
-    >
-      <template #append>
-        <v-btn variant="text" @click="assignedTable?.fetch('first')">
-          {{ t('admin.retryRoles') }}
-        </v-btn>
-      </template>
-    </v-alert>
     <v-ov-table
       ref="assigned"
       :options="assignedOptions"
@@ -29,22 +16,8 @@
     @after-leave="restoreAddFocus"
   >
     <template #content>
-      <v-alert
-        v-if="availableLoadFailed"
-        class="mb-3"
-        type="error"
-        variant="tonal"
-        :text="t('admin.loadRolesError')"
-      >
-        <template #append>
-          <v-btn variant="text" @click="availableTable?.fetch('first')">
-            {{ t('admin.retryRoles') }}
-          </v-btn>
-        </template>
-      </v-alert>
       <v-ov-table
         v-if="showAvailable"
-        ref="available"
         :options="availableOptions"
         :loading="saving"
         @fetch="fetchAvailable"
@@ -64,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, useTemplateRef, type Ref } from 'vue'
+import { computed, nextTick, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useHttp } from '@/capabilities/http'
 import { useUi } from '@/capabilities/ui'
@@ -85,10 +58,7 @@ const ui = useUi()
 const endpoint = computed(() => `/admin/users/${encodeURIComponent(props.userId)}/roles`)
 const assignedArea = useTemplateRef('assigned-area')
 const assignedTable = useTemplateRef('assigned')
-const availableTable = useTemplateRef('available')
 const showAvailable = ref(false)
-const assignedLoadFailed = ref(false)
-const availableLoadFailed = ref(false)
 const confirmRemoval = ref(false)
 const roleToRemove = ref('')
 const saving = ref(false)
@@ -156,33 +126,27 @@ const availableOptions = computed<OvTableOptions>(() => ({
 async function fetchRolePage(
   path: string,
   { cursor, limit, search, signal, complete }: OvTableFetchRequest,
-  failed: Ref<boolean>,
 ) {
   if (signal.aborted) return complete()
-  failed.value = false
-  let page: RolePage | undefined
-  try {
+  const result = await ui.action(`admin.users.roles.list:${path}`, async () => {
     const { data, error } = await http.get<RolePage>(path, {
       query: { cursor, limit, search },
       signal,
     })
-    if (!error && data) page = data
-  } catch {
-    if (!signal.aborted) failed.value = true
-    return complete()
-  }
-  if (signal.aborted) return complete()
-  if (page) return complete(page)
-  failed.value = true
-  complete()
+    if (signal.aborted) return
+    if (error || !data) throw new Error('admin.loadRolesError')
+    return data
+  })
+  if (signal.aborted || !result.ok || !result.data) return complete()
+  complete(result.data)
 }
 
 function fetchAssigned(request: OvTableFetchRequest) {
-  return fetchRolePage(endpoint.value, request, assignedLoadFailed)
+  return fetchRolePage(endpoint.value, request)
 }
 
 function fetchAvailable(request: OvTableFetchRequest) {
-  return fetchRolePage(`${endpoint.value}/available`, request, availableLoadFailed)
+  return fetchRolePage(`${endpoint.value}/available`, request)
 }
 
 function restoreAddFocus() {
@@ -201,7 +165,6 @@ function roleFromRow(row: unknown) {
 function onAssignedAction(action: string, _rows: unknown, row?: unknown) {
   if (saving.value) return
   if (action === 'admin.addRole') {
-    availableLoadFailed.value = false
     showAvailable.value = true
     return
   }

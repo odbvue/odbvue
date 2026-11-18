@@ -56,7 +56,7 @@ const view = defineComponent({
 const container = { template: '<div><slot /></div>' }
 const alert = {
   props: ['text', 'role'],
-  template: '<div :role="role ?? \'alert\'">{{ text }}<slot name="append" /></div>',
+  template: '<div :role="role ?? \'alert\'">{{ text }}</div>',
 }
 const user: components['schemas']['AdminListUsersItemsItem'] = {
   id: 'A'.repeat(32),
@@ -684,7 +684,7 @@ describe('admin user details', () => {
     },
   )
 
-  it('keeps save success visible when the assigned list reload fails or is aborted', async () => {
+  it('reports an assigned list reload failure globally but ignores an aborted load', async () => {
     const { wrapper } = await setup(true)
     await wrapper.get('button[role="tab"][value="permissions"]').trigger('click')
     const assigned = wrapper.findComponent(table)
@@ -707,23 +707,19 @@ describe('admin user details', () => {
       .vm.$emit('action', 'admin.addRole', [editor], editor)
     await flushPromises()
     expect(complete).toHaveBeenCalledExactlyOnceWith()
-    expect(wrapper.get('[role="alert"]').text()).toContain(messages['admin.loadRolesError'])
-    expect(ui.notification.value).toMatchObject({ type: 'success', message: 'admin.roleAdded' })
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(ui.notification.value).toMatchObject({ type: 'error', message: 'admin.loadRolesError' })
 
+    ui.clear()
     const read = Promise.withResolvers<HttpResponse<unknown>>()
     get.mockReturnValueOnce(read.promise)
-    refetchTable.mockImplementationOnce(async () => {
-      emitFetch(controller.signal)
-      return false
-    })
-    await wrapper.get('[role="alert"] button').trigger('click')
-    expect(refetchTable).toHaveBeenNthCalledWith(2, 'first')
+    emitFetch(controller.signal)
     controller.abort()
     read.resolve(failure(503))
     await flushPromises()
     expect(complete).toHaveBeenNthCalledWith(2)
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
-    expect(ui.notification.value).toMatchObject({ type: 'success', message: 'admin.roleAdded' })
+    expect(ui.notification.value).toBeUndefined()
     expect(putRole).toHaveBeenCalledTimes(1)
   })
 
@@ -743,6 +739,38 @@ describe('admin user details', () => {
       assigned: false,
     })
     expect(refetchTable).toHaveBeenCalledExactlyOnceWith('first')
+  })
+
+  it('closes the confirmation during removal, blocks a second submission, and alerts on failure', async () => {
+    const { wrapper } = await setup(true)
+    await wrapper.get('button[role="tab"][value="permissions"]').trigger('click')
+    const assigned = wrapper.findComponent(table)
+    const editor = { role: 'editor' }
+    const remove = () => assigned.vm.$emit('action', 'admin.removeRole', [editor], editor)
+    const saved = Promise.withResolvers<HttpResponse<unknown>>()
+    putRole.mockReturnValueOnce(saved.promise)
+
+    remove()
+    await flushPromises()
+    const submit = wrapper.get('[role="dialog"] button:last-of-type')
+    const firstClick = submit.trigger('click')
+    await submit.trigger('click')
+    await firstClick
+    remove()
+    await flushPromises()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(putRole).toHaveBeenCalledTimes(1)
+
+    saved.resolve(failure(500))
+    await flushPromises()
+    expect(ui.notification.value).toMatchObject({ type: 'error', message: 'admin.updateRoleError' })
+    expect(refetchTable).not.toHaveBeenCalled()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+
+    remove()
+    await flushPromises()
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Remove the editor role')
+    expect(putRole).toHaveBeenCalledTimes(1)
   })
 
   it('does not offer to remove the signed-in user’s admin role', async () => {

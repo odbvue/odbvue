@@ -117,7 +117,7 @@ describe('admin user details view', () => {
         `/admin/users/${user.id}/roles/available`,
         expect.any(Object),
       )
-      expect(useUi().loading.active.value).toBe(false)
+      expect(useUi().loading.active.value).toBe(true)
       availableRequest.resolve({
         data: null,
         error: Object.assign(new Error('Unavailable'), { status: 503, request: '/available' }),
@@ -125,10 +125,19 @@ describe('admin user details view', () => {
         headers: null,
       })
       await flushPromises()
-      expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain(
-        messages['admin.loadRolesError'],
-      )
-      expect(useUi().notification.value).toBeUndefined()
+      expect(useUi().loading.active.value).toBe(false)
+      expect(document.body.querySelector('[role="dialog"] [role="alert"]')).toBeNull()
+      expect(useUi().notification.value).toMatchObject({
+        type: 'error',
+        message: 'admin.loadRolesError',
+      })
+
+      const picker = wrapper.findAllComponents(VDialog).find((dialog) => dialog.props('modelValue'))
+      expect(picker).toBeDefined()
+      picker!.vm.$emit('update:modelValue', false)
+      await flushPromises()
+      picker!.vm.$emit('afterLeave')
+      expect(document.activeElement).toBe(add!.element)
 
       get.mockResolvedValueOnce({
         data: { items: [{ role: 'editor', description: 'Can edit content' }] },
@@ -136,11 +145,7 @@ describe('admin user details view', () => {
         status: 200,
         headers: null,
       })
-      const retry = wrapper
-        .findAllComponents(VBtn)
-        .find((button) => button.text() === messages['admin.retryRoles'])
-      expect(retry).toBeDefined()
-      await retry!.trigger('click')
+      await add!.trigger('click')
       await flushPromises()
       expect(document.body.querySelector('[role="dialog"]')?.textContent).not.toContain(
         messages['admin.loadRolesError'],
@@ -151,15 +156,9 @@ describe('admin user details view', () => {
         .find((button) => button.props('icon') === '$mdiPlus')
       expect(assign?.attributes('title')).toBe(messages['admin.addRole'])
       expect(assign?.attributes('aria-label')).toBe(messages['admin.addRole'])
-
-      const picker = wrapper.findAllComponents(VDialog).find((dialog) => dialog.props('modelValue'))
-      expect(picker).toBeDefined()
-      picker!.vm.$emit('update:modelValue', false)
-      await flushPromises()
-      picker!.vm.$emit('afterLeave')
-      expect(document.activeElement).toBe(add!.element)
     } finally {
       wrapper.unmount()
+      useUi().clear()
     }
   })
 })
