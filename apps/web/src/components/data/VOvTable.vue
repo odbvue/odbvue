@@ -425,7 +425,7 @@ const fallbackDefaults = {
     },
     VChip: {
       variant: 'text',
-      class: 'text-wrap',
+      class: 'text-wrap h-auto py-1',
     },
     VBtn: {
       size: 'small',
