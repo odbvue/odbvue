@@ -74,7 +74,9 @@ Return the whole page through completion instead of maintaining page state in th
 - `key`: row identity field.
 - `columns`: array of `{ name, label, format, actions, actionFormat, maxLength, align }`.
 - `search`: optional search label, placeholder, and default value.
-- `filter`: optional `OvFormOptions` used for the filter dialog.
+- `filter`: optional `OvFormOptions` used for the filter dialog. Set `filterUtc: true`
+  on individual `datetime` fields to keep local times in the form and chips but
+  send UTC ISO strings in `fetch`. Empty values are omitted.
 - `sort`: optional sort descriptors with `name`, `label`, and `value`.
 - `actions`: table-level actions, including grouped actions.
 - `itemsPerPage` / `mobileItemsPerPage`: pagination sizes.
@@ -86,6 +88,9 @@ Return the whole page through completion instead of maintaining page state in th
 - Search, filter, sort, and page state can be persisted with `stateKey`.
 - Apply commits filter values and requests the first page. Clearing a field or
   removing its chip removes that filter from the next request.
+- For date ranges, use the `date` rule on each field and the `date-on-or-after`
+  rule on the end field, with `params` set to the start field's name. Validation
+  errors appear under the relevant input, and invalid submissions do not fetch.
 - On mobile, the table switches to a stacked layout and uses `mobileItemsPerPage` when provided.
 - Column and action formatting use `OvFieldFormat` and `OvActionFormat` under the hood.
 - Row expansion only appears when the `expand` slot is provided.

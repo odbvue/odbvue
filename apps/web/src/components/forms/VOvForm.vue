@@ -639,7 +639,10 @@ const fields = computed(() => {
       rules: (() => {
         const fieldRules = (field.rules || []).map((rule) => (value: unknown) => {
           let params = rule.params
-          if (rule.type === 'same-as' && typeof params === 'string') {
+          if (
+            (rule.type === 'same-as' || rule.type === 'date-on-or-after') &&
+            typeof params === 'string'
+          ) {
             params = values.value[params]
           }
           return OvRuleValidate(value, rule.type, params, t(rule.message))

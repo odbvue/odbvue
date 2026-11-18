@@ -682,23 +682,29 @@ const filterChips = computed(() => {
   })
 })
 
-const filterValue = computed(() => {
-  if (!options.filter) return {}
+function collectFilterValues(): OvFilterValue | undefined {
+  const result: OvFilterValue = {}
+  if (!options.filter) return result
 
-  return filterField.value
-    .filter((field) => field.value !== undefined)
-    .reduce((result: OvFilterValue, field) => {
-      const values = Array.isArray(field.value)
-        ? field.value.filter((v) => v !== undefined)
-        : [field.value]
+  for (const field of filterField.value) {
+    const value = field.value
+    if (value === undefined) continue
 
-      if (values.length > 0) {
-        result[field.name] = values.map(String)
+    const values = Array.isArray(value) ? value.filter((v) => v !== undefined) : [value]
+    if (field.type === 'datetime' && field.filterUtc) {
+      if (value === null || value === '') continue
+      const timestamp = typeof value === 'string' ? Date.parse(value) : NaN
+      if (Number.isNaN(timestamp)) {
+        console.error('Cannot fetch table data with an invalid datetime filter:', field.name)
+        return undefined
       }
-
-      return result
-    }, {})
-})
+      result[field.name] = [new Date(timestamp).toISOString()]
+    } else if (values.length) {
+      result[field.name] = values.map(String)
+    }
+  }
+  return result
+}
 
 async function handleFilterRemove(filterName: string, removedFilterValue?: unknown) {
   if (!options.filter) return
@@ -977,7 +983,8 @@ function fetch(action?: 'first' | 'next' | 'prev'): Promise<boolean> {
     return Promise.resolve(false)
   }
   const search = searchValue.value?.trim() || undefined
-  const filter = filterValue.value
+  const filter = collectFilterValues()
+  if (!filter) return Promise.resolve(false)
   const sort = sortValue.value
   const query = JSON.stringify([limit, search, filter, sort])
   const reset = action === 'first' || (committedQuery !== undefined && committedQuery !== query)

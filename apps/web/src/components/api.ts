@@ -53,6 +53,8 @@ export type OvRule = {
     | 'ip'
     | 'regexp'
     | 'same-as'
+    | 'date'
+    | 'date-on-or-after'
     | 'is-json'
     | 'custom'
   params: unknown
@@ -327,7 +329,10 @@ export type OvTableOptions = {
     label?: string
     placeholder?: string
   }
-  filter?: OvFormOptions
+  filter?: Omit<OvFormOptions, 'fields'> & {
+    /** Set filterUtc on a datetime field to emit a UTC ISO string while displaying local time. */
+    fields: (OvFormField & { filterUtc?: boolean })[]
+  }
   sort?: OvTableSort[]
   singleSort?: boolean
   actions?: OvAction[]
@@ -408,6 +413,20 @@ export const OvRuleValidate = (
       false,
     regexp: () => new RegExp(String(params)).test(value as string) || message || false,
     'same-as': () => value === params || message || false,
+    date: () =>
+      value == null ||
+      value === '' ||
+      (typeof value === 'string' && !Number.isNaN(Date.parse(value))) ||
+      message ||
+      false,
+    'date-on-or-after': () => {
+      const current = typeof value === 'string' ? Date.parse(value) : NaN
+      const minimum = typeof params === 'string' ? Date.parse(params) : NaN
+      // The separate date rule reports malformed values on their own fields.
+      return (
+        Number.isNaN(current) || Number.isNaN(minimum) || current >= minimum || message || false
+      )
+    },
     'is-json': () =>
       (typeof value === 'string' &&
         (() => {

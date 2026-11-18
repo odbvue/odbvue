@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { VBtn } from 'vuetify/components'
+import { VBtn, VTextField } from 'vuetify/components'
 import VOvForm from '@/components/forms/VOvForm.vue'
 import VOvTable from '@/components/data/VOvTable.vue'
 import { globalPlugins } from '../../support/components.setup'
@@ -81,6 +81,107 @@ function mountManagedTable(options: OvTableOptions = baseOptions) {
 }
 
 describe('VOvTable', () => {
+  it.each([true, false])('converts only opt-in date filters (enabled: %s)', (enabled) => {
+    const start = '2026-11-01T10:00'
+    const { wrapper, request } = mountManagedTable({
+      ...baseOptions,
+      filter: {
+        fields: [
+          { type: 'datetime', name: 'start', value: start, filterUtc: enabled },
+          { type: 'datetime', name: 'end', filterUtc: enabled, value: '' },
+          { type: 'datetime', name: 'other', value: start },
+        ],
+      },
+    })
+    try {
+      expect(request().filter).toEqual({
+        start: [enabled ? new Date(start).toISOString() : start],
+        other: [start],
+        ...(enabled ? {} : { end: [''] }),
+      })
+      expect(wrapper.text()).toContain('2026-11-01 10:00')
+      expect(wrapper.text()).not.toContain(new Date(start).toISOString())
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('keeps the filter dialog open for invalid ranges, then fetches after correction', async () => {
+    const onFetch = vi.fn<(request: OvTableFetchRequest) => void>(({ complete }) =>
+      complete({ items: [] }),
+    )
+    const wrapper = mount(VOvTable, {
+      props: {
+        options: {
+          ...baseOptions,
+          filter: {
+            fields: [
+              {
+                type: 'datetime',
+                name: 'start',
+                filterUtc: true,
+                rules: [{ type: 'date', params: undefined, message: 'Invalid date' }],
+              },
+              {
+                type: 'datetime',
+                name: 'end',
+                filterUtc: true,
+                rules: [
+                  { type: 'date', params: undefined, message: 'Invalid date' },
+                  { type: 'date-on-or-after', params: 'start', message: 'Invalid range' },
+                ],
+              },
+            ],
+          },
+        },
+        onFetch,
+      },
+      global: {
+        plugins: globalPlugins,
+        stubs: {
+          VDialog: { props: ['modelValue'], template: '<div v-if="modelValue"><slot /></div>' },
+        },
+      },
+    })
+    try {
+      const filterButton = wrapper
+        .findAllComponents(VBtn)
+        .find((button) => button.props('icon') === '$mdiFilterPlus')!
+      await filterButton.trigger('click')
+      const form = wrapper.getComponent(VOvForm)
+      const start = '2026-11-01T10:00'
+      const end = '2026-11-18T12:00'
+      const startField = form
+        .findAllComponents(VTextField)
+        .find((field) => field.props('id') === 'start')!
+      startField.vm.$emit('update:modelValue', 'invalid-date')
+      await flushPromises()
+      await form.vm.handleAction('apply')
+      expect(wrapper.get('#start-messages').text()).toBe('Invalid date')
+      expect(onFetch).toHaveBeenCalledTimes(1)
+
+      await form.get('input#start').setValue(end)
+      await form.get('input#end').setValue(start)
+      await form.vm.handleAction('apply')
+      expect(wrapper.get('#end-messages').text()).toBe('Invalid range')
+      expect(wrapper.find('#start-messages .v-messages__message').exists()).toBe(false)
+      expect(onFetch).toHaveBeenCalledTimes(1)
+
+      await form.get('input#start').setValue(start)
+      await form.get('input#end').setValue(end)
+      await form.vm.handleAction('apply')
+      await flushPromises()
+      expect(onFetch).toHaveBeenCalledTimes(2)
+      expect(onFetch.mock.lastCall?.[0].filter).toEqual({
+        start: [new Date(start).toISOString()],
+        end: [new Date(end).toISOString()],
+      })
+      expect(wrapper.findComponent(VOvForm).exists()).toBe(false)
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it('passes async autocomplete to the filter dialog and uses the selected label on its chip', async () => {
     const fetchItems = vi
       .fn<NonNullable<OvFormSelectionField['fetchItems']>>()

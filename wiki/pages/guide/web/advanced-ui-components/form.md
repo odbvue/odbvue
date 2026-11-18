@@ -280,29 +280,31 @@ Validation rules are applied to fields through the `rules` array:
 
 #### Available Rule Types
 
-| Rule Type      | Params               | Description                                  |
-| -------------- | -------------------- | -------------------------------------------- |
-| `required`     | `true`               | Value must not be empty                      |
-| `min-length`   | `number`             | String length must be >= params              |
-| `max-length`   | `number`             | String length must be <= params              |
-| `equals`       | `any`                | Value must equal params                      |
-| `equals-not`   | `any`                | Value must not equal params                  |
-| `starts-with`  | `string`             | String must start with params                |
-| `ends-with`    | `string`             | String must end with params                  |
-| `contains`     | `string`             | String must contain params                   |
-| `greater-than` | `number`             | Number must be > params                      |
-| `less-than`    | `number`             | Number must be < params                      |
-| `in-range`     | `[min, max]`         | Number must be >= min and <= max             |
-| `includes`     | `any[]`              | Value must be in params array                |
-| `set`          | `any[]`              | Value must be in params array                |
-| `password`     | `true`               | Strong password (letters + digits, 8+ chars) |
-| `email`        | `true`               | Valid email format                           |
-| `url`          | `true`               | Valid URL format                             |
-| `ip`           | `true`               | Valid IPv4 address                           |
-| `regexp`       | `RegExp string`      | Value must match regexp                      |
-| `same-as`      | `any`                | Value must equal params                      |
-| `is-json`      | `true`               | Valid JSON string                            |
-| `custom`       | `(value) => boolean` | Custom validation function                   |
+| Rule Type          | Params                | Description                                                                                                           |
+| ------------------ | --------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `required`         | `true`                | Value must not be empty                                                                                               |
+| `min-length`       | `number`              | String length must be >= params                                                                                       |
+| `max-length`       | `number`              | String length must be <= params                                                                                       |
+| `equals`           | `any`                 | Value must equal params                                                                                               |
+| `equals-not`       | `any`                 | Value must not equal params                                                                                           |
+| `starts-with`      | `string`              | String must start with params                                                                                         |
+| `ends-with`        | `string`              | String must end with params                                                                                           |
+| `contains`         | `string`              | String must contain params                                                                                            |
+| `greater-than`     | `number`              | Number must be > params                                                                                               |
+| `less-than`        | `number`              | Number must be < params                                                                                               |
+| `in-range`         | `[min, max]`          | Number must be >= min and <= max                                                                                      |
+| `includes`         | `any[]`               | Value must be in params array                                                                                         |
+| `set`              | `any[]`               | Value must be in params array                                                                                         |
+| `password`         | `true`                | Strong password (letters + digits, 8+ chars)                                                                          |
+| `email`            | `true`                | Valid email format                                                                                                    |
+| `url`              | `true`                | Valid URL format                                                                                                      |
+| `ip`               | `true`                | Valid IPv4 address                                                                                                    |
+| `regexp`           | `RegExp string`       | Value must match regexp                                                                                               |
+| `same-as`          | `any`                 | Value must equal params                                                                                               |
+| `date`             | unused                | A nonempty value must be a parseable date.                                                                            |
+| `date-on-or-after` | name of another field | When both fields contain valid dates, this date must be on or after the other. Pair with `date` rules on both fields. |
+| `is-json`          | `true`                | Valid JSON string                                                                                                     |
+| `custom`           | `(value) => boolean`  | Custom validation function                                                                                            |
 
 ### Actions
 

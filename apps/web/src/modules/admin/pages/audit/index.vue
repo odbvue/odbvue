@@ -84,8 +84,23 @@ const options = computed<OvTableOptions>(() => ({
         clearable: true,
       },
       { type: 'text', name: 'messageType', label: 'admin.auditMessageType' },
-      { type: 'datetime', name: 'from', label: 'admin.auditFrom' },
-      { type: 'datetime', name: 'to', label: 'admin.auditTo' },
+      {
+        type: 'datetime',
+        name: 'from',
+        label: 'admin.auditFrom',
+        filterUtc: true,
+        rules: [{ type: 'date', params: undefined, message: 'admin.auditInvalidInterval' }],
+      },
+      {
+        type: 'datetime',
+        name: 'to',
+        label: 'admin.auditTo',
+        filterUtc: true,
+        rules: [
+          { type: 'date', params: undefined, message: 'admin.auditInvalidInterval' },
+          { type: 'date-on-or-after', params: 'from', message: 'admin.auditInvalidInterval' },
+        ],
+      },
       { ...userFilter, items: [...userItems.value.values()] },
     ],
     actions: [{ name: 'admin.apply' }, { name: 'admin.cancel', format: { variant: 'outlined' } }],
@@ -95,19 +110,9 @@ const options = computed<OvTableOptions>(() => ({
   },
 }))
 
-function utcTimestamp(value?: string) {
-  if (!value) return undefined
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) throw new Error('admin.auditInvalidInterval')
-  return date.toISOString()
-}
-
 async function fetchAudit({ cursor, limit, filter, signal, complete }: OvTableFetchRequest) {
   if (signal.aborted) return complete()
   const result = await ui.action('admin.audit.list', async () => {
-    const from = utcTimestamp(filter?.from?.[0])
-    const to = utcTimestamp(filter?.to?.[0])
-    if (from && to && from > to) throw new Error('admin.auditInvalidInterval')
     const { data, error } = await http.get<components['schemas']['AdminListAuditResponse']>(
       '/admin/audit/events',
       {
@@ -116,8 +121,8 @@ async function fetchAudit({ cursor, limit, filter, signal, complete }: OvTableFe
           limit,
           severity: filter?.severity?.filter(Boolean).join(',') || undefined,
           messageType: filter?.messageType?.[0] || undefined,
-          from,
-          to,
+          from: filter?.from?.[0],
+          to: filter?.to?.[0],
           userId: filter?.userId?.[0] || undefined,
         },
         signal,

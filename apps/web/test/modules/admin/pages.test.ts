@@ -25,7 +25,6 @@ import {
   renderViewItem,
   type OvTableOptions,
   type OvTableFetchRequest,
-  type OvFilterValue,
   type OvFormSelectionField,
 } from '@/components/api'
 
@@ -339,8 +338,8 @@ describe('admin user audit', () => {
     get.mockResolvedValueOnce({ ...result(), data: page })
     const complete = vi.fn<OvTableFetchRequest['complete']>()
     const { signal } = new AbortController()
-    const from = '2026-11-01T10:00'
-    const to = '2026-11-18T12:00'
+    const from = '2026-11-01T10:00:00.000Z'
+    const to = '2026-11-18T12:00:00.000Z'
     component.vm.$emit('fetch', {
       cursor: 'opaque-audit-cursor',
       limit: 1,
@@ -356,35 +355,14 @@ describe('admin user audit', () => {
         limit: 1,
         severity: 'WARN,INFO',
         messageType: 'auth.login',
-        from: new Date(from).toISOString(),
-        to: new Date(to).toISOString(),
+        from,
+        to,
       },
       signal,
     })
     expect(complete).toHaveBeenCalledExactlyOnceWith(page)
     expect(component.props('options').itemsPerPage).toBeUndefined()
     expect(component.props('options').mobileItemsPerPage).toBeUndefined()
-  })
-
-  it.each<OvFilterValue>([
-    { from: ['invalid-date'] },
-    { from: ['2026-11-18T12:00'], to: ['2026-11-01T10:00'] },
-  ])('reports an invalid interval without making a request: %j', async (filter) => {
-    const component = await openAudit()
-    const complete = vi.fn<OvTableFetchRequest['complete']>()
-    component.vm.$emit('fetch', {
-      limit: 5,
-      filter,
-      signal: new AbortController().signal,
-      complete,
-    } satisfies OvTableFetchRequest)
-    await flushPromises()
-    expect(get).toHaveBeenCalledTimes(2)
-    expect(complete).toHaveBeenCalledExactlyOnceWith()
-    expect(ui.notification.value).toMatchObject({
-      type: 'error',
-      message: 'admin.auditInvalidInterval',
-    })
   })
 
   it('reports load failures but ignores failures from cancelled requests', async () => {
