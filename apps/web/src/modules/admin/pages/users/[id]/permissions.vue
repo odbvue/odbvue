@@ -76,6 +76,7 @@ const saving = ref(false)
 
 const assignedOptions = computed<OvTableOptions>(() => ({
   key: 'role',
+  stateKey: `admin.users.${props.user.id}.roles`,
   actions: [
     {
       name: 'admin.addRole',

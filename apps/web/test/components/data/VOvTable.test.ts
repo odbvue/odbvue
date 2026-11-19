@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { VBtn, VTextField } from 'vuetify/components'
+import { VAutocomplete, VBtn, VChip, VTextField } from 'vuetify/components'
 import VOvForm from '@/components/forms/VOvForm.vue'
 import VOvTable from '@/components/data/VOvTable.vue'
 import { globalPlugins } from '../../support/components.setup'
@@ -80,7 +80,323 @@ function mountManagedTable(options: OvTableOptions = baseOptions) {
   return { wrapper, onFetch, request }
 }
 
+function storedState() {
+  return {
+    version: 1,
+    search: '',
+    filter: { status: null, removed: 'ignored' },
+    sort: [{ name: 'email', value: 'desc' }, { name: 'name' }, { name: 'removed', value: 'asc' }],
+    pageSizes: { desktop: 7, mobile: 2 },
+  }
+}
+
 describe('VOvTable', () => {
+  describe('session preferences', () => {
+    const stateKey = 'test.table.preferences'
+    const options = (): OvTableOptions => ({
+      ...baseOptions,
+      stateKey,
+      search: { value: 'default' },
+      filter: { fields: [{ type: 'text', name: 'status', value: 'active' }] },
+      sort: [{ name: 'name', value: 'asc' }, { name: 'email' }],
+    })
+
+    let originalWidth: number
+    beforeEach(() => {
+      sessionStorage.clear()
+      originalWidth = window.innerWidth
+      window.innerWidth = 1440
+      window.dispatchEvent(new Event('resize'))
+    })
+    afterEach(() => {
+      sessionStorage.clear()
+      window.innerWidth = originalWidth
+      window.dispatchEvent(new Event('resize'))
+      vi.restoreAllMocks()
+    })
+
+    it.each([
+      { width: 1440, limit: 7 },
+      { width: 480, limit: 2 },
+    ])(
+      'restores preferences before a fresh first fetch at width $width',
+      async ({ width, limit }) => {
+        window.innerWidth = width
+        window.dispatchEvent(new Event('resize'))
+        await flushPromises()
+        sessionStorage.setItem(
+          stateKey,
+          JSON.stringify({
+            ...storedState(),
+            pageCursor: 'stale',
+            cursorStack: ['stale'],
+          }),
+        )
+        const originalOptions = options()
+        const { wrapper, onFetch, request } = mountManagedTable(originalOptions)
+        try {
+          await flushPromises()
+          expect(onFetch).toHaveBeenCalledTimes(1)
+          expect(request()).toMatchObject({
+            cursor: undefined,
+            search: undefined,
+            filter: {},
+            sort: '-email',
+            limit,
+          })
+          expect(wrapper.getComponent(VTextField).props('modelValue')).toBe('')
+          expect(originalOptions.filter?.fields[0]?.value).toBe('active')
+          expect(originalOptions.sort?.[0]?.value).toBe('asc')
+        } finally {
+          wrapper.unmount()
+        }
+      },
+    )
+
+    it('automatically saves edits while mounted, then restores them on remount without cursors', async () => {
+      const { wrapper, request } = mountManagedTable(options())
+      request().complete({ items: [{ name: 'one' }], nextCursor: 'next-page' })
+      await flushPromises()
+      const next = wrapper
+        .findAllComponents(VBtn)
+        .find((button) => button.props('icon') === '$mdiChevronRight')!
+      await next.trigger('click')
+      request().complete({ items: [{ name: 'two' }] })
+      await wrapper.getComponent(VTextField).setValue('remember me')
+      await wrapper.findAllComponents(VChip)[0]!.vm.$emit('click:close')
+      await flushPromises()
+      request().complete({ items: [] })
+      const sortChip = wrapper.findAllComponents(VChip)[0]!
+      await sortChip.trigger('click')
+      await flushPromises()
+      request().complete({ items: [] })
+      expect(request().cursor).toBeUndefined()
+      const saved = JSON.parse(sessionStorage.getItem(stateKey)!)
+      expect(saved).toMatchObject({
+        search: 'remember me',
+        filter: { status: null },
+        sort: [{ name: 'name', value: 'desc' }, { name: 'email' }],
+      })
+      expect(Object.keys(saved).toSorted()).toEqual([
+        'filter',
+        'pageSizes',
+        'search',
+        'sort',
+        'version',
+      ])
+      wrapper.unmount()
+
+      const restored = mountManagedTable(options())
+      try {
+        expect(restored.request()).toMatchObject({
+          cursor: undefined,
+          search: 'remember me',
+          filter: {},
+          sort: '-name',
+        })
+      } finally {
+        restored.wrapper.unmount()
+      }
+    })
+
+    it('resets preferences to unmodified configured defaults and refetches the first page', async () => {
+      sessionStorage.setItem(stateKey, JSON.stringify(storedState()))
+      const { wrapper, request } = mountManagedTable(options())
+      try {
+        request().complete({ items: [] })
+        await flushPromises()
+        expect(
+          wrapper
+            .findAllComponents(VBtn)
+            .filter((button) => button.element.closest('tfoot'))
+            .map((button) => button.props('icon')),
+        ).toEqual(['$mdiRefresh'])
+        const reset = wrapper.vm.resetState()
+        expect(request()).toMatchObject({
+          cursor: undefined,
+          search: 'default',
+          filter: { status: ['active'] },
+          sort: 'name',
+          limit: 10,
+        })
+        request().complete({ items: [] })
+        expect(await reset).toBe(true)
+        expect(JSON.parse(sessionStorage.getItem(stateKey)!)).toMatchObject({
+          search: 'default',
+          filter: { status: 'active' },
+          pageSizes: { desktop: 10, mobile: 10 },
+        })
+      } finally {
+        wrapper.unmount()
+      }
+    })
+
+    it.each([false, true])(
+      'restores selected autocomplete titles for chips and the filter dialog (multiple: %s)',
+      async (multiple) => {
+        const choices = [
+          { title: 'Ada (ada@example.test)', value: 'ada-id' },
+          { title: 'Grace (grace@example.test)', value: 'grace-id' },
+          { title: 'Unselected user', value: 'other-id' },
+        ]
+        const value = multiple ? ['ada-id', 'grace-id'] : 'ada-id'
+        const fetchItems = vi
+          .fn<NonNullable<OvFormSelectionField['fetchItems']>>()
+          .mockResolvedValue(choices)
+        const tableOptions = (items: typeof choices = []): OvTableOptions => ({
+          ...baseOptions,
+          stateKey,
+          filter: {
+            fields: [
+              {
+                type: 'autocomplete',
+                name: 'userId',
+                multiple,
+                items,
+                fetchItems,
+                minSearchLength: 1,
+              },
+            ],
+          },
+        })
+        const onFetch = vi.fn<(request: OvTableFetchRequest) => void>(({ complete }) =>
+          complete({ items: [] }),
+        )
+        const mountAutocompleteTable = () =>
+          mount(VOvTable, {
+            props: { options: tableOptions(), onFetch },
+            global: {
+              plugins: globalPlugins,
+              stubs: {
+                VDialog: {
+                  props: ['modelValue'],
+                  template: '<div v-if="modelValue"><slot /></div>',
+                },
+              },
+            },
+          })
+        const wrapper = mountAutocompleteTable()
+        try {
+          await wrapper.setProps({ options: tableOptions(choices) })
+          await wrapper
+            .findAllComponents(VBtn)
+            .find((button) => button.props('icon') === '$mdiFilterPlus')!
+            .trigger('click')
+          const form = wrapper.getComponent(VOvForm)
+          form.getComponent(VAutocomplete).vm.$emit('update:modelValue', value)
+          await flushPromises()
+          await form.vm.handleAction('apply')
+          await flushPromises()
+          expect(JSON.parse(sessionStorage.getItem(stateKey)!).filterItems).toEqual({
+            userId: multiple ? choices.slice(0, 2) : choices.slice(0, 1),
+          })
+        } finally {
+          wrapper.unmount()
+        }
+
+        const restored = mountAutocompleteTable()
+        try {
+          await flushPromises()
+          const chips = restored.findAllComponents(VChip)
+          expect(chips.map((chip) => chip.get('strong').text())).toEqual(
+            (multiple ? choices.slice(0, 2) : choices.slice(0, 1)).map((item) => item.title),
+          )
+          expect(onFetch.mock.lastCall?.[0].filter).toEqual({
+            userId: multiple ? value : [value],
+          })
+          expect(fetchItems).not.toHaveBeenCalled()
+          await restored
+            .findAllComponents(VBtn)
+            .find((button) => button.props('icon') === '$mdiFilterPlus')!
+            .trigger('click')
+          const autocomplete = restored.getComponent(VOvForm).getComponent(VAutocomplete)
+          expect(autocomplete.props('items')).toEqual(
+            multiple ? choices.slice(0, 2) : choices.slice(0, 1),
+          )
+          await restored.setProps({
+            options: tableOptions([{ ...choices[0]!, title: 'Updated display name' }]),
+          })
+          expect(restored.findAllComponents(VChip)[0]!.get('strong').text()).toBe(
+            'Updated display name',
+          )
+        } finally {
+          restored.unmount()
+        }
+      },
+    )
+
+    it.each(['{invalid', 'null', JSON.stringify({ ...storedState(), pageSizes: { desktop: 0 } })])(
+      'warns and uses defaults for invalid saved state: %s',
+      (raw) => {
+        sessionStorage.setItem(stateKey, raw)
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+        const { wrapper, request } = mountManagedTable(options())
+        try {
+          expect(warn).toHaveBeenCalledWith(
+            'Unable to restore table session state',
+            expect.any(Error),
+          )
+          expect(request()).toMatchObject({
+            search: 'default',
+            filter: { status: ['active'] },
+            limit: 10,
+          })
+        } finally {
+          wrapper.unmount()
+        }
+      },
+    )
+
+    it('does not access storage when persistence is not enabled', async () => {
+      const get = vi.spyOn(Storage.prototype, 'getItem')
+      const set = vi.spyOn(Storage.prototype, 'setItem')
+      const { wrapper } = mountManagedTable({ ...baseOptions, search: {} })
+      await wrapper.getComponent(VTextField).setValue('transient')
+      wrapper.unmount()
+      expect(get).not.toHaveBeenCalled()
+      expect(set).not.toHaveBeenCalled()
+    })
+
+    it('keeps working when storage reads and writes fail', async () => {
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new DOMException('Denied', 'SecurityError')
+      })
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new DOMException('Quota', 'QuotaExceededError')
+      })
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const { wrapper, request } = mountManagedTable(options())
+      try {
+        expect(request().search).toBe('default')
+        await wrapper.getComponent(VTextField).setValue('still usable')
+        expect(warn).toHaveBeenCalledWith(
+          'Unable to save table session state',
+          expect.any(DOMException),
+        )
+      } finally {
+        wrapper.unmount()
+      }
+    })
+
+    it('honors the existing state-key prop over options.stateKey and isolates keys', () => {
+      sessionStorage.setItem(
+        'test.other',
+        JSON.stringify({ ...storedState(), search: 'other table' }),
+      )
+      const onFetch = vi.fn<(request: OvTableFetchRequest) => void>()
+      const wrapper = mount(VOvTable, {
+        props: { options: options(), stateKey: 'test.other', onFetch },
+        global: { plugins: globalPlugins },
+      })
+      try {
+        expect(onFetch.mock.lastCall?.[0].search).toBe('other table')
+        expect(sessionStorage.getItem(stateKey)).toBeNull()
+      } finally {
+        wrapper.unmount()
+      }
+    })
+  })
+
   it.each([true, false])('converts only opt-in date filters (enabled: %s)', (enabled) => {
     const start = '2026-11-01T10:00'
     const { wrapper, request } = mountManagedTable({

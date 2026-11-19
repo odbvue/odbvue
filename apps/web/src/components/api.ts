@@ -322,6 +322,8 @@ export interface OvTableFetchRequest {
 
 export type OvTableOptions = {
   key: string
+  /** Opt-in sessionStorage key for query preferences (never rows or cursors). */
+  stateKey?: string
   columns: OvTableColumn[]
   columnFormat?: OvFormat | OvFormat[]
   search?: {

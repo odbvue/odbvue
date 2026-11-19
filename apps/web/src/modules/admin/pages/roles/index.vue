@@ -28,6 +28,7 @@ const http = useHttp()
 const ui = useUi()
 const options: OvTableOptions = {
   key: 'role',
+  stateKey: 'admin.roles',
   search: { placeholder: 'admin.searchRoles' },
   columns: [
     { name: 'role', label: 'admin.role' },

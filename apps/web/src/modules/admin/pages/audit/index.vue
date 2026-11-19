@@ -53,6 +53,7 @@ const userFilter: OvFormSelectionField = {
 
 const options = computed<OvTableOptions>(() => ({
   key: 'id',
+  stateKey: 'admin.audit',
   columns: [
     {
       name: 'severityText',

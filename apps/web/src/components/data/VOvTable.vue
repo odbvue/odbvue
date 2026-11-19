@@ -369,6 +369,8 @@ import {
   type OvFormat,
   type OvViewOptions,
   type OvFormFieldError,
+  type OvFormSelectionField,
+  type OvFormSelectItem,
   OvActionFormat,
   renderViewItem,
 } from '../index'
@@ -463,7 +465,7 @@ const {
   loading?: boolean
   title?: string
   description?: string
-  /** When provided, persists table state (search, filter, sort, page) to sessionStorage under this key. */
+  /** Overrides options.stateKey for opt-in session query preference persistence. */
   stateKey?: string
 }>()
 
@@ -480,6 +482,8 @@ const emits = defineEmits<{
 
 const { mobile } = useDisplay()
 const slots = useSlots()
+const persistenceKey = computed(() => stateKey ?? options.stateKey)
+const savedPageSizes = ref<{ desktop: number; mobile: number }>()
 
 const localData = ref(items)
 const localNextCursor = ref(nextCursor)
@@ -506,8 +510,8 @@ let finishFetch: (() => void) | undefined
 let disposed = false
 let committedQuery: string | undefined
 const itemsPerPage = computed(() => {
-  if (mobile.value) return options.mobileItemsPerPage ?? 1
-  return options.itemsPerPage ?? 5
+  if (mobile.value) return savedPageSizes.value?.mobile ?? options.mobileItemsPerPage ?? 1
+  return savedPageSizes.value?.desktop ?? options.itemsPerPage ?? 5
 })
 const hasNextPage = computed(() => !!localNextCursor.value)
 const hasPrevPage = computed(() => cursorStack.value.length > 0)
@@ -638,47 +642,62 @@ function toggleExpand(key: string) {
 
 //filter
 
-const filterField = ref(options.filter?.fields || [])
+const filterField = ref(
+  (options.filter?.fields || []).map((field) => ({
+    ...field,
+    value: Array.isArray(field.value) ? [...field.value] : field.value,
+  })),
+)
+const restoredFilterItems = ref<Record<string, OvFormSelectItem[]>>({})
+
+function getFilterItems(field: Pick<OvFormSelectionField, 'name' | 'items'>) {
+  const choices = [...(field.items || [])]
+  for (const restored of restoredFilterItems.value[field.name] || []) {
+    if (
+      !choices.some((item) => (typeof item === 'string' ? item : item.value) === restored.value)
+    ) {
+      choices.push(restored)
+    }
+  }
+  return choices
+}
+
+const selectedFilterItems = computed(() => {
+  const result: Record<string, OvFormSelectItem[]> = {}
+  for (const field of options.filter?.fields || []) {
+    if (field.type !== 'autocomplete') continue
+    const value = filterField.value.find((item) => item.name === field.name)?.value
+    const values = Array.isArray(value) ? value : [value]
+    const selected = getFilterItems(field)
+      .filter((item) => values.includes(typeof item === 'string' ? item : item.value))
+      .map((item) =>
+        typeof item === 'string'
+          ? { title: item, value: item }
+          : { title: item.title, value: item.value },
+      )
+    if (selected.length) result[field.name] = selected
+  }
+  return result
+})
 
 const filterChips = computed(() => {
   if (!options.filter) return []
 
   return filterField.value.flatMap((field) => {
-    const baseChip = {
-      name: field.name,
-      label: t(field.label || field.name),
-      icon: '$mdiFilter',
-      color: 'primary',
-      displayValue: undefined as string | undefined,
-    }
-
-    if (Array.isArray(field.value)) {
-      return field.value
-        .filter((value) => value !== undefined)
-        .map((value) => ({ ...baseChip, value }))
-    }
-
-    const configuredField = options.filter?.fields.find((item) => item.name === field.name)
-    const displayValue =
-      configuredField?.type === 'autocomplete' && 'items' in configuredField
-        ? configuredField.items?.find(
-            (item) => typeof item !== 'string' && item.value === field.value,
-          )
-        : undefined
-    return field.value !== undefined
-      ? [
-          {
-            ...baseChip,
-            value: field.value,
-            displayValue:
-              field.type === 'datetime'
-                ? String(field.value).replace('T', ' ')
-                : typeof displayValue === 'object'
-                  ? displayValue.title
-                  : undefined,
-          },
-        ]
-      : []
+    const values = Array.isArray(field.value) ? field.value : [field.value]
+    return values
+      .filter((value) => value !== undefined)
+      .map((value) => ({
+        name: field.name,
+        label: t(field.label || field.name),
+        icon: '$mdiFilter',
+        color: 'primary',
+        value,
+        displayValue:
+          field.type === 'datetime'
+            ? String(value).replace('T', ' ')
+            : selectedFilterItems.value[field.name]?.find((item) => item.value === value)?.title,
+      }))
   })
 })
 
@@ -731,7 +750,9 @@ function handleFilterShow() {
   if (!options.filter) return
   formOptions.value = {
     ...options.filter,
-    fields: options.filter.fields.map((field) => ({ ...field })),
+    fields: options.filter.fields.map((field) =>
+      field.type === 'autocomplete' ? { ...field, items: getFilterItems(field) } : { ...field },
+    ),
     actions: options.filter.actions?.slice(),
   }
 
@@ -760,7 +781,7 @@ function handleFilterShow() {
 
 // sort
 
-const sortItem = ref(options.sort || [])
+const sortItem = ref((options.sort || []).map((item) => ({ ...item })))
 
 const sortChips = computed(() => {
   if (!options.sort) return []
@@ -1046,62 +1067,172 @@ function fetch(action?: 'first' | 'next' | 'prev'): Promise<boolean> {
 
 defineExpose({
   fetch,
+  resetState,
 })
 
-// State persistence via sessionStorage
 interface TablePersistedState {
-  search?: string
-  filter?: Record<string, unknown>
-  sort?: { name: string; value?: string }[]
-  cursorStack?: (string | undefined)[]
-  pageCursor?: string
+  version: 1
+  search: string
+  filter: Record<string, unknown>
+  filterItems?: Record<string, OvFormSelectItem[]>
+  sort: { name: string; value?: 'asc' | 'desc' }[]
+  pageSizes: { desktop: number; mobile: number }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isPageSize(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
+}
+
+function isFilterValue(value: unknown): boolean {
+  return (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'boolean' ||
+    (typeof value === 'number' && Number.isFinite(value)) ||
+    (Array.isArray(value) && value.every((item) => !Array.isArray(item) && isFilterValue(item)))
+  )
+}
+
+function isPersistedState(value: unknown): value is TablePersistedState {
+  return (
+    isRecord(value) &&
+    value.version === 1 &&
+    typeof value.search === 'string' &&
+    isRecord(value.filter) &&
+    Object.values(value.filter).every(isFilterValue) &&
+    (value.filterItems === undefined ||
+      (isRecord(value.filterItems) &&
+        Object.values(value.filterItems).every(
+          (choices: unknown) =>
+            Array.isArray(choices) &&
+            choices.every(
+              (item: unknown) =>
+                isRecord(item) && typeof item.title === 'string' && isFilterValue(item.value),
+            ),
+        ))) &&
+    Array.isArray(value.sort) &&
+    value.sort.every(
+      (item: unknown) =>
+        isRecord(item) &&
+        typeof item.name === 'string' &&
+        (item.value === undefined || item.value === 'asc' || item.value === 'desc'),
+    ) &&
+    isRecord(value.pageSizes) &&
+    isPageSize(value.pageSizes.desktop) &&
+    isPageSize(value.pageSizes.mobile)
+  )
 }
 
 function saveState() {
-  if (!stateKey) return
+  if (!persistenceKey.value) return
   const state: TablePersistedState = {
-    search: searchValue.value || undefined,
-    filter: filterField.value.reduce(
-      (acc, f) => {
-        if (f.value !== undefined) acc[f.name] = f.value
-        return acc
-      },
-      {} as Record<string, unknown>,
-    ),
-    sort: sortItem.value.filter((s) => s.value).map((s) => ({ name: s.name, value: s.value })),
-    cursorStack: cursorStack.value,
-    pageCursor: pageCursor.value,
+    version: 1,
+    search: searchValue.value || '',
+    filter: Object.fromEntries(filterField.value.map((field) => [field.name, field.value ?? null])),
+    filterItems: Object.keys(selectedFilterItems.value).length
+      ? selectedFilterItems.value
+      : undefined,
+    sort: sortItem.value.map(({ name, value }) => ({ name, value })),
+    pageSizes: {
+      desktop: savedPageSizes.value?.desktop ?? options.itemsPerPage ?? 5,
+      mobile: savedPageSizes.value?.mobile ?? options.mobileItemsPerPage ?? 1,
+    },
   }
-  sessionStorage.setItem(stateKey, JSON.stringify(state))
+  try {
+    sessionStorage.setItem(persistenceKey.value, JSON.stringify(state))
+  } catch (error) {
+    console.warn('Unable to save table session state', error)
+  }
 }
 
-function restoreState(): boolean {
-  if (!stateKey) return false
-  const raw = sessionStorage.getItem(stateKey)
-  if (!raw) return false
+function restoreState() {
+  if (!persistenceKey.value) return
   try {
-    const state: TablePersistedState = JSON.parse(raw)
-    if (state.search) searchValue.value = state.search
-    if (state.filter) {
-      for (const field of filterField.value) {
-        if (field.name in state.filter) {
-          field.value = state.filter[field.name]
-        }
+    const raw = sessionStorage.getItem(persistenceKey.value)
+    if (!raw) return
+    const state: unknown = JSON.parse(raw)
+    if (!isPersistedState(state)) throw new Error('Invalid or outdated table session state')
+    for (const field of filterField.value) {
+      const value = state.filter[field.name]
+      if (
+        field.type === 'datetime' &&
+        value !== undefined &&
+        value !== null &&
+        value !== '' &&
+        (typeof value !== 'string' || Number.isNaN(Date.parse(value)))
+      ) {
+        throw new Error('Invalid saved datetime filter')
       }
     }
-    if (state.sort) {
-      for (const saved of state.sort) {
-        const item = sortItem.value.find((s) => s.name === saved.name)
-        if (item) item.value = saved.value as 'asc' | 'desc' | undefined
+    searchValue.value = state.search
+    restoredFilterItems.value = state.filterItems || {}
+    for (const field of filterField.value) {
+      if (Object.hasOwn(state.filter, field.name)) {
+        field.value = state.filter[field.name] ?? undefined
       }
     }
-    if (state.cursorStack) cursorStack.value = state.cursorStack
-    if (state.pageCursor) pageCursor.value = state.pageCursor
-    return true
-  } catch {
-    return false
+    const configuredSort = new Map(sortItem.value.map((item) => [item.name, item]))
+    const restoredSort: typeof sortItem.value = []
+    for (const saved of state.sort) {
+      const item = configuredSort.get(saved.name)
+      if (!item) continue
+      item.value = saved.value
+      restoredSort.push(item)
+      configuredSort.delete(saved.name)
+    }
+    sortItem.value = [...restoredSort, ...configuredSort.values()]
+    if (options.singleSort) {
+      let hasSort = false
+      for (const item of sortItem.value) {
+        if (hasSort) item.value = undefined
+        hasSort ||= !!item.value
+      }
+    }
+    savedPageSizes.value = state.pageSizes
+  } catch (error) {
+    console.warn('Unable to restore table session state', error)
   }
 }
+
+function applyDefaults() {
+  restoredFilterItems.value = {}
+  searchValue.value = options.search?.value || ''
+  filterField.value = (options.filter?.fields || []).map((field) => ({
+    ...field,
+    value: Array.isArray(field.value) ? [...field.value] : field.value,
+  }))
+  sortItem.value = (options.sort || []).map((item) => ({ ...item }))
+  savedPageSizes.value = undefined
+}
+
+function resetState() {
+  applyDefaults()
+  saveState()
+  return fetch('first')
+}
+
+watch(
+  [
+    searchValue,
+    filterField,
+    selectedFilterItems,
+    sortItem,
+    () => options.itemsPerPage,
+    () => options.mobileItemsPerPage,
+  ],
+  saveState,
+  { deep: true },
+)
+
+watch(persistenceKey, () => {
+  applyDefaults()
+  restoreState()
+  fetch('first')
+})
 
 onBeforeUnmount(() => {
   disposed = true
@@ -1112,7 +1243,7 @@ onBeforeUnmount(() => {
 
 onMounted(async () => {
   restoreState()
-  await fetch()
+  await fetch('first')
 })
 </script>
 <style scoped>

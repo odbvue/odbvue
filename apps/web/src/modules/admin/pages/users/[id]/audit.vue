@@ -26,6 +26,7 @@ const { t } = useI18n()
 
 const options = computed<OvTableOptions>(() => ({
   key: 'id',
+  stateKey: `admin.users.${props.user.id}.audit`,
   columns: [
     {
       name: 'severityText',

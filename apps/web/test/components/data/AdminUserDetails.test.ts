@@ -26,10 +26,12 @@ vi.mock('@/capabilities/auth', () => ({
 }))
 
 beforeEach(() => {
+  sessionStorage.clear()
   vi.stubGlobal('definePage', vi.fn<() => void>())
 })
 
 afterEach(() => {
+  sessionStorage.clear()
   vi.unstubAllGlobals()
 })
 
@@ -114,6 +116,9 @@ describe('admin user details view', () => {
             query: expect.objectContaining({ cursor: undefined, ...query }),
           }),
         )
+        expect(JSON.parse(sessionStorage.getItem('admin.users.user-1.audit')!)).toMatchObject({
+          filter: { [field]: value },
+        })
         expect(wrapper.text()).not.toContain('Initial entry')
         get.mockResolvedValueOnce({
           data: { items: [{ id: 'entry-1', body: 'Initial entry', severityText: 'INFO' }] },
@@ -253,6 +258,7 @@ describe('admin user details view', () => {
       expect(tabs[1]?.attributes('aria-selected')).toBe('true')
       expect(get).toHaveBeenCalledWith(`/admin/users/${user.id}/roles`, expect.any(Object))
       const assigned = wrapper.getComponent(VOvTable)
+      expect(assigned.props('options').stateKey).toBe(`admin.users.${user.id}.roles`)
       expect(assigned.find('h3').exists()).toBe(false)
       const remove = assigned
         .findAllComponents(VBtn)
@@ -308,6 +314,8 @@ describe('admin user details view', () => {
         messages['admin.loadRolesError'],
       )
       const available = wrapper.findAllComponents(VOvTable)[1]
+      expect(available).toBeDefined()
+      expect(available!.props('options').stateKey).toBeUndefined()
       const assign = available
         ?.findAllComponents(VBtn)
         .find((button) => button.props('icon') === '$mdiPlus')

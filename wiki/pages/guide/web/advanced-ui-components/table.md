@@ -31,15 +31,15 @@ const options = ref<OvTableOptions>({
 
 ### Props
 
-| Prop          | Type             | Default     | Description                                                   |
-| ------------- | ---------------- | ----------- | ------------------------------------------------------------- |
-| `options`     | `OvTableOptions` | required    | Table layout, columns, search, filter, sort, and actions.     |
-| `items`       | `OvTableData[]`  | `[]`        | Optional supplied rows; fetched pages are managed internally. |
-| `nextCursor`  | `string`         | `undefined` | Optional external continuation override.                      |
-| `loading`     | `boolean`        | `false`     | Additional external loading; fetch loading is automatic.      |
-| `title`       | `string`         | -           | Optional title above the table.                               |
-| `description` | `string`         | -           | Optional description above the table.                         |
-| `stateKey`    | `string`         | -           | Persists table state to `sessionStorage` under this key.      |
+| Prop          | Type             | Default     | Description                                                    |
+| ------------- | ---------------- | ----------- | -------------------------------------------------------------- |
+| `options`     | `OvTableOptions` | required    | Table layout, columns, search, filter, sort, and actions.      |
+| `items`       | `OvTableData[]`  | `[]`        | Optional supplied rows; fetched pages are managed internally.  |
+| `nextCursor`  | `string`         | `undefined` | Optional external continuation override.                       |
+| `loading`     | `boolean`        | `false`     | Additional external loading; fetch loading is automatic.       |
+| `title`       | `string`         | -           | Optional title above the table.                                |
+| `description` | `string`         | -           | Optional description above the table.                          |
+| `stateKey`    | `string`         | -           | Optional session preference key; overrides `options.stateKey`. |
 
 ### Emits
 
@@ -55,9 +55,10 @@ Return the whole page through completion instead of maintaining page state in th
 
 ### Exposed
 
-| Method    | Type                                                         | Description                                          |
-| --------- | ------------------------------------------------------------ | ---------------------------------------------------- |
-| `fetch()` | `(action?: 'first' \| 'next' \| 'prev') => Promise<boolean>` | Resolves true only when the requested page succeeds. |
+| Method         | Type                                                         | Description                                                    |
+| -------------- | ------------------------------------------------------------ | -------------------------------------------------------------- |
+| `fetch()`      | `(action?: 'first' \| 'next' \| 'prev') => Promise<boolean>` | Resolves true only when the requested page succeeds.           |
+| `resetState()` | `() => Promise<boolean>`                                     | Restores configured query defaults and fetches the first page. |
 
 ### Slots
 
@@ -72,6 +73,7 @@ Return the whole page through completion instead of maintaining page state in th
 `options` is an `OvTableOptions` object with these main parts:
 
 - `key`: row identity field.
+- `stateKey`: optional stable, unique `sessionStorage` key, e.g. `'admin.audit'`.
 - `columns`: array of `{ name, label, format, actions, actionFormat, maxLength, align }`.
 - `search`: optional search label, placeholder, and default value.
 - `filter`: optional `OvFormOptions` used for the filter dialog. Set `filterUtc: true`
@@ -85,7 +87,22 @@ Return the whole page through completion instead of maintaining page state in th
 
 ### Notes
 
-- Search, filter, sort, and page state can be persisted with `stateKey`.
+- Persistence is opt-in via `options.stateKey` (or the `state-key` prop).
+  Search text, applied filter values, ordered sort descriptors, and desktop/mobile
+  page sizes are saved automatically in `sessionStorage`, surviving navigation
+  and reloads in the same browser tab. Empty search and cleared defaults are retained.
+- Selected autocomplete titles are also retained for filter chips and reopened
+  filter dialogs. Only selected entries are saved, not the picker search results;
+  fetch requests continue to use their underlying values.
+- Restoration happens before the first fetch, which always requests fresh data
+  without a cursor. Rows, cursor history, selection, loading, and errors are never
+  persisted. Invalid/outdated state or unavailable storage is logged as a warning;
+  the table remains usable with its configured defaults.
+- Persistence adds no extra buttons. The exposed `resetState()` method restores
+  configured search, filters, sorting, and page sizes, saves those defaults, and
+  fetches the first page.
+- Use unique keys for distinct tables and per-record tables; avoid storing sensitive
+  filter values. Temporary selection dialogs should normally omit `stateKey`.
 - Apply commits filter values and requests the first page. Clearing a field or
   removing its chip removes that filter from the next request.
 - For date ranges, use the `date` rule on each field and the `date-on-or-after`

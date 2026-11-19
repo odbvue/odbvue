@@ -31,6 +31,7 @@ const http = useHttp()
 const ui = useUi()
 const options = computed<OvTableOptions>(() => ({
   key: 'id',
+  stateKey: 'admin.users',
   itemsPerPage: 5,
   mobileItemsPerPage: 5,
   search: { placeholder: t('admin.searchUsers') },
