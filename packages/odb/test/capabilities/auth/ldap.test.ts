@@ -21,7 +21,7 @@ describe('LDAP and LDAPS authentication', () => {
       expect(seed).toContain(`APP.odb_settings.write('${setting.id}', '${setting.value}'`)
       if ('secret' in setting)
         expect(seed).toContain(
-          `'${setting.id}', '', '{"label":"${setting.label}","type":"string","secret":"Y"}'`,
+          `'${setting.id}', '', '{"label":"${setting.label}","deletable":"N","type":"string","secret":"Y"}'`,
         )
     }
     expect(() => odbAuth.config({ ldap: 'Y' } as never)).toThrow('must be a boolean')

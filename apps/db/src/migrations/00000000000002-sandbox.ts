@@ -8,14 +8,15 @@ import {
   odbEnv,
   odbHttp,
   odbPackage,
+  odbQuery,
   odbSettings,
   odbStorage,
   odbEmails,
   odbAcl,
-  odbOracle,
   odbLiteral,
   odbType,
   PlsqlStatement,
+  settingsStore,
   type Package,
 } from '@odbvue/odb'
 
@@ -244,10 +245,22 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
     'read_setting',
     {
       in: { id: odbSettings.types.id },
-      out: { value: odbSettings.types.value, meta: odbSettings.types.meta },
+      out: {
+        value: odbSettings.types.value,
+        meta: odbSettings.types.meta,
+        protected: settingsStore.protected,
+      },
     },
-    ({ params: { id, value, meta }, body }) => {
+    ({ params: { id, value, meta, protected: protection }, body }) => {
       body.call(odbSettings.readMasked(id, value, meta))
+      body.query(
+        odbQuery()
+          .selectFrom(settingsStore)
+          .select(settingsStore.protected)
+          .into(protection)
+          .where(cond.eq(settingsStore.id, id)),
+      )
+      body.when('NO_DATA_FOUND', (missing) => missing.notFound('SETTING_NOT_FOUND'))
     },
   )
   defineService(readSetting, {
@@ -256,7 +269,11 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
     path: '/settings/:id',
     summary: 'Read a setting',
     uri: { id: readSetting.parameters.id },
-    response: { value: readSetting.parameters.value, meta: readSetting.parameters.meta },
+    response: {
+      value: readSetting.parameters.value,
+      meta: readSetting.parameters.meta,
+      protected: readSetting.parameters.protected,
+    },
   })
 
   const writeSetting = pkg.proc(
@@ -268,17 +285,14 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
       },
     },
     ({ params: { id, value }, body }) => {
-      body.ifThen(cond.regexpLike(odbOracle.upper(id), '^AUTH_'), (then) =>
-        then.forbidden('AUTH_SETTINGS_REQUIRE_TRUSTED_SETUP'),
-      )
-      body.call(odbSettings.write(id, value))
+      body.call(odbSettings.updateEditable(id, value))
     },
   )
   defineService(writeSetting, {
     auth: { roles: ['admin'] },
     method: 'PUT',
     path: '/settings/:id',
-    summary: 'Create or update a setting',
+    summary: 'Update an existing unprotected setting',
     uri: { id: writeSetting.parameters.id },
     body: { value: writeSetting.parameters.value },
   })
@@ -287,10 +301,7 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
     'remove_setting',
     { in: { id: odbSettings.types.id } },
     ({ params: { id }, body }) => {
-      body.ifThen(cond.regexpLike(odbOracle.upper(id), '^AUTH_'), (then) =>
-        then.forbidden('AUTH_SETTINGS_REQUIRE_TRUSTED_SETUP'),
-      )
-      body.call(odbSettings.remove(id))
+      body.call(odbSettings.removeEditable(id))
     },
   )
   defineService(removeSetting, {
@@ -576,4 +587,6 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
 
 export const migration = defineMigration('00000000000002_sandbox', {
   schema: odbEnv.schemaUsername,
-}).install(sandboxPackage)
+})
+  .install(odbSettings.seed({ id: 'SANDBOX_DEMO', value: 'Demo setting' }))
+  .install(sandboxPackage)

@@ -13,13 +13,15 @@ import {
   odbLiteral,
   odbPackage,
   odbQuery,
+  odbSettings,
   odbTable,
   odbType,
   plsqlExpr,
+  settingsStore,
   type Package,
 } from '@odbvue/odb'
 
-const rolePageInputs = {
+const searchPageInputs = {
   after: odbType.json(),
   limit: odbType.integer(),
   search: odbType.string(256),
@@ -191,7 +193,7 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
   const listRoles = pkg.proc(
     'list_roles',
     {
-      in: rolePageInputs,
+      in: searchPageInputs,
       out: { items: odbType.resultset() },
     },
     ({ params: { after, limit, search, items }, body }) => {
@@ -230,7 +232,7 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
 
   const listUserRoles = pkg.proc(
     'list_user_roles',
-    { in: { id: odbType.guid(), ...rolePageInputs }, out: { items: odbType.resultset() } },
+    { in: { id: odbType.guid(), ...searchPageInputs }, out: { items: odbType.resultset() } },
     ({ params: { id, after, limit, search, items }, body }) => {
       const { foundId } = body.variables({ foundId: authUsers.id })
       body.query(findUserId(id).into(foundId))
@@ -279,7 +281,7 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
 
   const listAvailableUserRoles = pkg.proc(
     'list_available_user_roles',
-    { in: { id: odbType.guid(), ...rolePageInputs }, out: { items: odbType.resultset() } },
+    { in: { id: odbType.guid(), ...searchPageInputs }, out: { items: odbType.resultset() } },
     ({ params: { id, after, limit, search, items }, body }) => {
       const { foundId } = body.variables({ foundId: authUsers.id })
       body.query(findUserId(id).into(foundId))
@@ -402,12 +404,87 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
     responseStatus: 204,
   })
 
+  const listSettings = pkg.proc(
+    'list_settings',
+    { in: searchPageInputs, out: { items: odbType.resultset() } },
+    ({ params: { after, limit, search, items }, body }) => {
+      const term = odbOracle.lower(odbOracle.trim(search))
+      body.openFor(
+        items,
+        odbQuery()
+          .selectFrom(settingsStore)
+          .select([
+            settingsStore.id,
+            settingsStore.secret,
+            settingsStore.protected,
+            settingsStore.meta,
+          ])
+          .selectAs(
+            odbOracle.caseWhen(
+              cond.eq(settingsStore.secret, 'N'),
+              settingsStore.value,
+              odbOracle.toClob('NULL'),
+              'CLOB',
+            ),
+            settingsStore.value,
+          )
+          .where(
+            cond.or([
+              cond.isNull(term),
+              cond.gt(odbOracle.instr(odbOracle.lower(settingsStore.id), term), 0),
+            ]),
+          )
+          .orderBy(settingsStore.id)
+          .paginate({ cursor: after, limit }),
+      )
+    },
+  )
+  defineService(listSettings, {
+    auth: { roles: ['admin'] },
+    module: 'admin',
+    basePath: '/admin',
+    method: 'GET',
+    path: '/settings',
+    summary: 'List settings by ID without returning secret values',
+    query: {
+      cursor: listSettings.parameters.after,
+      limit: listSettings.parameters.limit,
+      search: listSettings.parameters.search,
+    },
+    response: { items: listSettings.parameters.items },
+  })
+
+  const updateSetting = pkg.proc(
+    'update_setting',
+    { in: { id: odbSettings.types.id, value: odbSettings.types.value, actorId: odbType.guid() } },
+    ({ params: { id, value, actorId }, body }) => {
+      body.call(odbSettings.updateEditable(id, value))
+      body.auditEvent('Application setting updated', {
+        'user.id': actorId,
+        'event.name': odbLiteral('admin.setting.update'),
+        'setting.id': id,
+      })
+    },
+  )
+  defineService(updateSetting, {
+    auth: { roles: ['admin'] },
+    module: 'admin',
+    basePath: '/admin',
+    method: 'PUT',
+    path: '/settings/:id',
+    summary: 'Update an existing setting without returning its value',
+    uri: { id: updateSetting.parameters.id },
+    context: { userId: updateSetting.parameters.actorId },
+    body: { value: updateSetting.parameters.value },
+    responseStatus: 204,
+  })
+
   const listUserAudit = pkg.proc(
     'list_user_audit',
     {
       in: {
         id: odbType.guid(),
-        ...rolePageInputs,
+        ...searchPageInputs,
         severity: odbType.string(64),
         from: odbType.string(24),
         to: odbType.string(24),

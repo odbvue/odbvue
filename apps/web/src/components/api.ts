@@ -86,7 +86,7 @@ export type OvAction =
       name: string
       title?: string
       format?: OvFormat | OvFormat[]
-      form?: OvFormOptions
+      form?: OvFormOptions | ((data: OvTableData) => OvFormOptions)
       group?: boolean
     }
   | string

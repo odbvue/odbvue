@@ -37,7 +37,7 @@ describe('Settings', () => {
 
   it('implements list, read, write and remove in PL/SQL', () => {
     expect(sql).toContain(
-      'OPEN p_items FOR SELECT id AS "id", CASE WHEN secret = \'Y\' THEN TO_CLOB(\'********\') ELSE value END AS "value", meta AS "meta" FROM odb_settings_store',
+      'OPEN p_items FOR SELECT id AS "id", CASE WHEN secret = \'Y\' THEN TO_CLOB(\'********\') ELSE value END AS "value", meta AS "meta", protected AS "protected" FROM odb_settings_store',
     )
     expect(sql).toContain("id > JSON_VALUE(p_after, '$[0]'")
     expect(sql).toContain('ORDER BY id ASC FETCH FIRST NVL(p_limit, 25) + 1 ROWS ONLY')
@@ -80,11 +80,61 @@ describe('Settings', () => {
       { name: 'id', type: 'string', nullable: false },
       { name: 'value', type: 'clob', nullable: true },
       { name: 'meta', type: 'json', nullable: false },
+      { name: 'protected', type: 'string', nullable: false },
     ])
     expect(sql).toContain('read_value(p_id, 0, p_value, p_meta)')
     expect(sql).toContain('read_value(p_id, 1, p_value, p_meta)')
     expect(sql).toMatch(
       /IF p_masked = 1 THEN\s+p_value := '\*{8}';\s+ELSE\s+p_value := decrypt_value\(p_id, l_stored_value\)/,
+    )
+  })
+
+  it('locks and checks persisted protection before any editable update or delete', () => {
+    expect(sql).toContain("CHECK (protected IN ('Y', 'N'))")
+    expect(sql).toContain(
+      'SELECT protected, secret INTO l_protection, p_secret FROM odb_settings_store WHERE id = p_id FOR UPDATE',
+    )
+    expect(sql).toMatch(/IF l_protection = 'Y' THEN\s+.*SETTINGS_REQUIRE_TRUSTED_SETUP/)
+    expect(sql).toContain('ODB_ERROR|NOT_FOUND|SETTING_NOT_FOUND')
+    expect(sql).toMatch(
+      /lock_editable\(p_id, l_secret\);\s+IF .*p_value IS NULL.* THEN[\s\S]+?SETTINGS_SECRET_REPLACEMENT_REQUIRED[\s\S]+?write\(p_id, p_value, NULL\);/,
+    )
+    expect(sql).toMatch(
+      /lock_editable\(p_id, l_secret\);[\s\S]+?JSON_VALUE\(meta, '\$\.deletable'[\s\S]+?SETTINGS_DELETE_FORBIDDEN[\s\S]+?remove\(p_id\);/,
+    )
+    expect(sql).toMatch(
+      /write\(p_id, p_value, p_meta\);\s+UPDATE odb_settings_store SET protected = 'Y' WHERE id = p_id;/,
+    )
+  })
+
+  it('validates editable values against stored metadata before writing', () => {
+    const start = sql.indexOf(
+      'PROCEDURE validate_editable(p_value IN VARCHAR2, p_meta IN odb_settings_store.meta%TYPE) IS',
+    )
+    const end = sql.indexOf('END validate_editable;', start)
+    expect(start).toBeGreaterThan(-1)
+    const validator = sql.slice(start, end)
+    expect(JSON.stringify(odbSettingsPackage.application())).not.toContain('"kind":"raw"')
+    expect(validator).toContain('l_element := JSON_ELEMENT_T.PARSE(p_meta)')
+    expect(validator).toContain('IF l_element.is_object() = FALSE THEN')
+    expect(validator).toContain("l_field_type = 'number'")
+    expect(validator).toContain("l_field_type = 'switch'")
+    expect(validator).toContain("l_field_type = 'checkbox'")
+    expect(validator).toContain("l_field_type = 'select'")
+    expect(validator).toContain("l_kind = 'custom'")
+    for (const name of ['jwt-secret', 'jwt-issuer', 'jwt-expiration', 'port']) {
+      expect(validator).toContain(`'${name}'`)
+    }
+    expect(validator).toContain('SETTINGS_VALIDATION_INVALID')
+    expect(validator).toContain('odb_validation.check_rule(p_value, l_rule) = FALSE')
+    expect(validator).toContain('odb_validation.in_set(p_value, l_params) = FALSE')
+    expect(validator).toContain('odb_validation.is_number(p_value) = FALSE')
+    expect(validator).toContain('odb_validation.is_port(p_value) = FALSE')
+    expect(validator).toMatch(
+      /odb_validation\.check_rule\(p_value, l_rule\) = FALSE THEN\s+raise_application_error\(-20998, 'ODB_ERROR\|VALIDATION_ERROR\|SETTINGS_VALIDATION_INVALID'\)/,
+    )
+    expect(sql).toMatch(
+      /lock_editable\(p_id, l_secret\);[\s\S]+?validate_editable\(p_value, l_meta\);\s+write\(p_id, p_value, NULL\);/,
     )
   })
 

@@ -28,6 +28,15 @@
           hover
         />
       </v-col>
+      <v-col cols="12" md="6">
+        <v-card
+          to="/admin/settings"
+          prepend-icon="$mdiCog"
+          :title="t('admin.settings')"
+          :text="t('admin.settingsDescription')"
+          hover
+        />
+      </v-col>
     </v-row>
   </v-container>
 </template>

@@ -136,6 +136,9 @@ const bindings = {
   jwt_expiration: '900',
   app_public_url: settings.app_public_url,
   google_enabled: 'N',
+  smtp_secret_meta: '{"label":"SMTP password","type":"string","secret":"Y"}',
+  jwt_secret_meta:
+    '{"label":"JWT signing secret","type":"password","secret":"Y","deletable":"N","rules":[{"type":"custom","params":"jwt-secret"}]}',
 }
 
 describe('CLI SMTP, JWT, and application URL settings setup', () => {
@@ -214,7 +217,7 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
       auth_ldap_tls_enabled: 'Y',
       auth_ldap_port: '636',
       ldap_port: 636,
-      ldap_secret_meta: '{"secret":"Y"}',
+      ldap_secret_meta: '{"secret":"Y","deletable":"N"}',
     })
     expect(sql).not.toContain(ldapSettings.auth_ldap_bind_password)
     expect(sql).not.toContain(ldapSettings.auth_ldap_wallet_password)
@@ -557,20 +560,21 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
     await expect(runSetupSettings()).resolves.toBe(true)
     const [sql, actualBindings] = state.connection.execute.mock.calls[0]!
     expect(actualBindings).toEqual(bindings)
-    for (const [id, bind] of [
+    for (const [id, bind, meta] of [
       ['SMTP_HOST', 'host'],
       ['SMTP_PORT', 'port_value'],
       ['SMTP_USERNAME', 'username'],
-      ['SMTP_PASSWORD', 'password'],
+      ['SMTP_PASSWORD', 'password', ':smtp_secret_meta'],
       ['SMTP_FROM_ADDR', 'from_addr'],
       ['SMTP_FROM_NAME', 'from_name'],
-      ['AUTH_JWT_SECRET', 'jwt_secret'],
+      ['AUTH_JWT_SECRET', 'jwt_secret', ':jwt_secret_meta'],
       ['AUTH_JWT_ISSUER', 'auth_jwt_issuer'],
       ['AUTH_JWT_EXPIRATION_SECONDS', 'jwt_expiration'],
       ['APP_PUBLIC_URL', 'app_public_url'],
       ['AUTH_GOOGLE_ENABLED', 'google_enabled'],
     ]) {
-      expect(sql).toContain(`APP.odb_settings.write('${id}', :${bind}, NULL)`)
+      const method = 'write'
+      expect(sql).toContain(`APP.odb_settings.${method}('${id}', :${bind}, ${meta ?? 'NULL'})`)
     }
     expect(sql).toContain('APP.odb_acl.add_smtp(:host, :port)')
     expect(sql).not.toContain('DECLARE')
@@ -893,7 +897,7 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
           auth_google_client_id: google.auth_google_client_id,
           auth_google_client_secret: google.auth_google_client_secret,
           auth_google_redirect_uri: 'http://localhost:5173/api/auth/google/callback',
-          google_secret_meta: '{"secret":"Y"}',
+          google_secret_meta: '{"secret":"Y","deletable":"N"}',
         })
         expect(sql).toContain(
           "APP.odb_settings.write('AUTH_GOOGLE_CLIENT_SECRET', :auth_google_client_secret, :google_secret_meta)",

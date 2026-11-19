@@ -2,6 +2,7 @@
 @username = admin
 @password = change-me
 @settingId = SANDBOX_DEMO
+@settingsCursor = replace-with-nextCursor
 @emailAddress = recipient@example.com
 @emailId = replace-with-queued-email-id
 
@@ -63,12 +64,12 @@ Authorization: Bearer {{accessToken}}
 ### Current user without token (expects 401)
 GET {{baseUrl}}/auth/me
 
-### List settings (first page, 50 per page)
+### List settings (first page)
 GET {{baseUrl}}/sandbox/settings
 Authorization: Bearer {{accessToken}}
 
 ### List settings (next page, from a previous nextCursor)
-GET {{baseUrl}}/sandbox/settings?limit=50&cursor={{settingId}}
+GET {{baseUrl}}/sandbox/settings?limit=50&cursor={{settingsCursor}}
 Authorization: Bearer {{accessToken}}
 
 ### Read setting
@@ -79,8 +80,8 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/sandbox/settings/DOES_NOT_EXIST
 Authorization: Bearer {{accessToken}}
 
-### Create or update setting
-PUT {{baseUrl}}/sandbox/settings/SANDBOX_TEST
+### Update the seeded demo setting
+PUT {{baseUrl}}/sandbox/settings/{{settingId}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -88,12 +89,12 @@ Content-Type: application/json
   "value": "Hello from test.http"
 }
 
-### Read created setting
-GET {{baseUrl}}/sandbox/settings/SANDBOX_TEST
+### Read updated setting
+GET {{baseUrl}}/sandbox/settings/{{settingId}}
 Authorization: Bearer {{accessToken}}
 
-### Delete setting
-DELETE {{baseUrl}}/sandbox/settings/SANDBOX_TEST
+### Delete protected setting (expects 403)
+DELETE {{baseUrl}}/sandbox/settings/AUTH_JWT_SECRET
 Authorization: Bearer {{accessToken}}
 
 ### Settings without token (expects 401)

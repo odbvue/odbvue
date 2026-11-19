@@ -69,6 +69,7 @@ export default defineConfig({
                 { text: 'Authentication', link: '/guide/db/capabilities/auth' },
                 { text: 'Lob', link: '/guide/db/capabilities/lob' },
                 { text: 'Audit', link: '/guide/db/capabilities/audit' },
+                { text: 'Validation', link: '/guide/db/capabilities/validation' },
                 { text: 'Settings', link: '/guide/db/capabilities/settings' },
                 { text: 'Storage', link: '/guide/db/capabilities/storage' },
                 { text: 'Emails', link: '/guide/db/capabilities/emails' },

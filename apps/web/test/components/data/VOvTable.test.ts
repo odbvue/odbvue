@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import { mdiPencil } from '@mdi/js'
 import { VAutocomplete, VBtn, VChip, VTextField } from 'vuetify/components'
 import VOvForm from '@/components/forms/VOvForm.vue'
 import VOvTable from '@/components/data/VOvTable.vue'
@@ -906,6 +907,89 @@ describe('VOvTable', () => {
       sampleData,
     )
     expect(wrapper.html()).toContain('button')
+  })
+
+  it('prefills an ordinary row form and keeps a write-only draft out of rows after refetch', async () => {
+    const ordinary = { name: 'Ordinary', value: 'original', editMode: 'value' }
+    const writeOnly = { name: 'Secret', value: null, editMode: 'secret' }
+    const protectedRow = { name: 'Protected', value: null, editMode: 'none' }
+    const items = [ordinary, writeOnly, protectedRow]
+    const { wrapper, onFetch, request } = mountManagedTable({
+      key: 'name',
+      columns: [
+        { name: 'name' },
+        { name: 'value' },
+        {
+          name: 'actions',
+          actions: [
+            {
+              name: 'edit',
+              title: 'Edit',
+              key: 'editMode',
+              format: [
+                { rules: { type: 'equals', params: 'value' }, icon: mdiPencil },
+                { hidden: true },
+              ],
+              form: (row) => ({
+                fields: [{ name: 'value', type: row.name === 'Ordinary' ? 'textarea' : 'text' }],
+                actions: ['cancel'],
+                actionCancel: 'cancel',
+              }),
+            },
+            {
+              name: 'replace',
+              title: 'Replace',
+              key: 'editMode',
+              format: [
+                { rules: { type: 'equals', params: 'secret' }, icon: mdiPencil },
+                { hidden: true },
+              ],
+              form: {
+                fields: [{ name: 'replacement', type: 'password', value: '' }],
+                actions: ['save', 'cancel'],
+                actionSubmit: 'save',
+                actionCancel: 'cancel',
+              },
+            },
+          ],
+        },
+      ],
+      mobileItemsPerPage: 3,
+    })
+    request().complete({ items })
+    await flushPromises()
+    expect(wrapper.findAll('button[aria-label="Replace"]')).toHaveLength(1)
+    expect(wrapper.findAll('button[aria-label="Edit"]')).toHaveLength(1)
+    await wrapper.get('button[aria-label="Edit"]').trigger('click')
+    await flushPromises()
+    let form = wrapper.getComponent(VOvForm)
+    expect(form.get<HTMLTextAreaElement>('textarea').element.value).toBe('original')
+    await form.vm.handleAction('cancel')
+
+    const openReplacement = async () => {
+      await wrapper.get('button[aria-label="Replace"]').trigger('click')
+      await flushPromises()
+      return wrapper.getComponent(VOvForm)
+    }
+    form = await openReplacement()
+    const input = form.get<HTMLInputElement>('input[type="password"]')
+    expect(input.element.value).toBe('')
+    await input.setValue('test-replacement')
+    await form.vm.handleAction('save')
+    const [action, rows, submission, complete] = wrapper.emitted('action')![0]!
+    expect(action).toBe('replace')
+    expect(rows).toEqual(items)
+    expect(submission).toMatchObject({ name: 'Secret', replacement: 'test-replacement' })
+    expect(complete).toBeTypeOf('function')
+    if (typeof complete !== 'function') throw new Error('Missing action callback')
+    complete(undefined, true)
+    expect(onFetch).toHaveBeenCalledTimes(2)
+    request().complete({ items })
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('test-replacement')
+    form = await openReplacement()
+    expect(form.get<HTMLInputElement>('input[type="password"]').element.value).toBe('')
+    wrapper.unmount()
   })
 
   it('renders action with title attribute', () => {

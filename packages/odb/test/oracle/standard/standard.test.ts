@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { odbOracle } from '../../../src/oracle/standard/standard.js'
 import { odbDbmsCrypto } from '../../../src/oracle/dbms-crypto/dbms-crypto.js'
+import { odbJson } from '../../../src/oracle/json/json.js'
 import { cond, odbLiteral, Param, type PlsqlExpression } from '../../../src/schema/attribute.js'
 
 describe('odbOracle', () => {
@@ -118,6 +119,16 @@ describe('odbOracle', () => {
     expect(odbOracle.lower(odbOracle.trim('p_username')).toSQL()).toBe('LOWER(TRIM(p_username))')
     expect(odbOracle.nvl('l_hash', odbLiteral('fallback')).toSQL()).toBe("NVL(l_hash, 'fallback')")
     expect(odbOracle.toNumber('l_value').toSQL()).toBe('TO_NUMBER(l_value)')
+    expect(odbOracle.length2('l_value').toSQL()).toBe('LENGTH2(l_value)')
+    expect(
+      odbOracle
+        .toNumber('l_value', odbLiteral('999D99'), odbLiteral("NLS_NUMERIC_CHARACTERS='.,'"))
+        .toSQL(),
+    ).toBe("TO_NUMBER(l_value, '999D99', 'NLS_NUMERIC_CHARACTERS=''.,''')")
+    expect(() => odbOracle.toNumber('l_value', undefined, odbLiteral('nls'))).toThrow(
+      'nls requires a format',
+    )
+    expect(odbJson.parseElement('p_meta').toSQL()).toBe('JSON_ELEMENT_T.PARSE(p_meta)')
   })
 
   it('renders regular-expression functions with optional arguments', () => {

@@ -19,12 +19,14 @@ import UserPermissionsTab from '@/modules/admin/pages/users/[id]/permissions.vue
 import UserAuditTab from '@/modules/admin/pages/users/[id]/audit.vue'
 import Audit from '@/modules/admin/pages/audit/index.vue'
 import Roles from '@/modules/admin/pages/roles/index.vue'
+import Settings from '@/modules/admin/pages/settings/index.vue'
 import App from '@/app/App.vue'
 import messages from '@/modules/admin/i18n/en.json'
 import {
   renderViewItem,
   type OvTableOptions,
   type OvTableFetchRequest,
+  type OvFormFieldError,
   type OvFormSelectionField,
 } from '@/components/api'
 
@@ -103,7 +105,9 @@ const pages = import.meta.glob<string>('@/modules/admin/pages/**/*.vue', {
 const wrappers: ReturnType<typeof mount>[] = []
 const ui = useUi()
 
-async function setup(page: boolean | 'roles' | 'permissions' | 'audit' | 'global-audit' = false) {
+async function setup(
+  page: boolean | 'roles' | 'permissions' | 'audit' | 'global-audit' | 'settings' = false,
+) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -123,13 +127,14 @@ async function setup(page: boolean | 'roles' | 'permissions' | 'audit' | 'global
       },
       { path: '/admin/roles', component: Roles },
       { path: '/admin/audit', component: Audit },
+      { path: '/admin/settings', component: Settings },
     ],
   })
   await router.push(
     page === 'global-audit'
       ? '/admin/audit'
-      : page === 'roles'
-        ? '/admin/roles'
+      : page === 'roles' || page === 'settings'
+        ? `/admin/${page}`
         : page
           ? `/admin/users/${user.id}${page === 'permissions' || page === 'audit' ? `/${page}` : ''}`
           : '/admin/users',
@@ -240,9 +245,148 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+type SettingActionComplete = (errors?: OvFormFieldError[], refetch?: boolean) => void
+
+describe('admin settings', () => {
+  it('limits displayed values to 30 characters and marks secrets with a lock icon', async () => {
+    const { wrapper } = await setup('settings')
+    const options: OvTableOptions = wrapper.findComponent(table).props('options')
+    const value = options.columns.find(
+      (column) => typeof column !== 'string' && column.name === 'value',
+    )
+    const secret = options.columns.find(
+      (column) => typeof column !== 'string' && column.name === 'secret',
+    )
+    expect(value).toMatchObject({ maxLength: 30 })
+    expect(secret).toMatchObject({
+      format: [
+        { rules: { type: 'equals', params: 'Y' }, icon: '$mdiLock', text: '' },
+        { text: '' },
+      ],
+    })
+  })
+
+  it('passes search and the opaque cursor through and can clear an ordinary setting', async () => {
+    const { wrapper } = await setup('settings')
+    const settings = wrapper.findComponent(table)
+    const row = {
+      id: 'SMTP_HOST',
+      secret: 'N',
+      protected: 'N',
+      value: 'smtp.example.test',
+      meta: { type: 'text' },
+    }
+    const secret = {
+      id: 'SMTP_PASSWORD',
+      secret: 'Y',
+      protected: 'N',
+      value: null,
+      meta: { type: 'password' },
+    }
+    const protectedSecret = { ...secret, id: 'AUTH_JWT_SECRET', protected: 'Y' }
+    const protectedValue = { ...row, id: 'AUTH_JWT_ISSUER', protected: 'Y' }
+    const page = {
+      items: [row, secret, protectedSecret, protectedValue],
+      nextCursor: 'opaque-next',
+    }
+    const complete = vi.fn<OvTableFetchRequest['complete']>()
+    const { signal } = new AbortController()
+    get.mockResolvedValueOnce({ ...result(), data: page })
+    settings.vm.$emit('fetch', {
+      cursor: 'opaque-cursor',
+      limit: 5,
+      search: 'smtp',
+      signal,
+      complete,
+    })
+    await flushPromises()
+    expect(get).toHaveBeenLastCalledWith('/admin/settings', {
+      query: { cursor: 'opaque-cursor', limit: 5, search: 'smtp' },
+      signal,
+    })
+    expect(complete).toHaveBeenCalledExactlyOnceWith({
+      items: [
+        { ...row, editMode: 'value' },
+        { ...secret, editMode: 'secret' },
+        { ...protectedSecret, editMode: 'none' },
+        { ...protectedValue, editMode: 'none' },
+      ],
+      nextCursor: 'opaque-next',
+    })
+    const saved = vi.fn<SettingActionComplete>()
+    putRole.mockResolvedValueOnce({ data: null, error: null, status: 204, headers: null })
+    settings.vm.$emit('action', 'admin.editSetting', page.items, { ...row, value: null }, saved)
+    await flushPromises()
+    expect(putRole).toHaveBeenCalledExactlyOnceWith('/admin/settings/SMTP_HOST', { value: '' })
+    expect(saved).toHaveBeenCalledExactlyOnceWith(undefined, true)
+  })
+
+  it('rejects empty or masked secret replacements and requests a refetch after saving', async () => {
+    const { wrapper } = await setup('settings')
+    const settings = wrapper.findComponent(table)
+    const row = { id: 'API_TOKEN', secret: 'Y', protected: 'N', value: null }
+    const complete = vi.fn<SettingActionComplete>()
+    const submit = (replacement: string) =>
+      settings.vm.$emit(
+        'action',
+        'admin.replaceSettingSecret',
+        [row],
+        { ...row, replacement },
+        complete,
+      )
+    for (const invalid of ['', '********']) {
+      submit(invalid)
+      expect(putRole).not.toHaveBeenCalled()
+      expect(complete).toHaveBeenLastCalledWith([
+        { name: 'replacement', message: 'admin.settingSecretRequired' },
+      ])
+    }
+    putRole.mockResolvedValueOnce({ data: null, error: null, status: 204, headers: null })
+    submit('new-test-value')
+    await flushPromises()
+    expect(putRole).toHaveBeenCalledExactlyOnceWith('/admin/settings/API_TOKEN', {
+      value: 'new-test-value',
+    })
+
+    expect(complete).toHaveBeenLastCalledWith(undefined, true)
+    expect(row.value).toBeNull()
+  })
+
+  it('stores boolean switch submissions as Y or N', async () => {
+    const { wrapper } = await setup('settings')
+    const row = {
+      id: 'AUTH_PASSWORD_ENABLED',
+      secret: 'N',
+      protected: 'N',
+      value: null,
+      meta: { type: 'switch' },
+    }
+    const complete = vi.fn<SettingActionComplete>()
+    putRole.mockResolvedValueOnce({ data: null, error: null, status: 204, headers: null })
+    wrapper
+      .findComponent(table)
+      .vm.$emit('action', 'admin.editSetting', [row], { ...row, value: true }, complete)
+    await flushPromises()
+    expect(putRole).toHaveBeenCalledExactlyOnceWith('/admin/settings/AUTH_PASSWORD_ENABLED', {
+      value: 'Y',
+    })
+    expect(complete).toHaveBeenCalledExactlyOnceWith(undefined, true)
+  })
+
+  it('rejects a protected row even if a form submission is emitted', async () => {
+    const { wrapper } = await setup('settings')
+    const row = { id: 'CUSTOM_POLICY', secret: 'N', protected: 'Y', value: 'Y' }
+    const complete = vi.fn<SettingActionComplete>()
+    wrapper.findComponent(table).vm.$emit('action', 'admin.editSetting', [row], row, complete)
+    await flushPromises()
+    expect(complete).toHaveBeenCalledWith([{ name: 'value', message: 'admin.settingTrustedSetup' }])
+    expect(putRole).not.toHaveBeenCalled()
+  })
+})
+
 describe('admin page metadata', () => {
-  it('discovers the landing page, users list, user details, roles list, and global audit', () => {
-    expect(Object.keys(pages)).toHaveLength(8)
+  it('discovers the landing page, users list, user details, roles, audit, and settings', () => {
+    expect(Object.keys(pages)).toHaveLength(9)
   })
 
   it.each(Object.entries(pages))('restricts %s to administrators', (path, source) => {

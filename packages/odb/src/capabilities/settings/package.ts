@@ -7,6 +7,7 @@ import { settingsTypes } from './types.js'
 import { settingsEncryption } from './encryption.js'
 import { odbDbmsLob, odbOracle } from '../../oracle/index.js'
 import { VALUE_LENGTH } from './constants.js'
+import { defineSettingsValidation } from './validation.js'
 
 /** PL/SQL API for the settings store. Callers own authorization and transactions. */
 export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
@@ -33,7 +34,7 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
             ),
             settingsStore.value,
           )
-          .select(settingsStore.meta)
+          .select([settingsStore.meta, settingsStore.protected])
           .orderBy(settingsStore.id)
           .paginate({ cursor: after, limit }),
       )
@@ -174,6 +175,68 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
     },
   )
 
+  const writeProtected = pkg.proc(
+    'write_protected',
+    { in: { id: settingsStore.id, value: settingsTypes.value, meta: settingsStore.meta } },
+    ({ params: { id, value, meta }, body }) => {
+      body.call(write.invoke(id, value, meta))
+      body.query(
+        odbQuery()
+          .updateTable(settingsStore)
+          .set({ protected: 'Y' })
+          .where(cond.eq(settingsStore.id, id)),
+      )
+    },
+  )
+
+  const lockEditable = pkg.privateProc('lock_editable', (proc) => {
+    const { id, secret } = proc.parameters({
+      in: { id: settingsStore.id },
+      out: { secret: settingsStore.secret },
+    })
+    proc.body((body) => {
+      const { protection } = body.variables({ protection: settingsStore.protected })
+      body.query(
+        odbQuery()
+          .selectFrom(settingsStore)
+          .select([settingsStore.protected, settingsStore.secret])
+          .into(protection, secret)
+          .where(cond.eq(settingsStore.id, id))
+          .forUpdate(),
+      )
+      body.ifThen(cond.eq(protection, 'Y'), (denied) =>
+        denied.forbidden('SETTINGS_REQUIRE_TRUSTED_SETUP'),
+      )
+      body.when('NO_DATA_FOUND', (missing) => missing.notFound('SETTING_NOT_FOUND'))
+    })
+  })
+
+  const validateEditable = defineSettingsValidation(pkg)
+
+  const updateEditable = pkg.proc(
+    'update_editable',
+    { in: { id: settingsStore.id, value: settingsTypes.value } },
+    ({ params: { id, value }, body }) => {
+      const { secret, meta } = body.variables({
+        secret: settingsStore.secret,
+        meta: settingsStore.meta,
+      })
+      body.call(lockEditable.invoke(id, secret))
+      body.ifThen(cond.and([cond.eq(secret, 'Y'), cond.isNull(value)]), (invalid) =>
+        invalid.invalid('SETTINGS_SECRET_REPLACEMENT_REQUIRED'),
+      )
+      body.query(
+        odbQuery()
+          .selectFrom(settingsStore)
+          .select(settingsStore.meta)
+          .into(meta)
+          .where(cond.eq(settingsStore.id, id)),
+      )
+      body.call(validateEditable.invoke(value, meta))
+      body.call(write.invoke(id, value, 'NULL'))
+    },
+  )
+
   const remove = pkg.proc(
     'remove',
     { in: { id: settingsStore.id } },
@@ -181,6 +244,37 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
       body.query(odbQuery().deleteFrom(settingsStore).where(cond.eq(settingsStore.id, id)))
     },
   )
+  const removeEditable = pkg.proc(
+    'remove_editable',
+    { in: { id: settingsStore.id } },
+    ({ params: { id }, body }) => {
+      const { secret, deletable } = body.variables({
+        secret: settingsStore.secret,
+        deletable: odbType.string(10),
+      })
+      body.call(lockEditable.invoke(id, secret))
+      body.query(
+        odbQuery()
+          .selectFrom(settingsStore)
+          .select(
+            odbOracle.nvl(
+              odbOracle.jsonValue(settingsStore.meta, odbLiteral('$.deletable'), {
+                length: 10,
+                errorOnError: true,
+                nullOnEmpty: true,
+              }),
+              odbLiteral('Y'),
+            ),
+          )
+          .into(deletable)
+          .where(cond.eq(settingsStore.id, id)),
+      )
+      body.ifThen(cond.ne(deletable, 'Y'), (denied) =>
+        denied.forbidden('SETTINGS_DELETE_FORBIDDEN'),
+      )
+      body.call(remove.invoke(id))
+    },
+  )
 
-  return { list, read, readMasked, write, remove }
+  return { list, read, readMasked, write, writeProtected, updateEditable, remove, removeEditable }
 })

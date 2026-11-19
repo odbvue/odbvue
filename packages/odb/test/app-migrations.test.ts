@@ -43,6 +43,8 @@ describe('app-owned ORDS migrations', () => {
       'GET',
       'PUT',
       'GET',
+      'PUT',
+      'GET',
       'GET',
     ])
     expect(new Set(endpoints.map((endpoint) => endpoint.toNode().module))).toEqual(
@@ -88,6 +90,8 @@ describe('app-owned ORDS migrations', () => {
       '/admin/roles',
       '/admin/users/{id}/roles',
       '/admin/users/{id}/roles/available',
+      '/admin/settings',
+      '/admin/settings/{id}',
       '/admin/users/{id}/audit',
       '/admin/audit/events',
     ])
@@ -110,6 +114,32 @@ describe('app-owned ORDS migrations', () => {
         expect(operation.security).toEqual([{ bearerAuth: [] }])
       }
     }
+  })
+
+  it('searches settings by ID without exposing secret values, and updates existing rows only', async () => {
+    const { adminPackage, migration } = await migrations['00000000000003-admin']()
+    const nodes = compileApplicationEndpoints(adminPackage.application()).map((endpoint) =>
+      endpoint.toNode(),
+    )
+    const list = nodes.find((node) => node.procedureName.toLowerCase() === 'list_settings')!
+    const update = nodes.find((node) => node.procedureName.toLowerCase() === 'update_setting')!
+    for (const endpoint of [list, update]) {
+      expect(endpoint.source).toContain("odb_auth.has_role(v_auth_user_id, 'admin')")
+    }
+    expect(list.source).toContain("'nextCursor' VALUE")
+    expect(
+      list.params.find((param) => param.resultColumns)?.resultColumns?.map((c) => c.name),
+    ).toEqual(['id', 'secret', 'protected', 'meta', 'value'])
+    expect(update.source).toContain(':status_code := 204')
+    expect(update.params.some((param) => param.sourceType === 'RESPONSE')).toBe(false)
+    const sql = migration.compile().up().join('\n')
+    expect(sql).toMatch(
+      /SELECT id AS "id", secret AS "secret", protected AS "protected", meta AS "meta", CASE WHEN secret = 'N' THEN value ELSE TO_CLOB\(NULL\) END AS "value" FROM odb_settings_store WHERE .*INSTR\(LOWER\(id\), LOWER\(TRIM\(p_search\)\)\).*ORDER BY id ASC FETCH FIRST/,
+    )
+    expect(sql).toContain('odb_settings.update_editable(p_id, p_value)')
+    expect(sql).not.toContain('APP_SETTINGS_MASTER_KEY_URI')
+    expect(sql).toMatch(/'event.name', 'admin.setting.update', 'setting.id', p_id/)
+    expect(sql).not.toMatch(/odb_settings.read|odb_settings.decrypt/)
   })
 
   it('filters user audit in SQL before a stable newest-first cursor page', async () => {
@@ -396,6 +426,7 @@ describe('app-owned ORDS migrations', () => {
       'DROP PACKAGE ODBVUE.odb_auth',
       'DROP TABLE ODBVUE.odb_storage_files',
       'DROP TABLE ODBVUE.odb_settings_store',
+      'DROP PACKAGE ODBVUE.odb_validation',
     ]
     const positions = markers.map((marker) => down.indexOf(marker))
     expect(positions.every((position) => position >= 0)).toBe(true)
@@ -619,7 +650,7 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain(
       `ODBVUE.odb_settings.write('SMTP_PASSWORD', '', '{"label":"SMTP password","type":"string","secret":"Y"}')`,
     )
-    expect(sql).toContain("ODBVUE.odb_settings.write('APP_SETTINGS_MASTER_KEY_URI', ''")
+    expect(sql).toContain("ODBVUE.odb_settings.write_protected('APP_SETTINGS_MASTER_KEY_URI', ''")
     expect(sql.indexOf('CREATE OR REPLACE PACKAGE ODBVUE.odb_audit AS')).toBeLessThan(
       sql.indexOf('CREATE OR REPLACE PACKAGE ODBVUE.odb_settings AS'),
     )
@@ -771,10 +802,16 @@ describe('app-owned ORDS migrations', () => {
 
   it('installs the odb_settings package before application seeds', async () => {
     const sql = await loadUpSql()
+    expect(sql).toContain('CREATE OR REPLACE PACKAGE ODBVUE.odb_validation AS')
+    expect(sql.indexOf('CREATE OR REPLACE PACKAGE BODY ODBVUE.odb_validation AS')).toBeLessThan(
+      sql.indexOf('CREATE OR REPLACE PACKAGE BODY ODBVUE.odb_settings AS'),
+    )
     expect(sql).toContain('CREATE TABLE ODBVUE.odb_settings_store')
     expect(sql).toContain('CREATE OR REPLACE PACKAGE ODBVUE.odb_settings AS')
     expect(sql).toContain("ODBVUE.odb_settings.write('APP_VERSION', '1.0.0'")
-    expect(sql).not.toContain("ODBVUE.odb_settings.write('SANDBOX_DEMO'")
+    expect(sql.indexOf("ODBVUE.odb_settings.write('SANDBOX_DEMO'")).toBeGreaterThan(
+      sql.indexOf('CREATE OR REPLACE PACKAGE ODBVUE.odb_settings AS'),
+    )
   })
 
   it('installs the transport-independent odb_auth package after settings', async () => {
@@ -829,12 +866,10 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain('odb_settings.list(p_after, p_limit, p_items)')
     expect(sql).toContain('odb_settings.read_masked(p_id, p_value, p_meta)')
     expect(sql).not.toContain('odb_settings.read(p_id, p_value, p_meta)')
-    expect(sql).toContain('odb_settings.write(p_id, p_value, NULL)')
-    expect(sql).toContain('odb_settings.remove(p_id)')
-    expect(sql.match(/AUTH_SETTINGS_REQUIRE_TRUSTED_SETUP/g)).toHaveLength(2)
-    expect(sql).toContain("REGEXP_LIKE(UPPER(p_id), '^AUTH_')")
-    expect(sql).not.toContain("ODBVUE.odb_settings.write('SANDBOX_DEMO'")
-    expect(sql).not.toContain('odb_settings_store')
+    expect(sql).toContain('odb_settings.update_editable(p_id, p_value)')
+    expect(sql).toContain('odb_settings.remove_editable(p_id)')
+    expect(sql).not.toContain('APP_SETTINGS_MASTER_KEY_URI')
+    expect(sql).toContain("ODBVUE.odb_settings.write('SANDBOX_DEMO'")
   })
 
   it('keeps the auth OpenAPI contract free of cookies', async () => {

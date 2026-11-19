@@ -10,7 +10,7 @@ export type AuthFeature = (typeof authPolicySettings)[number][0]
 export type AuthConfig = Partial<Record<AuthFeature, boolean>>
 
 export const authLdapSettings = [
-  { id: 'AUTH_LDAP_TLS_ENABLED', value: 'N', label: 'Require LDAPS (Y/N)' },
+  { id: 'AUTH_LDAP_TLS_ENABLED', value: 'N', label: 'Require LDAPS (Y/N)', type: 'switch' },
   { id: 'AUTH_LDAP_HOST', value: '', label: 'LDAP hostname' },
   { id: 'AUTH_LDAP_PORT', value: '389', label: 'LDAP port', type: 'number' },
   { id: 'AUTH_LDAP_BASE_DN', value: '', label: 'LDAP search base DN' },

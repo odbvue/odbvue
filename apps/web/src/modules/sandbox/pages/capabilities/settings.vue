@@ -42,10 +42,10 @@
               :label="secret ? 'New secret value' : 'Value'"
               :type="secret ? 'password' : 'text'"
               :placeholder="secret ? 'Stored value is hidden' : undefined"
-              :readonly="trustedSetup"
+              :readonly="!editable"
               :hint="
                 trustedSetup
-                  ? 'Managed through ov setup settings.'
+                  ? 'Managed through trusted setup.'
                   : secret
                     ? 'Enter a replacement; the stored secret cannot be read.'
                     : undefined
@@ -59,9 +59,7 @@
             <v-btn
               color="primary"
               prepend-icon="$mdiContentSave"
-              :disabled="
-                !id || !auth.authenticated.value || !!busy || trustedSetup || (secret && !value)
-              "
+              :disabled="!editable || !auth.authenticated.value || !!busy || (secret && !value)"
               :loading="busy === 'write'"
               @click="write"
               >Write</v-btn
@@ -76,7 +74,7 @@
             <v-btn
               color="error"
               prepend-icon="$mdiDelete"
-              :disabled="!id || !auth.authenticated.value || !!busy || trustedSetup"
+              :disabled="!editable || !deletable || !auth.authenticated.value || !!busy"
               :loading="busy === 'remove'"
               @click="remove"
               >Delete</v-btn
@@ -150,17 +148,21 @@ const http = useHttp()
 const id = ref('SANDBOX_DEMO')
 const value = ref('')
 const items = ref<Item[]>([])
-const loaded = ref<{ id: string; meta: unknown }>()
+const loaded = ref<{ id: string; meta: unknown; protected?: string | null }>()
 const secretMeta = (meta: unknown) =>
   meta !== null && typeof meta === 'object' && 'secret' in meta && meta.secret === 'Y'
-const secret = computed(
-  () =>
-    id.value === 'SMTP_PASSWORD' ||
-    id.value === 'AUTH_JWT_SECRET' ||
-    (loaded.value?.id === id.value && secretMeta(loaded.value.meta)) ||
-    items.value.some((item) => item.id === id.value && secretMeta(item.meta)),
+const current = computed(() =>
+  loaded.value?.id === id.value ? loaded.value : items.value.find((item) => item.id === id.value),
 )
-const trustedSetup = computed(() => id.value.startsWith('AUTH_JWT_'))
+const secret = computed(() => secretMeta(current.value?.meta))
+const trustedSetup = computed(() => current.value?.protected === 'Y')
+const editable = computed(() => current.value?.protected === 'N')
+const deletable = computed(() => {
+  const meta = current.value?.meta
+  return (
+    meta !== null && typeof meta === 'object' && (!('deletable' in meta) || meta.deletable === 'Y')
+  )
+})
 const nextCursor = ref<string>()
 const busy = ref<Action>()
 const message = ref<{ type: 'success' | 'error'; text: string }>()
@@ -171,6 +173,7 @@ watch(
   id,
   () => {
     value.value = ''
+    loaded.value = undefined
   },
   { flush: 'sync' },
 )
@@ -197,18 +200,27 @@ const write = () =>
 
 const read = () =>
   run('read', 'Setting loaded.', 'Setting could not be loaded.', async () => {
-    const response = await http.get<{ value: string | null; meta: unknown }>(url())
+    const requested = id.value
+    const response = await http.get<components['schemas']['SandboxReadSettingResponse']>(url())
     if (response.error || !response.data) throw response.error ?? new Error('Not found')
-    loaded.value = { id: id.value, meta: response.data.meta }
+    if (id.value !== requested) return
+    loaded.value = { id: requested, meta: response.data.meta, protected: response.data.protected }
     value.value = secret.value ? '' : (response.data.value ?? '')
   })
 
-const remove = () =>
-  run('remove', 'Setting deleted.', 'Setting could not be deleted.', async () => {
+const remove = () => {
+  if (!window.confirm('Delete this setting?')) return
+  return run('remove', 'Setting deleted.', 'Setting could not be deleted.', async () => {
+    const requested = id.value
     const response = await http.delete(url())
     if (response.error) throw response.error
-    value.value = ''
+    items.value = items.value.filter((item) => item.id !== requested)
+    if (id.value === requested) {
+      loaded.value = undefined
+      value.value = ''
+    }
   })
+}
 
 const list = (cursor?: string) =>
   run('list', 'Settings loaded.', 'Settings could not be loaded.', async () => {
@@ -224,7 +236,7 @@ const list = (cursor?: string) =>
 
 function pick(item: Item) {
   id.value = item.id
-  loaded.value = { id: item.id, meta: item.meta }
+  loaded.value = item
   value.value = secret.value ? '' : (item.value ?? '')
 }
 </script>

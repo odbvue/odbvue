@@ -167,7 +167,7 @@ function handleFieldAction(actionName: string) {
   }
 
   if (action.form) {
-    formOptions.value = action.form
+    formOptions.value = typeof action.form === 'function' ? action.form(data) : action.form
     formData.value = { ...data }
     const fmt = OvActionFormat(undefined, action, options.actionFormat)
     formTitle.value = t(fmt.text || action.name)
@@ -188,7 +188,7 @@ function handleAction(actionName: string) {
   if (!action) return
 
   if (typeof action !== 'string' && action.form) {
-    formOptions.value = action.form
+    formOptions.value = typeof action.form === 'function' ? action.form(data) : action.form
     formData.value = { ...data }
     const fmt = OvActionFormat(undefined, action, options.actionFormat)
     formTitle.value = t(fmt.text || action.name)

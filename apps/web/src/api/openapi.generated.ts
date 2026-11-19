@@ -387,7 +387,7 @@ export interface paths {
         };
         /** Read a setting */
         get: operations["sandbox_read_setting"];
-        /** Create or update a setting */
+        /** Update an existing unprotected setting */
         put: operations["sandbox_write_setting"];
         post?: never;
         /** Delete a setting */
@@ -710,6 +710,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List settings by ID without returning secret values */
+        get: operations["admin_list_settings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/settings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update an existing setting without returning its value */
+        put: operations["admin_update_setting"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/users/{id}/audit": {
         parameters: {
             query?: never;
@@ -822,6 +856,7 @@ export interface components {
             id: string;
             value?: string | null;
             meta: unknown;
+            protected: string;
         };
         SandboxListSettingsResponse: {
             items: components["schemas"]["SandboxListSettingsItemsItem"][];
@@ -831,6 +866,7 @@ export interface components {
         SandboxReadSettingResponse: {
             value: string;
             meta: unknown;
+            protected: string;
         };
         SandboxWriteSettingResponse: Record<string, never>;
         SandboxRemoveSettingResponse: Record<string, never>;
@@ -982,6 +1018,19 @@ export interface components {
             nextCursor?: string;
         };
         AdminSetUserRoleResponse: Record<string, never>;
+        AdminListSettingsItemsItem: {
+            id: string;
+            secret?: string | null;
+            protected: string;
+            meta: unknown;
+            value?: string | null;
+        };
+        AdminListSettingsResponse: {
+            items: components["schemas"]["AdminListSettingsItemsItem"][];
+            /** @description Opaque continuation token; absent when pagination is exhausted. */
+            nextCursor?: string;
+        };
+        AdminUpdateSettingResponse: Record<string, never>;
         AdminListUserAuditItemsItem: {
             id: string;
             /** Format: date-time */
@@ -2725,6 +2774,93 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient authorization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    admin_list_settings: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminListSettingsResponse"];
+                };
+            };
+            /** @description Invalid limit, cursor, or cursor query context */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient authorization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    admin_update_setting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    value?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUpdateSettingResponse"];
+                };
             };
             /** @description Authentication required */
             401: {

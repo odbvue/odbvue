@@ -408,7 +408,7 @@ describe('odbAuth framework package', () => {
     expect(sql.match(/IF l_count = 0 THEN/g)).toHaveLength(17)
     expect(sql).toContain("FROM APP.odb_settings_store WHERE id = 'AUTH_JWT_SECRET'")
     expect(sql).toContain(
-      `APP.odb_settings.write('AUTH_JWT_SECRET', '', '{"label":"JWT signing secret","type":"string","secret":"Y"}')`,
+      `APP.odb_settings.write('AUTH_JWT_SECRET', '', '{"label":"JWT signing secret","type":"password","secret":"Y","deletable":"N","rules":[{"type":"custom","params":"jwt-secret"}]}')`,
     )
     expect(sql).toContain("APP.odb_settings.write('AUTH_JWT_ISSUER', 'odbvue',")
     expect(sql).toContain("APP.odb_settings.write('AUTH_JWT_EXPIRATION_SECONDS', '900',")

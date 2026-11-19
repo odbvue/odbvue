@@ -159,7 +159,7 @@ export const odbAuth = {
         return {
           id,
           value: (options[key] ?? key !== 'ldap') ? 'Y' : 'N',
-          meta: { type: 'string' },
+          meta: { type: 'switch' as const, deletable: 'N' as const },
         }
       }),
     )
@@ -208,31 +208,51 @@ export const odbAuth = {
       ...authPolicySettings.map(([key, id]) => ({
         id,
         value: key === 'ldap' ? 'N' : 'Y',
-        meta: { type: 'string' },
+        meta: { type: 'switch', deletable: 'N' },
       })),
       ...authLdapSettings.map((setting) => ({
         id: setting.id,
         value: setting.value,
         meta: {
           label: setting.label,
+          deletable: 'N',
           type: 'type' in setting ? setting.type : 'string',
           ...('secret' in setting ? { secret: setting.secret } : {}),
+          ...(setting.id === 'AUTH_LDAP_PORT'
+            ? { rules: [{ type: 'custom', params: 'port' }] }
+            : {}),
         },
       })),
       {
         id: 'AUTH_JWT_SECRET',
         value: '',
-        meta: { label: 'JWT signing secret', type: 'string', secret: 'Y' as const },
+        meta: {
+          label: 'JWT signing secret',
+          type: 'password',
+          secret: 'Y' as const,
+          deletable: 'N',
+          rules: [{ type: 'custom', params: 'jwt-secret' }],
+        },
       },
       {
         id: 'AUTH_JWT_ISSUER',
         value: authJwtSettings.defaultIssuer,
-        meta: { label: 'JWT issuer', type: 'string' },
+        meta: {
+          label: 'JWT issuer',
+          type: 'text',
+          deletable: 'N',
+          rules: [{ type: 'custom', params: 'jwt-issuer' }],
+        },
       },
       {
         id: 'AUTH_JWT_EXPIRATION_SECONDS',
         value: String(authJwtSettings.defaultExpirationSeconds),
-        meta: { label: 'JWT expiration (seconds)', type: 'number' },
+        meta: {
+          label: 'JWT expiration (seconds)',
+          type: 'number',
+          deletable: 'N',
+          rules: [{ type: 'custom', params: 'jwt-expiration' }],
+        },
       },
     ]
     return {

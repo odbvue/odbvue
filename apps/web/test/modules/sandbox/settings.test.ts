@@ -56,7 +56,10 @@ describe('sandbox Settings secrets', () => {
   afterEach(() => vi.unstubAllGlobals())
 
   it('preserves normal configuration reads and writes', async () => {
-    get.mockResolvedValueOnce({ data: { value: 'smtp.example.com', meta: {} }, error: null })
+    get.mockResolvedValueOnce({
+      data: { value: 'smtp.example.com', meta: {}, protected: 'N' },
+      error: null,
+    })
     const wrapper = setup()
     await wrapper.get('[aria-label="ID"]').setValue('SMTP_HOST')
     await findButton(wrapper, 'Read').trigger('click')
@@ -71,7 +74,10 @@ describe('sandbox Settings secrets', () => {
   })
 
   it('never prefills the mask and writes only a secret replacement', async () => {
-    get.mockResolvedValueOnce({ data: { value: '********', meta: { secret: 'Y' } }, error: null })
+    get.mockResolvedValueOnce({
+      data: { value: '********', meta: { secret: 'Y' }, protected: 'N' },
+      error: null,
+    })
     const wrapper = setup()
     await wrapper.get('[aria-label="ID"]').setValue('SMTP_PASSWORD')
     await findButton(wrapper, 'Read').trigger('click')
@@ -91,7 +97,9 @@ describe('sandbox Settings secrets', () => {
 
   it('recognizes secret metadata on arbitrary listed settings', async () => {
     get.mockResolvedValueOnce({
-      data: { items: [{ id: 'API_TOKEN', value: '********', meta: { secret: 'Y' } }] },
+      data: {
+        items: [{ id: 'API_TOKEN', value: '********', meta: { secret: 'Y' }, protected: 'N' }],
+      },
       error: null,
     })
     const wrapper = setup()
@@ -105,7 +113,10 @@ describe('sandbox Settings secrets', () => {
   })
 
   it('recognizes secret metadata on arbitrary individual settings', async () => {
-    get.mockResolvedValueOnce({ data: { value: '********', meta: { secret: 'Y' } }, error: null })
+    get.mockResolvedValueOnce({
+      data: { value: '********', meta: { secret: 'Y' }, protected: 'N' },
+      error: null,
+    })
     const wrapper = setup()
     await wrapper.get('[aria-label="ID"]').setValue('API_TOKEN')
     await findButton(wrapper, 'Read').trigger('click')
@@ -115,19 +126,35 @@ describe('sandbox Settings secrets', () => {
   })
 
   it('clears an entered secret when the selected ID changes', async () => {
+    get.mockResolvedValueOnce({
+      data: { value: '********', meta: { secret: 'Y' }, protected: 'N' },
+      error: null,
+    })
     const wrapper = setup()
     await wrapper.get('[aria-label="ID"]').setValue('SMTP_PASSWORD')
+    await findButton(wrapper, 'Read').trigger('click')
+    await flushPromises()
     await wrapper.get('[aria-label="New secret value"]').setValue('replacement')
     await wrapper.get('[aria-label="ID"]').setValue('SMTP_HOST')
     expect(wrapper.get<HTMLInputElement>('[aria-label="Value"]').element.value).toBe('')
     wrapper.unmount()
   })
 
-  it.each(['AUTH_JWT_SECRET', 'AUTH_JWT_ISSUER', 'AUTH_JWT_EXPIRATION_SECONDS'])(
-    'keeps trusted auth configuration read-only: %s',
+  it.each(['AUTH_JWT_SECRET', 'CUSTOM_POLICY'])(
+    'keeps protected configuration read-only: %s',
     async (id) => {
+      get.mockResolvedValueOnce({
+        data: {
+          value: '********',
+          meta: id === 'AUTH_JWT_SECRET' ? { secret: 'Y' } : {},
+          protected: 'Y',
+        },
+        error: null,
+      })
       const wrapper = setup()
       await wrapper.get('[aria-label="ID"]').setValue(id)
+      await findButton(wrapper, 'Read').trigger('click')
+      await flushPromises()
       expect(findButton(wrapper, 'Write').attributes('disabled')).toBeDefined()
       expect(findButton(wrapper, 'Delete').attributes('disabled')).toBeDefined()
       expect(findButton(wrapper, 'Read').attributes('disabled')).toBeUndefined()
@@ -140,10 +167,30 @@ describe('sandbox Settings secrets', () => {
     },
   )
 
+  it('allows editing a non-deletable setting without allowing its deletion', async () => {
+    get.mockResolvedValueOnce({
+      data: { value: 'odbvue', meta: { deletable: 'N' }, protected: 'N' },
+      error: null,
+    })
+    const wrapper = setup()
+    await wrapper.get('[aria-label="ID"]').setValue('AUTH_JWT_ISSUER')
+    await findButton(wrapper, 'Read').trigger('click')
+    await flushPromises()
+    expect(findButton(wrapper, 'Write').attributes('disabled')).toBeUndefined()
+    expect(findButton(wrapper, 'Delete').attributes('disabled')).toBeDefined()
+    wrapper.unmount()
+  })
+
   it('surfaces write failures without reporting success or discarding the replacement', async () => {
+    get.mockResolvedValueOnce({
+      data: { value: '********', meta: { secret: 'Y' }, protected: 'N' },
+      error: null,
+    })
     put.mockResolvedValueOnce({ data: null, error: new Error('Encryption unavailable') })
     const wrapper = setup()
     await wrapper.get('[aria-label="ID"]').setValue('SMTP_PASSWORD')
+    await findButton(wrapper, 'Read').trigger('click')
+    await flushPromises()
     await wrapper.get('[aria-label="New secret value"]').setValue('replacement')
     await findButton(wrapper, 'Write').trigger('click')
     await flushPromises()

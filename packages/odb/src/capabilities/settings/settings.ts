@@ -49,9 +49,24 @@ export const odbSettings = {
     return odbSettingsPackage.write(id, value, meta)
   },
 
+  /** Trusted provisioning writes the value and marks the row as protected. */
+  writeProtected(id: PlsqlRenderable, value: PlsqlRenderable, meta: PlsqlRenderable = 'NULL') {
+    return odbSettingsPackage.writeProtected(id, value, meta)
+  },
+
+  /** Updates only an existing, unprotected setting without changing metadata. */
+  updateEditable(id: PlsqlRenderable, value: PlsqlRenderable) {
+    return odbSettingsPackage.updateEditable(id, value)
+  },
+
   /** `odb_settings.remove(<id>)`. */
   remove(id: PlsqlRenderable) {
     return odbSettingsPackage.remove(id)
+  },
+
+  /** Removes only an existing, unprotected setting. */
+  removeEditable(id: PlsqlRenderable) {
+    return odbSettingsPackage.removeEditable(id)
   },
 
   /**
@@ -59,7 +74,7 @@ export const odbSettings = {
    * them on rollback. Install it after `odbSettings`. Secret values must be empty;
    * supply credentials later through bind variables, not migration literals.
    */
-  seed(...settings: Array<{ id: string; value: string; meta?: SettingMeta }>) {
+  seed(...settings: Array<{ id: string; value: string; meta?: SettingMeta; protected?: boolean }>) {
     if (settings.length === 0)
       throw new Error('odbSettings.seed(): at least one setting is required.')
     const validateSecrets = () => {
@@ -77,7 +92,7 @@ export const odbSettings = {
         return settings
           .map((s) =>
             plsqlBlock(
-              `${pkg}.write(${lit(s.id)}, ${lit(s.value)}, ${s.meta ? lit(JSON.stringify(s.meta)) : 'NULL'})`,
+              `${pkg}.${s.protected ? 'write_protected' : 'write'}(${lit(s.id)}, ${lit(s.value)}, ${s.meta ? lit(JSON.stringify(s.meta)) : 'NULL'})`,
             ),
           )
           .join('\n')

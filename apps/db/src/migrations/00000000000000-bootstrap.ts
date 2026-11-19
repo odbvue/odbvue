@@ -12,6 +12,7 @@ import {
   odbSchema,
   odbSettings,
   odbStorage,
+  odbValidation,
 } from '@odbvue/odb'
 
 const schemaName = odbEnv.schemaUsername
@@ -36,6 +37,7 @@ export const migration = defineMigration('00000000000000_bootstrap', {
   .install(odbHttp)
   .install(odbRateLimit)
   .install(odbAudit)
+  .install(odbValidation)
   .install(odbSettings)
   .install(odbLob)
   .install(odbStorage)
@@ -49,7 +51,11 @@ export const migration = defineMigration('00000000000000_bootstrap', {
   .install(
     odbSettings.seed(
       { id: 'SMTP_HOST', value: '', meta: { label: 'SMTP host', type: 'string' } },
-      { id: 'SMTP_PORT', value: '', meta: { label: 'SMTP port', type: 'number' } },
+      {
+        id: 'SMTP_PORT',
+        value: '',
+        meta: { label: 'SMTP port', type: 'number', rules: [{ type: 'custom', params: 'port' }] },
+      },
       { id: 'SMTP_USERNAME', value: '', meta: { label: 'SMTP username', type: 'string' } },
       {
         id: 'SMTP_PASSWORD',
@@ -72,6 +78,7 @@ export const migration = defineMigration('00000000000000_bootstrap', {
       id: 'APP_SETTINGS_MASTER_KEY_URI',
       value: '',
       meta: { label: 'OCI Vault master key secret bundle URI', type: 'string' },
+      protected: true,
     }),
   )
   .install(

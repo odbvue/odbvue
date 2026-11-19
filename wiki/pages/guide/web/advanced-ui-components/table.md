@@ -110,6 +110,7 @@ Return the whole page through completion instead of maintaining page state in th
   errors appear under the relevant input, and invalid submissions do not fetch.
 - On mobile, the table switches to a stacked layout and uses `mobileItemsPerPage` when provided.
 - Column and action formatting use `OvFieldFormat` and `OvActionFormat` under the hood.
+- Use an action's `key` to select the row field tested by `format` rules, with a final `{ hidden: true }` fallback to hide nonmatching actions. Use `form` to open an editor initialized from the row. For write-only fields, use a separate field name and call the action callback with `(undefined, true)` after saving to reload from the server instead of copying submitted values into the table.
 - Row expansion only appears when the `expand` slot is provided.
 - Enable remote sorting only when the fetch handler and endpoint implement the requested ordering.
   name: 'add',

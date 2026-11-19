@@ -115,14 +115,17 @@ pkg.proc('log_event', {}, ({ body }) => {
 ## Settings
 
 Settings store defined in TypeScript: the `odb_settings_store` table and the `odb_settings` PL/SQL package (`list`, `read`, `write`, `remove`). See the [Settings guide](./settings) for details.
+Install [Validation](./validation) first.
 
 ### Install
 
 ```ts
-import { odbSettings } from '@odbvue/odb'
+import { odbSettings, odbValidation } from '@odbvue/odb'
 
+odbValidation.toSQLUp({ schema: 'APP_USER' })
 odbSettings.toSQLUp({ schema: 'APP_USER' })
 odbSettings.toSQLDown({ schema: 'APP_USER' })
+odbValidation.toSQLDown({ schema: 'APP_USER' })
 ```
 
 ### Calling the package

@@ -121,6 +121,11 @@ export const odbOracle = {
     return call('NUMBER', 'LENGTH', [value])
   },
 
+  /** `LENGTH2(<value>)` counts UTF-16 code units. */
+  length2(value: PlsqlRenderable): PlsqlExpression<'NUMBER'> {
+    return call('NUMBER', 'LENGTH2', [value])
+  },
+
   /** `SUBSTR(<value>, <position>[, <length>])` -> VARCHAR2 */
   substr(
     value: PlsqlRenderable,
@@ -329,8 +334,18 @@ export const odbOracle = {
   },
 
   /** `TO_NUMBER(<value>)` -> NUMBER */
-  toNumber(value: PlsqlRenderable, format?: PlsqlRenderable): PlsqlExpression<'NUMBER'> {
-    return call('NUMBER', 'TO_NUMBER', format === undefined ? [value] : [value, format])
+  toNumber(
+    value: PlsqlRenderable,
+    format?: PlsqlRenderable,
+    nls?: PlsqlRenderable,
+  ): PlsqlExpression<'NUMBER'> {
+    const args = [value]
+    if (format !== undefined) args.push(format)
+    if (nls !== undefined) {
+      if (format === undefined) throw new Error('odbOracle.toNumber: nls requires a format.')
+      args.push(nls)
+    }
+    return call('NUMBER', 'TO_NUMBER', args)
   },
 
   /** `REGEXP_REPLACE(<source>, <pattern>[, <replace>[, <position>[, <occurrence>[, <match_parameter>]]]])` -> VARCHAR2 */

@@ -298,11 +298,12 @@
         :content-format="dialogContentFormat"
       />
 
-      <v-dialog v-model="form" :width="mobile ? '100%' : '75%'">
+      <v-dialog v-model="form" :persistent="loading" :width="mobile ? '100%' : '75%'">
         <v-card>
           <v-card-title>{{ formTitle }}</v-card-title>
           <v-card-text @mousedown.capture="handleFilterCardMouseDown">
             <v-Ov-form
+              v-if="form"
               ref="tableFormRef"
               :options="formOptions"
               :data="formData"
@@ -319,6 +320,7 @@
               v-for="action in formDialogActions"
               :key="action.name"
               v-bind="action.props"
+              :disabled="loading"
               @click="tableFormRef?.handleAction(action.name)"
             />
           </v-card-actions>
@@ -883,7 +885,11 @@ async function handleSortUpdate(sortName: string, sortAction: string) {
 
 // actions
 
-const onActionComplete = (formErrors?: OvFormFieldError[], shouldRefetch?: boolean) => {
+const onActionComplete = (
+  formErrors?: OvFormFieldError[],
+  shouldRefetch?: boolean,
+  submittedData = formData.value,
+) => {
   if (formErrors && formErrors.length > 0) {
     formOptions.value = {
       ...formOptions.value,
@@ -895,7 +901,7 @@ const onActionComplete = (formErrors?: OvFormFieldError[], shouldRefetch?: boole
   if (shouldRefetch) {
     fetch()
   } else {
-    localData.value[formRowIndex.value] = formData.value
+    localData.value[formRowIndex.value] = submittedData
   }
   form.value = false
 }
@@ -947,8 +953,9 @@ async function handleFormSubmit(actionData: OvFormData) {
     return
   }
 
-  formData.value = actionData as OvTableData
-  emits('action', formActionName.value, localData.value, actionData, onActionComplete)
+  emits('action', formActionName.value, localData.value, actionData, (errors, refetch) =>
+    onActionComplete(errors, refetch, actionData),
+  )
 }
 
 async function handleRowAction(columnName: string, actionName: string, keyValue?: unknown) {
@@ -963,10 +970,11 @@ async function handleRowAction(columnName: string, actionName: string, keyValue?
   if (!action) return
 
   const rowIndex = localData.value.findIndex((item) => item[options.key] === keyValue)
+  const row = localData.value[rowIndex]
 
   if (typeof action !== 'string' && action.form) {
-    formOptions.value = action.form
-    formData.value = localData.value[rowIndex] ?? {}
+    formOptions.value = typeof action.form === 'function' ? action.form(row ?? {}) : action.form
+    formData.value = row ?? {}
     formTitle.value = t(action.name)
     formIsFilter.value = false
     formActionName.value = action.name
@@ -984,7 +992,8 @@ async function handleTableAction(actionName: string) {
   )
   if (!tableAction) return
   if (tableAction && typeof tableAction !== 'string' && tableAction.form) {
-    formOptions.value = tableAction.form
+    formOptions.value =
+      typeof tableAction.form === 'function' ? tableAction.form({}) : tableAction.form
     formData.value = {}
     const fmt = OvActionFormat(undefined, tableAction, options.actionFormat)
     formTitle.value = t(fmt.text || tableAction.name)

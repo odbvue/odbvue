@@ -26,11 +26,12 @@ For example, an application may expose `odbSettings.read()` through ORDS, use it
 ## Install And Seed
 
 ```ts
-import { defineMigration, odbSettings } from '@odbvue/odb'
+import { defineMigration, odbSettings, odbValidation } from '@odbvue/odb'
 
 export const migration = defineMigration('20260802140000_settings', {
   schema: process.env.ODBVUE_ADB_SCHEMA_USERNAME ?? '',
 })
+  .install(odbValidation)
   .install(odbSettings)
   .install(
     odbSettings.seed({
@@ -66,15 +67,18 @@ HTTP exposure, authorization, and mapping ODB errors to HTTP responses belong to
 
 ## Procedures
 
-| Procedure     | Parameters                                                     | Behavior                                                                                                                                                                                                 |
-| ------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list`        | `p_after` IN JSON, `p_limit` IN, `p_items` OUT `SYS_REFCURSOR` | Ordered by `id`, after a decoded cursor tuple (`NULL` for the first page). Returns the displayed limit plus one lookahead row (`NULL` limit uses the shared default 25). Columns: `id`, `value`, `meta`. |
-| `read`        | `p_id` IN, `p_value` OUT, `p_meta` OUT                         | Reads one setting, decrypting secrets; raises the ODB `NOT_FOUND` error if it does not exist.                                                                                                            |
-| `read_masked` | `p_id` IN, `p_value` OUT, `p_meta` OUT                         | Reads one setting, returning `********` for secrets without loading the key.                                                                                                                             |
-| `write`       | `p_id`, `p_value`, `p_meta` IN                                 | Creates or updates a setting. A `NULL` `p_meta` keeps existing metadata (`{}` on create).                                                                                                                |
-| `remove`      | `p_id` IN                                                      | Deletes a setting.                                                                                                                                                                                       |
+| Procedure         | Parameters                                                     | Behavior                                                                                                                                                                                                              |
+| ----------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list`            | `p_after` IN JSON, `p_limit` IN, `p_items` OUT `SYS_REFCURSOR` | Ordered by `id`, after a decoded cursor tuple (`NULL` for the first page). Returns the displayed limit plus one lookahead row (`NULL` limit uses the shared default 25). Columns: `id`, `value`, `meta`, `protected`. |
+| `read`            | `p_id` IN, `p_value` OUT, `p_meta` OUT                         | Reads one setting, decrypting secrets; raises the ODB `NOT_FOUND` error if it does not exist.                                                                                                                         |
+| `read_masked`     | `p_id` IN, `p_value` OUT, `p_meta` OUT                         | Reads one setting, returning `********` for secrets without loading the key.                                                                                                                                          |
+| `write`           | `p_id`, `p_value`, `p_meta` IN                                 | Creates or updates a setting. A `NULL` `p_meta` keeps existing metadata (`{}` on create).                                                                                                                             |
+| `remove`          | `p_id` IN                                                      | Deletes a setting from trusted code.                                                                                                                                                                                  |
+| `write_protected` | Same as `write`                                                | Writes a setting and marks it as protected. For trusted provisioning only.                                                                                                                                            |
+| `update_editable` | `p_id`, `p_value` IN                                           | Updates an existing unprotected setting without changing metadata.                                                                                                                                                    |
+| `remove_editable` | `p_id` IN                                                      | Deletes an existing unprotected setting unless its metadata disallows deletion.                                                                                                                                       |
 
-`meta` is JSON text for presentation or validation hints (label, type, and so on).
+`meta` is JSON text for presentation and editable-value validation.
 `meta.secret` is reserved: `'Y'` marks an encrypted secret; omitted, `null`, or
 `'N'` means ordinary configuration. The table exposes this flag as a virtual
 `secret` column. Plaintext input is limited to 2000 characters. The stored `value`
@@ -97,6 +101,8 @@ a direct PL/SQL assignment.
 
 Install `odbAudit` before `odbSettings` for key-provider failure logging, and grant
 `EXECUTE ON DBMS_CRYPTO`, `UTL_RAW`, and `UTL_I18N` as required by the database.
+Install [Validation](./validation) before Settings; editable-value validation
+delegates portable rules to `odb_validation`.
 
 ### `read`
 
@@ -106,7 +112,7 @@ Reads a setting by ID.
 Use `odbSettings.readMasked(id, value, meta)` (`odb_settings.read_masked`) for
 presentation: secret values are always `********`, even when empty. This path
 does not fetch or use the master key. Both sandbox list and get use masked output.
-`list` also always masks secrets, retaining the `id`, `value`, `meta` response shape.
+`list` also always masks secrets and includes the `protected` flag.
 
 If the setting does not exist, `read` raises the standard ODB `NOT_FOUND` error. The caller decides how that error is exposed; for example, an ORDS service may map it to HTTP 404.
 
@@ -159,6 +165,68 @@ const api = odbPackage('pck_app_api', (pkg) => {
 Reuse the exported capability types instead of redeclaring them. `value: odbSettings.types.value` preserves JSON typing, sizes, and future changes to the capability contract; `value: odbType.string(2000)` does not.
 
 The sandbox API migration (`apps/db/src/migrations/00000000000002-sandbox.ts`) shows the full set of `list`, `read`, `write`, and `remove` services in one `pck_sandbox` package.
+
+### Admin settings
+
+The **Admin → Settings** page lists existing settings with case-insensitive
+setting ID search and cursor pagination (`GET /admin/settings`). The admin list
+returns a `secret` flag and `null` instead of the stored value for secrets.
+`PUT /admin/settings/:id` updates an existing setting and returns `204 No Content`.
+Ordinary values can be cleared; secrets require a new, non-empty replacement.
+The update audit records the actor and setting ID, not the value.
+
+`protected` is independent of `secret`. Bootstrap marks the master-key URI
+protected. Authentication settings are editable by administrators. Admin and Sandbox
+require an existing row for edits and reject protected rows; Sandbox deletion
+also rejects settings with `meta.deletable: 'N'`. Authentication settings carry
+that flag so they remain editable but cannot be deleted through Sandbox. A
+missing row returns 404; protected or non-deletable rows return 403.
+Use trusted setup for those settings. Changing an SMTP host or port
+through the editor does not update network ACLs; use `ov setup-settings` for that.
+
+### Editable field metadata
+
+The admin list returns metadata but never returns secret values. `type` selects
+the form control: `string` (legacy alias for `text`), `text`, `textarea`,
+`markdown`, `number`, `switch`, `checkbox`, `select`, `combobox`, `autocomplete`,
+`email`, `password`, `color`, `date`, `time`, or `datetime`. A `select` requires
+an `items` array of strings and the API checks membership. Switches and checkboxes
+store `Y` or `N`. Values remain stored as strings; `number` accepts a signed
+decimal with at most 15 integer and 10 fractional digits. File, custom component,
+rating, and duration fields are not supported for settings.
+
+`rules` is an array of form-compatible `{ type, params, message? }` objects.
+The portable rules are `required`, `min-length`, `max-length`, `equals`,
+`equals-not`, `greater-than`, `less-than`, `in-range`, `set`, and `custom`.
+Length parameters are nonnegative integers; equality parameters are strings;
+numeric comparisons take numbers; `in-range` takes two ascending numbers and
+`set` takes an array of strings. Missing values are treated as empty strings.
+Numeric comparisons use the same decimal syntax as `number`. Unknown types,
+rules and custom names are rejected rather than ignored.
+
+Custom validators use registered names, not executable code or arbitrary
+JavaScript regexes. The currently registered names are `jwt-secret` (64 hex
+characters), `jwt-issuer` (1–255 visible ASCII characters), `jwt-expiration`
+(integer 1–86400), and `port` (integer 1–65535). Adding another requires an
+implementation in both the editor and database validator. An optional `message`
+is a translation key; otherwise the editor uses a generic localized error.
+
+```ts
+odbSettings.seed({
+  id: 'RETRY_COUNT',
+  value: '3',
+  meta: {
+    type: 'number',
+    rules: [{ type: 'required' }, { type: 'in-range', params: [1, 10] }],
+  },
+})
+```
+
+Changing authentication settings can interrupt sign-in. JWT configuration is
+cached per database session for up to 30 seconds; rotating its signing secret
+invalidates existing access tokens once sessions reload it. Changing LDAP or
+Google network settings does not create ACL grants or external provider
+configuration; provision those separately through trusted setup.
 
 ## Calling From PL/SQL
 
@@ -239,7 +307,7 @@ unrecoverable.
 
 ## Deployment
 
-This updates the bootstrap table layout (`value` becomes CLOB, with a virtual
-`secret` column). Redeploy the database when editing the original migrations.
-Existing deployments otherwise need an explicit table/data migration; editing
-an applied bootstrap does not migrate an existing table.
+The bootstrap table includes the `protected` column and its initial values.
+Redeploy from the updated bootstrap. For an in-place upgrade, add the column and
+backfill protected rows before exposing the new routes; editing an applied
+migration does not update an existing table.

@@ -439,17 +439,27 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
     ['SMTP_HOST', 'host'],
     ['SMTP_PORT', 'port_value'],
     ['SMTP_USERNAME', 'username'],
-    ['SMTP_PASSWORD', 'password'],
+    ['SMTP_PASSWORD', 'password', ':smtp_secret_meta'],
     ['SMTP_FROM_ADDR', 'from_addr'],
     ['SMTP_FROM_NAME', 'from_name'],
-    ['AUTH_JWT_SECRET', 'jwt_secret'],
+    ['APP_PUBLIC_URL', 'app_public_url'],
+  ]
+  const authWrites: typeof settingWrites = [
+    ['AUTH_JWT_SECRET', 'jwt_secret', ':jwt_secret_meta'],
     ['AUTH_JWT_ISSUER', 'auth_jwt_issuer'],
     ['AUTH_JWT_EXPIRATION_SECONDS', 'jwt_expiration'],
-    ['APP_PUBLIC_URL', 'app_public_url'],
     ['AUTH_GOOGLE_ENABLED', 'google_enabled'],
   ]
   const googleBindings: Record<string, string> = {
     google_enabled: settings.auth_google_enabled ? 'Y' : 'N',
+    smtp_secret_meta: JSON.stringify({ label: 'SMTP password', type: 'string', secret: 'Y' }),
+    jwt_secret_meta: JSON.stringify({
+      label: 'JWT signing secret',
+      type: 'password',
+      secret: 'Y',
+      deletable: 'N',
+      rules: [{ type: 'custom', params: 'jwt-secret' }],
+    }),
   }
   for (const key of [
     'auth_password_enabled',
@@ -458,7 +468,7 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
     'auth_ldap_enabled',
   ] as const) {
     if (settings[key] !== undefined) {
-      settingWrites.push([key.toUpperCase(), key])
+      authWrites.push([key.toUpperCase(), key])
       googleBindings[key] = settings[key] ? 'Y' : 'N'
     }
   }
@@ -466,13 +476,13 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
     if (settings[key] !== undefined) {
       const value = settings[key]
       googleBindings[key] = typeof value === 'boolean' ? (value ? 'Y' : 'N') : String(value)
-      settingWrites.push([
+      authWrites.push([
         key.toUpperCase(),
         key,
         key.endsWith('_password') ? ':ldap_secret_meta' : undefined,
       ])
       if (key.endsWith('_password'))
-        googleBindings.ldap_secret_meta = JSON.stringify({ secret: 'Y' })
+        googleBindings.ldap_secret_meta = JSON.stringify({ secret: 'Y', deletable: 'N' })
     }
   }
   if (settings.auth_google_enabled) {
@@ -481,7 +491,7 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
       ['AUTH_GOOGLE_CLIENT_SECRET', 'auth_google_client_secret'],
     ] as const satisfies ReadonlyArray<readonly [string, keyof SetupSettings]>) {
       googleBindings[bind] = String(settings[bind])
-      settingWrites.push([
+      authWrites.push([
         id,
         bind,
         id === 'AUTH_GOOGLE_CLIENT_SECRET' ? ':google_secret_meta' : undefined,
@@ -492,14 +502,14 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
       settings.app_public_url,
       development ? undefined : new ConfigStore().getConfig().runtime?.apiUrl,
     )
-    settingWrites.push(['AUTH_GOOGLE_REDIRECT_URI', 'auth_google_redirect_uri'])
-    googleBindings.google_secret_meta = JSON.stringify({ secret: 'Y' })
+    authWrites.push(['AUTH_GOOGLE_REDIRECT_URI', 'auth_google_redirect_uri'])
+    googleBindings.google_secret_meta = JSON.stringify({ secret: 'Y', deletable: 'N' })
   }
-  const writes = settingWrites
-    .map(
-      ([id, bind, meta]) =>
-        `  ${schema}.${odbSettings.write(odbLiteral(id), `:${bind}`, meta ?? 'NULL').toSQL()};`,
-    )
+  const writes = [
+    ...settingWrites.map(([id, bind, meta]) => odbSettings.write(odbLiteral(id), `:${bind}`, meta)),
+    ...authWrites.map(([id, bind, meta]) => odbSettings.write(odbLiteral(id), `:${bind}`, meta)),
+  ]
+    .map((call) => `  ${schema}.${call.toSQL()};`)
     .join('\n')
   const googleAcl = settings.auth_google_enabled
     ? ['www.googleapis.com', 'oauth2.googleapis.com']

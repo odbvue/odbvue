@@ -27,6 +27,9 @@ export const odbJson = {
   parse(document: PlsqlRenderable): PlsqlExpression<'JSON_OBJECT_T'> {
     return new PlsqlExpression('JSON_OBJECT_T', `JSON_OBJECT_T.PARSE(${renderPlsql(document)})`)
   },
+  parseElement(document: PlsqlRenderable): PlsqlExpression<'JSON_ELEMENT_T'> {
+    return new PlsqlExpression('JSON_ELEMENT_T', `JSON_ELEMENT_T.PARSE(${renderPlsql(document)})`)
+  },
   asObject(element: PlsqlRenderable): PlsqlExpression<'JSON_OBJECT_T'> {
     return new PlsqlExpression('JSON_OBJECT_T', `TREAT(${renderPlsql(element)} AS JSON_OBJECT_T)`)
   },

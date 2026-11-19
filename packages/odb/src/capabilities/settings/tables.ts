@@ -8,6 +8,7 @@ export const settingsStore = odbTable('odb_settings_store', (t) => ({
   id: t.string(ID_LENGTH).primaryKey(),
   value: t.clob(),
   meta: t.json<SettingMeta>().notNull().default({}),
+  protected: t.string(1).notNull().default('N'),
   secret: t.string(1).generatedAs(
     odbOracle
       .nvl(
@@ -22,4 +23,5 @@ export const settingsStore = odbTable('odb_settings_store', (t) => ({
   ),
 }))
   .check('odb_settings_chk_secret', "secret IN ('Y', 'N')")
+  .check('odb_settings_chk_protected', "protected IN ('Y', 'N')")
   .comment('Application settings')
