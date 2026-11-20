@@ -630,7 +630,7 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).not.toContain('PROCEDURE google_link_callback(')
   })
 
-  it('installs emails and seeds six empty SMTP settings without a host ACL', async () => {
+  it('installs emails and seeds SMTP settings with a default port and no host ACL', async () => {
     const sql = await loadUpSql()
     expect(sql).toContain('CREATE TABLE ODBVUE.odb_emails_queue')
     expect(sql).toContain('CREATE TABLE ODBVUE.odb_emails_addr')
@@ -638,7 +638,6 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain('CREATE OR REPLACE PACKAGE ODBVUE.odb_emails AS')
     for (const id of [
       'SMTP_HOST',
-      'SMTP_PORT',
       'SMTP_USERNAME',
       'SMTP_PASSWORD',
       'SMTP_FROM_ADDR',
@@ -646,6 +645,9 @@ describe('app-owned ORDS migrations', () => {
     ]) {
       expect(sql).toContain(`ODBVUE.odb_settings.write('${id}', ''`)
     }
+    expect(sql).toContain(
+      `ODBVUE.odb_settings.write('SMTP_PORT', '587', '{"label":"SMTP port","type":"number","rules":[{"type":"custom","params":"port"}]}')`,
+    )
     expect(sql).not.toContain("ODBVUE.odb_settings.write('smtp'")
     expect(sql).toContain(
       `ODBVUE.odb_settings.write('SMTP_PASSWORD', '', '{"label":"SMTP password","type":"string","secret":"Y"}')`,
@@ -830,7 +832,9 @@ describe('app-owned ORDS migrations', () => {
     expect(sql.indexOf('CREATE OR REPLACE PACKAGE ODBVUE.odb_settings AS')).toBeLessThan(
       sql.indexOf('CREATE OR REPLACE PACKAGE ODBVUE.odb_auth_jwt AS'),
     )
-    expect(sql).toContain("ODBVUE.odb_settings.write('AUTH_JWT_SECRET', '',")
+    expect(sql).toContain(
+      "ODBVUE.odb_settings.write('AUTH_JWT_SECRET', LOWER(RAWTOHEX(DBMS_CRYPTO.RANDOMBYTES(32))),",
+    )
     expect(sql).toContain("ODBVUE.odb_settings.write('AUTH_JWT_ISSUER', 'odbvue',")
     expect(sql).toContain("ODBVUE.odb_settings.write('AUTH_JWT_EXPIRATION_SECONDS', '900',")
     expect(sql).not.toContain('change-this-development-only')

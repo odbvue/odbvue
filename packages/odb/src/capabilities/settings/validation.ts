@@ -1,4 +1,10 @@
-import { cond, odbLiteral, plsqlExpr, type PlsqlValue } from '../../schema/attribute.js'
+import {
+  cond,
+  odbLiteral,
+  plsqlExpr,
+  type PlsqlBooleanExpression,
+  type PlsqlValue,
+} from '../../schema/attribute.js'
 import { odbType, type PackageImpl, type ProcedureBody } from '../../schema/package.js'
 import { odbJson, odbOracle } from '../../oracle/index.js'
 import { settingsStore } from './tables.js'
@@ -27,6 +33,8 @@ const fieldTypes = [
 const oneOf = (value: PlsqlValue, choices: readonly string[]) =>
   cond.or(choices.map((choice) => cond.eq(value, choice)))
 const invalid = (body: ProcedureBody) => body.invalid('SETTINGS_VALIDATION_INVALID')
+const requireValid = (body: ProcedureBody, condition: PlsqlBooleanExpression) =>
+  body.ifThen(condition, (valid) => valid.null(), invalid)
 
 export function defineSettingsValidation(pkg: PackageImpl) {
   return pkg.privateProc('validate_setting', (proc) => {
@@ -57,13 +65,18 @@ export function defineSettingsValidation(pkg: PackageImpl) {
         })
         fn.body((check) => {
           const { member } = check.variables({ member: odbJson.element })
-          check.ifThen(cond.eq(odbJson.has(source, key), false), (missing) => missing.return(false))
-          check.set(member, odbJson.get(source, key))
-          check.ifThen(cond.eq(expected, 'string'), (branch) =>
-            branch.return(odbJson.isString(member)),
+          check.ifThen(
+            cond.eq(odbJson.has(source, key), true),
+            (present) => present.set(member, odbJson.get(source, key)),
+            (missing) => missing.return(false),
           )
-          check.elsif(cond.eq(expected, 'array'), (branch) =>
-            branch.return(odbJson.isArray(member)),
+          check.ifThen(cond.isNull(member), (missing) => missing.return(false))
+          check.ifThen(
+            cond.or([
+              cond.and([cond.eq(expected, 'string'), cond.eq(odbJson.isString(member), true)]),
+              cond.and([cond.eq(expected, 'array'), cond.eq(odbJson.isArray(member), true)]),
+            ]),
+            (match) => match.return(true),
           )
           check.return(false)
         })
@@ -74,13 +87,16 @@ export function defineSettingsValidation(pkg: PackageImpl) {
         key: string,
         expected: string,
       ) =>
-        target.ifThen(
-          cond.eq(memberIs.invoke(source, odbLiteral(key), odbLiteral(expected)), false),
-          invalid,
+        requireValid(
+          target,
+          cond.eq(memberIs.invoke(source, odbLiteral(key), odbLiteral(expected)), true),
         )
 
+      body.ifThen(cond.isNull(meta), invalid)
       body.set(element, odbJson.parseElement(meta))
-      body.ifThen(cond.eq(odbJson.isObject(element), false), invalid)
+      const isObject = () =>
+        cond.and([cond.isNotNull(element), cond.eq(odbJson.isObject(element), true)])
+      requireValid(body, isObject())
       body.set(object, odbJson.asObject(element))
       body.ifThen(cond.eq(odbJson.has(object, odbLiteral('type')), true), (typed) => {
         checkMember(typed, object, 'type', 'string')
@@ -89,13 +105,11 @@ export function defineSettingsValidation(pkg: PackageImpl) {
           cond.or([cond.isNull(fieldType), cond.not(oneOf(fieldType, fieldTypes))]),
           invalid,
         )
-        typed.ifThen(
-          cond.and([
-            cond.eq(fieldType, 'number'),
-            cond.isNotNull(value),
-            cond.eq(odbValidation.isNumber(value), false),
-          ]),
-          invalid,
+        typed.ifThen(cond.eq(fieldType, 'number'), (numeric) =>
+          requireValid(
+            numeric,
+            cond.or([cond.isNull(value), cond.eq(odbValidation.isNumber(value), true)]),
+          ),
         )
         typed.ifThen(
           cond.and([
@@ -107,12 +121,13 @@ export function defineSettingsValidation(pkg: PackageImpl) {
         typed.ifThen(cond.eq(fieldType, 'select'), (select) => {
           checkMember(select, object, 'items', 'array')
           select.set(params, odbJson.getArray(object, odbLiteral('items')))
-          select.ifThen(cond.eq(odbValidation.inSet(value, params), false), invalid)
+          requireValid(select, cond.eq(odbValidation.inSet(value, params), true))
         })
       })
       body.ifThen(cond.eq(odbJson.has(object, odbLiteral('rules')), true), (hasRules) => {
         checkMember(hasRules, object, 'rules', 'array')
         hasRules.set(rules, odbJson.getArray(object, odbLiteral('rules')))
+        hasRules.ifThen(cond.isNull(rules), invalid)
         hasRules.ifThen(cond.gt(odbJson.getSize(rules), 32), invalid)
         hasRules.forRange(
           'ruleIndex',
@@ -120,15 +135,11 @@ export function defineSettingsValidation(pkg: PackageImpl) {
           plsqlExpr.subtract(odbJson.getSize(rules), 1),
           (i, each) => {
             each.set(element, odbJson.get(rules, i))
-            each.ifThen(cond.eq(odbJson.isObject(element), false), invalid)
+            requireValid(each, isObject())
             each.set(rule, odbJson.asObject(element))
             checkMember(each, rule, 'type', 'string')
-            each.ifThen(
-              cond.and([
-                cond.eq(odbJson.has(rule, odbLiteral('message')), true),
-                cond.eq(memberIs.invoke(rule, odbLiteral('message'), odbLiteral('string')), false),
-              ]),
-              invalid,
+            each.ifThen(cond.eq(odbJson.has(rule, odbLiteral('message')), true), (message) =>
+              checkMember(message, rule, 'message', 'string'),
             )
             each.set(kind, odbJson.getString(rule, odbLiteral('type')))
             each.ifThen(
@@ -156,7 +167,7 @@ export function defineSettingsValidation(pkg: PackageImpl) {
                     ),
                   )
                   validators.when(cond.eq(text, 'port'), (port) =>
-                    port.ifThen(cond.eq(odbValidation.isPort(value), false), invalid),
+                    requireValid(port, cond.eq(odbValidation.isPort(value), true)),
                   )
                   validators.when(cond.eq(text, 'jwt-expiration'), (bounded) => {
                     bounded.ifThen(
@@ -166,15 +177,14 @@ export function defineSettingsValidation(pkg: PackageImpl) {
                       ]),
                       invalid,
                     )
-                    bounded.ifThen(cond.eq(odbValidation.isNumber(value), false), invalid)
                     bounded.set(number, odbOracle.toNumber(value))
-                    bounded.ifThen(cond.or([cond.lt(number, 1), cond.gt(number, 86400)]), invalid)
+                    requireValid(bounded, cond.and([cond.gte(number, 1), cond.lte(number, 86400)]))
                   })
                   validators.else(invalid)
                 })
               },
               (portable) =>
-                portable.ifThen(cond.eq(odbValidation.checkRule(value, rule), false), invalid),
+                requireValid(portable, cond.eq(odbValidation.checkRule(value, rule), true)),
             )
           },
         )

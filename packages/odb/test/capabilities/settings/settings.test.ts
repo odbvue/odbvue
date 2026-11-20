@@ -115,7 +115,7 @@ describe('Settings', () => {
     const validator = sql.slice(start, end)
     expect(JSON.stringify(odbSettingsPackage.application())).not.toContain('"kind":"raw"')
     expect(validator).toContain('l_element := JSON_ELEMENT_T.PARSE(p_meta)')
-    expect(validator).toContain('IF l_element.is_object() = FALSE THEN')
+    expect(validator).toContain('IF (l_element IS NOT NULL AND l_element.is_object() = TRUE) THEN')
     expect(validator).toContain("l_field_type = 'number'")
     expect(validator).toContain("l_field_type = 'switch'")
     expect(validator).toContain("l_field_type = 'checkbox'")
@@ -125,12 +125,11 @@ describe('Settings', () => {
       expect(validator).toContain(`'${name}'`)
     }
     expect(validator).toContain('SETTINGS_VALIDATION_INVALID')
-    expect(validator).toContain('odb_validation.check_rule(p_value, l_rule) = FALSE')
-    expect(validator).toContain('odb_validation.in_set(p_value, l_params) = FALSE')
-    expect(validator).toContain('odb_validation.is_number(p_value) = FALSE')
-    expect(validator).toContain('odb_validation.is_port(p_value) = FALSE')
+    expect(validator).toContain('odb_validation.in_set(p_value, l_params) = TRUE')
+    expect(validator).toContain('p_value IS NULL OR odb_validation.is_number(p_value) = TRUE')
+    expect(validator).toContain('odb_validation.is_port(p_value) = TRUE')
     expect(validator).toMatch(
-      /odb_validation\.check_rule\(p_value, l_rule\) = FALSE THEN\s+raise_application_error\(-20998, 'ODB_ERROR\|VALIDATION_ERROR\|SETTINGS_VALIDATION_INVALID'\)/,
+      /odb_validation\.check_rule\(p_value, l_rule\) = TRUE THEN\s+NULL;\s+ELSE\s+raise_application_error\(-20998, 'ODB_ERROR\|VALIDATION_ERROR\|SETTINGS_VALIDATION_INVALID'\)/,
     )
     const writeStart = sql.indexOf(
       'PROCEDURE write(p_id IN odb_settings_store.id%TYPE, p_value IN VARCHAR2, p_meta IN odb_settings_store.meta%TYPE) IS',

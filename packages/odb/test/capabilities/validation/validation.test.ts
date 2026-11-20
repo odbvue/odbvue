@@ -39,8 +39,8 @@ describe('shared validation capability', () => {
     expect(sql).toMatch(/IF p_rule IS NULL THEN\s+RETURN FALSE;/)
     expect(sql).toMatch(/ELSE\s+RETURN FALSE;\s+END CASE;/)
     expect(sql).toContain('l_params.get_size() != 2')
-    expect(sql).toContain('l_element.is_number() = FALSE')
-    expect(sql).toContain('l_element.is_string() = FALSE')
+    expect(sql).toContain('l_element IS NOT NULL AND l_element.is_number() = TRUE')
+    expect(sql).toContain('l_element IS NOT NULL AND l_element.is_string() = TRUE')
     expect(sql).toContain('p_value IS NULL AND l_text IS NULL')
     expect(sql).toContain('NVL(LENGTH2(p_value), 0)')
     expect(sql).toContain(

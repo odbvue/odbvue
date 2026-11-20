@@ -1,4 +1,10 @@
-import { cond, odbLiteral, plsqlExpr, type PlsqlValue } from '../../schema/attribute.js'
+import {
+  cond,
+  odbLiteral,
+  PlsqlExpression,
+  plsqlExpr,
+  type PlsqlValue,
+} from '../../schema/attribute.js'
 import { odbPackage, odbType, type ProcedureBody } from '../../schema/package.js'
 import { odbJson, odbOracle } from '../../oracle/index.js'
 
@@ -15,6 +21,13 @@ const decimal = (value: PlsqlValue) =>
     odbLiteral('999999999999999D9999999999'),
     odbLiteral("NLS_NUMERIC_CHARACTERS='.,'"),
   )
+// Oracle's JSON DOM can convert an overflowing JSON number to infinity.
+const finite = (value: PlsqlValue) =>
+  cond.and([
+    cond.isNotNull(value),
+    cond.gt(value, new PlsqlExpression('BINARY_DOUBLE', '-BINARY_DOUBLE_INFINITY')),
+    cond.lt(value, new PlsqlExpression('BINARY_DOUBLE', 'BINARY_DOUBLE_INFINITY')),
+  ])
 const invalid = (target: ProcedureBody) => target.return(false)
 
 export const odbValidationPackage = odbPackage('odb_validation', (pkg) => {
@@ -30,7 +43,7 @@ export const odbValidationPackage = odbPackage('odb_validation', (pkg) => {
         invalid,
       )
       body.set(parsed, decimal(value))
-      body.return(true)
+      body.return(cond.isNotNull(parsed))
       body.when('VALUE_ERROR', invalid)
       body.when('INVALID_NUMBER', invalid)
     })
@@ -50,9 +63,14 @@ export const odbValidationPackage = odbPackage('odb_validation', (pkg) => {
       body.set(found, false)
       body.forRange('item', 0, plsqlExpr.subtract(odbJson.getSize(items), 1), (i, each) => {
         each.set(element, odbJson.get(items, i))
-        each.ifThen(cond.eq(odbJson.isString(element), false), invalid)
-        each.set(text, odbJson.getString(items, i))
-        each.ifThen(sameText(value, text), (match) => match.set(found, true))
+        each.ifThen(
+          cond.and([cond.isNotNull(element), cond.eq(odbJson.isString(element), true)]),
+          (string) => {
+            string.set(text, odbJson.getString(items, i))
+            string.ifThen(sameText(value, text), (match) => match.set(found, true))
+          },
+          invalid,
+        )
       })
       body.return(found)
     })
@@ -63,15 +81,11 @@ export const odbValidationPackage = odbPackage('odb_validation', (pkg) => {
     fn.body((body) => {
       const { port } = body.variables({ port: odbType.number() })
       body.ifThen(
-        cond.or([
-          cond.isNull(value),
-          cond.not(cond.regexpLike(value, '^[0-9]{1,5}$', 'c')),
-          cond.eq(isNumber.invoke(value), false),
-        ]),
+        cond.or([cond.isNull(value), cond.not(cond.regexpLike(value, '^[0-9]{1,5}$', 'c'))]),
         invalid,
       )
       body.set(port, odbOracle.toNumber(value))
-      body.return(cond.and([cond.gte(port, 1), cond.lte(port, 65535)]))
+      body.return(cond.and([cond.isNotNull(port), cond.gte(port, 1), cond.lte(port, 65535)]))
     })
   })
 
@@ -80,12 +94,14 @@ export const odbValidationPackage = odbPackage('odb_validation', (pkg) => {
       in: { value: odbType.string(32767), rule: odbJson.object },
     })
     fn.body((body) => {
-      const { element, params, kind, text, number } = body.variables({
+      const { element, params, kind, text, number, min, max } = body.variables({
         element: odbJson.element,
         params: odbJson.array,
         kind: odbType.string(32767),
         text: odbType.string(32767),
         number: odbType.number(),
+        min: odbType.number(),
+        max: odbType.number(),
       })
       const memberIs = body.localFunc('member_is', odbType.boolean(), (local) => {
         const { key, kind: expected } = local.parameters({
@@ -93,25 +109,34 @@ export const odbValidationPackage = odbPackage('odb_validation', (pkg) => {
         })
         local.body((check) => {
           const { member } = check.variables({ member: odbJson.element })
-          check.ifThen(cond.eq(odbJson.has(rule, key), false), (missing) => missing.return(false))
-          check.set(member, odbJson.get(rule, key))
-          check.ifThen(cond.eq(expected, 'string'), (branch) =>
-            branch.return(odbJson.isString(member)),
+          check.ifThen(
+            cond.eq(odbJson.has(rule, key), true),
+            (present) => present.set(member, odbJson.get(rule, key)),
+            invalid,
           )
-          check.elsif(cond.eq(expected, 'number'), (branch) =>
-            branch.return(odbJson.isNumber(member)),
-          )
-          check.elsif(cond.eq(expected, 'array'), (branch) =>
-            branch.return(odbJson.isArray(member)),
-          )
-          check.elsif(cond.eq(expected, 'boolean'), (branch) =>
-            branch.return(odbJson.isBoolean(member)),
+          check.ifThen(cond.isNull(member), invalid)
+          check.ifThen(
+            cond.or([
+              cond.and([cond.eq(expected, 'string'), cond.eq(odbJson.isString(member), true)]),
+              cond.and([cond.eq(expected, 'number'), cond.eq(odbJson.isNumber(member), true)]),
+              cond.and([cond.eq(expected, 'array'), cond.eq(odbJson.isArray(member), true)]),
+              cond.and([cond.eq(expected, 'boolean'), cond.eq(odbJson.isBoolean(member), true)]),
+            ]),
+            (match) => match.return(true),
           )
           check.return(false)
         })
       })
       const validMember = (key: string, type: string) =>
         cond.eq(memberIs.invoke(odbLiteral(key), odbLiteral(type)), true)
+      const requiredNumber = (target: ProcedureBody) => {
+        target.ifThen(
+          cond.eq(isNumber.invoke(value), true),
+          (parsed) => parsed.set(number, decimal(value)),
+          invalid,
+        )
+        target.ifThen(cond.isNull(number), invalid)
+      }
       body.ifThen(cond.isNull(rule), invalid)
       body.ifThen(cond.not(validMember('type', 'string')), invalid)
       body.ifThen(
@@ -137,7 +162,11 @@ export const odbValidationPackage = odbPackage('odb_validation', (pkg) => {
           length.ifThen(cond.not(validMember('params', 'number')), invalid)
           length.set(number, odbJson.getNumber(rule, odbLiteral('params')))
           length.ifThen(
-            cond.or([cond.lt(number, 0), cond.ne(number, odbOracle.trunc(number))]),
+            cond.or([
+              cond.not(finite(number)),
+              cond.lt(number, 0),
+              cond.ne(number, odbOracle.trunc(number)),
+            ]),
             invalid,
           )
           const actual = odbOracle.nvl(odbOracle.length2(value), odbLiteral(0))
@@ -160,29 +189,35 @@ export const odbValidationPackage = odbPackage('odb_validation', (pkg) => {
         })
         branches.when(oneOf(kind, ['greater-than', 'less-than']), (comparison) => {
           comparison.ifThen(cond.not(validMember('params', 'number')), invalid)
-          comparison.ifThen(cond.eq(isNumber.invoke(value), false), invalid)
-          comparison.set(number, decimal(value))
-          const threshold = odbJson.getNumber(rule, odbLiteral('params'))
+          comparison.set(min, odbJson.getNumber(rule, odbLiteral('params')))
+          comparison.ifThen(cond.not(finite(min)), invalid)
+          requiredNumber(comparison)
           comparison.return(
             cond.or([
-              cond.and([cond.eq(kind, 'greater-than'), cond.gt(number, threshold)]),
-              cond.and([cond.eq(kind, 'less-than'), cond.lt(number, threshold)]),
+              cond.and([cond.eq(kind, 'greater-than'), cond.gt(number, min)]),
+              cond.and([cond.eq(kind, 'less-than'), cond.lt(number, min)]),
             ]),
           )
         })
         branches.when(cond.eq(kind, 'in-range'), (range) => {
           range.ifThen(cond.not(validMember('params', 'array')), invalid)
           range.set(params, odbJson.getArray(rule, odbLiteral('params')))
+          range.ifThen(cond.isNull(params), invalid)
           range.ifThen(cond.ne(odbJson.getSize(params), 2), invalid)
           for (const index of [0, 1]) {
             range.set(element, odbJson.get(params, odbLiteral(index)))
-            range.ifThen(cond.eq(odbJson.isNumber(element), false), invalid)
+            range.ifThen(
+              cond.and([cond.isNotNull(element), cond.eq(odbJson.isNumber(element), true)]),
+              (numeric) =>
+                numeric.set(index === 0 ? min : max, odbJson.getNumber(params, odbLiteral(index))),
+              invalid,
+            )
           }
-          const min = odbJson.getNumber(params, odbLiteral(0))
-          const max = odbJson.getNumber(params, odbLiteral(1))
-          range.ifThen(cond.gt(min, max), invalid)
-          range.ifThen(cond.eq(isNumber.invoke(value), false), invalid)
-          range.set(number, decimal(value))
+          range.ifThen(
+            cond.or([cond.not(finite(min)), cond.not(finite(max)), cond.gt(min, max)]),
+            invalid,
+          )
+          requiredNumber(range)
           range.return(cond.and([cond.gte(number, min), cond.lte(number, max)]))
         })
         branches.when(cond.eq(kind, 'set'), (set) => {

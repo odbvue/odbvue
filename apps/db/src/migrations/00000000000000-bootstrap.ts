@@ -53,7 +53,7 @@ export const migration = defineMigration('00000000000000_bootstrap', {
       { id: 'SMTP_HOST', value: '', meta: { label: 'SMTP host', type: 'string' } },
       {
         id: 'SMTP_PORT',
-        value: '',
+        value: '587',
         meta: { label: 'SMTP port', type: 'number', rules: [{ type: 'custom', params: 'port' }] },
       },
       { id: 'SMTP_USERNAME', value: '', meta: { label: 'SMTP username', type: 'string' } },

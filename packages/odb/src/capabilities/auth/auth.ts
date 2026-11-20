@@ -13,7 +13,7 @@ import {
 import { qualify } from '../../schema/ddl.js'
 import { odbBlock, odbType } from '../../schema/package.js'
 import { odbQuery } from '../../query/index.js'
-import { odbOracle } from '../../oracle/index.js'
+import { odbDbmsCrypto, odbOracle } from '../../oracle/index.js'
 import { REFRESH_TOKEN_MAX_AGE_SECONDS } from './constants.js'
 import { odbAuthCrypto, dummyPasswordHash } from './core/crypto.js'
 import { odbAuthJwt } from './core/tokens.js'
@@ -202,7 +202,7 @@ export const odbAuth = {
       }),
     ].join('\n')
   },
-  /** Seed missing configuration only; provisioning supplies the JWT secret later. */
+  /** Seed missing configuration with a random JWT secret; provisioning may replace it later. */
   seedSettings() {
     const settings = [
       ...authPolicySettings.map(([key, id]) => ({
@@ -264,18 +264,18 @@ export const odbAuth = {
                 .where(cond.eq(settingsStore.id, id))
               if (schema) query.resolveSchema(schema)
               body.query(query)
-              body.ifThen(cond.eq(count, 0), (then) =>
+              body.ifThen(cond.eq(count, 0), (then) => {
+                const seedValue =
+                  id === 'AUTH_JWT_SECRET'
+                    ? odbOracle.lower(odbOracle.rawToHex(odbDbmsCrypto.randomBytes(32)))
+                    : odbLiteral(value)
                 then.call(
                   qualifyCall(
-                    odbSettings.write(
-                      odbLiteral(id),
-                      odbLiteral(value),
-                      odbLiteral(JSON.stringify(meta)),
-                    ),
+                    odbSettings.write(odbLiteral(id), seedValue, odbLiteral(JSON.stringify(meta))),
                     schema,
                   ),
-                ),
-              )
+                )
+              })
             }),
           )
           .join('\n')
