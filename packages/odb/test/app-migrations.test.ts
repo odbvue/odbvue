@@ -129,12 +129,12 @@ describe('app-owned ORDS migrations', () => {
     expect(list.source).toContain("'nextCursor' VALUE")
     expect(
       list.params.find((param) => param.resultColumns)?.resultColumns?.map((c) => c.name),
-    ).toEqual(['id', 'secret', 'protected', 'meta', 'value'])
+    ).toEqual(['id', 'secret', 'readonly', 'meta', 'value'])
     expect(update.source).toContain(':status_code := 204')
     expect(update.params.some((param) => param.sourceType === 'RESPONSE')).toBe(false)
     const sql = migration.compile().up().join('\n')
     expect(sql).toMatch(
-      /SELECT id AS "id", secret AS "secret", protected AS "protected", meta AS "meta", CASE WHEN secret = 'N' THEN value ELSE TO_CLOB\(NULL\) END AS "value" FROM odb_settings_store WHERE .*INSTR\(LOWER\(id\), LOWER\(TRIM\(p_search\)\)\).*ORDER BY id ASC FETCH FIRST/,
+      /SELECT id AS "id", secret AS "secret", readonly AS "readonly", meta AS "meta", CASE WHEN secret = 'N' THEN value ELSE TO_CLOB\(NULL\) END AS "value" FROM odb_settings_store WHERE .*INSTR\(LOWER\(id\), LOWER\(TRIM\(p_search\)\)\).*ORDER BY id ASC FETCH FIRST/,
     )
     expect(sql).toContain('odb_settings.update_editable(p_id, p_value)')
     expect(sql).not.toContain('APP_SETTINGS_MASTER_KEY_URI')
@@ -650,7 +650,9 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain(
       `ODBVUE.odb_settings.write('SMTP_PASSWORD', '', '{"label":"SMTP password","type":"string","secret":"Y"}')`,
     )
-    expect(sql).toContain("ODBVUE.odb_settings.write_protected('APP_SETTINGS_MASTER_KEY_URI', ''")
+    expect(sql).toContain(
+      `ODBVUE.odb_settings.write('APP_SETTINGS_MASTER_KEY_URI', '', '{"label":"OCI Vault master key secret bundle URI","type":"string","readonly":"Y"}')`,
+    )
     expect(sql.indexOf('CREATE OR REPLACE PACKAGE ODBVUE.odb_audit AS')).toBeLessThan(
       sql.indexOf('CREATE OR REPLACE PACKAGE ODBVUE.odb_settings AS'),
     )

@@ -387,7 +387,7 @@ export interface paths {
         };
         /** Read a setting */
         get: operations["sandbox_read_setting"];
-        /** Update an existing unprotected setting */
+        /** Update an existing editable setting */
         put: operations["sandbox_write_setting"];
         post?: never;
         /** Delete a setting */
@@ -856,7 +856,7 @@ export interface components {
             id: string;
             value?: string | null;
             meta: unknown;
-            protected: string;
+            readonly: string;
         };
         SandboxListSettingsResponse: {
             items: components["schemas"]["SandboxListSettingsItemsItem"][];
@@ -866,7 +866,7 @@ export interface components {
         SandboxReadSettingResponse: {
             value: string;
             meta: unknown;
-            protected: string;
+            readonly: string;
         };
         SandboxWriteSettingResponse: Record<string, never>;
         SandboxRemoveSettingResponse: Record<string, never>;
@@ -1021,7 +1021,7 @@ export interface components {
         AdminListSettingsItemsItem: {
             id: string;
             secret?: string | null;
-            protected: string;
+            readonly: string;
             meta: unknown;
             value?: string | null;
         };

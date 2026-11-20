@@ -37,7 +37,7 @@ describe('Settings', () => {
 
   it('implements list, read, write and remove in PL/SQL', () => {
     expect(sql).toContain(
-      'OPEN p_items FOR SELECT id AS "id", CASE WHEN secret = \'Y\' THEN TO_CLOB(\'********\') ELSE value END AS "value", meta AS "meta", protected AS "protected" FROM odb_settings_store',
+      'OPEN p_items FOR SELECT id AS "id", CASE WHEN secret = \'Y\' THEN TO_CLOB(\'********\') ELSE value END AS "value", meta AS "meta", readonly AS "readonly" FROM odb_settings_store',
     )
     expect(sql).toContain("id > JSON_VALUE(p_after, '$[0]'")
     expect(sql).toContain('ORDER BY id ASC FETCH FIRST NVL(p_limit, 25) + 1 ROWS ONLY')
@@ -54,6 +54,9 @@ describe('Settings', () => {
     expect(sql).toContain("meta CLOB DEFAULT '{}' NOT NULL CHECK (meta IS JSON)")
     expect(sql).toContain(
       "GENERATED ALWAYS AS (NVL(JSON_VALUE(meta, '$.secret' RETURNING VARCHAR2(1) ERROR ON ERROR NULL ON EMPTY), 'N')) VIRTUAL",
+    )
+    expect(sql).toContain(
+      "GENERATED ALWAYS AS (NVL(JSON_VALUE(meta, '$.readonly' RETURNING VARCHAR2(1) ERROR ON ERROR NULL ON EMPTY), 'N')) VIRTUAL",
     )
     expect(sql).toContain("CHECK (secret IN ('Y', 'N'))")
     expect(sql).toContain('value CLOB')
@@ -80,7 +83,7 @@ describe('Settings', () => {
       { name: 'id', type: 'string', nullable: false },
       { name: 'value', type: 'clob', nullable: true },
       { name: 'meta', type: 'json', nullable: false },
-      { name: 'protected', type: 'string', nullable: false },
+      { name: 'readonly', type: 'string', nullable: false },
     ])
     expect(sql).toContain('read_value(p_id, 0, p_value, p_meta)')
     expect(sql).toContain('read_value(p_id, 1, p_value, p_meta)')
@@ -89,21 +92,18 @@ describe('Settings', () => {
     )
   })
 
-  it('locks and checks persisted protection before any editable update or delete', () => {
-    expect(sql).toContain("CHECK (protected IN ('Y', 'N'))")
+  it('locks and checks readonly before any editable update or delete', () => {
+    expect(sql).toContain("CHECK (readonly IN ('Y', 'N'))")
     expect(sql).toContain(
-      'SELECT protected, secret INTO l_protection, p_secret FROM odb_settings_store WHERE id = p_id FOR UPDATE',
+      'SELECT readonly, secret INTO l_readonly, p_secret FROM odb_settings_store WHERE id = p_id FOR UPDATE',
     )
-    expect(sql).toMatch(/IF l_protection = 'Y' THEN\s+.*SETTINGS_REQUIRE_TRUSTED_SETUP/)
+    expect(sql).toMatch(/IF l_readonly = 'Y' THEN\s+.*SETTINGS_REQUIRE_TRUSTED_SETUP/)
     expect(sql).toContain('ODB_ERROR|NOT_FOUND|SETTING_NOT_FOUND')
     expect(sql).toMatch(
       /lock_editable\(p_id, l_secret\);\s+IF .*p_value IS NULL.* THEN[\s\S]+?SETTINGS_SECRET_REPLACEMENT_REQUIRED[\s\S]+?write\(p_id, p_value, NULL\);/,
     )
     expect(sql).toMatch(
       /lock_editable\(p_id, l_secret\);[\s\S]+?JSON_VALUE\(meta, '\$\.deletable'[\s\S]+?SETTINGS_DELETE_FORBIDDEN[\s\S]+?remove\(p_id\);/,
-    )
-    expect(sql).toMatch(
-      /write\(p_id, p_value, p_meta\);\s+UPDATE odb_settings_store SET protected = 'Y' WHERE id = p_id;/,
     )
   })
 
@@ -140,7 +140,7 @@ describe('Settings', () => {
 
   it('encrypts only secret writes and preserves metadata on ordinary updates', () => {
     expect(sql).toContain(
-      'SELECT meta, secret INTO l_effective_meta, l_existing_secret FROM odb_settings_store WHERE id = p_id FOR UPDATE',
+      'SELECT meta, secret, readonly INTO l_effective_meta, l_existing_secret, l_existing_readonly FROM odb_settings_store WHERE id = p_id FOR UPDATE',
     )
     expect(sql).toContain('l_effective_meta := NVL(p_meta, l_effective_meta)')
     expect(sql).toContain("IF l_existing_secret = 'Y' THEN")
@@ -169,7 +169,7 @@ describe('Settings', () => {
       sql.indexOf('PROCEDURE remove(', sql.indexOf('CREATE OR REPLACE PACKAGE BODY')),
     )
     expect(write).toMatch(
-      /WHEN NO_DATA_FOUND THEN\s+l_effective_meta := '\{\}';\s+l_existing_secret := 'N';/,
+      /WHEN NO_DATA_FOUND THEN\s+l_effective_meta := '\{\}';\s+l_existing_secret := 'N';\s+l_existing_readonly := 'N';/,
     )
     const replacement = write.indexOf('l_effective_meta := NVL(p_meta, l_effective_meta)')
     const preservation = write.indexOf("IF l_existing_secret = 'Y' THEN")
@@ -182,6 +182,15 @@ describe('Settings', () => {
     )
     expect(write).not.toContain('SMTP_PASSWORD')
     expect(write).not.toContain('AUTH_JWT_SECRET')
+  })
+
+  it('preserves readonly metadata on replacement while allowing trusted value writes', () => {
+    expect(sql).toMatch(
+      /IF l_existing_readonly = 'Y' THEN\s+SELECT JSON_MERGEPATCH\(l_effective_meta, '\{"readonly":"Y"\}' RETURNING CLOB\) INTO l_effective_meta FROM dual;\s+END IF;/,
+    )
+    expect(
+      odbSettings.seed({ id: 'LOCKED', value: '1', meta: { readonly: 'Y' } }).toSQLUp(),
+    ).toContain(`odb_settings.write('LOCKED', '1', '{"readonly":"Y"}')`)
   })
 
   it('uses authenticated AES-256 encryption, random IVs, UTF-8 and setting-bound MACs', () => {

@@ -101,7 +101,7 @@ async function fetchSettings({ cursor, limit, search, signal, complete }: OvTabl
       ...data,
       items: data.items.map((row) => {
         settingField(row.meta, row.secret === 'Y')
-        if (row.protected === 'N') {
+        if (row.readonly === 'N') {
           if (row.secret === 'N') return { ...row, editMode: 'value' }
           if (row.secret === 'Y') return { ...row, editMode: 'secret' }
         }
@@ -139,8 +139,8 @@ async function saveSetting(
   if (
     !row ||
     typeof row !== 'object' ||
-    !('protected' in row) ||
-    row.protected !== 'N' ||
+    !('readonly' in row) ||
+    row.readonly !== 'N' ||
     !('secret' in row) ||
     row.secret !== (secret ? 'Y' : 'N')
   ) {

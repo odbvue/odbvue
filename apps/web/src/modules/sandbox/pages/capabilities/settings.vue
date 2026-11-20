@@ -148,15 +148,15 @@ const http = useHttp()
 const id = ref('SANDBOX_DEMO')
 const value = ref('')
 const items = ref<Item[]>([])
-const loaded = ref<{ id: string; meta: unknown; protected?: string | null }>()
+const loaded = ref<{ id: string; meta: unknown; readonly?: string | null }>()
 const secretMeta = (meta: unknown) =>
   meta !== null && typeof meta === 'object' && 'secret' in meta && meta.secret === 'Y'
 const current = computed(() =>
   loaded.value?.id === id.value ? loaded.value : items.value.find((item) => item.id === id.value),
 )
 const secret = computed(() => secretMeta(current.value?.meta))
-const trustedSetup = computed(() => current.value?.protected === 'Y')
-const editable = computed(() => current.value?.protected === 'N')
+const trustedSetup = computed(() => current.value?.readonly === 'Y')
+const editable = computed(() => current.value?.readonly === 'N')
 const deletable = computed(() => {
   const meta = current.value?.meta
   return (
@@ -204,7 +204,7 @@ const read = () =>
     const response = await http.get<components['schemas']['SandboxReadSettingResponse']>(url())
     if (response.error || !response.data) throw response.error ?? new Error('Not found')
     if (id.value !== requested) return
-    loaded.value = { id: requested, meta: response.data.meta, protected: response.data.protected }
+    loaded.value = { id: requested, meta: response.data.meta, readonly: response.data.readonly }
     value.value = secret.value ? '' : (response.data.value ?? '')
   })
 

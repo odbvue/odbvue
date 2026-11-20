@@ -248,16 +248,16 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
       out: {
         value: odbSettings.types.value,
         meta: odbSettings.types.meta,
-        protected: settingsStore.protected,
+        readonly: settingsStore.readonly,
       },
     },
-    ({ params: { id, value, meta, protected: protection }, body }) => {
+    ({ params: { id, value, meta, readonly }, body }) => {
       body.call(odbSettings.readMasked(id, value, meta))
       body.query(
         odbQuery()
           .selectFrom(settingsStore)
-          .select(settingsStore.protected)
-          .into(protection)
+          .select(settingsStore.readonly)
+          .into(readonly)
           .where(cond.eq(settingsStore.id, id)),
       )
       body.when('NO_DATA_FOUND', (missing) => missing.notFound('SETTING_NOT_FOUND'))
@@ -272,7 +272,7 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
     response: {
       value: readSetting.parameters.value,
       meta: readSetting.parameters.meta,
-      protected: readSetting.parameters.protected,
+      readonly: readSetting.parameters.readonly,
     },
   })
 
@@ -292,7 +292,7 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
     auth: { roles: ['admin'] },
     method: 'PUT',
     path: '/settings/:id',
-    summary: 'Update an existing unprotected setting',
+    summary: 'Update an existing editable setting',
     uri: { id: writeSetting.parameters.id },
     body: { value: writeSetting.parameters.value },
   })

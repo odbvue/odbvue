@@ -77,8 +77,7 @@ export const migration = defineMigration('00000000000000_bootstrap', {
     odbSettings.seed({
       id: 'APP_SETTINGS_MASTER_KEY_URI',
       value: '',
-      meta: { label: 'OCI Vault master key secret bundle URI', type: 'string' },
-      protected: true,
+      meta: { label: 'OCI Vault master key secret bundle URI', type: 'string', readonly: 'Y' },
     }),
   )
   .install(

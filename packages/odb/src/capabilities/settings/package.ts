@@ -34,7 +34,7 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
             ),
             settingsStore.value,
           )
-          .select([settingsStore.meta, settingsStore.protected])
+          .select([settingsStore.meta, settingsStore.readonly])
           .orderBy(settingsStore.id)
           .paginate({ cursor: after, limit }),
       )
@@ -87,17 +87,19 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
     ({ params: { id, value, meta }, body }) => body.call(readValue.invoke(id, '1', value, meta)),
   )
 
-  /** Creates or updates a setting; null `meta` keeps metadata, and existing secrets stay secret. */
+  /** Creates or updates a setting; null `meta` keeps metadata, and secret/readonly flags persist. */
   const write = pkg.proc(
     'write',
     { in: { id: settingsStore.id, value: settingsTypes.value, meta: settingsStore.meta } },
     ({ params: { id, value, meta }, body }) => {
-      const { effectiveMeta, storedValue, secret, existingSecret } = body.variables({
-        effectiveMeta: settingsStore.meta,
-        storedValue: odbType.clob(),
-        secret: odbType.string(10),
-        existingSecret: settingsStore.secret,
-      })
+      const { effectiveMeta, storedValue, secret, existingSecret, existingReadonly } =
+        body.variables({
+          effectiveMeta: settingsStore.meta,
+          storedValue: odbType.clob(),
+          secret: odbType.string(10),
+          existingSecret: settingsStore.secret,
+          existingReadonly: settingsStore.readonly,
+        })
       body.ifThen(cond.gt(odbOracle.length(value), VALUE_LENGTH), (invalid) =>
         invalid.invalid('SETTINGS_VALUE_TOO_LONG'),
       )
@@ -105,14 +107,15 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
         existing.query(
           odbQuery()
             .selectFrom(settingsStore)
-            .select([settingsStore.meta, settingsStore.secret])
-            .into(effectiveMeta, existingSecret)
+            .select([settingsStore.meta, settingsStore.secret, settingsStore.readonly])
+            .into(effectiveMeta, existingSecret, existingReadonly)
             .where(cond.eq(settingsStore.id, id))
             .forUpdate(),
         )
         existing.when('NO_DATA_FOUND', (missing) => {
           missing.set(effectiveMeta, odbLiteral('{}'))
           missing.set(existingSecret, odbLiteral('N'))
+          missing.set(existingReadonly, odbLiteral('N'))
         })
       })
       body.set(effectiveMeta, odbOracle.nvl(meta, effectiveMeta))
@@ -139,6 +142,14 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
           odbQuery()
             .selectFrom('dual')
             .select(odbOracle.jsonMergePatch(effectiveMeta, odbLiteral('{"secret":"Y"}')))
+            .into(effectiveMeta),
+        )
+      })
+      body.ifThen(cond.eq(existingReadonly, 'Y'), (then) => {
+        then.query(
+          odbQuery()
+            .selectFrom('dual')
+            .select(odbOracle.jsonMergePatch(effectiveMeta, odbLiteral('{"readonly":"Y"}')))
             .into(effectiveMeta),
         )
       })
@@ -175,36 +186,22 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
     },
   )
 
-  const writeProtected = pkg.proc(
-    'write_protected',
-    { in: { id: settingsStore.id, value: settingsTypes.value, meta: settingsStore.meta } },
-    ({ params: { id, value, meta }, body }) => {
-      body.call(write.invoke(id, value, meta))
-      body.query(
-        odbQuery()
-          .updateTable(settingsStore)
-          .set({ protected: 'Y' })
-          .where(cond.eq(settingsStore.id, id)),
-      )
-    },
-  )
-
   const lockEditable = pkg.privateProc('lock_editable', (proc) => {
     const { id, secret } = proc.parameters({
       in: { id: settingsStore.id },
       out: { secret: settingsStore.secret },
     })
     proc.body((body) => {
-      const { protection } = body.variables({ protection: settingsStore.protected })
+      const { readonly } = body.variables({ readonly: settingsStore.readonly })
       body.query(
         odbQuery()
           .selectFrom(settingsStore)
-          .select([settingsStore.protected, settingsStore.secret])
-          .into(protection, secret)
+          .select([settingsStore.readonly, settingsStore.secret])
+          .into(readonly, secret)
           .where(cond.eq(settingsStore.id, id))
           .forUpdate(),
       )
-      body.ifThen(cond.eq(protection, 'Y'), (denied) =>
+      body.ifThen(cond.eq(readonly, 'Y'), (denied) =>
         denied.forbidden('SETTINGS_REQUIRE_TRUSTED_SETUP'),
       )
       body.when('NO_DATA_FOUND', (missing) => missing.notFound('SETTING_NOT_FOUND'))
@@ -276,5 +273,5 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
     },
   )
 
-  return { list, read, readMasked, write, writeProtected, updateEditable, remove, removeEditable }
+  return { list, read, readMasked, write, updateEditable, remove, removeEditable }
 })

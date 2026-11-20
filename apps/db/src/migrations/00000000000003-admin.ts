@@ -416,7 +416,7 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
           .select([
             settingsStore.id,
             settingsStore.secret,
-            settingsStore.protected,
+            settingsStore.readonly,
             settingsStore.meta,
           ])
           .selectAs(

@@ -272,21 +272,21 @@ describe('admin settings', () => {
     const row = {
       id: 'SMTP_HOST',
       secret: 'N',
-      protected: 'N',
+      readonly: 'N',
       value: 'smtp.example.test',
       meta: { type: 'text' },
     }
     const secret = {
       id: 'SMTP_PASSWORD',
       secret: 'Y',
-      protected: 'N',
+      readonly: 'N',
       value: null,
       meta: { type: 'password' },
     }
-    const protectedSecret = { ...secret, id: 'AUTH_JWT_SECRET', protected: 'Y' }
-    const protectedValue = { ...row, id: 'AUTH_JWT_ISSUER', protected: 'Y' }
+    const readonlySecret = { ...secret, id: 'AUTH_JWT_SECRET', readonly: 'Y' }
+    const readonlyValue = { ...row, id: 'AUTH_JWT_ISSUER', readonly: 'Y' }
     const page = {
-      items: [row, secret, protectedSecret, protectedValue],
+      items: [row, secret, readonlySecret, readonlyValue],
       nextCursor: 'opaque-next',
     }
     const complete = vi.fn<OvTableFetchRequest['complete']>()
@@ -308,8 +308,8 @@ describe('admin settings', () => {
       items: [
         { ...row, editMode: 'value' },
         { ...secret, editMode: 'secret' },
-        { ...protectedSecret, editMode: 'none' },
-        { ...protectedValue, editMode: 'none' },
+        { ...readonlySecret, editMode: 'none' },
+        { ...readonlyValue, editMode: 'none' },
       ],
       nextCursor: 'opaque-next',
     })
@@ -324,7 +324,7 @@ describe('admin settings', () => {
   it('rejects empty or masked secret replacements and requests a refetch after saving', async () => {
     const { wrapper } = await setup('settings')
     const settings = wrapper.findComponent(table)
-    const row = { id: 'API_TOKEN', secret: 'Y', protected: 'N', value: null }
+    const row = { id: 'API_TOKEN', secret: 'Y', readonly: 'N', value: null }
     const complete = vi.fn<SettingActionComplete>()
     const submit = (replacement: string) =>
       settings.vm.$emit(
@@ -357,7 +357,7 @@ describe('admin settings', () => {
     const row = {
       id: 'AUTH_PASSWORD_ENABLED',
       secret: 'N',
-      protected: 'N',
+      readonly: 'N',
       value: null,
       meta: { type: 'switch' },
     }
@@ -373,9 +373,9 @@ describe('admin settings', () => {
     expect(complete).toHaveBeenCalledExactlyOnceWith(undefined, true)
   })
 
-  it('rejects a protected row even if a form submission is emitted', async () => {
+  it('rejects a readonly row even if a form submission is emitted', async () => {
     const { wrapper } = await setup('settings')
-    const row = { id: 'CUSTOM_POLICY', secret: 'N', protected: 'Y', value: 'Y' }
+    const row = { id: 'CUSTOM_POLICY', secret: 'N', readonly: 'Y', value: 'Y' }
     const complete = vi.fn<SettingActionComplete>()
     wrapper.findComponent(table).vm.$emit('action', 'admin.editSetting', [row], row, complete)
     await flushPromises()

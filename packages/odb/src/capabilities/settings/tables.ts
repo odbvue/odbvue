@@ -8,7 +8,21 @@ export const settingsStore = odbTable('odb_settings_store', (t) => ({
   id: t.string(ID_LENGTH).primaryKey(),
   value: t.clob(),
   meta: t.json<SettingMeta>().notNull().default({}),
-  protected: t.string(1).notNull().default('N'),
+  readonly: t
+    .string(1)
+    .generatedAs(
+      odbOracle
+        .nvl(
+          odbOracle.jsonValue('meta', odbLiteral('$.readonly'), {
+            length: 1,
+            errorOnError: true,
+            nullOnEmpty: true,
+          }),
+          odbLiteral('N'),
+        )
+        .toSQL(),
+    )
+    .notNull(),
   secret: t.string(1).generatedAs(
     odbOracle
       .nvl(
@@ -23,5 +37,5 @@ export const settingsStore = odbTable('odb_settings_store', (t) => ({
   ),
 }))
   .check('odb_settings_chk_secret', "secret IN ('Y', 'N')")
-  .check('odb_settings_chk_protected', "protected IN ('Y', 'N')")
+  .check('odb_settings_chk_readonly', "readonly IN ('Y', 'N')")
   .comment('Application settings')

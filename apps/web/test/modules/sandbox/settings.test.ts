@@ -57,7 +57,7 @@ describe('sandbox Settings secrets', () => {
 
   it('preserves normal configuration reads and writes', async () => {
     get.mockResolvedValueOnce({
-      data: { value: 'smtp.example.com', meta: {}, protected: 'N' },
+      data: { value: 'smtp.example.com', meta: {}, readonly: 'N' },
       error: null,
     })
     const wrapper = setup()
@@ -75,7 +75,7 @@ describe('sandbox Settings secrets', () => {
 
   it('never prefills the mask and writes only a secret replacement', async () => {
     get.mockResolvedValueOnce({
-      data: { value: '********', meta: { secret: 'Y' }, protected: 'N' },
+      data: { value: '********', meta: { secret: 'Y' }, readonly: 'N' },
       error: null,
     })
     const wrapper = setup()
@@ -98,7 +98,7 @@ describe('sandbox Settings secrets', () => {
   it('recognizes secret metadata on arbitrary listed settings', async () => {
     get.mockResolvedValueOnce({
       data: {
-        items: [{ id: 'API_TOKEN', value: '********', meta: { secret: 'Y' }, protected: 'N' }],
+        items: [{ id: 'API_TOKEN', value: '********', meta: { secret: 'Y' }, readonly: 'N' }],
       },
       error: null,
     })
@@ -114,7 +114,7 @@ describe('sandbox Settings secrets', () => {
 
   it('recognizes secret metadata on arbitrary individual settings', async () => {
     get.mockResolvedValueOnce({
-      data: { value: '********', meta: { secret: 'Y' }, protected: 'N' },
+      data: { value: '********', meta: { secret: 'Y' }, readonly: 'N' },
       error: null,
     })
     const wrapper = setup()
@@ -127,7 +127,7 @@ describe('sandbox Settings secrets', () => {
 
   it('clears an entered secret when the selected ID changes', async () => {
     get.mockResolvedValueOnce({
-      data: { value: '********', meta: { secret: 'Y' }, protected: 'N' },
+      data: { value: '********', meta: { secret: 'Y' }, readonly: 'N' },
       error: null,
     })
     const wrapper = setup()
@@ -141,13 +141,13 @@ describe('sandbox Settings secrets', () => {
   })
 
   it.each(['AUTH_JWT_SECRET', 'CUSTOM_POLICY'])(
-    'keeps protected configuration read-only: %s',
+    'keeps readonly configuration read-only: %s',
     async (id) => {
       get.mockResolvedValueOnce({
         data: {
           value: '********',
-          meta: id === 'AUTH_JWT_SECRET' ? { secret: 'Y' } : {},
-          protected: 'Y',
+          meta: id === 'AUTH_JWT_SECRET' ? { secret: 'Y', readonly: 'Y' } : { readonly: 'Y' },
+          readonly: 'Y',
         },
         error: null,
       })
@@ -169,7 +169,7 @@ describe('sandbox Settings secrets', () => {
 
   it('allows editing a non-deletable setting without allowing its deletion', async () => {
     get.mockResolvedValueOnce({
-      data: { value: 'odbvue', meta: { deletable: 'N' }, protected: 'N' },
+      data: { value: 'odbvue', meta: { deletable: 'N' }, readonly: 'N' },
       error: null,
     })
     const wrapper = setup()
@@ -183,7 +183,7 @@ describe('sandbox Settings secrets', () => {
 
   it('surfaces write failures without reporting success or discarding the replacement', async () => {
     get.mockResolvedValueOnce({
-      data: { value: '********', meta: { secret: 'Y' }, protected: 'N' },
+      data: { value: '********', meta: { secret: 'Y' }, readonly: 'N' },
       error: null,
     })
     put.mockResolvedValueOnce({ data: null, error: new Error('Encryption unavailable') })
