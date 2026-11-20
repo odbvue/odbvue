@@ -138,7 +138,7 @@ const bindings = {
   google_enabled: 'N',
   smtp_secret_meta: '{"label":"SMTP password","type":"string","secret":"Y"}',
   jwt_secret_meta:
-    '{"label":"JWT signing secret","type":"password","secret":"Y","deletable":"N","rules":[{"type":"custom","params":"jwt-secret"}]}',
+    '{"label":"JWT signing secret","type":"password","secret":"Y","rules":[{"type":"custom","params":"jwt-secret"}]}',
 }
 
 describe('CLI SMTP, JWT, and application URL settings setup', () => {
@@ -217,7 +217,7 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
       auth_ldap_tls_enabled: 'Y',
       auth_ldap_port: '636',
       ldap_port: 636,
-      ldap_secret_meta: '{"secret":"Y","deletable":"N"}',
+      ldap_secret_meta: '{"secret":"Y"}',
     })
     expect(sql).not.toContain(ldapSettings.auth_ldap_bind_password)
     expect(sql).not.toContain(ldapSettings.auth_ldap_wallet_password)
@@ -897,7 +897,7 @@ describe('CLI SMTP, JWT, and application URL settings setup', () => {
           auth_google_client_id: google.auth_google_client_id,
           auth_google_client_secret: google.auth_google_client_secret,
           auth_google_redirect_uri: 'http://localhost:5173/api/auth/google/callback',
-          google_secret_meta: '{"secret":"Y","deletable":"N"}',
+          google_secret_meta: '{"secret":"Y"}',
         })
         expect(sql).toContain(
           "APP.odb_settings.write('AUTH_GOOGLE_CLIENT_SECRET', :auth_google_client_secret, :google_secret_meta)",

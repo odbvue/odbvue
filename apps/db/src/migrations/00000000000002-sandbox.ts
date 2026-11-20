@@ -285,31 +285,16 @@ export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_san
       },
     },
     ({ params: { id, value }, body }) => {
-      body.call(odbSettings.updateEditable(id, value))
+      body.call(odbSettings.updateValue(id, value))
     },
   )
   defineService(writeSetting, {
     auth: { roles: ['admin'] },
     method: 'PUT',
     path: '/settings/:id',
-    summary: 'Update an existing editable setting',
+    summary: 'Update an existing setting value',
     uri: { id: writeSetting.parameters.id },
     body: { value: writeSetting.parameters.value },
-  })
-
-  const removeSetting = pkg.proc(
-    'remove_setting',
-    { in: { id: odbSettings.types.id } },
-    ({ params: { id }, body }) => {
-      body.call(odbSettings.removeEditable(id))
-    },
-  )
-  defineService(removeSetting, {
-    auth: { roles: ['admin'] },
-    method: 'DELETE',
-    path: '/settings/:id',
-    summary: 'Delete a setting',
-    uri: { id: removeSetting.parameters.id },
   })
 
   const listAudit = pkg.proc(

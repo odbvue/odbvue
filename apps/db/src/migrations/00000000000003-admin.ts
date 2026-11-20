@@ -458,7 +458,7 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
     'update_setting',
     { in: { id: odbSettings.types.id, value: odbSettings.types.value, actorId: odbType.guid() } },
     ({ params: { id, value, actorId }, body }) => {
-      body.call(odbSettings.updateEditable(id, value))
+      body.call(odbSettings.updateValue(id, value))
       body.auditEvent('Application setting updated', {
         'user.id': actorId,
         'event.name': odbLiteral('admin.setting.update'),

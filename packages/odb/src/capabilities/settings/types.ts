@@ -13,7 +13,6 @@ export type SettingRule =
 export type SettingMeta = Record<string, unknown> & {
   secret?: 'Y' | 'N'
   readonly?: 'Y' | 'N'
-  deletable?: 'Y' | 'N'
   type?:
     | 'string'
     | 'text'

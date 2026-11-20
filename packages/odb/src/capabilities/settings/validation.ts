@@ -29,7 +29,7 @@ const oneOf = (value: PlsqlValue, choices: readonly string[]) =>
 const invalid = (body: ProcedureBody) => body.invalid('SETTINGS_VALIDATION_INVALID')
 
 export function defineSettingsValidation(pkg: PackageImpl) {
-  return pkg.privateProc('validate_editable', (proc) => {
+  return pkg.privateProc('validate_setting', (proc) => {
     const { value, meta } = proc.parameters({
       in: { value: settingsTypes.value, meta: settingsStore.meta },
     })

@@ -457,7 +457,6 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
       label: 'JWT signing secret',
       type: 'password',
       secret: 'Y',
-      deletable: 'N',
       rules: [{ type: 'custom', params: 'jwt-secret' }],
     }),
   }
@@ -482,7 +481,7 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
         key.endsWith('_password') ? ':ldap_secret_meta' : undefined,
       ])
       if (key.endsWith('_password'))
-        googleBindings.ldap_secret_meta = JSON.stringify({ secret: 'Y', deletable: 'N' })
+        googleBindings.ldap_secret_meta = JSON.stringify({ secret: 'Y' })
     }
   }
   if (settings.auth_google_enabled) {
@@ -503,7 +502,7 @@ export const runSetupSettings = async (file?: string): Promise<boolean> => {
       development ? undefined : new ConfigStore().getConfig().runtime?.apiUrl,
     )
     authWrites.push(['AUTH_GOOGLE_REDIRECT_URI', 'auth_google_redirect_uri'])
-    googleBindings.google_secret_meta = JSON.stringify({ secret: 'Y', deletable: 'N' })
+    googleBindings.google_secret_meta = JSON.stringify({ secret: 'Y' })
   }
   const writes = [
     ...settingWrites.map(([id, bind, meta]) => odbSettings.write(odbLiteral(id), `:${bind}`, meta)),

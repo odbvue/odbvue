@@ -92,26 +92,25 @@ describe('Settings', () => {
     )
   })
 
-  it('locks and checks readonly before any editable update or delete', () => {
+  it('locks and checks readonly before editable value updates', () => {
     expect(sql).toContain("CHECK (readonly IN ('Y', 'N'))")
     expect(sql).toContain(
-      'SELECT readonly, secret INTO l_readonly, p_secret FROM odb_settings_store WHERE id = p_id FOR UPDATE',
+      'SELECT readonly, secret INTO l_readonly, l_secret FROM odb_settings_store WHERE id = p_id FOR UPDATE',
     )
     expect(sql).toMatch(/IF l_readonly = 'Y' THEN\s+.*SETTINGS_REQUIRE_TRUSTED_SETUP/)
     expect(sql).toContain('ODB_ERROR|NOT_FOUND|SETTING_NOT_FOUND')
     expect(sql).toMatch(
-      /lock_editable\(p_id, l_secret\);\s+IF .*p_value IS NULL.* THEN[\s\S]+?SETTINGS_SECRET_REPLACEMENT_REQUIRED[\s\S]+?write\(p_id, p_value, NULL\);/,
+      /IF l_readonly = 'Y' THEN[\s\S]+?SETTINGS_REQUIRE_TRUSTED_SETUP[\s\S]+?IF .*p_value IS NULL.* THEN[\s\S]+?SETTINGS_SECRET_REPLACEMENT_REQUIRED[\s\S]+?write\(p_id, p_value, NULL\);/,
     )
-    expect(sql).toMatch(
-      /lock_editable\(p_id, l_secret\);[\s\S]+?JSON_VALUE\(meta, '\$\.deletable'[\s\S]+?SETTINGS_DELETE_FORBIDDEN[\s\S]+?remove\(p_id\);/,
-    )
+    expect(sql).not.toContain('PROCEDURE remove_editable')
+    expect(sql).not.toContain('lock_editable')
   })
 
-  it('validates editable values against stored metadata before writing', () => {
+  it('validates every write against its effective metadata', () => {
     const start = sql.indexOf(
-      'PROCEDURE validate_editable(p_value IN VARCHAR2, p_meta IN odb_settings_store.meta%TYPE) IS',
+      'PROCEDURE validate_setting(p_value IN VARCHAR2, p_meta IN odb_settings_store.meta%TYPE) IS',
     )
-    const end = sql.indexOf('END validate_editable;', start)
+    const end = sql.indexOf('END validate_setting;', start)
     expect(start).toBeGreaterThan(-1)
     const validator = sql.slice(start, end)
     expect(JSON.stringify(odbSettingsPackage.application())).not.toContain('"kind":"raw"')
@@ -133,8 +132,16 @@ describe('Settings', () => {
     expect(validator).toMatch(
       /odb_validation\.check_rule\(p_value, l_rule\) = FALSE THEN\s+raise_application_error\(-20998, 'ODB_ERROR\|VALIDATION_ERROR\|SETTINGS_VALIDATION_INVALID'\)/,
     )
+    const writeStart = sql.indexOf(
+      'PROCEDURE write(p_id IN odb_settings_store.id%TYPE, p_value IN VARCHAR2, p_meta IN odb_settings_store.meta%TYPE) IS',
+    )
+    const writeEnd = sql.indexOf('END write;', writeStart)
+    const write = sql.slice(writeStart, writeEnd)
+    expect(write).toMatch(
+      /l_effective_meta := NVL\(p_meta, l_effective_meta\);[\s\S]+?validate_setting\(p_value, l_effective_meta\);/,
+    )
     expect(sql).toMatch(
-      /lock_editable\(p_id, l_secret\);[\s\S]+?validate_editable\(p_value, l_meta\);\s+write\(p_id, p_value, NULL\);/,
+      /SELECT readonly, secret INTO l_readonly, l_secret FROM odb_settings_store WHERE id = p_id FOR UPDATE;[\s\S]+?SETTINGS_REQUIRE_TRUSTED_SETUP[\s\S]+?write\(p_id, p_value, NULL\);/,
     )
   })
 

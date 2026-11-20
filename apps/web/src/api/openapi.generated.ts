@@ -387,11 +387,10 @@ export interface paths {
         };
         /** Read a setting */
         get: operations["sandbox_read_setting"];
-        /** Update an existing editable setting */
+        /** Update an existing setting value */
         put: operations["sandbox_write_setting"];
         post?: never;
-        /** Delete a setting */
-        delete: operations["sandbox_remove_setting"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -869,7 +868,6 @@ export interface components {
             readonly: string;
         };
         SandboxWriteSettingResponse: Record<string, never>;
-        SandboxRemoveSettingResponse: Record<string, never>;
         SandboxListAuditItemsItem: {
             id: string;
             /** Format: date-time */
@@ -1751,42 +1749,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SandboxWriteSettingResponse"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Insufficient authorization */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    sandbox_remove_setting: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SandboxRemoveSettingResponse"];
                 };
             };
             /** @description Authentication required */

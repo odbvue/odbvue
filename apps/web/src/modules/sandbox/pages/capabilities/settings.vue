@@ -71,14 +71,6 @@
               @click="read"
               >Read</v-btn
             >
-            <v-btn
-              color="error"
-              prepend-icon="$mdiDelete"
-              :disabled="!editable || !deletable || !auth.authenticated.value || !!busy"
-              :loading="busy === 'remove'"
-              @click="remove"
-              >Delete</v-btn
-            >
           </v-card-actions>
         </v-card>
       </v-col>
@@ -140,7 +132,7 @@ definePage({
 })
 
 type Item = components['schemas']['SandboxListSettingsItemsItem']
-type Action = 'read' | 'write' | 'remove' | 'list'
+type Action = 'read' | 'write' | 'list'
 
 const pageSize = 50
 const auth = useAuth()
@@ -157,12 +149,6 @@ const current = computed(() =>
 const secret = computed(() => secretMeta(current.value?.meta))
 const trustedSetup = computed(() => current.value?.readonly === 'Y')
 const editable = computed(() => current.value?.readonly === 'N')
-const deletable = computed(() => {
-  const meta = current.value?.meta
-  return (
-    meta !== null && typeof meta === 'object' && (!('deletable' in meta) || meta.deletable === 'Y')
-  )
-})
 const nextCursor = ref<string>()
 const busy = ref<Action>()
 const message = ref<{ type: 'success' | 'error'; text: string }>()
@@ -207,20 +193,6 @@ const read = () =>
     loaded.value = { id: requested, meta: response.data.meta, readonly: response.data.readonly }
     value.value = secret.value ? '' : (response.data.value ?? '')
   })
-
-const remove = () => {
-  if (!window.confirm('Delete this setting?')) return
-  return run('remove', 'Setting deleted.', 'Setting could not be deleted.', async () => {
-    const requested = id.value
-    const response = await http.delete(url())
-    if (response.error) throw response.error
-    items.value = items.value.filter((item) => item.id !== requested)
-    if (id.value === requested) {
-      loaded.value = undefined
-      value.value = ''
-    }
-  })
-}
 
 const list = (cursor?: string) =>
   run('list', 'Settings loaded.', 'Settings could not be loaded.', async () => {

@@ -7,10 +7,9 @@ const authenticated = ref(true)
 type Response = { data: unknown; error: Error | null }
 const get = vi.fn<(url: string) => Promise<Response>>()
 const put = vi.fn<(url: string, body: unknown) => Promise<Response>>()
-const remove = vi.fn<(url: string) => Promise<Response>>()
 vi.mock('@/capabilities/auth', () => ({ useAuth: () => ({ authenticated }) }))
 vi.mock('@/capabilities/http', () => ({
-  useHttp: () => ({ get, put, delete: remove }),
+  useHttp: () => ({ get, put }),
 }))
 
 const field = defineComponent({
@@ -51,7 +50,6 @@ describe('sandbox Settings secrets', () => {
     authenticated.value = true
     get.mockReset().mockResolvedValue({ data: { items: [] }, error: null })
     put.mockReset().mockResolvedValue({ data: null, error: null })
-    remove.mockReset().mockResolvedValue({ data: null, error: null })
   })
   afterEach(() => vi.unstubAllGlobals())
 
@@ -156,30 +154,17 @@ describe('sandbox Settings secrets', () => {
       await findButton(wrapper, 'Read').trigger('click')
       await flushPromises()
       expect(findButton(wrapper, 'Write').attributes('disabled')).toBeDefined()
-      expect(findButton(wrapper, 'Delete').attributes('disabled')).toBeDefined()
+      expect(wrapper.findAll('button').some((candidate) => candidate.text() === 'Delete')).toBe(
+        false,
+      )
       expect(findButton(wrapper, 'Read').attributes('disabled')).toBeUndefined()
       if (id === 'AUTH_JWT_SECRET') {
         expect(wrapper.get('[aria-label="New secret value"]').attributes('type')).toBe('password')
       }
       expect(put).not.toHaveBeenCalled()
-      expect(remove).not.toHaveBeenCalled()
       wrapper.unmount()
     },
   )
-
-  it('allows editing a non-deletable setting without allowing its deletion', async () => {
-    get.mockResolvedValueOnce({
-      data: { value: 'odbvue', meta: { deletable: 'N' }, readonly: 'N' },
-      error: null,
-    })
-    const wrapper = setup()
-    await wrapper.get('[aria-label="ID"]').setValue('AUTH_JWT_ISSUER')
-    await findButton(wrapper, 'Read').trigger('click')
-    await flushPromises()
-    expect(findButton(wrapper, 'Write').attributes('disabled')).toBeUndefined()
-    expect(findButton(wrapper, 'Delete').attributes('disabled')).toBeDefined()
-    wrapper.unmount()
-  })
 
   it('surfaces write failures without reporting success or discarding the replacement', async () => {
     get.mockResolvedValueOnce({

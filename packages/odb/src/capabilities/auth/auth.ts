@@ -159,7 +159,7 @@ export const odbAuth = {
         return {
           id,
           value: (options[key] ?? key !== 'ldap') ? 'Y' : 'N',
-          meta: { type: 'switch' as const, deletable: 'N' as const },
+          meta: { type: 'switch' as const },
         }
       }),
     )
@@ -208,14 +208,13 @@ export const odbAuth = {
       ...authPolicySettings.map(([key, id]) => ({
         id,
         value: key === 'ldap' ? 'N' : 'Y',
-        meta: { type: 'switch', deletable: 'N' },
+        meta: { type: 'switch' },
       })),
       ...authLdapSettings.map((setting) => ({
         id: setting.id,
         value: setting.value,
         meta: {
           label: setting.label,
-          deletable: 'N',
           type: 'type' in setting ? setting.type : 'string',
           ...('secret' in setting ? { secret: setting.secret } : {}),
           ...(setting.id === 'AUTH_LDAP_PORT'
@@ -230,7 +229,6 @@ export const odbAuth = {
           label: 'JWT signing secret',
           type: 'password',
           secret: 'Y' as const,
-          deletable: 'N',
           rules: [{ type: 'custom', params: 'jwt-secret' }],
         },
       },
@@ -240,7 +238,6 @@ export const odbAuth = {
         meta: {
           label: 'JWT issuer',
           type: 'text',
-          deletable: 'N',
           rules: [{ type: 'custom', params: 'jwt-issuer' }],
         },
       },
@@ -250,7 +247,6 @@ export const odbAuth = {
         meta: {
           label: 'JWT expiration (seconds)',
           type: 'number',
-          deletable: 'N',
           rules: [{ type: 'custom', params: 'jwt-expiration' }],
         },
       },

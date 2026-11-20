@@ -67,15 +67,14 @@ HTTP exposure, authorization, and mapping ODB errors to HTTP responses belong to
 
 ## Procedures
 
-| Procedure         | Parameters                                                     | Behavior                                                                                                                                                                                                             |
-| ----------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list`            | `p_after` IN JSON, `p_limit` IN, `p_items` OUT `SYS_REFCURSOR` | Ordered by `id`, after a decoded cursor tuple (`NULL` for the first page). Returns the displayed limit plus one lookahead row (`NULL` limit uses the shared default 25). Columns: `id`, `value`, `meta`, `readonly`. |
-| `read`            | `p_id` IN, `p_value` OUT, `p_meta` OUT                         | Reads one setting, decrypting secrets; raises the ODB `NOT_FOUND` error if it does not exist.                                                                                                                        |
-| `read_masked`     | `p_id` IN, `p_value` OUT, `p_meta` OUT                         | Reads one setting, returning `********` for secrets without loading the key.                                                                                                                                         |
-| `write`           | `p_id`, `p_value`, `p_meta` IN                                 | Creates or updates a setting. A `NULL` `p_meta` keeps existing metadata (`{}` on create).                                                                                                                            |
-| `remove`          | `p_id` IN                                                      | Deletes a setting from trusted code.                                                                                                                                                                                 |
-| `update_editable` | `p_id`, `p_value` IN                                           | Updates an existing editable setting without changing metadata.                                                                                                                                                      |
-| `remove_editable` | `p_id` IN                                                      | Deletes an existing editable setting unless its metadata disallows deletion.                                                                                                                                         |
+| Procedure      | Parameters                                                     | Behavior                                                                                                                                                                                                             |
+| -------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list`         | `p_after` IN JSON, `p_limit` IN, `p_items` OUT `SYS_REFCURSOR` | Ordered by `id`, after a decoded cursor tuple (`NULL` for the first page). Returns the displayed limit plus one lookahead row (`NULL` limit uses the shared default 25). Columns: `id`, `value`, `meta`, `readonly`. |
+| `read`         | `p_id` IN, `p_value` OUT, `p_meta` OUT                         | Reads one setting, decrypting secrets; raises the ODB `NOT_FOUND` error if it does not exist.                                                                                                                        |
+| `read_masked`  | `p_id` IN, `p_value` OUT, `p_meta` OUT                         | Reads one setting, returning `********` for secrets without loading the key.                                                                                                                                         |
+| `write`        | `p_id`, `p_value`, `p_meta` IN                                 | Creates or updates a setting. A `NULL` `p_meta` keeps existing metadata (`{}` on create).                                                                                                                            |
+| `remove`       | `p_id` IN                                                      | Deletes a setting from trusted code.                                                                                                                                                                                 |
+| `update_value` | `p_id`, `p_value` IN                                           | Updates an existing setting's value against its metadata without changing metadata.                                                                                                                                  |
 
 `meta` is JSON text for presentation and editable-value validation.
 `meta.secret` is reserved: `'Y'` marks an encrypted secret; omitted, `null`, or
@@ -94,8 +93,8 @@ New settings default to ordinary configuration unless their metadata declares
 `secret: 'Y'`. Auth and Email provisioning declare their own secret metadata,
 including when recreating settings after deletion.
 
-`meta.readonly` is independent of `secret`. `'Y'` disallows updates and deletion
-through editable operations; omitted, `null`, or `'N'` allows them. The generated
+`meta.readonly` is independent of `secret`. `'Y'` disallows value updates through
+`update_value`; omitted, `null`, or `'N'` allows them. The generated
 `readonly` column applies the same default and JSON error handling as `secret`,
 and its check constraint accepts only `'Y'` or `'N'`. Trusted `write` can update
 the value, but preserves an existing `'Y'` on metadata replacement. An intentional
@@ -170,7 +169,7 @@ const api = odbPackage('pck_app_api', (pkg) => {
 
 Reuse the exported capability types instead of redeclaring them. `value: odbSettings.types.value` preserves JSON typing, sizes, and future changes to the capability contract; `value: odbType.string(2000)` does not.
 
-The sandbox API migration (`apps/db/src/migrations/00000000000002-sandbox.ts`) shows the full set of `list`, `read`, `write`, and `remove` services in one `pck_sandbox` package.
+The sandbox API migration (`apps/db/src/migrations/00000000000002-sandbox.ts`) shows `list`, `read`, and value-update services in one `pck_sandbox` package.
 
 ### Admin settings
 
@@ -183,11 +182,9 @@ The update audit records the actor and setting ID, not the value.
 
 Bootstrap marks the master-key URI with `meta.readonly: 'Y'`.
 Authentication settings are editable by administrators. Admin and Sandbox
-require an existing row for edits and reject read-only rows; Sandbox deletion
-also rejects settings with `meta.deletable: 'N'`. Authentication settings carry
-that flag so they remain editable but cannot be deleted through Sandbox. A
-missing row returns 404; read-only or non-deletable rows return 403.
-Use trusted setup for those settings. Changing an SMTP host or port
+require an existing row for edits and reject read-only rows. Sandbox does not
+expose setting deletion; use trusted setup for removals. A missing row returns
+404 and read-only updates return 403. Changing an SMTP host or port
 through the editor does not update network ACLs; use `ov setup-settings` for that.
 
 ### Editable field metadata

@@ -49,19 +49,14 @@ export const odbSettings = {
     return odbSettingsPackage.write(id, value, meta)
   },
 
-  /** Updates only an existing, editable setting without changing metadata. */
-  updateEditable(id: PlsqlRenderable, value: PlsqlRenderable) {
-    return odbSettingsPackage.updateEditable(id, value)
+  /** Updates an existing setting's value against its metadata without changing metadata. */
+  updateValue(id: PlsqlRenderable, value: PlsqlRenderable) {
+    return odbSettingsPackage.updateValue(id, value)
   },
 
   /** `odb_settings.remove(<id>)`. */
   remove(id: PlsqlRenderable) {
     return odbSettingsPackage.remove(id)
-  },
-
-  /** Removes only an existing, editable setting. */
-  removeEditable(id: PlsqlRenderable) {
-    return odbSettingsPackage.removeEditable(id)
   },
 
   /**

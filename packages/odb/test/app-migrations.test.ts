@@ -136,7 +136,7 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toMatch(
       /SELECT id AS "id", secret AS "secret", readonly AS "readonly", meta AS "meta", CASE WHEN secret = 'N' THEN value ELSE TO_CLOB\(NULL\) END AS "value" FROM odb_settings_store WHERE .*INSTR\(LOWER\(id\), LOWER\(TRIM\(p_search\)\)\).*ORDER BY id ASC FETCH FIRST/,
     )
-    expect(sql).toContain('odb_settings.update_editable(p_id, p_value)')
+    expect(sql).toContain('odb_settings.update_value(p_id, p_value)')
     expect(sql).not.toContain('APP_SETTINGS_MASTER_KEY_URI')
     expect(sql).toMatch(/'event.name', 'admin.setting.update', 'setting.id', p_id/)
     expect(sql).not.toMatch(/odb_settings.read|odb_settings.decrypt/)
@@ -868,8 +868,8 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain('odb_settings.list(p_after, p_limit, p_items)')
     expect(sql).toContain('odb_settings.read_masked(p_id, p_value, p_meta)')
     expect(sql).not.toContain('odb_settings.read(p_id, p_value, p_meta)')
-    expect(sql).toContain('odb_settings.update_editable(p_id, p_value)')
-    expect(sql).toContain('odb_settings.remove_editable(p_id)')
+    expect(sql).toContain('odb_settings.update_value(p_id, p_value)')
+    expect(sql).not.toContain('odb_settings.remove_editable(p_id)')
     expect(sql).not.toContain('APP_SETTINGS_MASTER_KEY_URI')
     expect(sql).toContain("ODBVUE.odb_settings.write('SANDBOX_DEMO'")
   })
@@ -950,12 +950,21 @@ describe('app-owned ORDS migrations', () => {
     ).toEqual({
       redirect: { type: 'string' },
     })
+
     expect(document.paths['/auth/google/callback']?.get?.responses).toHaveProperty('303')
     const query = document.paths['/auth/google/callback']?.get?.parameters?.filter(
       (item) => item.in === 'query',
     )
     expect(query?.map((item) => item.name)).toEqual(['state', 'code', 'error'])
     expect(Object.keys(document.paths).some((path) => path.includes('login-google'))).toBe(false)
+  })
+
+  it('does not expose setting deletion through the sandbox API', async () => {
+    const migration = await load('00000000000002-sandbox')
+    const openapi = generateApplicationOpenApi(migration.applications()[0]) as {
+      paths: Record<string, { delete?: unknown }>
+    }
+    expect(openapi.paths['/sandbox/settings/{id}'].delete).toBeUndefined()
   })
 
   it('owns all auth endpoints in pck_app with signup and email delivery wired into the migration sequence', async () => {
