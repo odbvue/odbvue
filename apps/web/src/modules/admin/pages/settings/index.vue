@@ -44,7 +44,6 @@ const editForm = (field: OvFormOptions['fields'][number]): OvFormOptions => ({
   actionSubmit: 'admin.saveSetting',
 })
 
-const maxValueLength = 2000
 const options = computed<OvTableOptions>(() => ({
   key: 'id',
   stateKey: 'admin.settings',
@@ -119,24 +118,16 @@ async function saveSetting(
   submission?: unknown,
   complete?: (errors?: OvFormFieldError[], refetch?: boolean) => void,
 ) {
-  const secret = action === 'admin.replaceSettingSecret'
-  if ((!secret && action !== 'admin.editSetting') || saving.value || !complete) return
-  const field = secret ? 'replacement' : 'value'
+  if (
+    (action !== 'admin.replaceSettingSecret' && action !== 'admin.editSetting') ||
+    saving.value ||
+    !complete
+  )
+    return
   if (!isRecord(submission) || typeof submission.id !== 'string') {
-    return complete([{ name: field, message: 'admin.updateSettingError' }])
+    return complete([{ name: 'value', message: 'admin.updateSettingError' }])
   }
-  const { id } = submission
-  const input = submission[field]
-  const value = !secret && typeof input === 'boolean' ? (input ? 'Y' : 'N') : (input ?? '')
-  if (typeof value !== 'string') {
-    return complete([{ name: field, message: 'admin.updateSettingError' }])
-  }
-  if (secret && (!value || value === '********')) {
-    return complete([{ name: field, message: 'admin.settingSecretRequired' }])
-  }
-  if (value.length > maxValueLength) {
-    return complete([{ name: field, message: 'admin.settingTooLong' }])
-  }
+  const { id, value } = submission
   saving.value = true
   const result = await ui.action('admin.settings.update', async () => {
     const { error } = await http.put(`/admin/settings/${encodeURIComponent(id)}`, { value })

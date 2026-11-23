@@ -179,7 +179,7 @@ export function settingField(meta: unknown, secret: boolean): Field {
     message: 'admin.settingTooLong',
   })
   return {
-    name: secret ? 'replacement' : 'value',
+    name: 'value',
     type: secret ? 'password' : (type as SettingType),
     label: secret ? 'admin.settingReplacement' : 'admin.settingValue',
     ...(secret ? { value: '', hint: 'admin.settingSecretHint', autocomplete: 'new-password' } : {}),

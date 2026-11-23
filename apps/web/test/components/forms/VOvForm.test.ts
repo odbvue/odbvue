@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import VOvForm from '@/components/forms/VOvForm.vue'
 import { globalPlugins } from '../../support/components.setup'
 import type { OvFormOptions } from '@/components'
+import { settingField } from '@/modules/admin/pages/settings/metadata'
 
 function mountForm(options: OvFormOptions, data = {}, attachTo?: Element) {
   return mount(VOvForm, {
@@ -71,6 +72,125 @@ describe('VOvForm', () => {
       fields: [{ type: 'checkbox', name: 'agree', label: 'I Agree' }],
     })
     expect(wrapper.text()).toContain('I Agree')
+  })
+
+  it.each(['switch', 'checkbox'] as const)(
+    'round-trips initial Y/N values through a %s',
+    async (type) => {
+      const wrapper = mountForm(
+        { fields: [{ type, name: 'value' }], actions: ['save'], actionSubmit: 'save' },
+        { value: 'N' },
+      )
+      await flushPromises()
+      const input = wrapper.get('input[type="checkbox"]')
+      expect((input.element as HTMLInputElement).checked).toBe(false)
+      await input.setValue(true)
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+      expect(wrapper.emitted('submit')).toEqual([[{ value: 'Y' }]])
+      await input.setValue(false)
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+      expect(wrapper.emitted('submit')?.[1]).toEqual([{ value: 'N' }])
+    },
+  )
+
+  it.each([
+    ['switch', false, true],
+    ['checkbox', false, true],
+    ['switch', 0, 1],
+    ['checkbox', '0', '1'],
+  ] as const)('preserves %s scalar format for %s', async (type, initial, expected) => {
+    const wrapper = mountForm(
+      { fields: [{ type, name: 'value' }], actions: ['save'], actionSubmit: 'save' },
+      { value: initial },
+    )
+    await flushPromises()
+    await wrapper.get('input[type="checkbox"]').setValue(true)
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('submit')).toEqual([[{ value: expected }]])
+  })
+
+  it.each([
+    ['switch', 'Y'],
+    ['checkbox', true],
+  ] as const)('uses the existing default format for an unset %s', async (type, expected) => {
+    const wrapper = mountForm({
+      fields: [{ type, name: 'value' }],
+      actions: ['save'],
+      actionSubmit: 'save',
+    })
+    await flushPromises()
+    await wrapper.get('input[type="checkbox"]').setValue(true)
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('submit')).toEqual([[{ value: expected }]])
+  })
+
+  it('updates and resets boolean fields using the latest input format', async () => {
+    const wrapper = mountForm(
+      {
+        fields: [{ type: 'checkbox', name: 'value', value: 'N' }],
+        actions: ['save', 'reset'],
+        actionSubmit: 'save',
+        actionReset: 'reset',
+      },
+      { value: 'Y' },
+    )
+    await flushPromises()
+    const input = wrapper.get('input[type="checkbox"]')
+    expect((input.element as HTMLInputElement).checked).toBe(true)
+    await wrapper.setProps({ data: { value: false } })
+    expect((input.element as HTMLInputElement).checked).toBe(false)
+    await input.setValue(true)
+    await wrapper.get('button[type="button"]').trigger('click')
+    await flushPromises()
+    expect((input.element as HTMLInputElement).checked).toBe(false)
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('submit')).toEqual([[{ value: false }]])
+  })
+
+  it('clears the previous checkbox format when the input data is cleared', async () => {
+    const wrapper = mountForm(
+      { fields: [{ type: 'checkbox', name: 'value' }], actions: ['save'], actionSubmit: 'save' },
+      { value: 'Y' },
+    )
+    await flushPromises()
+    await wrapper.setProps({ data: {} })
+    await wrapper.get('input[type="checkbox"]').setValue(true)
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('submit')).toEqual([[{ value: true }]])
+  })
+
+  it('validates a blank secret before submitting its replacement as value', async () => {
+    const wrapper = mountForm(
+      {
+        fields: [settingField({}, true)],
+        actions: ['save'],
+        actionSubmit: 'save',
+      },
+      { value: null },
+    )
+    await flushPromises()
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('submit')).toBeUndefined()
+    const input = wrapper.get('input[type="password"]')
+    await input.setValue('********')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('submit')).toBeUndefined()
+    await input.setValue('a'.repeat(2001))
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('submit')).toBeUndefined()
+    await input.setValue('new-secret')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('submit')).toEqual([[{ value: 'new-secret' }]])
   })
 
   it('renders textarea field', () => {

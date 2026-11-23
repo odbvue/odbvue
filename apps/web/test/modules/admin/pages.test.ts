@@ -317,32 +317,23 @@ describe('admin settings', () => {
     putRole.mockResolvedValueOnce({ data: null, error: null, status: 204, headers: null })
     settings.vm.$emit('action', 'admin.editSetting', page.items, { ...row, value: null }, saved)
     await flushPromises()
-    expect(putRole).toHaveBeenCalledExactlyOnceWith('/admin/settings/SMTP_HOST', { value: '' })
+    expect(putRole).toHaveBeenCalledExactlyOnceWith('/admin/settings/SMTP_HOST', { value: null })
     expect(saved).toHaveBeenCalledExactlyOnceWith(undefined, true)
   })
 
-  it('rejects empty or masked secret replacements and requests a refetch after saving', async () => {
+  it('saves a secret replacement and requests a refetch', async () => {
     const { wrapper } = await setup('settings')
     const settings = wrapper.findComponent(table)
     const row = { id: 'API_TOKEN', secret: 'Y', readonly: 'N', value: null }
     const complete = vi.fn<SettingActionComplete>()
-    const submit = (replacement: string) =>
-      settings.vm.$emit(
-        'action',
-        'admin.replaceSettingSecret',
-        [row],
-        { ...row, replacement },
-        complete,
-      )
-    for (const invalid of ['', '********']) {
-      submit(invalid)
-      expect(putRole).not.toHaveBeenCalled()
-      expect(complete).toHaveBeenLastCalledWith([
-        { name: 'replacement', message: 'admin.settingSecretRequired' },
-      ])
-    }
     putRole.mockResolvedValueOnce({ data: null, error: null, status: 204, headers: null })
-    submit('new-test-value')
+    settings.vm.$emit(
+      'action',
+      'admin.replaceSettingSecret',
+      [row],
+      { ...row, value: 'new-test-value' },
+      complete,
+    )
     await flushPromises()
     expect(putRole).toHaveBeenCalledExactlyOnceWith('/admin/settings/API_TOKEN', {
       value: 'new-test-value',
@@ -352,28 +343,39 @@ describe('admin settings', () => {
     expect(row.value).toBeNull()
   })
 
-  it.each([
-    [true, 'Y'],
-    [false, 'N'],
-  ])('stores boolean %s as %s without consulting displayed rows', async (value, expected) => {
+  it('reports malformed submissions without sending an update', async () => {
     const { wrapper } = await setup('settings')
+    const settings = wrapper.findComponent(table)
     const complete = vi.fn<SettingActionComplete>()
-    putRole.mockResolvedValueOnce({ data: null, error: null, status: 204, headers: null })
-    wrapper
-      .findComponent(table)
-      .vm.$emit(
-        'action',
-        'admin.editSetting',
-        undefined,
-        { id: 'AUTH_PASSWORD_ENABLED', value },
-        complete,
-      )
-    await flushPromises()
-    expect(putRole).toHaveBeenCalledExactlyOnceWith('/admin/settings/AUTH_PASSWORD_ENABLED', {
-      value: expected,
-    })
-    expect(complete).toHaveBeenCalledExactlyOnceWith(undefined, true)
+    settings.vm.$emit('action', 'admin.editSetting', [], { value: 'test' }, complete)
+    expect(putRole).not.toHaveBeenCalled()
+    expect(complete).toHaveBeenCalledExactlyOnceWith([
+      { name: 'value', message: 'admin.updateSettingError' },
+    ])
   })
+
+  it.each(['Y', 'N'])(
+    'passes the form value %s without consulting displayed rows',
+    async (value) => {
+      const { wrapper } = await setup('settings')
+      const complete = vi.fn<SettingActionComplete>()
+      putRole.mockResolvedValueOnce({ data: null, error: null, status: 204, headers: null })
+      wrapper
+        .findComponent(table)
+        .vm.$emit(
+          'action',
+          'admin.editSetting',
+          undefined,
+          { id: 'AUTH_PASSWORD_ENABLED', value },
+          complete,
+        )
+      await flushPromises()
+      expect(putRole).toHaveBeenCalledExactlyOnceWith('/admin/settings/AUTH_PASSWORD_ENABLED', {
+        value,
+      })
+      expect(complete).toHaveBeenCalledExactlyOnceWith(undefined, true)
+    },
+  )
 
   it('leaves the form open when the backend rejects a readonly update', async () => {
     const { wrapper } = await setup('settings')

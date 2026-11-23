@@ -16,7 +16,7 @@ describe('settings metadata', () => {
     })
     expect(settingField({ type: 'number' }, true)).toMatchObject({
       type: 'password',
-      name: 'replacement',
+      name: 'value',
       value: '',
     })
     expect(() => settingField({ type: 'file' }, false)).toThrow('admin.settingMetadataError')
@@ -53,5 +53,14 @@ describe('settings metadata', () => {
     expect(validates({ rules: [{ type: 'custom', params: 'jwt-secret' }] }, '********', true)).toBe(
       false,
     )
+  })
+
+  it('validates secret replacements and the maximum value length in the form', () => {
+    expect(validates({}, '', true)).toBe(false)
+    expect(validates({}, '********', true)).toBe(false)
+    expect(validates({}, 'a'.repeat(2000), true)).toBe(true)
+    expect(validates({}, 'a'.repeat(2001), true)).toBe(false)
+    expect(validates({}, 'a'.repeat(2000))).toBe(true)
+    expect(validates({}, 'a'.repeat(2001))).toBe(false)
   })
 })

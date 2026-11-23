@@ -135,7 +135,7 @@ import {
   durationToMinutes,
   isValidDuration,
 } from '../index'
-import { detectSwitchFormat, toBoolean, transformFormData } from './transforms'
+import { transformFormData, type BooleanFormat } from './transforms'
 
 const { defaults } = useDefaults({
   name: 'VOvForm',
@@ -185,12 +185,10 @@ const emits = defineEmits<{
 const getDurationFieldNames = () =>
   options.fields.filter((f) => f.type === 'duration').map((f) => f.name)
 
-// Get switch field names for conversion
-const getSwitchFieldNames = () =>
-  options.fields.filter((f) => f.type === 'switch').map((f) => f.name)
+const getBooleanFieldNames = () =>
+  options.fields.filter((f) => f.type === 'switch' || f.type === 'checkbox').map((f) => f.name)
 
-// Store original switch field formats (Y/N, 0/1, T/F, true/false, etc.)
-const switchFieldFormats = ref<Record<string, string>>({})
+const switchFieldFormats = ref<Record<string, BooleanFormat>>({})
 
 // Store loaded custom components to avoid reloading (shallowRef prevents deep reactivity on components)
 const customComponents = shallowRef<Record<string, unknown>>({})
@@ -226,26 +224,24 @@ const loadCustomComponent = async (fieldName: string, field: OvFormCustomField) 
 const definedProps = (props: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(props).filter(([, value]) => value !== undefined))
 
-// Convert various string formats to boolean (Y/N, 0/1, T/F, true/false)
-// Convert boolean back to original format
-const fromBoolean = (value: boolean, originalFormat?: string): string | number | boolean => {
-  // If we know the original format, use it
+const fromBoolean = (value: boolean, originalFormat?: BooleanFormat): string | number | boolean => {
+  if (originalFormat === 'boolean') return value
   if (originalFormat === 'Y/N') return value ? 'Y' : 'N'
-  if (originalFormat === '0/1') return value ? '1' : '0'
+  if (originalFormat === '0/1') return value ? 1 : 0
+  if (originalFormat === '0/1-string') return value ? '1' : '0'
   if (originalFormat === 'T/F') return value ? 'T' : 'F'
   if (originalFormat === 'true/false') return value ? 'true' : 'false'
-
-  // Default to Y/N format (most common in databases)
-  return value ? 'Y' : 'N'
+  return value
 }
 
-// Transform incoming numeric values to duration strings for display
-// Also convert switch field values from strings to booleans
 const transformIncomingData = (incomingData: OvFormData): OvFormData => {
+  for (const name of getBooleanFieldNames()) {
+    if (Object.hasOwn(incomingData, name)) delete switchFieldFormats.value[name]
+  }
   const transformed = transformFormData(
     incomingData,
     getDurationFieldNames(),
-    getSwitchFieldNames(),
+    getBooleanFieldNames(),
   )
   Object.assign(switchFieldFormats.value, transformed.switchFieldFormats)
   return transformed.values
@@ -261,6 +257,7 @@ watch(
         syncAsyncSelectedItems()
       } else {
         values.value = {}
+        switchFieldFormats.value = {}
         syncAsyncSelectedItems()
       }
     }
@@ -692,13 +689,13 @@ const getTransformedValues = (): OvFormData => {
     }
   }
 
-  const switchFields = getSwitchFieldNames()
-  for (const fieldName of switchFields) {
-    const val = result[fieldName]
+  for (const field of options.fields) {
+    if (field.type !== 'switch' && field.type !== 'checkbox') continue
+    const val = result[field.name]
     if (typeof val === 'boolean') {
-      // Convert boolean back to original format
-      const originalFormat = switchFieldFormats.value[fieldName]
-      result[fieldName] = fromBoolean(val, originalFormat)
+      const originalFormat =
+        switchFieldFormats.value[field.name] ?? (field.type === 'switch' ? 'Y/N' : 'boolean')
+      result[field.name] = fromBoolean(val, originalFormat)
     }
   }
 
@@ -760,7 +757,8 @@ function resetValues() {
       .filter((field) => field.value !== undefined)
       .map((field) => [field.name, field.value]),
   )
-  values.value = { ...fieldDefaults, ...data }
+  switchFieldFormats.value = {}
+  values.value = transformIncomingData({ ...fieldDefaults, ...data })
   syncAsyncSelectedItems()
 }
 
