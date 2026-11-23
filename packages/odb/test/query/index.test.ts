@@ -10,6 +10,30 @@ import {
 } from '../../src/schema/table.js'
 
 describe('odbQuery', () => {
+  it('marks typed JSON cursor columns without changing SQL queries or response metadata', () => {
+    const settings = odbTable('settings', (t) => ({
+      id: t.string().primaryKey(),
+      meta: t.json(),
+      displayText: t.clob(),
+    })).as('s')
+    const query = odbQuery()
+      .selectFrom(settings)
+      .select([settings.id, settings.meta, settings.displayText])
+    expect(query.toCursorSQL()).toBe(
+      'SELECT s.id AS "id", s.meta AS "{}meta", s.display_text AS "displayText" FROM settings s',
+    )
+    expect(query.toSQL()).toBe('SELECT s.id, s.meta, s.display_text FROM settings s')
+    expect(query.selectedColumns()?.[1]).toMatchObject({ name: 's.meta', type: 'json' })
+    const expression = odbQuery()
+      .selectFrom(settings)
+      .selectAs("JSON_OBJECT('label' VALUE 'Version' RETURNING CLOB)", settings.meta)
+    expect(expression.toCursorSQL()).toContain(
+      `JSON_OBJECT('label' VALUE 'Version' RETURNING CLOB) AS "{}meta"`,
+    )
+    expect(expression.selectedColumns()?.[0]).toMatchObject({ name: 'meta', type: 'json' })
+    expect(odbQuery().selectFrom(settings).toCursorSQL()).toContain('meta AS "{}meta"')
+  })
+
   it('quotes camelCase cursor fields without changing ordinary queries or database metadata', () => {
     const logs = odbTable('logs', (t) => ({
       id: t.guid('ID').primaryKey(),

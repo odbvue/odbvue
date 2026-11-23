@@ -716,7 +716,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List settings by ID without returning secret values */
+        /** List settings by ID with JSON metadata without returning secret values */
         get: operations["admin_list_settings"];
         put?: never;
         post?: never;

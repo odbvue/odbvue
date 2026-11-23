@@ -352,35 +352,44 @@ describe('admin settings', () => {
     expect(row.value).toBeNull()
   })
 
-  it('stores boolean switch submissions as Y or N', async () => {
+  it.each([
+    [true, 'Y'],
+    [false, 'N'],
+  ])('stores boolean %s as %s without consulting displayed rows', async (value, expected) => {
     const { wrapper } = await setup('settings')
-    const row = {
-      id: 'AUTH_PASSWORD_ENABLED',
-      secret: 'N',
-      readonly: 'N',
-      value: null,
-      meta: { type: 'switch' },
-    }
     const complete = vi.fn<SettingActionComplete>()
     putRole.mockResolvedValueOnce({ data: null, error: null, status: 204, headers: null })
     wrapper
       .findComponent(table)
-      .vm.$emit('action', 'admin.editSetting', [row], { ...row, value: true }, complete)
+      .vm.$emit(
+        'action',
+        'admin.editSetting',
+        undefined,
+        { id: 'AUTH_PASSWORD_ENABLED', value },
+        complete,
+      )
     await flushPromises()
     expect(putRole).toHaveBeenCalledExactlyOnceWith('/admin/settings/AUTH_PASSWORD_ENABLED', {
-      value: 'Y',
+      value: expected,
     })
     expect(complete).toHaveBeenCalledExactlyOnceWith(undefined, true)
   })
 
-  it('rejects a readonly row even if a form submission is emitted', async () => {
+  it('leaves the form open when the backend rejects a readonly update', async () => {
     const { wrapper } = await setup('settings')
     const row = { id: 'CUSTOM_POLICY', secret: 'N', readonly: 'Y', value: 'Y' }
     const complete = vi.fn<SettingActionComplete>()
+    putRole.mockResolvedValueOnce(failure(403))
     wrapper.findComponent(table).vm.$emit('action', 'admin.editSetting', [row], row, complete)
     await flushPromises()
-    expect(complete).toHaveBeenCalledWith([{ name: 'value', message: 'admin.settingTrustedSetup' }])
-    expect(putRole).not.toHaveBeenCalled()
+    expect(putRole).toHaveBeenCalledExactlyOnceWith('/admin/settings/CUSTOM_POLICY', {
+      value: 'Y',
+    })
+    expect(complete).not.toHaveBeenCalled()
+    expect(ui.notification.value).toMatchObject({
+      type: 'error',
+      message: 'admin.updateSettingError',
+    })
   })
 })
 

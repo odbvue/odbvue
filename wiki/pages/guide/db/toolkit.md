@@ -91,6 +91,14 @@ Use `cond` for comparisons and logical groups in both PL/SQL control flow and qu
 
 `odbPackage()` is the application model. Procedures retain their inputs, outputs, implementation, and service metadata in one serializable contract. PL/SQL, ORDS, TypeScript clients, and OpenAPI are generated from that model.
 
+Typed cursor projections automatically alias `json` columns as `"{}fieldName"`,
+including implicit selections and `selectAs()` expressions. This follows
+[ORDS's JSON-column alias convention](https://docs.oracle.com/en/database/oracle/oracle-rest-data-services/25.3/orddg/developing-REST-applications.html#GUID-24084688-616A-40D6-B267-72254092096B).
+The generated JSON handler embeds these columns with `FORMAT JSON`, preserving
+camelCase keys and native JSON values. Ordinary SQL queries and database column
+names are unchanged. Raw SQL projections must supply their own aliases and
+cannot infer typed response metadata.
+
 ```ts
 const settings = odbPackage('PCK_SETTINGS', (p) => ({
   getValue: p.func('GET_VALUE', odbType.string(), (fn) => {

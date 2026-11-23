@@ -1,5 +1,3 @@
-// Decodes ODB `json` fields (OpenAPI `x-odb-type: json`), which ORDS delivers as JSON text, into values.
-
 type Schema = {
   $ref?: string
   type?: string | string[]
@@ -16,7 +14,7 @@ type Operation = {
   >
 }
 
-/** The subset of an OpenAPI 3.1 document needed to locate ODB `json` fields. */
+/** The subset of an OpenAPI 3.1 document used by the HTTP client. */
 export interface OdbOpenApiDocument {
   security?: Record<string, readonly string[]>[]
   paths?: Record<string, Record<string, Operation | undefined>>
@@ -24,14 +22,6 @@ export interface OdbOpenApiDocument {
     schemas?: Record<string, Schema>
     securitySchemes?: Record<string, { type?: string; scheme?: string }>
   }
-}
-
-function resolve(document: OdbOpenApiDocument, schema: Schema | undefined): Schema | undefined {
-  let current = schema
-  for (let depth = 0; current?.$ref && depth < 16; depth++) {
-    current = document.components?.schemas?.[current.$ref.split('/').pop() ?? '']
-  }
-  return current
 }
 
 function segments(path: string): string[] {
@@ -74,40 +64,4 @@ export function requiresBearerToken(
       return scheme?.type === 'http' && scheme.scheme?.toLowerCase() === 'bearer'
     }),
   )
-}
-
-function decode(document: OdbOpenApiDocument, schema: Schema | undefined, value: unknown): unknown {
-  const resolved = resolve(document, schema)
-  if (!resolved || value === null || value === undefined) return value
-  if (resolved['x-odb-type'] === 'json') {
-    if (typeof value !== 'string') return value
-    try {
-      return JSON.parse(value)
-    } catch {
-      return value
-    }
-  }
-  if (Array.isArray(value)) return value.map((item) => decode(document, resolved.items, item))
-  if (typeof value === 'object' && resolved.properties) {
-    const record = value as Record<string, unknown>
-    const result: Record<string, unknown> = { ...record }
-    for (const [key, property] of Object.entries(resolved.properties)) {
-      if (key in record) result[key] = decode(document, property, record[key])
-    }
-    return result
-  }
-  return value
-}
-
-/** Parses `json` fields of a successful response according to the OpenAPI operation for `method` and `request`. */
-export function decodeOdbJson<T>(
-  document: OdbOpenApiDocument,
-  method: string,
-  request: string,
-  data: T,
-): T {
-  const schema = findOperation(document, method, request)?.responses?.['200']?.content?.[
-    'application/json'
-  ]?.schema
-  return schema ? (decode(document, schema, data) as T) : data
 }

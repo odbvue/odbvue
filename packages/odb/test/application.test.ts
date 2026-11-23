@@ -133,7 +133,7 @@ describe('ODB application contract', () => {
     })
   })
 
-  it('streams mixed scalar and JSON outputs without quoting arrays or parsing text as JSON', () => {
+  it('automatically streams mixed scalar and JSON outputs without quoting arrays or parsing text as JSON', () => {
     const native = odbPackage('PCK_PROFILE', (pkg) => {
       const read = pkg.proc(
         'read',
@@ -160,7 +160,6 @@ describe('ODB application contract', () => {
         auth: 'anonymous',
         method: 'GET',
         path: '/me',
-        responseMediaType: 'application/json',
         response: {
           name: read.parameters.name,
           count: read.parameters.count,

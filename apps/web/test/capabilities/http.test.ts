@@ -344,7 +344,16 @@ describe('HTTP capability', () => {
     expect(new Headers(fetch.mock.calls.at(-1)?.[1]?.headers).has('Authorization')).toBe(false)
     expect(refreshAccessToken).toHaveBeenCalledTimes(1)
   })
-  it('parses ODB json fields using the OpenAPI document', async () => {
+  it.each([
+    { label: 'object', meta: { label: 'Version' } },
+    { label: 'array', meta: ['Version'] },
+    { label: 'boolean', meta: true },
+    { label: 'number', meta: 123 },
+    { label: 'null', meta: null },
+    { label: 'boolean-like string', meta: 'true' },
+    { label: 'number-like string', meta: '123' },
+    { label: 'object-like string', meta: '{"label":"Version"}' },
+  ])('preserves native JSON $label values without decoding them again', async ({ meta }) => {
     const openapi = {
       paths: {
         '/sandbox/settings/{id}': {
@@ -369,15 +378,13 @@ describe('HTTP capability', () => {
       },
     }
     const http = useHttp({
-      fetch: vi.fn<FetchMock>(() =>
-        Promise.resolve(response(200, { value: '1.0.0', meta: '{"label":"Version"}' })),
-      ),
+      fetch: vi.fn<FetchMock>(() => Promise.resolve(response(200, { value: 'true', meta }))),
       configuration: { openapi },
     })
 
     const result = await http.get('/sandbox/settings/VERSION?x=1')
 
-    expect(result.data).toEqual({ value: '1.0.0', meta: { label: 'Version' } })
+    expect(result.data).toEqual({ value: 'true', meta })
   })
   it('shares one refresh and retries concurrent unauthorized requests once', async () => {
     let token = 'expired'

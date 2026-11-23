@@ -1,4 +1,4 @@
-import { Column, type ColumnNode } from '../schema/column.js'
+import { Column, type ColumnNode, type ColumnType } from '../schema/column.js'
 import { toCamelCase } from '../model.js'
 import { Param } from '../schema/attribute.js'
 import { CURSOR_PAGE_DEFAULTS } from '../constants.js'
@@ -72,9 +72,9 @@ function exprSql(expr: SqlExpr): string {
   return typeof expr === 'string' ? expr : expr.toSQL()
 }
 
-function cursorColumnSql(expression: string, name: string): string {
+function cursorColumnSql(expression: string, name: string, type: ColumnType): string {
   const alias = toCamelCase(name.slice(name.lastIndexOf('.') + 1))
-  return `${expression} AS "${alias}"`
+  return `${expression} AS "${type === 'json' ? '{}' : ''}${alias}"`
 }
 
 function isSqlExpression(value: unknown): value is { toSQL(): string } {
@@ -212,7 +212,9 @@ export class SelectQueryBuilder<
     this._columns.push(...cols.map(exprSql))
     this._cursorColumns.push(
       ...cols.map((column) =>
-        column instanceof Column ? cursorColumnSql(column.toSQL(), column.name) : exprSql(column),
+        column instanceof Column
+          ? cursorColumnSql(column.toSQL(), column.name, column.type)
+          : exprSql(column),
       ),
     )
     if (this._selectedColumns) {
@@ -236,7 +238,7 @@ export class SelectQueryBuilder<
   > {
     const name = column.name.slice(column.name.lastIndexOf('.') + 1)
     this._columns.push(`${exprSql(expression)} AS ${name}`)
-    this._cursorColumns.push(cursorColumnSql(exprSql(expression), name))
+    this._cursorColumns.push(cursorColumnSql(exprSql(expression), name, column.type))
     this._selectedColumns?.push({ ...column.toNode(), name })
     return this as SelectQueryBuilder<
       TTable,
@@ -415,13 +417,15 @@ export class SelectQueryBuilder<
     return this._columns.length > 0 ? this._columns.join(', ') : '*'
   }
 
-  /** Render typed cursor projections with case-preserving camelCase JSON field names. */
+  /** Render camelCase cursor aliases, marking JSON columns with the ORDS `{}` prefix. */
   toCursorSQL(): string {
     const columns =
       this._cursorColumns.length > 0
         ? this._cursorColumns
         : this._table instanceof Table && !this._joins.length
-          ? this._table.toNode().columns.map((column) => cursorColumnSql(column.name, column.name))
+          ? this._table
+              .toNode()
+              .columns.map((column) => cursorColumnSql(column.name, column.name, column.type))
           : ['*']
     return this.renderSQL(columns.join(', '))
   }

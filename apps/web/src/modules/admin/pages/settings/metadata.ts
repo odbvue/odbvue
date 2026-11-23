@@ -43,7 +43,7 @@ const customRules: Record<string, (value: string) => boolean> = {
   port: (value) => /^[0-9]{1,5}$/.test(value) && Number(value) >= 1 && Number(value) <= 65535,
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 

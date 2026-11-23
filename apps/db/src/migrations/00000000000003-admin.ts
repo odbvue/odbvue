@@ -445,7 +445,7 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
     basePath: '/admin',
     method: 'GET',
     path: '/settings',
-    summary: 'List settings by ID without returning secret values',
+    summary: 'List settings by ID with JSON metadata without returning secret values',
     query: {
       cursor: listSettings.parameters.after,
       limit: listSettings.parameters.limit,

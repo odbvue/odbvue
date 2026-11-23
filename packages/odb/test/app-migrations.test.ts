@@ -127,6 +127,7 @@ describe('app-owned ORDS migrations', () => {
       expect(endpoint.source).toContain("odb_auth.has_role(v_auth_user_id, 'admin')")
     }
     expect(list.source).toContain("'nextCursor' VALUE")
+    expect(list.source).toContain("'meta' VALUE v_output_3_column_3 FORMAT JSON")
     expect(
       list.params.find((param) => param.resultColumns)?.resultColumns?.map((c) => c.name),
     ).toEqual(['id', 'secret', 'readonly', 'meta', 'value'])
@@ -134,7 +135,7 @@ describe('app-owned ORDS migrations', () => {
     expect(update.params.some((param) => param.sourceType === 'RESPONSE')).toBe(false)
     const sql = migration.compile().up().join('\n')
     expect(sql).toMatch(
-      /SELECT id AS "id", secret AS "secret", readonly AS "readonly", meta AS "meta", CASE WHEN secret = 'N' THEN value ELSE TO_CLOB\(NULL\) END AS "value" FROM odb_settings_store WHERE .*INSTR\(LOWER\(id\), LOWER\(TRIM\(p_search\)\)\).*ORDER BY id ASC FETCH FIRST/,
+      /SELECT id AS "id", secret AS "secret", readonly AS "readonly", meta AS "\{\}meta", CASE WHEN secret = 'N' THEN value ELSE TO_CLOB\(NULL\) END AS "value" FROM odb_settings_store WHERE .*INSTR\(LOWER\(id\), LOWER\(TRIM\(p_search\)\)\).*ORDER BY id ASC FETCH FIRST/,
     )
     expect(sql).toContain('odb_settings.update_value(p_id, p_value)')
     expect(sql).not.toContain('APP_SETTINGS_MASTER_KEY_URI')

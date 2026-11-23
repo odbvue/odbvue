@@ -41,7 +41,7 @@ describe('odbAudit (framework package odb_audit)', () => {
       expect(sql).toContain('FETCH FIRST NVL(p_limit, 25) + 1 ROWS ONLY')
       expect(sql).not.toContain('AUDIT_CURSOR_NOT_FOUND')
       expect(sql).toContain(
-        'OPEN p_items FOR SELECT id AS "id", observed_timestamp AS "observedTimestamp", event_timestamp AS "eventTimestamp", severity_text AS "severityText", body AS "body", attributes AS "attributes" FROM odb_audit_logs',
+        'OPEN p_items FOR SELECT id AS "id", observed_timestamp AS "observedTimestamp", event_timestamp AS "eventTimestamp", severity_text AS "severityText", body AS "body", attributes AS "{}attributes" FROM odb_audit_logs',
       )
     })
 

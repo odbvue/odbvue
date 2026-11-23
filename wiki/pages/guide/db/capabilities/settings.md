@@ -214,6 +214,14 @@ characters), `jwt-issuer` (1–255 visible ASCII characters), `jwt-expiration`
 implementation in both the editor and database validator. An optional `message`
 is a translation key; otherwise the editor uses a generic localized error.
 
+The admin editor uses metadata for form validation and blank password fields for
+secret replacements. Metadata arrives as a JSON value, not a JSON-encoded string.
+On submission it converts boolean inputs to `Y`/`N` and
+sends only the value; it does not re-check permissions against the displayed rows.
+The admin service enforces authorization and delegates readonly and metadata
+validation to `update_value`. Failed updates leave the editor open and do not
+refresh the table.
+
 ```ts
 odbSettings.seed({
   id: 'RETRY_COUNT',

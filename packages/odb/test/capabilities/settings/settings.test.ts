@@ -37,7 +37,7 @@ describe('Settings', () => {
 
   it('implements list, read, write and remove in PL/SQL', () => {
     expect(sql).toContain(
-      'OPEN p_items FOR SELECT id AS "id", CASE WHEN secret = \'Y\' THEN TO_CLOB(\'********\') ELSE value END AS "value", meta AS "meta", readonly AS "readonly" FROM odb_settings_store',
+      'OPEN p_items FOR SELECT id AS "id", CASE WHEN secret = \'Y\' THEN TO_CLOB(\'********\') ELSE value END AS "value", meta AS "{}meta", readonly AS "readonly" FROM odb_settings_store',
     )
     expect(sql).toContain("id > JSON_VALUE(p_after, '$[0]'")
     expect(sql).toContain('ORDER BY id ASC FETCH FIRST NVL(p_limit, 25) + 1 ROWS ONLY')

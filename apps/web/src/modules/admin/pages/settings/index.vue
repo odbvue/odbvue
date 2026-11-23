@@ -15,7 +15,7 @@
 import { computed, nextTick, ref } from 'vue'
 import { useHttp } from '@/capabilities/http'
 import { useUi } from '@/capabilities/ui'
-import { settingField } from './metadata'
+import { isRecord, settingField } from './metadata'
 import type { components } from '@/api/openapi.generated'
 import type {
   OvFormFieldError,
@@ -101,11 +101,11 @@ async function fetchSettings({ cursor, limit, search, signal, complete }: OvTabl
       ...data,
       items: data.items.map((row) => {
         settingField(row.meta, row.secret === 'Y')
-        if (row.readonly === 'N') {
-          if (row.secret === 'N') return { ...row, editMode: 'value' }
-          if (row.secret === 'Y') return { ...row, editMode: 'secret' }
+        const editable = row.readonly === 'N' ? row.secret : undefined
+        return {
+          ...row,
+          editMode: editable === 'N' ? 'value' : editable === 'Y' ? 'secret' : 'none',
         }
-        return { ...row, editMode: 'none' }
       }),
     }
   })
@@ -115,51 +115,19 @@ async function fetchSettings({ cursor, limit, search, signal, complete }: OvTabl
 
 async function saveSetting(
   action: string,
-  rows: unknown,
+  _rows: unknown,
   submission?: unknown,
   complete?: (errors?: OvFormFieldError[], refetch?: boolean) => void,
 ) {
   const secret = action === 'admin.replaceSettingSecret'
   if ((!secret && action !== 'admin.editSetting') || saving.value || !complete) return
   const field = secret ? 'replacement' : 'value'
-  if (
-    !submission ||
-    typeof submission !== 'object' ||
-    !('id' in submission) ||
-    typeof submission.id !== 'string' ||
-    !Array.isArray(rows)
-  ) {
+  if (!isRecord(submission) || typeof submission.id !== 'string') {
     return complete([{ name: field, message: 'admin.updateSettingError' }])
   }
   const { id } = submission
-  const row: unknown = rows.find(
-    (candidate: unknown) =>
-      candidate && typeof candidate === 'object' && 'id' in candidate && candidate.id === id,
-  )
-  if (
-    !row ||
-    typeof row !== 'object' ||
-    !('readonly' in row) ||
-    row.readonly !== 'N' ||
-    !('secret' in row) ||
-    row.secret !== (secret ? 'Y' : 'N')
-  ) {
-    return complete([{ name: field, message: 'admin.settingTrustedSetup' }])
-  }
-  const input = secret
-    ? 'replacement' in submission
-      ? submission.replacement
-      : undefined
-    : 'value' in submission
-      ? submission.value
-      : undefined
-  const isSwitch =
-    'meta' in row &&
-    row.meta !== null &&
-    typeof row.meta === 'object' &&
-    'type' in row.meta &&
-    (row.meta.type === 'switch' || row.meta.type === 'checkbox')
-  const value = typeof input === 'boolean' && isSwitch ? (input ? 'Y' : 'N') : (input ?? '')
+  const input = submission[field]
+  const value = !secret && typeof input === 'boolean' ? (input ? 'Y' : 'N') : (input ?? '')
   if (typeof value !== 'string') {
     return complete([{ name: field, message: 'admin.updateSettingError' }])
   }

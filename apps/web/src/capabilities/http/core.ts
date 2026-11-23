@@ -1,12 +1,12 @@
 import { $fetch, type FetchContext, type FetchOptions } from 'ofetch'
-import { decodeOdbJson, requiresBearerToken, type OdbOpenApiDocument } from './json.js'
+import { requiresBearerToken, type OdbOpenApiDocument } from './openapi.js'
 
 type HttpRequestOptions = FetchOptions<'json' | 'blob'> & {
   /** Password reauthentication failures must not refresh or replace the current session. */
   skipAuthRefresh?: boolean
 }
 
-export { decodeOdbJson, type OdbOpenApiDocument } from './json.js'
+export { type OdbOpenApiDocument } from './openapi.js'
 
 const baseURL = import.meta.env?.DEV ? '/api/' : import.meta.env?.VITE_API_URI
 
@@ -40,7 +40,7 @@ export interface HttpConfiguration {
   refreshAccessToken?: () => Promise<boolean>
   shouldRefresh?: (request: string, options?: HttpRequestOptions) => boolean
   onRefreshFailure?: (context: HttpRefreshFailureContext) => void
-  /** OpenAPI document used to parse ODB `json` response fields into values. */
+  /** OpenAPI document used to identify endpoints requiring bearer authentication. */
   openapi?: OdbOpenApiDocument
 }
 export interface HttpClientOptions {
@@ -184,17 +184,7 @@ async function executeRequest<T>(
       configuration.onSlowRequest?.(context)
     }
     return {
-      data:
-        response._data === undefined || response._data === null
-          ? null
-          : configuration.openapi && options?.responseType !== 'blob'
-            ? decodeOdbJson(
-                configuration.openapi,
-                options?.method ?? 'GET',
-                request,
-                response._data as T,
-              )
-            : (response._data as T),
+      data: (response._data as T | undefined) ?? null,
       error: null,
       status: response.status,
       headers: response.headers,

@@ -17,12 +17,12 @@ type GetUser = paths['/users/users/{id}']['get']
 
 The application HTTP client supplies common behavior such as base URLs, request retries, authorization, and slow-request reporting. `useHttp()` from `@/capabilities/http` returns the installed application client; pass explicit options for an isolated test or sandbox client. Configure shared defaults under `http` in `odbvue.config.ts`.
 
-For PL/SQL services whose response fields are all `odbType.json()`, declare
-`responseMediaType: 'application/json'` to return native JSON values. The generated
-handler validates the JSON and streams it without ORDS quoting the fields.
-Other JSON-typed OUT fields retain ORDS's JSON-string transport; the HTTP client
-decodes these using OpenAPI's `x-odb-type: json` metadata and leaves native values
-unchanged.
+Typed JSON responses are serialized by the backend, not decoded again by the
+HTTP client. Typed cursor projections mark `json` columns with ORDS aliases such
+as `meta AS "{}meta"`; generated JSON handlers embed those values with
+`FORMAT JSON`. JSON-typed OUT fields also use native JSON serialization by
+default for supported scalar responses. Objects, arrays, scalars, and nulls
+arrive as JSON values, while ordinary string/CLOB columns remain strings.
 
 ## Server-backed lists
 

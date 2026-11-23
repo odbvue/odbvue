@@ -364,7 +364,7 @@ export class OrdsEndpoint {
     return (
       (this._responseMediaType === 'application/json' ||
         (this._responseMediaType === undefined &&
-          outputs.some((p) => p.paramType === 'RESULTSET'))) &&
+          outputs.some((p) => p.odbType === 'json' || p.paramType === 'RESULTSET'))) &&
       outputs.some((p) => p.odbType === 'json' || p.paramType === 'RESULTSET') &&
       outputs.every(
         (p) =>
@@ -411,7 +411,9 @@ export class OrdsEndpoint {
               ? `TO_CHAR(${value}, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`
               : column.type === 'boolean'
                 ? `CASE ${value} WHEN 1 THEN 'true' WHEN 0 THEN 'false' ELSE 'null' END FORMAT JSON`
-                : value
+                : column.type === 'json'
+                  ? `${value} FORMAT JSON`
+                  : value
       return `${sqlStr(oracleParameterName(column.name, { stripPrefix: false }))} VALUE ${expression}`
     })
     const keyValues = this._cursorPage?.order.map((key) => {
