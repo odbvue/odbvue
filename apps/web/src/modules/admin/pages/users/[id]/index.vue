@@ -7,7 +7,7 @@
     :text="user.enabled && isSelf ? t('admin.cannotDisableSelf') : undefined"
   >
     <v-card-actions>
-      <v-btn v-if="user.enabled" color="warning" :disabled="busy || isSelf">
+      <v-btn v-if="user.enabled" color="warning" :disabled="busy || isSelf" :loading="busy">
         {{ t('admin.disableUser') }}
         <v-ov-dialog
           activator="parent"
@@ -20,7 +20,7 @@
           @submit="setEnabled(false)"
         />
       </v-btn>
-      <v-btn v-else color="success" :disabled="busy" @click="setEnabled(true)">
+      <v-btn v-else color="success" :disabled="busy" :loading="busy" @click="setEnabled(true)">
         {{ t('admin.enableUser') }}
       </v-btn>
     </v-card-actions>

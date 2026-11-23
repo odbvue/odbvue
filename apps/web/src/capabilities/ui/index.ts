@@ -8,8 +8,19 @@ import { odbVueComponentIcons } from './icons.js'
 
 export { usePreferencesStore } from './preferences.js'
 export { useUi } from './store.js'
-export { useCardBackground, useNotificationMessage } from './composables.js'
-export type { AlertOptions, UiActionResult, UiNotification, UiNotificationType } from './store.js'
+export {
+  useCardBackground,
+  useNotificationMessage,
+  useNotificationQueue,
+  useNotificationTranslator,
+} from './composables.js'
+export type {
+  AlertOptions,
+  UiAlertOptions,
+  UiActionResult,
+  UiNotification,
+  UiNotificationType,
+} from './store.js'
 
 const ui = appConfig.ui ?? {}
 

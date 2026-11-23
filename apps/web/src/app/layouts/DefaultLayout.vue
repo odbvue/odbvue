@@ -155,12 +155,20 @@
         data-cy="theme-toggle"
       ></v-btn>
       <v-progress-linear
-        :active="ui.loading.active.value"
+        :active="ui.loading.global.value"
         indeterminate
         absolute
         location="bottom"
         height="4"
       ></v-progress-linear>
+    </v-app-bar>
+    <v-app-bar class="pa-2" v-if="ui.notification.value && !ui.snackbar.value">
+      <v-alert
+        :type="ui.notification.value.type"
+        :text="notificationMessage"
+        closable
+        @click:close="ui.clearAlert()"
+      />
     </v-app-bar>
     <v-app-bar>
       <v-breadcrumbs :items="breadcrumbs">
@@ -170,22 +178,14 @@
       </v-breadcrumbs>
     </v-app-bar>
 
-    <v-app-bar class="pa-2" v-if="ui.notification.value && !ui.snackbar.value">
-      <v-alert :type="ui.notification.value.type" :text="notificationMessage"></v-alert>
-    </v-app-bar>
-
     <v-main class="ma-4">
       <slot />
-
-      <v-snackbar :model-value="ui.snackbar.value" @update:model-value="!$event && ui.clear()">
-        {{ notificationMessage }}
-        <template v-slot:actions>
-          <v-btn color="pink" variant="text" @click="ui.clear()">
-            {{ t('close') }}
-          </v-btn>
+      <v-snackbar-queue ref="snackbarQueue" v-model="messages" :close-text="t('close')" closable>
+        <template #text="{ item }">
+          {{ translateNotification(item.text) }}
         </template>
-      </v-snackbar>
-      <v-overlay :model-value="ui.loading.active.value" contained persistent></v-overlay>
+      </v-snackbar-queue>
+      <v-overlay :model-value="ui.loading.global.value" contained persistent />
     </v-main>
     <v-footer app>
       <v-row>
@@ -216,16 +216,24 @@ import { useApp } from '@/capabilities'
 import { avatarInitials } from '@/capabilities/auth/avatar'
 import { appConfig } from '@/capabilities/config'
 import { usePreferencesStore } from '@/capabilities/ui'
-import { useNotificationMessage } from '@/capabilities/ui'
+import {
+  useNotificationMessage,
+  useNotificationQueue,
+  useNotificationTranslator,
+} from '@/capabilities/ui'
+import { provideLoadingOverlays } from '@/components/overlays/loading'
 
 const drawer = ref(false)
 const { t, te } = useI18n()
 const translateTitle = (title: string) => (te(title) ? t(title) : title)
 const preferences = usePreferencesStore()
 const { ui, auth } = useApp()
+provideLoadingOverlays(ui.loading.registerOverlay)
 const avatarUrl = computed(() => auth.user.value?.avatarUrl)
 const initials = computed(() => avatarInitials(auth.user.value))
+const translateNotification = useNotificationTranslator()
 const notificationMessage = useNotificationMessage(() => ui.notification.value?.message)
+const { messages, snackbarQueue } = useNotificationQueue(ui)
 const routing = useRouting()
 const breadcrumbs = computed(() =>
   routing.breadcrumbs.value.map((item) => ({ ...item, title: translateTitle(item.title) })),

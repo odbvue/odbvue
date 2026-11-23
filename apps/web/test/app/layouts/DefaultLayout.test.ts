@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, nextTick, ref } from 'vue'
+import { defineComponent, h, nextTick, ref, type Component, type PropType } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -10,20 +10,23 @@ import { useUi } from '@/capabilities/ui/store'
 import { authConfig } from '../../auth-state'
 import DefaultLayout from '@/app/layouts/DefaultLayout.vue'
 import type { Breadcrumb } from '@/capabilities/routing'
+import { useLoadingOverlay } from '@/components/overlays/loading'
 
 const breadcrumbItems = ref<Breadcrumb[]>([])
 
 const runtime = vi.hoisted((): { auth?: Auth; ui?: ReturnType<typeof useUi> } => ({}))
 
 vi.mock('@/capabilities', () => ({ useApp: () => runtime }))
-vi.mock('@/capabilities/ui', () => ({
+vi.mock('@/capabilities/ui', async () => ({
   usePreferencesStore: () => ({
     fontSizes: [100],
     locales: ['en'],
     locale: 'en',
     themeIcon: '$mdiWeatherSunny',
   }),
-  useNotificationMessage: () => ref(''),
+  useNotificationTranslator: () => (message?: string) => message ?? '',
+  useNotificationMessage: (await import('@/capabilities/ui/composables')).useNotificationMessage,
+  useNotificationQueue: (await import('@/capabilities/ui/composables')).useNotificationQueue,
 }))
 vi.mock('@/capabilities/routing', () => ({
   useRouting: () => ({ pages: ref([]), breadcrumbs: breadcrumbItems }),
@@ -48,6 +51,31 @@ const overlay = defineComponent({
   props: { modelValue: Boolean, contained: Boolean },
   template: '<div />',
 })
+const progress = defineComponent({
+  props: { active: Boolean },
+  template: '<div />',
+})
+const alert = defineComponent({
+  name: 'VAlert',
+  props: { type: String, text: String, closable: Boolean },
+  emits: ['click:close'],
+  template: '<div role="alert">{{ text }}</div>',
+})
+type QueuedMessage = { text: string; color: string; timeout: number; onDismiss: () => void }
+const snackbar = defineComponent({
+  props: {
+    modelValue: { type: Array as PropType<QueuedMessage[]>, required: true },
+    closable: Boolean,
+    closeText: String,
+  },
+  emits: ['update:modelValue'],
+  methods: {
+    clear() {
+      this.$emit('update:modelValue', [])
+    },
+  },
+  template: '<div><slot v-for="item in modelValue" name="text" :item="item" /></div>',
+})
 const breadcrumbs = defineComponent({
   props: ['items'],
   template:
@@ -58,7 +86,12 @@ function response<T>(data: T | null, status = 200): HttpResponse<T> {
   return { data, error: null, status, headers: null }
 }
 
-async function setup(authenticated = true, avatarUrl: string | null = null, ready = true) {
+async function setup(
+  authenticated = true,
+  avatarUrl: string | null = null,
+  ready = true,
+  content?: Component,
+) {
   const ui = useUi(createState())
   const http = createHttpClient()
   const post = vi
@@ -86,6 +119,7 @@ async function setup(authenticated = true, avatarUrl: string | null = null, read
   })
   await router.push('/settings/account')
   const wrapper = mount(DefaultLayout, {
+    slots: { default: () => (content ? h(content) : null) },
     global: {
       plugins: [
         router,
@@ -94,6 +128,7 @@ async function setup(authenticated = true, avatarUrl: string | null = null, read
           locale: 'en',
           messages: {
             en: {
+              close: 'Close',
               'settings.title': 'Settings',
               'auth.logout': 'Logout',
               'auth.login': 'Login',
@@ -102,6 +137,7 @@ async function setup(authenticated = true, avatarUrl: string | null = null, read
               'admin.users': 'Users',
             },
             de: {
+              close: 'Schließen',
               'settings.title': 'Einstellungen',
               'auth.logout': 'Abmelden',
               'auth.login': 'Anmelden',
@@ -130,11 +166,11 @@ async function setup(authenticated = true, avatarUrl: string | null = null, read
         VAvatar: avatar,
         VImg: image,
         VIcon: true,
-        VProgressLinear: true,
+        VProgressLinear: progress,
         VBreadcrumbs: breadcrumbs,
-        VAlert: true,
+        VAlert: alert,
         VMain: container,
-        VSnackbar: true,
+        VSnackbarQueue: snackbar,
         VOverlay: overlay,
         VFooter: container,
         VRow: container,
@@ -181,26 +217,133 @@ describe('default layout account navigation', () => {
     }
   })
 
-  it.each(['auth.refresh', 'auth.profile', 'sandbox.demo', 'overlay.auth.login'])(
-    'shows the contained overlay for %s until all activity finishes',
+  it.each(['overlay.auth.login', 'admin.settings.update', 'auth.refresh', 'sandbox.demo'])(
+    'shows the fallback overlay for %s without requiring a special prefix',
     async (key) => {
       const { wrapper, ui } = await setup()
       const loadingOverlay = wrapper.findComponent(overlay)
       expect(loadingOverlay.props('modelValue')).toBe(false)
+      expect(wrapper.getComponent(progress).props('active')).toBe(false)
       expect(loadingOverlay.props('contained')).toBe(true)
       const first = ui.loading.start(key)
       const second = ui.loading.start(key)
       await nextTick()
       expect(loadingOverlay.props('modelValue')).toBe(true)
+      expect(wrapper.getComponent(progress).props('active')).toBe(true)
       first()
       await nextTick()
       expect(loadingOverlay.props('modelValue')).toBe(true)
       second()
       await nextTick()
       expect(loadingOverlay.props('modelValue')).toBe(false)
+      expect(wrapper.getComponent(progress).props('active')).toBe(false)
       wrapper.unmount()
     },
   )
+
+  it('suppresses the fallback while local surfaces own loading and releases ownership on unmount', async () => {
+    const firstBusy = ref(true)
+    const secondBusy = ref(true)
+    const show = ref(true)
+    const first = defineComponent({
+      setup() {
+        useLoadingOverlay(firstBusy)
+        return () => null
+      },
+    })
+    const second = defineComponent({
+      setup() {
+        useLoadingOverlay(secondBusy)
+        return () => null
+      },
+    })
+    const content = defineComponent({
+      components: { First: first, Second: second },
+      setup: () => ({ show }),
+      template: '<First /><Second v-if="show" />',
+    })
+    const { wrapper, ui } = await setup(true, null, true, content)
+    const finish = ui.loading.start('admin.settings.update')
+    try {
+      await nextTick()
+      expect(wrapper.findComponent(overlay).props('modelValue')).toBe(false)
+      expect(wrapper.getComponent(progress).props('active')).toBe(false)
+      firstBusy.value = false
+      await nextTick()
+      expect(wrapper.findComponent(overlay).props('modelValue')).toBe(false)
+      show.value = false
+      await nextTick()
+      expect(ui.loading.active.value).toBe(true)
+      expect(wrapper.findComponent(overlay).props('modelValue')).toBe(true)
+      expect(wrapper.getComponent(progress).props('active')).toBe(true)
+      firstBusy.value = true
+      await nextTick()
+      expect(wrapper.findComponent(overlay).props('modelValue')).toBe(false)
+    } finally {
+      finish()
+      wrapper.unmount()
+    }
+  })
+
+  it('renders a translated page alert alongside snackbars and closes only the alert', async () => {
+    const { wrapper, ui } = await setup()
+    try {
+      ui.alert('admin.title', { type: 'warning' })
+      ui.success('Saved')
+      await nextTick()
+      const pageAlert = wrapper.getComponent(alert)
+      expect(pageAlert.props('type')).toBe('warning')
+      expect(pageAlert.props('text')).toBe('Admin')
+      expect(pageAlert.props('closable')).toBe(true)
+      expect(
+        wrapper
+          .getComponent(snackbar)
+          .props('modelValue')
+          .map((item) => item.text),
+      ).toEqual(['Saved'])
+      wrapper.vm.$i18n.locale = 'de'
+      await nextTick()
+      expect(pageAlert.props('text')).toBe('Administration')
+      pageAlert.vm.$emit('click:close')
+      await nextTick()
+      expect(wrapper.findComponent(alert).exists()).toBe(false)
+      expect(
+        wrapper
+          .getComponent(snackbar)
+          .props('modelValue')
+          .map((item) => item.text),
+      ).toEqual(['Saved'])
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('queues messages by severity and clears both pending and displayed snackbars', async () => {
+    const { wrapper, ui } = await setup()
+    ui.success('Saved')
+    ui.error('Failed', { timeout: 0 })
+    await nextTick()
+    const queue = wrapper.getComponent(snackbar)
+    const clear = vi.spyOn(queue.vm, 'clear')
+    const messages = queue.props('modelValue')
+    expect(messages.map(({ text, color, timeout }) => ({ text, color, timeout }))).toEqual([
+      { text: 'Saved', color: 'success', timeout: 5000 },
+      { text: 'Failed', color: 'error', timeout: -1 },
+    ])
+    expect(queue.props('closable')).toBe(true)
+    expect(wrapper.findComponent({ name: 'VAlert' }).exists()).toBe(false)
+    queue.vm.$emit('update:modelValue', messages.slice(1))
+    messages[0]!.onDismiss()
+    await nextTick()
+    expect(ui.notification.value?.message).toBe('Failed')
+    expect(queue.props('modelValue').map((item) => item.text)).toEqual(['Failed'])
+    ui.clear()
+    await nextTick()
+    expect(ui.notification.value).toBeUndefined()
+    expect(queue.props('modelValue')).toEqual([])
+    expect(clear).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
 
   it('shows a static avatar and full name above separate Settings and Logout drawer entries', async () => {
     const { wrapper } = await setup()

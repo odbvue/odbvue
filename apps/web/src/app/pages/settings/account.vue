@@ -81,6 +81,7 @@
             <v-ov-form
               :options="passwordOptions"
               :data="passwordData"
+              :loading="changingPassword"
               :t="t"
               :key="passwordFormKey"
               @submit="changePassword"

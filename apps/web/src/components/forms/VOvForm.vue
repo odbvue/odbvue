@@ -16,9 +16,11 @@
       <v-container>
         <v-form
           ref="formRef"
+          :aria-busy="loading"
+          :inert="loading"
           validate-on="invalid-input"
           :autocomplete="options.autocomplete"
-          :disabled="options.disabled"
+          :disabled="loading || options.disabled"
           :readonly="options.readonly"
           :fast-fail="options.fastFail"
           @submit.prevent="handleSubmit"
@@ -71,6 +73,7 @@
                 v-for="action in actions"
                 :key="action.name"
                 v-bind="action.props"
+                :disabled="loading || options.disabled || action.disabled"
                 :type="action.name === options.actionSubmit ? 'submit' : 'button'"
                 @click="action.name !== options.actionSubmit && handleAction(action.name)"
               />
@@ -83,7 +86,12 @@
             tabindex="-1"
           />
         </v-form>
-        <v-overlay :model-value="loading" persistent contained class="align-center justify-center">
+        <v-overlay
+          :model-value="loadingOverlay"
+          class="d-flex align-center justify-center"
+          persistent
+          contained
+        >
           <v-progress-circular indeterminate size="48" />
         </v-overlay>
       </v-container>
@@ -116,6 +124,7 @@ import {
 } from 'vuetify/components'
 import { useDefaults } from 'vuetify'
 import VOvEditor from './VOvEditor.vue'
+import { useLoadingOverlay } from '../overlays/loading'
 
 import {
   type OvFormOptions,
@@ -143,9 +152,6 @@ const { defaults } = useDefaults({
     VContainer: {
       class: 'position-relative',
     },
-    VOverlay: {
-      class: 'rounded',
-    },
     VForm: {
       VBtn: {
         class: 'ma-1',
@@ -171,6 +177,7 @@ const {
   title?: string
   description?: string
 }>()
+const loadingOverlay = useLoadingOverlay(() => loading)
 
 const emits = defineEmits<{
   (event: 'action', actionName: string, formData: OvFormData): void
@@ -519,7 +526,7 @@ const fields = computed(() => {
         field.type === 'password' ? () => (showPwd.value = !showPwd.value) : undefined,
       required: field.required,
       readonly: field.readonly,
-      disabled: field.disabled,
+      disabled: loading || field.disabled,
       variant: field.variant,
       density: field.density,
       color: field.color,
@@ -664,6 +671,7 @@ const actions = computed(() => {
     return {
       name: props.name as string,
       props,
+      disabled: 'disabled' in props && props.disabled === true,
     }
   })
 })
@@ -703,8 +711,9 @@ const getTransformedValues = (): OvFormData => {
 }
 
 const handleAction = async (actionName: string) => {
+  if (loading || options.disabled) return
   const action = actions.value.find((actionItem) => actionItem.name === actionName)
-  if (!action) return
+  if (!action || action.disabled) return
 
   if (action.name === options.actionCancel) {
     await emits('cancel')
@@ -719,6 +728,7 @@ const handleAction = async (actionName: string) => {
 
   if (action.name === options.actionSubmit) {
     const { valid, errors } = await formRef.value.validate()
+    if (loading || options.disabled) return
     if (!valid) {
       formFocus(errors[0]?.id)
       return

@@ -31,15 +31,15 @@ const options = ref<OvTableOptions>({
 
 ### Props
 
-| Prop          | Type             | Default     | Description                                                    |
-| ------------- | ---------------- | ----------- | -------------------------------------------------------------- |
-| `options`     | `OvTableOptions` | required    | Table layout, columns, search, filter, sort, and actions.      |
-| `items`       | `OvTableData[]`  | `[]`        | Optional supplied rows; fetched pages are managed internally.  |
-| `nextCursor`  | `string`         | `undefined` | Optional external continuation override.                       |
-| `loading`     | `boolean`        | `false`     | Additional external loading; fetch loading is automatic.       |
-| `title`       | `string`         | -           | Optional title above the table.                                |
-| `description` | `string`         | -           | Optional description above the table.                          |
-| `stateKey`    | `string`         | -           | Optional session preference key; overrides `options.stateKey`. |
+| Prop          | Type             | Default     | Description                                                                                                     |
+| ------------- | ---------------- | ----------- | --------------------------------------------------------------------------------------------------------------- |
+| `options`     | `OvTableOptions` | required    | Table layout, columns, search, filter, sort, and actions.                                                       |
+| `items`       | `OvTableData[]`  | `[]`        | Optional supplied rows; fetched pages are managed internally.                                                   |
+| `nextCursor`  | `string`         | `undefined` | Optional external continuation override.                                                                        |
+| `loading`     | `boolean`        | `false`     | External loading; shows one contained overlay on the table or its open form dialog. Fetch loading is automatic. |
+| `title`       | `string`         | -           | Optional title above the table.                                                                                 |
+| `description` | `string`         | -           | Optional description above the table.                                                                           |
+| `stateKey`    | `string`         | -           | Optional session preference key; overrides `options.stateKey`.                                                  |
 
 ### Emits
 
@@ -165,6 +165,11 @@ Navigation buttons appear in the table footer:
 - **Previous** - Disabled on the first page or while loading
 - **Next** - Disabled without a server continuation cursor or while loading
 - **Refresh** - Appears when `canRefresh: true`
+
+Existing rows remain mounted during fetches behind a contained table overlay.
+An open action dialog owns the save overlay: fields/actions are disabled and the
+background table has no additional overlay. Clear external `loading` before calling `complete(undefined, true)` to
+close the form and refresh the current page; the table handles the render boundary.
 
 The fetch handler must call the supplied completion callback exactly once.
 Make the HTTP request inside `ui.action()` and return its page, then call
@@ -356,7 +361,7 @@ name,-status           // name asc, then status desc
 - Filter state persists until cleared; sort state is shown as chips
 - Refresh button only appears when `canRefresh: true` and data is loaded
 - All labels, placeholders, and action text respect the `t` translation function
-- Loading overlay prevents interaction during data fetch operations
+- A contained loading overlay and inert table controls prevent interaction during fetches
 - The `fetch` method can be called manually via template ref to refresh data
 
 ## Composables

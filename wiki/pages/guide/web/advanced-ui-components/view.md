@@ -33,12 +33,12 @@ const options = <OvViewOptions>{
 
 ### Props
 
-| Prop      | Type                        | Default         | Description                      |
-| --------- | --------------------------- | --------------- | -------------------------------- |
-| `data`    | `OvViewData`                | required        | Data object keyed by item names. |
-| `options` | `OvViewOptions`             | `{ items: [] }` | View configuration.              |
-| `loading` | `boolean`                   | `false`         | Shows the loading overlay.       |
-| `t`       | `(text?: string) => string` | identity        | Translation function.            |
+| Prop      | Type                        | Default         | Description                                                             |
+| --------- | --------------------------- | --------------- | ----------------------------------------------------------------------- |
+| `data`    | `OvViewData`                | required        | Data object keyed by item names.                                        |
+| `options` | `OvViewOptions`             | `{ items: [] }` | View configuration.                                                     |
+| `loading` | `boolean`                   | `false`         | Shows a contained overlay on the view, or on its form dialog when open. |
+| `t`       | `(text?: string) => string` | identity        | Translation function.                                                   |
 
 ### Emits
 

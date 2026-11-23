@@ -12,16 +12,47 @@ ui.success('Saved', { timeout: 3000 })
 ui.warning('Please review this change')
 ui.error(new Error('Save failed'))
 ui.snack('Copied', { timeout: 1500 })
+ui.alert('Maintenance is scheduled', { type: 'warning' })
+ui.clearAlert()
+ui.clearSnackbars()
 ui.clear()
 ```
 
-`notification` is a read-only ref with `type`, `message`, and `presentation`
-(`alert` or `snackbar`). `snackbar` and `loading.active` are read-only refs too.
+The default layout renders action feedback through Vuetify's `v-snackbar-queue`, one
+message at a time, without custom notification containers or page movement.
+Success, info, warning, and error messages use their corresponding severity color.
+Each message is closable and defaults to five seconds once displayed; an explicit
+`timeout` overrides this, and `{ timeout: 0 }` keeps a message until dismissed.
+`ui.snack()` queues an info message too.
+
+Use `ui.alert(message, { type: 'warning' })` for a separate, persistent page alert.
+It defaults to type `info` and stays visible until closed, replaced, or cleared;
+an optional positive `timeout` expires it. The default layout renders it in a
+`v-app-bar` containing a `v-alert`, so showing or hiding it changes the page's
+available space. Showing an alert replaces only the previous alert, not snackbars.
+Action feedback and queued snackbars do not hide an active page alert.
+`ui.clearAlert()` clears only the alert; `ui.clearSnackbars()` clears only displayed
+and pending snackbars. `ui.clear()` clears both.
+
+`notifications` is a read-only ref containing all undismissed notifications.
+Each has an `id`, `type`, `message`, `timeout`, and `presentation: 'alert' | 'snackbar'`.
+`notification` is a read-only ref to the active page alert, or otherwise the latest
+undismissed snackbar. `snackbar` indicates whether that notification is a snackbar.
+The layout acknowledges each
+Vuetify dismissal with `ui.dismiss(id)`; `ui.clear()` clears displayed and pending messages.
+Vuetify owns display timing, so waiting messages do not expire before being shown.
+Messages are translated when rendered, including after a locale change.
+The UI store is the single source of truth: each notification tracks whether it is
+pending or already presented. Its writable computed `notificationQueue` adapts only
+snackbar notifications to Vuetify's model; consuming a queue item does not dismiss it.
+`useNotificationQueue(ui)` connects the renderer's lifecycle and clear action.
+Layouts do not maintain a second notification array or copy messages with watchers.
+Undismissed snackbars are requeued when the renderer unmounts; alerts never enter the queue.
 When using the `ui` object directly, read nested refs with `.value`, including
 in templates.
 
 ```ts
-const finish = ui.loading.start('overlay.save')
+const finish = ui.loading.start('orders.save')
 try {
   await save()
 } catch (error) {
@@ -31,7 +62,7 @@ try {
 }
 ```
 
-The default layout in `src/app/layouts` renders alerts, snackbars, and a loading
+The default layout in `src/app/layouts` renders the page alert, snackbar queue, and a loading
 indicator. `useNotificationMessage()` from `@/capabilities/ui` translates known
 catalog keys and displays arbitrary errors as plain text. Runtime error messages
 are not submitted to the missing-translation collector.
@@ -45,11 +76,11 @@ on success, rejection, or a synchronous throw.
 For an operation that should report errors to the user rather than reject, use
 `await ui.action('orders.save', () => save())`. It executes an application action with
 named loading and automatic error notification. It preserves existing notifications
-on start, returns `{ ok: true, data }` on success, and shows an error alert and returns
+on start, returns `{ ok: true, data }` on success, and queues an error snackbar and returns
 `{ ok: false, error }` on failure. The exported `UiActionResult<T>` type represents
 these outcomes and preserves the original error as `unknown`. A successful action
 may return `undefined` as its data; check `ok` rather than the data to detect success.
-Error alerts replace the current notification; call
+New notifications are appended rather than replacing earlier feedback. Call
 `ui.clear()` explicitly if an initiating action should dismiss existing feedback.
 Operations and their notifications may finish after a page is left.
 
@@ -68,10 +99,33 @@ specific operation; `loading.has('auth')` also includes descendant keys such as
 Auth retains its private request guards and restoration deduplication; UI loading
 does not control domain concurrency.
 
-The app-bar progress indicator and contained main-content overlay both respond to
-`loading.active.value`: any tracked operation activates them, including auth
-refresh, profile requests, and sandbox activity. Keys identify operations; no
-special `overlay` prefix is required. Both indicators remain active until all
-tracked operations finish.
+`loading.global.value` is the store-computed application loading indicator: tracked
+activity is active and no local loading surface owns an overlay. The default layout
+uses it for both the contained application overlay and the app-bar progress line.
+Operation names do not require an `overlay.*` prefix. Auth activity without a local
+loading owner uses the application fallback too.
 
-Use the sandbox UI page to exercise preferences and feedback.
+Give each operation one local interaction owner:
+
+- Forms use `:loading` to disable fields/actions and show one contained overlay.
+  Table/view-generated forms use their parent's `loading` prop, but do not add
+  their own overlay when the parent already covers the dialog.
+- Tables retain their last successful rows and show a contained table overlay
+  during fetches. Views use a contained overlay for external loading.
+- While a table/view form dialog is open, its card owns the save overlay, covering
+  fields and actions. The table/view background overlay is suppressed and the
+  dialog cannot be dismissed during saving.
+- The layout provides the store's `loading.registerOverlay()` callback through Vue
+  context. Local loading surfaces register ownership with the store through that
+  callback and suppress nested loading overlays through ancestor context. Registration
+  is released when loading ends or a surface unmounts. Reusable components also work
+  without the default layout and do not depend on the application store.
+- On table save success, clear the external loading state and call
+  `complete(undefined, true)`. The table closes the dialog and lets loading props
+  settle before refreshing the current page. Callers need no `nextTick()` workaround.
+- On failure, clear external loading without completing the action so the dialog
+  and draft stay open for retry. `ui.action()` reports the error.
+
+Use the sandbox UI page to exercise preferences, persistent and timed page alerts,
+queued severity messages, persistent snackbars, independent clearing, and a
+two-second application loading demo.

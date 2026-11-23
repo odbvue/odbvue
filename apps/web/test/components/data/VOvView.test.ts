@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import { nextTick } from 'vue'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import VOvView from '@/components/data/VOvView.vue'
+import VOvForm from '@/components/forms/VOvForm.vue'
+import { VBtn, VDialog, VOverlay, VProgressLinear } from 'vuetify/components'
 import { globalPlugins, i18n } from '../../support/components.setup'
 import type { OvViewOptions } from '@/components'
 
@@ -13,6 +15,52 @@ function mountView(options: OvViewOptions, data = {}) {
 }
 
 describe('VOvView', () => {
+  it('leaves background content visible and gives the open form ownership of save feedback', async () => {
+    const wrapper = mountView(
+      {
+        items: [{ name: 'name' }],
+        actions: [
+          {
+            name: 'edit',
+            form: {
+              fields: [{ name: 'name', type: 'text' }],
+              actions: ['save'],
+              actionSubmit: 'save',
+            },
+          },
+        ],
+      },
+      { name: 'Original' },
+    )
+    try {
+      await wrapper.getComponent(VBtn).trigger('click')
+      await flushPromises()
+      await wrapper.setProps({ loading: true })
+      expect(wrapper.getComponent(VOvForm).props('loading')).toBe(true)
+      expect(wrapper.getComponent(VDialog).props('persistent')).toBe(true)
+      expect(
+        wrapper.findAllComponents(VProgressLinear).filter((progress) => progress.props('active')),
+      ).toHaveLength(0)
+      expect(wrapper.getComponent(VOvForm).getComponent(VOverlay).props('modelValue')).toBe(false)
+      expect(
+        wrapper.findAllComponents(VOverlay).filter((overlay) => overlay.props('modelValue')),
+      ).toHaveLength(2)
+      await wrapper.setProps({ loading: false })
+      await wrapper.getComponent(VOvForm).vm.handleAction('save')
+      const complete = wrapper.emitted('action')![0]![3]
+      if (typeof complete !== 'function') throw new Error('Missing action callback')
+      complete()
+      await wrapper.setProps({ loading: true })
+      await flushPromises()
+      expect(
+        wrapper.findAllComponents(VOverlay).filter((overlay) => overlay.props('modelValue')),
+      ).toHaveLength(1)
+      expect(wrapper.text()).toContain('Original')
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it.each(['date', 'time', 'datetime'])('formats raw ISO timestamps using %s style', (style) => {
     const timestamp = '2026-11-11T03:03:34.956221Z'
     const wrapper = mountView(

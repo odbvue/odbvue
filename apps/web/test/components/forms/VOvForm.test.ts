@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { VBtn, VOverlay } from 'vuetify/components'
 import VOvForm from '@/components/forms/VOvForm.vue'
 import { globalPlugins } from '../../support/components.setup'
 import type { OvFormOptions } from '@/components'
@@ -14,6 +15,41 @@ function mountForm(options: OvFormOptions, data = {}, attachTo?: Element) {
 }
 
 describe('VOvForm', () => {
+  it('disables edits and actions while saving with a contained overlay', async () => {
+    const wrapper = mountForm(
+      {
+        fields: [{ type: 'text', name: 'name' }],
+        actions: ['save', 'cancel'],
+        actionSubmit: 'save',
+        actionCancel: 'cancel',
+      },
+      { name: 'Draft' },
+    )
+    try {
+      await wrapper.setProps({ loading: true })
+      const buttons = wrapper.findAllComponents(VBtn)
+      expect(buttons.map((button) => button.props('disabled'))).toEqual([true, true])
+      expect(buttons.every((button) => !button.props('loading'))).toBe(true)
+      expect(wrapper.get<HTMLInputElement>('input').element.disabled).toBe(true)
+      expect(wrapper.getComponent(VOverlay).props('modelValue')).toBe(true)
+      expect(wrapper.getComponent(VOverlay).props('contained')).toBe(true)
+      await wrapper.get('form').trigger('submit')
+      await wrapper.vm.handleAction('cancel')
+      await flushPromises()
+      expect(wrapper.emitted('submit')).toBeUndefined()
+      expect(wrapper.emitted('cancel')).toBeUndefined()
+
+      await wrapper.setProps({ loading: false })
+      expect(wrapper.getComponent(VOverlay).props('modelValue')).toBe(false)
+      expect(wrapper.get<HTMLInputElement>('input').element.value).toBe('Draft')
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+      expect(wrapper.emitted('submit')).toEqual([[{ name: 'Draft' }]])
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it('renders text fields', () => {
     const wrapper = mountForm({
       fields: [

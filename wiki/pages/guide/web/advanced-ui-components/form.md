@@ -53,15 +53,15 @@ const options = ref<OvFormOptions>({
 
 ### Props
 
-| Prop          | Type                        | Default     | Description                                   |
-| ------------- | --------------------------- | ----------- | --------------------------------------------- |
-| `options`     | `OvFormOptions`             | required    | Form configuration, field list, and actions.  |
-| `data`        | `OvFormData`                | `undefined` | Initial or refreshed form data.               |
-| `loading`     | `boolean`                   | `false`     | Shows the contained loading overlay.          |
-| `hideActions` | `boolean`                   | `false`     | Hides the bottom action row.                  |
-| `title`       | `string`                    | -           | Optional heading rendered above the form.     |
-| `description` | `string`                    | -           | Optional description rendered above the form. |
-| `t`           | `(text?: string) => string` | identity    | Translation function for labels and messages. |
+| Prop          | Type                        | Default     | Description                                                                                |
+| ------------- | --------------------------- | ----------- | ------------------------------------------------------------------------------------------ |
+| `options`     | `OvFormOptions`             | required    | Form configuration, field list, and actions.                                               |
+| `data`        | `OvFormData`                | `undefined` | Initial or refreshed form data.                                                            |
+| `loading`     | `boolean`                   | `false`     | Disables fields/actions and shows a contained overlay unless an ancestor already owns one. |
+| `hideActions` | `boolean`                   | `false`     | Hides the bottom action row.                                                               |
+| `title`       | `string`                    | -           | Optional heading rendered above the form.                                                  |
+| `description` | `string`                    | -           | Optional description rendered above the form.                                              |
+| `t`           | `(text?: string) => string` | identity    | Translation function for labels and messages.                                              |
 
 ### Emits
 
@@ -369,7 +369,6 @@ The form uses Vuetify defaults provider for consistent styling:
 
 - `.v-form` - Main form container
 - `.v-container` - Form content wrapper (class: `position-relative`)
-- `.v-overlay` - Loading overlay (class: `rounded`)
 - Form action buttons have `ma-1` class by default
 
 ## Notes

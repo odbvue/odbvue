@@ -1,6 +1,6 @@
 <template>
   <v-defaults-provider :defaults>
-    <v-container>
+    <v-container :aria-busy="busy">
       <v-row v-if="title || description || $slots.title || $slots.description">
         <v-col>
           <slot name="title">
@@ -11,7 +11,7 @@
           </slot>
         </v-col>
       </v-row>
-      <v-row>
+      <v-row :inert="busy">
         <v-col>
           <v-table>
             <thead>
@@ -299,7 +299,7 @@
       />
 
       <v-dialog v-model="form" :persistent="loading" :width="mobile ? '100%' : '75%'">
-        <v-card>
+        <v-card class="position-relative">
           <v-card-title>{{ formTitle }}</v-card-title>
           <v-card-text @mousedown.capture="handleFilterCardMouseDown">
             <v-Ov-form
@@ -320,14 +320,26 @@
               v-for="action in formDialogActions"
               :key="action.name"
               v-bind="action.props"
-              :disabled="loading"
+              :disabled="loading || formOptions.disabled || action.disabled"
               @click="tableFormRef?.handleAction(action.name)"
             />
           </v-card-actions>
+          <v-overlay
+            :model-value="loadingOverlay && form"
+            class="d-flex align-center justify-center"
+            persistent
+            contained
+          >
+            <v-progress-circular indeterminate />
+          </v-overlay>
         </v-card>
       </v-dialog>
-
-      <v-overlay :model-value="busy" persistent contained class="align-center justify-center">
+      <v-overlay
+        :model-value="loadingOverlay && !form"
+        class="d-flex align-center justify-center"
+        persistent
+        contained
+      >
         <v-progress-circular indeterminate />
       </v-overlay>
     </v-container>
@@ -335,7 +347,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, inject, useSlots, onBeforeUnmount, type Ref } from 'vue'
+import {
+  ref,
+  computed,
+  nextTick,
+  onMounted,
+  watch,
+  inject,
+  useSlots,
+  onBeforeUnmount,
+  type Ref,
+} from 'vue'
 import { useDisplay } from 'vuetify'
 import VOvDialog from '../overlays/VOvDialog.vue'
 import VOvForm from '../forms/VOvForm.vue'
@@ -377,6 +399,7 @@ import {
   renderViewItem,
 } from '../index'
 import { emptyRowCount, pageItems } from './pagination'
+import { useLoadingOverlay } from '../overlays/loading'
 
 import { useI18n } from 'vue-i18n'
 const { t, locale } = useI18n()
@@ -412,9 +435,6 @@ function mergeDefaults(
 const fallbackDefaults = {
   VContainer: {
     class: 'position-relative',
-  },
-  VOverlay: {
-    class: 'rounded',
   },
   VTable: {
     hover: true,
@@ -507,6 +527,7 @@ const pageCursor = ref<string | undefined>(undefined)
 const cursorStack = ref<(string | undefined)[]>([])
 const fetching = ref(false)
 const busy = computed(() => loading || fetching.value)
+const loadingOverlay = useLoadingOverlay(busy)
 let fetchId = 0
 let finishFetch: (() => void) | undefined
 let disposed = false
@@ -619,7 +640,11 @@ const formDialogActions = computed(() => {
   return (formOptions.value.actions || []).map((action) => {
     const props = OvActionFormat(undefined, action, formOptions.value.actionFormat)
     props.text = props.text ? t(String(props.text)) : undefined
-    return { name: props.name as string, props }
+    return {
+      name: props.name as string,
+      props,
+      disabled: 'disabled' in props && props.disabled === true,
+    }
   })
 })
 
@@ -885,7 +910,7 @@ async function handleSortUpdate(sortName: string, sortAction: string) {
 
 // actions
 
-const onActionComplete = (
+const onActionComplete = async (
   formErrors?: OvFormFieldError[],
   shouldRefetch?: boolean,
   submittedData = formData.value,
@@ -898,12 +923,15 @@ const onActionComplete = (
     return
   }
 
-  if (shouldRefetch) {
-    fetch()
-  } else {
+  if (!shouldRefetch) {
     localData.value[formRowIndex.value] = submittedData
   }
   form.value = false
+  if (shouldRefetch) {
+    // Let the parent's loading prop settle before the fetch busy guard runs.
+    await nextTick()
+    await fetch()
+  }
 }
 
 async function handleFormAction(actionName: string, actionData: OvFormData) {
@@ -948,8 +976,9 @@ async function handleFormSubmit(actionData: OvFormData) {
             : fieldValue
       }
     })
-    await fetch('first')
     form.value = false
+    await nextTick()
+    await fetch('first')
     return
   }
 

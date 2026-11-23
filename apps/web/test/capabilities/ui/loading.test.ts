@@ -1,10 +1,147 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { isReadonly } from 'vue'
 import { createState } from '@/capabilities/state'
 import { createLoading } from '@/capabilities/ui/loading'
 import { useUi } from '@/capabilities/ui/store'
 
 describe('keyed UI loading', () => {
+  it('keeps a replaceable page alert independent of the snackbar queue and its lifecycle', async () => {
+    const state = createState()
+    const ui = useUi(state)
+    const same = useUi(state)
+    ui.alert('Page warning', { type: 'warning' })
+    const warning = ui.notification.value!
+    await ui.action('save', () => ui.success('Saved'))
+    await ui.action('failed', () => Promise.reject(new Error('Failed')))
+    expect(same.notification.value).toMatchObject({
+      message: 'Page warning',
+      presentation: 'alert',
+      timeout: 0,
+    })
+    expect(same.snackbar.value).toBe(false)
+    expect(ui.notificationQueue.value.map((item) => item.text)).toEqual(['Saved', 'Failed'])
+    ui.resetNotificationQueue()
+    ui.notificationQueue.value = ui.notificationQueue.value.slice(1)
+    expect(ui.notification.value?.message).toBe('Page warning')
+    ui.alert('Replacement')
+    expect(ui.notifications.value.some((item) => item.id === warning.id)).toBe(false)
+    expect(ui.notificationQueue.value.map((item) => item.text)).toEqual(['Failed'])
+    ui.clearSnackbars()
+    expect(ui.notification.value?.message).toBe('Replacement')
+    expect(ui.notificationQueue.value).toEqual([])
+    ui.success('Still queued')
+    ui.clearAlert()
+    expect(ui.notification.value?.message).toBe('Still queued')
+    expect(ui.snackbar.value).toBe(true)
+    expect(ui.notificationQueue.value.map((item) => item.text)).toEqual(['Still queued'])
+    ui.alert('Another alert')
+    ui.clear()
+    expect(ui.notifications.value).toEqual([])
+  })
+
+  it('expires only the current timed alert and cancels alert timers on clear', () => {
+    vi.useFakeTimers()
+    try {
+      const ui = useUi(createState())
+      ui.alert('First', { timeout: 1000 })
+      vi.advanceTimersByTime(500)
+      ui.alert('Replacement', { timeout: 2000 })
+      ui.success('Queued')
+      vi.advanceTimersByTime(500)
+      expect(ui.notification.value?.message).toBe('Replacement')
+      vi.advanceTimersByTime(1500)
+      expect(ui.notification.value?.message).toBe('Queued')
+      expect(ui.notificationQueue.value.map((item) => item.text)).toEqual(['Queued'])
+      ui.alert('Cleared', { timeout: 1000 })
+      ui.clearAlert()
+      expect(vi.getTimerCount()).toBe(0)
+      ui.alert('Cleared with all feedback', { timeout: 1000 })
+      ui.clear()
+      expect(vi.getTimerCount()).toBe(0)
+      expect(ui.notification.value).toBeUndefined()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('shares global overlay ownership through Pinia without changing operation activity', () => {
+    const state = createState()
+    const ui = useUi(state)
+    const same = useUi(state)
+    const other = useUi(createState())
+    const finish = ui.loading.start('save')
+    const finishOther = other.loading.start('save')
+    expect(same.loading.global.value).toBe(true)
+    expect(isReadonly(ui.loading.global)).toBe(true)
+
+    const releaseFirst = ui.loading.registerOverlay()
+    const releaseSecond = same.loading.registerOverlay()
+    expect(same.loading.global.value).toBe(false)
+    expect(ui.loading.active.value).toBe(true)
+    expect(ui.loading.has('save')).toBe(true)
+    expect(other.loading.global.value).toBe(true)
+    ui.clear()
+    expect(ui.loading.global.value).toBe(false)
+
+    releaseFirst()
+    releaseFirst()
+    expect(same.loading.global.value).toBe(false)
+    releaseSecond()
+    expect(same.loading.global.value).toBe(true)
+    releaseSecond()
+    const releaseThird = ui.loading.registerOverlay()
+    expect(same.loading.global.value).toBe(false)
+    finish()
+    releaseThird()
+    expect(same.loading.global.value).toBe(false)
+    expect(ui.loading.active.value).toBe(false)
+    finishOther()
+  })
+
+  it('keeps consumed messages in app state until dismissal without queueing them twice', () => {
+    const state = createState()
+    const ui = useUi(state)
+    const same = useUi(state)
+    ui.success('First')
+    ui.warning('Second')
+    const [first] = ui.notificationQueue.value
+    same.notificationQueue.value = same.notificationQueue.value.slice(1)
+    expect(ui.notifications.value.map((item) => item.message)).toEqual(['First', 'Second'])
+    expect(ui.notificationQueue.value.map((item) => item.text)).toEqual(['Second'])
+    ui.info('Third')
+    expect(same.notificationQueue.value.map((item) => item.text)).toEqual(['Second', 'Third'])
+    first!.onDismiss()
+    expect(ui.notifications.value.map((item) => item.message)).toEqual(['Second', 'Third'])
+    ui.clear()
+    ui.success('After clear')
+    first!.onDismiss()
+    expect(ui.notificationQueue.value.map((item) => item.text)).toEqual(['After clear'])
+  })
+
+  it('queues consecutive notifications without replacing earlier feedback', () => {
+    const ui = useUi(createState())
+    ui.success('Saved')
+    ui.warning('Review', { timeout: 0 })
+    ui.error('Failed', { timeout: 1000 })
+    expect(
+      ui.notifications.value.map(({ type, message, timeout }) => ({ type, message, timeout })),
+    ).toEqual([
+      { type: 'success', message: 'Saved', timeout: 5000 },
+      { type: 'warning', message: 'Review', timeout: 0 },
+      { type: 'error', message: 'Failed', timeout: 1000 },
+    ])
+    expect(new Set(ui.notifications.value.map((item) => item.id)).size).toBe(3)
+    expect(ui.snackbar.value).toBe(true)
+    const first = ui.notifications.value[0]!
+    ui.dismiss(first.id)
+    ui.dismiss(first.id)
+    expect(ui.notifications.value.map((item) => item.message)).toEqual(['Review', 'Failed'])
+    expect(ui.notification.value?.message).toBe('Failed')
+    ui.clear()
+    expect(ui.notifications.value).toEqual([])
+    expect(ui.notification.value).toBeUndefined()
+  })
+
   it('runs UI operations with loading and returns successful results', async () => {
     const ui = useUi(createState())
     ui.error('Old error')

@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { mdiPencil } from '@mdi/js'
-import { VAutocomplete, VBtn, VChip, VTextField } from 'vuetify/components'
+import {
+  VAutocomplete,
+  VBtn,
+  VChip,
+  VDialog,
+  VOverlay,
+  VProgressLinear,
+  VTextField,
+} from 'vuetify/components'
 import VOvForm from '@/components/forms/VOvForm.vue'
 import VOvTable from '@/components/data/VOvTable.vue'
 import { globalPlugins } from '../../support/components.setup'
@@ -983,6 +991,7 @@ describe('VOvTable', () => {
     expect(complete).toBeTypeOf('function')
     if (typeof complete !== 'function') throw new Error('Missing action callback')
     complete(undefined, true)
+    await flushPromises()
     expect(onFetch).toHaveBeenCalledTimes(2)
     request().complete({ items })
     await flushPromises()
@@ -990,6 +999,73 @@ describe('VOvTable', () => {
     form = await openReplacement()
     expect(form.get<HTMLInputElement>('input[type="password"]').element.value).toBe('')
     wrapper.unmount()
+  })
+
+  it('keeps save feedback in the dialog and closes it before refetching with settled loading props', async () => {
+    const items = [{ name: 'Original' }]
+    const { wrapper, onFetch, request } = mountManagedTable({
+      key: 'name',
+      columns: [{ name: 'name' }],
+      actions: [
+        {
+          name: 'edit',
+          form: {
+            fields: [{ name: 'name', type: 'text' }],
+            actions: ['save', 'cancel'],
+            actionSubmit: 'save',
+            actionCancel: 'cancel',
+          },
+        },
+      ],
+    })
+    try {
+      request().complete({ items })
+      await flushPromises()
+      await wrapper.get('button[name="edit"]').trigger('click')
+      await flushPromises()
+      const form = wrapper.getComponent(VOvForm)
+      await form.vm.handleAction('save')
+      const complete = wrapper.emitted('action')![0]![3]
+      if (typeof complete !== 'function') throw new Error('Missing action callback')
+      await wrapper.setProps({ loading: true })
+      expect(form.props('loading')).toBe(true)
+      expect(
+        wrapper.findAllComponents(VProgressLinear).filter((progress) => progress.props('active')),
+      ).toHaveLength(0)
+      expect(form.getComponent(VOverlay).props('modelValue')).toBe(false)
+      expect(
+        wrapper.findAllComponents(VOverlay).filter((overlay) => overlay.props('modelValue')),
+      ).toHaveLength(2)
+      const dialog = wrapper
+        .findAllComponents(VDialog)
+        .find((candidate) => candidate.props('modelValue'))!
+      expect(dialog.props('persistent')).toBe(true)
+      const buttons = dialog.findAllComponents(VBtn)
+      expect(buttons.every((button) => !button.props('loading'))).toBe(true)
+      expect(buttons.every((button) => button.props('disabled'))).toBe(true)
+
+      onFetch.mockImplementation(() => {
+        expect(wrapper.findComponent(VOvForm).exists()).toBe(false)
+      })
+      const settled = wrapper.setProps({ loading: false })
+      complete(undefined, true)
+      await settled
+      await flushPromises()
+      expect(onFetch).toHaveBeenCalledTimes(2)
+      expect(
+        wrapper.findAllComponents(VOverlay).filter((overlay) => overlay.props('modelValue')),
+      ).toHaveLength(1)
+      expect(wrapper.text()).toContain('Original')
+      expect(wrapper.get('table').element.closest('[inert]')).not.toBeNull()
+      request().complete()
+      await flushPromises()
+      expect(
+        wrapper.findAllComponents(VOverlay).filter((overlay) => overlay.props('modelValue')),
+      ).toHaveLength(0)
+      expect(wrapper.text()).toContain('Original')
+    } finally {
+      wrapper.unmount()
+    }
   })
 
   it('renders action with title attribute', () => {

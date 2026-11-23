@@ -1,7 +1,7 @@
 <template>
   <v-defaults-provider :defaults>
-    <v-container>
-      <v-row no-gutters>
+    <v-container :aria-busy="loading">
+      <v-row no-gutters :inert="loading">
         <v-col
           v-for="item in options.items"
           :key="item.name"
@@ -10,7 +10,7 @@
           <component :is="renderViewItem(data[item.name], item, data, viewOptions, handleEmit)" />
         </v-col>
       </v-row>
-      <v-row v-if="actions.length > 0">
+      <v-row v-if="actions.length > 0" :inert="loading">
         <v-col :class="OvTextAlign(options.actionAlign)">
           <v-btn
             v-for="action in actions"
@@ -21,8 +21,8 @@
         </v-col>
       </v-row>
 
-      <v-dialog v-model="form" :width="mobile ? '100%' : '75%'">
-        <v-card>
+      <v-dialog v-model="form" :persistent="loading" :width="mobile ? '100%' : '75%'">
+        <v-card class="position-relative">
           <v-card-title>{{ formTitle }}</v-card-title>
           <v-card-text>
             <v-Ov-form
@@ -35,10 +35,22 @@
               @cancel="form = false"
             />
           </v-card-text>
+          <v-overlay
+            :model-value="loadingOverlay && form"
+            class="d-flex align-center justify-center"
+            persistent
+            contained
+          >
+            <v-progress-circular indeterminate />
+          </v-overlay>
         </v-card>
       </v-dialog>
-
-      <v-overlay :model-value="loading" persistent contained class="align-center justify-center">
+      <v-overlay
+        :model-value="loadingOverlay && !form"
+        class="d-flex align-center justify-center"
+        persistent
+        contained
+      >
         <v-progress-circular indeterminate />
       </v-overlay>
     </v-container>
@@ -49,6 +61,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDisplay, useDefaults } from 'vuetify'
 import VOvForm from '../forms/VOvForm.vue'
+import { useLoadingOverlay } from '../overlays/loading'
 import {
   VBtn,
   VCard,
@@ -85,9 +98,6 @@ const { defaults } = useDefaults({
     VContainer: {
       class: 'position-relative',
     },
-    VOverlay: {
-      class: 'rounded',
-    },
     VChip: {
       variant: 'text',
     },
@@ -107,6 +117,7 @@ const {
   t?: (text?: string) => string
   loading?: boolean
 }>()
+const loadingOverlay = useLoadingOverlay(() => loading)
 const viewOptions = computed(() => ({ ...options, locale: options.locale ?? locale.value }))
 
 const emit = defineEmits<{

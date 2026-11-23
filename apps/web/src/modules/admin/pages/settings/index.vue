@@ -12,7 +12,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useHttp } from '@/capabilities/http'
 import { useUi } from '@/capabilities/ui'
 import { isRecord, settingField } from './metadata'
@@ -134,7 +134,6 @@ async function saveSetting(
     if (error) throw new Error('admin.updateSettingError')
   })
   saving.value = false
-  await nextTick()
   if (result.ok) {
     complete(undefined, true)
     ui.success('admin.settingSaved')

@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, ref } from 'vue'
 import { createI18n } from 'vue-i18n'
 import { enableAutoUnmount, mount } from '@vue/test-utils'
-import { useNotificationMessage } from '@/capabilities/ui'
+import { useNotificationMessage, useNotificationQueue, useUi } from '@/capabilities/ui'
+import { createState } from '@/capabilities/state'
 
 enableAutoUnmount(afterEach)
 
@@ -32,6 +33,27 @@ function setup(initialMessage?: string) {
 }
 
 describe('notification messages', () => {
+  it('presents existing app notifications and restores undismissed messages when the renderer remounts', async () => {
+    const ui = useUi(createState())
+    ui.success('Waiting')
+    const surface = defineComponent({
+      setup: () => useNotificationQueue(ui),
+      template: '<p>{{ messages.map(item => item.text).join("|") }}</p>',
+    })
+    const first = mount(surface)
+    await first.vm.$nextTick()
+    expect(first.text()).toBe('Waiting')
+    ui.notificationQueue.value = []
+    await first.vm.$nextTick()
+    expect(first.text()).toBe('')
+    expect(ui.notifications.value).toHaveLength(1)
+    first.unmount()
+    const second = mount(surface)
+    await second.vm.$nextTick()
+    expect(second.text()).toBe('Waiting')
+    expect(ui.notifications.value).toHaveLength(1)
+  })
+
   it('displays fetch errors verbatim without registering missing translations or rendering HTML', () => {
     const error = '[POST] "/api/auth/login": <no response> Failed to fetch'
     const { wrapper, missing } = setup(error)
