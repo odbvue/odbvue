@@ -58,6 +58,8 @@ Completion ends submission loading. Previous field errors clear on the next subm
 Duplicate completions and completions after unmount are ignored. Ordinary actions
 without a generated form do not receive completion. The shared `refetch` success
 flag applies only to tables; views do not fetch data.
+In development, a form action still pending after 30 seconds logs a diagnostic
+warning with its action name; the form remains busy until completion.
 
 ### Exposed
 

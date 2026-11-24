@@ -81,6 +81,9 @@ type OvActionComplete = (result: OvActionResult) => void
 
 Call completion on every outcome. Duplicate callbacks and callbacks after unmount
 are ignored; a completed submission cannot affect a later submission.
+In development, a form action still pending after 30 seconds logs a warning with
+its action name. This is diagnostic only: a slow operation may still complete,
+and the form remains busy until its handler calls completion.
 Ordinary actions without a generated form do not enter submission loading or
 require completion. They can optionally complete with
 `{ status: 'success', refetch: true }` to request a reload.

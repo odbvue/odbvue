@@ -922,6 +922,7 @@ function handleFormAction(actionName: string, actionData: OvFormData) {
   const rowIndex = formRowIndex.value
   formOptions.value = { ...formOptions.value, errors: [] }
   submit(
+    actionName,
     (complete) => emits('action', actionName, localData.value, actionData, complete),
     (result) => onActionComplete(result, actionData, rowIndex),
   )

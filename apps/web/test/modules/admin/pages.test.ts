@@ -353,6 +353,14 @@ describe('admin settings', () => {
     })
   })
 
+  it('completes unsupported actions with an error without sending an update', async () => {
+    const { wrapper } = await setup('settings')
+    const complete = vi.fn<OvActionComplete>()
+    wrapper.findComponent(table).vm.$emit('action', 'admin.unsupported', [], {}, complete)
+    expect(complete).toHaveBeenCalledExactlyOnceWith({ status: 'error' })
+    expect(putRole).not.toHaveBeenCalled()
+  })
+
   it.each(['Y', 'N'])(
     'passes the form value %s without consulting displayed rows',
     async (value) => {

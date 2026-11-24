@@ -219,6 +219,7 @@ function handleFormAction(_actionName: string, actionData: OvFormData) {
   if (!form.value || busy.value || formOptions.value.disabled) return
   formOptions.value = { ...formOptions.value, errors: [] }
   submit(
+    formActionName.value,
     (complete) => emit('action', formActionName.value, data, actionData, complete),
     onActionComplete,
   )

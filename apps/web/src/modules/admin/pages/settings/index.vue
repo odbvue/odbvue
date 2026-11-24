@@ -116,8 +116,9 @@ async function saveSetting(
   submission?: unknown,
   complete?: OvActionComplete,
 ) {
-  if ((action !== 'admin.replaceSettingSecret' && action !== 'admin.editSetting') || !complete)
-    return
+  if (!complete) return
+  if (action !== 'admin.replaceSettingSecret' && action !== 'admin.editSetting')
+    return complete({ status: 'error' })
   if (!isRecord(submission) || typeof submission.id !== 'string') {
     return complete({
       status: 'invalid',
