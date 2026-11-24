@@ -124,7 +124,7 @@ import {
 } from 'vuetify/components'
 import { useDefaults } from 'vuetify'
 import VOvEditor from './VOvEditor.vue'
-import { useLoadingOverlay } from '../overlays/loading'
+import { provideLoadingOverlayBoundary, useLoadingOverlay } from '../overlays/loading'
 
 import {
   type OvFormOptions,
@@ -168,6 +168,7 @@ const {
   hideActions = false,
   title,
   description,
+  overlayBoundary,
 } = defineProps<{
   options: OvFormOptions
   data?: OvFormData
@@ -176,8 +177,13 @@ const {
   hideActions?: boolean
   title?: string
   description?: string
+  overlayBoundary?: symbol
 }>()
-const loadingOverlay = useLoadingOverlay(() => loading)
+provideLoadingOverlayBoundary(overlayBoundary)
+const loadingOverlay = useLoadingOverlay(
+  () => loading,
+  () => overlayBoundary,
+)
 
 const emits = defineEmits<{
   (event: 'action', actionName: string, formData: OvFormData): void

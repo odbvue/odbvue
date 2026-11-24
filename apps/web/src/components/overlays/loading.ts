@@ -10,21 +10,38 @@ import {
 } from 'vue'
 
 const registerOverlayKey: InjectionKey<() => () => void> = Symbol('ov-loading-overlays')
-const ancestorOverlayKey: InjectionKey<ComputedRef<boolean>> = Symbol('ov-loading-ancestor')
+type OverlayBoundary = symbol
+type AncestorOverlay = {
+  active: MaybeRefOrGetter<boolean>
+  boundary: ComputedRef<OverlayBoundary | undefined>
+}
+const ancestorOverlayKey: InjectionKey<AncestorOverlay[]> = Symbol('ov-loading-ancestors')
+const overlayBoundaryKey: InjectionKey<OverlayBoundary> = Symbol('ov-loading-boundary')
 
 export function provideLoadingOverlays(register: () => () => void) {
   provide(registerOverlayKey, register)
 }
 
-export function useLoadingOverlay(active: MaybeRefOrGetter<boolean>) {
+export function provideLoadingOverlayBoundary(boundary: OverlayBoundary | undefined) {
+  if (boundary) provide(overlayBoundaryKey, boundary)
+}
+
+export function useLoadingOverlay(
+  active: MaybeRefOrGetter<boolean>,
+  targetBoundary?: MaybeRefOrGetter<OverlayBoundary | undefined>,
+) {
   const register = inject(registerOverlayKey, undefined)
-  const ancestor = inject(
-    ancestorOverlayKey,
-    computed(() => false),
+  const ancestors = inject(ancestorOverlayKey, [])
+  const inheritedBoundary = inject(overlayBoundaryKey, undefined)
+  const boundary = computed(() => toValue(targetBoundary) ?? inheritedBoundary)
+  const visible = computed(
+    () =>
+      toValue(active) &&
+      !ancestors.some(
+        (ancestor) => toValue(ancestor.active) && ancestor.boundary.value === boundary.value,
+      ),
   )
-  const covered = computed(() => ancestor.value || toValue(active))
-  const visible = computed(() => toValue(active) && !ancestor.value)
-  provide(ancestorOverlayKey, covered)
+  provide(ancestorOverlayKey, [...ancestors, { active, boundary }])
   watch(
     visible,
     (show, _previous, onCleanup) => {

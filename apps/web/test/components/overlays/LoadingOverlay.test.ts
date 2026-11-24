@@ -170,7 +170,7 @@ describe('nested loading overlays', () => {
     }
   })
 
-  it('reproduces suppression of an uncovered teleported nested view dialog', async () => {
+  it('keeps overlays visible in separate teleported nested view dialogs', async () => {
     const ui = useUi(createState())
     const outerBusy = ref(false)
     const innerBusy = ref(false)
@@ -218,13 +218,26 @@ describe('nested loading overlays', () => {
       await flushPromises()
       const views = wrapper.findAllComponents(VOvView)
       expect(views).toHaveLength(2)
+      const outerForm = wrapper.getComponent(VOvForm)
+      const outerCard = outerForm.element.closest('.v-card')
+      expect(outerCard).not.toBeNull()
+      const finish = ui.loading.start('nested')
+      innerBusy.value = true
+      await flushPromises()
+      expect(views[1]!.findAllComponents(VOverlay).at(-1)!.props('modelValue')).toBe(true)
+      outerBusy.value = true
+      await flushPromises()
+      expect(views[1]!.findAllComponents(VOverlay).at(-1)!.props('modelValue')).toBe(false)
+      expect(outerCard!.querySelectorAll('.v-overlay--contained.v-overlay--active')).toHaveLength(1)
+      outerBusy.value = false
+      innerBusy.value = false
+      await flushPromises()
+      expect(ui.loading.global.value).toBe(true)
       await views[1]!.get('button[name="edit-inner"]').trigger('click')
       await flushPromises()
       const forms = wrapper.findAllComponents(VOvForm)
       expect(forms).toHaveLength(2)
-      const outerCard = forms[0]!.element.closest('.v-card')
       const innerCard = forms[1]!.element.closest('.v-card')
-      expect(outerCard).not.toBeNull()
       expect(innerCard).not.toBeNull()
       expect(outerCard!.contains(innerCard)).toBe(false)
 
@@ -235,10 +248,22 @@ describe('nested loading overlays', () => {
       await flushPromises()
       expect(outerCard!.querySelector('.v-overlay--contained.v-overlay--active')).not.toBeNull()
       expect(forms[1]!.props('loading')).toBe(true)
-      expect(innerCard!.querySelector('.v-overlay--contained.v-overlay--active')).toBeNull()
+      expect(innerCard!.querySelector('.v-overlay--contained.v-overlay--active')).not.toBeNull()
+      expect(innerCard!.querySelectorAll('.v-overlay--contained.v-overlay--active')).toHaveLength(1)
+      expect(ui.loading.global.value).toBe(false)
       outerBusy.value = false
       await flushPromises()
       expect(innerCard!.querySelector('.v-overlay--contained.v-overlay--active')).not.toBeNull()
+      outerBusy.value = true
+      innerBusy.value = false
+      await flushPromises()
+      expect(outerCard!.querySelector('.v-overlay--contained.v-overlay--active')).not.toBeNull()
+      expect(innerCard!.querySelector('.v-overlay--contained.v-overlay--active')).toBeNull()
+      expect(ui.loading.global.value).toBe(false)
+      outerBusy.value = false
+      await flushPromises()
+      expect(ui.loading.global.value).toBe(true)
+      finish()
     } finally {
       wrapper.unmount()
     }

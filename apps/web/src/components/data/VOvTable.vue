@@ -309,6 +309,7 @@
               :data="formData"
               :t
               :loading="formBusy"
+              :overlay-boundary="dialogBoundary"
               hide-actions
               @action="handleFormAction"
               @submit="handleFormSubmit"
@@ -515,7 +516,9 @@ const fetching = ref(false)
 const { submitting, submit, completeOnce } = useFormSubmission()
 const formBusy = computed(() => loading || submitting.value)
 const busy = computed(() => formBusy.value || fetching.value)
-const loadingOverlay = useLoadingOverlay(busy)
+const form = ref(false)
+const dialogBoundary = Symbol('table-dialog')
+const loadingOverlay = useLoadingOverlay(busy, () => (form.value ? dialogBoundary : undefined))
 let fetchId = 0
 let finishFetch: (() => void) | undefined
 let disposed = false
@@ -615,7 +618,6 @@ function showDialog(dialogTitleText: string, content: string, format?: OvFormat 
 
 // form
 
-const form = ref(false)
 const formTitle = ref('')
 const formOptions = ref<OvFormOptions>({ fields: [] })
 const formData = ref<OvTableData>({})

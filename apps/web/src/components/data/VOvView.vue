@@ -29,7 +29,8 @@
               :options="formOptions"
               :data="formData"
               :t
-              :loading="busy"
+              :loading="busy && form"
+              :overlay-boundary="dialogBoundary"
               @action="handleFormAction"
               @submit="handleFormSubmit"
               @cancel="form = false"
@@ -121,7 +122,9 @@ const {
 }>()
 const { submitting, submit } = useFormSubmission()
 const busy = computed(() => loading || submitting.value)
-const loadingOverlay = useLoadingOverlay(busy)
+const form = ref(false)
+const dialogBoundary = Symbol('view-dialog')
+const loadingOverlay = useLoadingOverlay(busy, () => (form.value ? dialogBoundary : undefined))
 const viewOptions = computed(() => ({ ...options, locale: options.locale ?? locale.value }))
 
 const emit = defineEmits<{
@@ -137,7 +140,6 @@ function handleEmit(event: string, ...args: unknown[]) {
   }
 }
 
-const form = ref(false)
 const formTitle = ref('')
 const formOptions = ref<OvFormOptions>({ fields: [] })
 const formData = ref<OvFormData>({})
