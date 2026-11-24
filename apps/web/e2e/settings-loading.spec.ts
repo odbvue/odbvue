@@ -58,9 +58,10 @@ for (const viewport of [
       await page.goto('/admin/settings')
       const edit = page.getByRole('button', { name: 'Edit setting', exact: true })
       await expect(edit).toBeVisible()
+      // Focus restoration can scroll on mobile; compare document coordinates.
       const mainTop = await page
         .locator('main')
-        .evaluate((main) => main.getBoundingClientRect().top)
+        .evaluate((main) => main.getBoundingClientRect().top + window.scrollY)
       await edit.click()
       const dialog = page.getByRole('dialog')
       const field = dialog.getByRole('textbox', { name: 'Value', exact: true })
@@ -87,9 +88,11 @@ for (const viewport of [
       await expect(
         page.locator('.v-snackbar').getByText('Setting saved.', { exact: true }),
       ).toBeVisible()
-      expect(await page.locator('main').evaluate((main) => main.getBoundingClientRect().top)).toBe(
-        mainTop,
-      )
+      expect(
+        await page
+          .locator('main')
+          .evaluate((main) => main.getBoundingClientRect().top + window.scrollY),
+      ).toBe(mainTop)
 
       refresh.resolve()
       await expect(page.locator('table').getByText('Updated', { exact: true })).toBeVisible()
@@ -103,7 +106,10 @@ for (const viewport of [
       await expect(dialog.locator(loadingOverlay)).toHaveCount(0)
       await expect(save).toBeEnabled()
       await expect(field).toHaveValue('Rejected')
-      await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+      await field.fill('Updated')
+      await save.click()
+      await expect(dialog).not.toBeVisible()
+      await expect(page.locator(loadingOverlay)).toHaveCount(0)
       const saved = page.locator('.v-snackbar').filter({ hasText: 'Setting saved.' })
       await expect(saved).toBeVisible()
       await expect(
@@ -116,7 +122,7 @@ for (const viewport of [
           .getByText('The setting could not be saved. Please try again.', { exact: true }),
       ).toBeVisible()
       await expect(page.locator('.v-snackbar:visible')).toHaveCount(1)
-      expect(reads).toBe(2)
+      expect(reads).toBe(3)
     } finally {
       write.resolve()
       refresh.resolve()

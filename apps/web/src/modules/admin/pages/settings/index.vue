@@ -2,7 +2,6 @@
   <v-container>
     <v-ov-table
       :options="options"
-      :loading="saving"
       title="admin.settings"
       description="admin.settingsDescription"
       @fetch="fetchSettings"
@@ -12,13 +11,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useHttp } from '@/capabilities/http'
 import { useUi } from '@/capabilities/ui'
 import { isRecord, settingField } from './metadata'
 import type { components } from '@/api/openapi.generated'
 import type {
-  OvFormFieldError,
+  OvActionComplete,
   OvFormOptions,
   OvTableFetchRequest,
   OvTableOptions,
@@ -35,7 +34,6 @@ definePage({
 
 const http = useHttp()
 const ui = useUi()
-const saving = ref(false)
 
 const editForm = (field: OvFormOptions['fields'][number]): OvFormOptions => ({
   fields: [{ name: 'id', type: 'text', label: 'admin.settingId', readonly: true }, field],
@@ -116,27 +114,23 @@ async function saveSetting(
   action: string,
   _rows: unknown,
   submission?: unknown,
-  complete?: (errors?: OvFormFieldError[], refetch?: boolean) => void,
+  complete?: OvActionComplete,
 ) {
-  if (
-    (action !== 'admin.replaceSettingSecret' && action !== 'admin.editSetting') ||
-    saving.value ||
-    !complete
-  )
+  if ((action !== 'admin.replaceSettingSecret' && action !== 'admin.editSetting') || !complete)
     return
   if (!isRecord(submission) || typeof submission.id !== 'string') {
-    return complete([{ name: 'value', message: 'admin.updateSettingError' }])
+    return complete({
+      status: 'invalid',
+      errors: [{ name: 'value', message: 'admin.updateSettingError' }],
+    })
   }
   const { id, value } = submission
-  saving.value = true
   const result = await ui.action('admin.settings.update', async () => {
     const { error } = await http.put(`/admin/settings/${encodeURIComponent(id)}`, { value })
     if (error) throw new Error('admin.updateSettingError')
   })
-  saving.value = false
-  if (result.ok) {
-    complete(undefined, true)
-    ui.success('admin.settingSaved')
-  }
+  if (!result.ok) return complete({ status: 'error' })
+  complete({ status: 'success', refetch: true })
+  ui.success('admin.settingSaved')
 }
 </script>

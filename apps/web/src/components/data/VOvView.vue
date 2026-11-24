@@ -1,7 +1,7 @@
 <template>
   <v-defaults-provider :defaults>
-    <v-container :aria-busy="loading">
-      <v-row no-gutters :inert="loading">
+    <v-container :aria-busy="busy">
+      <v-row no-gutters :inert="busy">
         <v-col
           v-for="item in options.items"
           :key="item.name"
@@ -10,7 +10,7 @@
           <component :is="renderViewItem(data[item.name], item, data, viewOptions, handleEmit)" />
         </v-col>
       </v-row>
-      <v-row v-if="actions.length > 0" :inert="loading">
+      <v-row v-if="actions.length > 0" :inert="busy">
         <v-col :class="OvTextAlign(options.actionAlign)">
           <v-btn
             v-for="action in actions"
@@ -21,7 +21,7 @@
         </v-col>
       </v-row>
 
-      <v-dialog v-model="form" :persistent="loading" :width="mobile ? '100%' : '75%'">
+      <v-dialog v-model="form" :persistent="busy" :width="mobile ? '100%' : '75%'">
         <v-card class="position-relative">
           <v-card-title>{{ formTitle }}</v-card-title>
           <v-card-text>
@@ -29,7 +29,7 @@
               :options="formOptions"
               :data="formData"
               :t
-              :loading
+              :loading="busy"
               @action="handleFormAction"
               @submit="handleFormSubmit"
               @cancel="form = false"
@@ -62,6 +62,7 @@ import { useI18n } from 'vue-i18n'
 import { useDisplay, useDefaults } from 'vuetify'
 import VOvForm from '../forms/VOvForm.vue'
 import { useLoadingOverlay } from '../overlays/loading'
+import { useFormSubmission } from '../forms/submission'
 import {
   VBtn,
   VCard,
@@ -80,7 +81,8 @@ import type {
   OvViewData,
   OvFormOptions,
   OvFormData,
-  OvFormFieldError,
+  OvActionComplete,
+  OvActionResult,
 } from '../index'
 import { renderViewItem, OvTextAlign, OvActionFormat } from '../index'
 
@@ -117,18 +119,14 @@ const {
   t?: (text?: string) => string
   loading?: boolean
 }>()
-const loadingOverlay = useLoadingOverlay(() => loading)
+const { submitting, submit } = useFormSubmission()
+const busy = computed(() => loading || submitting.value)
+const loadingOverlay = useLoadingOverlay(busy)
 const viewOptions = computed(() => ({ ...options, locale: options.locale ?? locale.value }))
 
 const emit = defineEmits<{
   (e: 'details', name: string, value: string): void
-  (
-    e: 'action',
-    name: string,
-    value: unknown,
-    formData?: unknown,
-    callback?: (errors?: OvFormFieldError[], shouldRefetch?: boolean) => void,
-  ): void
+  (e: 'action', name: string, value: unknown, formData?: unknown, complete?: OvActionComplete): void
 }>()
 
 function handleEmit(event: string, ...args: unknown[]) {
@@ -146,19 +144,21 @@ const formData = ref<OvFormData>({})
 const formActionName = ref('')
 const formFieldName = ref('')
 
-const onActionComplete = (formErrors?: OvFormFieldError[]) => {
-  if (formErrors && formErrors.length > 0) {
+const onActionComplete = (result: OvActionResult) => {
+  if (result.status === 'invalid') {
     formOptions.value = {
       ...formOptions.value,
-      errors: formErrors,
+      errors: result.errors,
     }
     return
   }
+  if (result.status === 'error') return
 
   form.value = false
 }
 
 function handleFieldAction(actionName: string) {
+  if (busy.value) return
   // Find the field with this action
   const item = options.items?.find((field) => {
     if (!field.actions) return false
@@ -192,6 +192,7 @@ function handleFieldAction(actionName: string) {
 }
 
 function handleAction(actionName: string) {
+  if (busy.value) return
   const action = (options.actions || []).find(
     (act) => typeof act !== 'string' && act.name === actionName,
   )
@@ -212,12 +213,17 @@ function handleAction(actionName: string) {
   emit('action', actionName, data)
 }
 
-async function handleFormAction(_actionName: string, actionData: OvFormData) {
-  await emit('action', formActionName.value, data, actionData, onActionComplete)
+function handleFormAction(_actionName: string, actionData: OvFormData) {
+  if (!form.value || busy.value || formOptions.value.disabled) return
+  formOptions.value = { ...formOptions.value, errors: [] }
+  submit(
+    (complete) => emit('action', formActionName.value, data, actionData, complete),
+    onActionComplete,
+  )
 }
 
-async function handleFormSubmit(actionData: OvFormData) {
-  emit('action', formActionName.value, data, actionData, onActionComplete)
+function handleFormSubmit(actionData: OvFormData) {
+  handleFormAction(formActionName.value, actionData)
 }
 
 const actions = computed(() => {

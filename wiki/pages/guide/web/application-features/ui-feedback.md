@@ -108,8 +108,9 @@ loading owner uses the application fallback too.
 Give each operation one local interaction owner:
 
 - Forms use `:loading` to disable fields/actions and show one contained overlay.
-  Table/view-generated forms use their parent's `loading` prop, but do not add
-  their own overlay when the parent already covers the dialog.
+  Table/view-generated forms own submission loading until their action completion
+  callback is called. They do not need a parent `saving` ref or `loading` binding,
+  and do not add their own overlay when the parent component covers the dialog.
 - Tables retain their last successful rows and show a contained table overlay
   during fetches. Views use a contained overlay for external loading.
 - While a table/view form dialog is open, its card owns the save overlay, covering
@@ -120,11 +121,17 @@ Give each operation one local interaction owner:
   callback and suppress nested loading overlays through ancestor context. Registration
   is released when loading ends or a surface unmounts. Reusable components also work
   without the default layout and do not depend on the application store.
-- On table save success, clear the external loading state and call
-  `complete(undefined, true)`. The table closes the dialog and lets loading props
-  settle before refreshing the current page. Callers need no `nextTick()` workaround.
-- On failure, clear external loading without completing the action so the dialog
-  and draft stay open for retry. `ui.action()` reports the error.
+- On table save success, call `complete({ status: 'success', refetch: true })`.
+  The table closes the dialog and explicitly reloads the current page, independently
+  of external loading props and Vue render timing. Fetch loading is separate from
+  submission loading. A refresh failure does not undo a successful save.
+- On validation failure, call `complete({ status: 'invalid', errors })` to end
+  submission and show field errors while preserving the draft.
+- On other failures, call `complete({ status: 'error' })` to end submission and keep
+  the dialog and draft open for retry. `ui.action()` reports the error; completion
+  does not add another notification.
+- View-generated forms use the same outcomes; the parent owns view data updates.
+  Completion is single-use, and late completion after unmount has no effect.
 
 Use the sandbox UI page to exercise preferences, persistent and timed page alerts,
 queued severity messages, persistent snackbars, independent clearing, and a

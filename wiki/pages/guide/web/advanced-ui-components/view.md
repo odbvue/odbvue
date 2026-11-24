@@ -42,10 +42,22 @@ const options = <OvViewOptions>{
 
 ### Emits
 
-| Event     | Payload                               | Description                                 |
-| --------- | ------------------------------------- | ------------------------------------------- |
-| `details` | `(name, value)`                       | Emitted when a truncated value is expanded. |
-| `action`  | `(name, value, formData?, callback?)` | Emitted for item and grid actions.          |
+| Event     | Payload                               | Description                                                            |
+| --------- | ------------------------------------- | ---------------------------------------------------------------------- |
+| `details` | `(name, value)`                       | Emitted when a truncated value is expanded.                            |
+| `action`  | `(name, value, formData?, complete?)` | Emitted for item and grid actions. Generated forms provide completion. |
+
+Generated action forms own their submission loading; no parent `saving` ref is
+needed. Call the supplied `OvActionComplete` callback on every outcome:
+
+- `{ status: 'success' }` closes the dialog. The parent owns updates to view data.
+- `{ status: 'invalid', errors }` keeps the draft open and shows field errors.
+- `{ status: 'error' }` keeps the draft open for retry; the handler reports the error.
+
+Completion ends submission loading. Previous field errors clear on the next submission.
+Duplicate completions and completions after unmount are ignored. Ordinary actions
+without a generated form do not receive completion. The shared `refetch` success
+flag applies only to tables; views do not fetch data.
 
 ### Exposed
 

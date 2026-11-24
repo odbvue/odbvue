@@ -49,13 +49,67 @@ describe('VOvView', () => {
       await wrapper.getComponent(VOvForm).vm.handleAction('save')
       const complete = wrapper.emitted('action')![0]![3]
       if (typeof complete !== 'function') throw new Error('Missing action callback')
-      complete()
+      complete({ status: 'success' })
       await wrapper.setProps({ loading: true })
       await flushPromises()
       expect(
         wrapper.findAllComponents(VOverlay).filter((overlay) => overlay.props('modelValue')),
       ).toHaveLength(1)
       expect(wrapper.text()).toContain('Original')
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('owns submission loading and preserves the draft through validation and server failures', async () => {
+    const wrapper = mountView({
+      items: [{ name: 'name' }],
+      actions: [
+        {
+          name: 'edit',
+          form: {
+            fields: [{ name: 'name', type: 'text' }],
+            actions: ['save'],
+            actionSubmit: 'save',
+          },
+        },
+      ],
+    })
+    try {
+      await wrapper.getComponent(VBtn).trigger('click')
+      await flushPromises()
+      const form = wrapper.getComponent(VOvForm)
+      const field = form.get<HTMLInputElement>('input')
+      await field.setValue('Draft')
+      await form.vm.handleAction('save')
+      await flushPromises()
+      expect(form.props('loading')).toBe(true)
+      expect(wrapper.getComponent(VDialog).props('persistent')).toBe(true)
+      form.vm.$emit('submit', { name: 'Duplicate' })
+      expect(wrapper.emitted('action')).toHaveLength(1)
+      const first = wrapper.emitted('action')![0]![3]
+      if (typeof first !== 'function') throw new Error('Missing action callback')
+      first({ status: 'invalid', errors: [{ name: 'name', message: 'Invalid name' }] })
+      await flushPromises()
+      expect(form.text()).toContain('Invalid name')
+      expect(form.props('loading')).toBe(false)
+      await form.vm.handleAction('save')
+      await flushPromises()
+      expect(form.props('options').errors).toEqual([])
+      first({ status: 'success' })
+      const second = wrapper.emitted('action')![1]![3]
+      if (typeof second !== 'function') throw new Error('Missing action callback')
+      second({ status: 'error' })
+      await flushPromises()
+      expect(form.props('loading')).toBe(false)
+      expect(field.element.value).toBe('Draft')
+      expect(wrapper.getComponent(VDialog).props('modelValue')).toBe(true)
+      await form.vm.handleAction('save')
+      const third = wrapper.emitted('action')![2]![3]
+      if (typeof third !== 'function') throw new Error('Missing action callback')
+      third({ status: 'success' })
+      await flushPromises()
+      expect(wrapper.getComponent(VDialog).props('modelValue')).toBe(false)
     } finally {
       wrapper.unmount()
     }

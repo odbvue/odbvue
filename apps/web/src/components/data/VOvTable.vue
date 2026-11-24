@@ -298,7 +298,7 @@
         :content-format="dialogContentFormat"
       />
 
-      <v-dialog v-model="form" :persistent="loading" :width="mobile ? '100%' : '75%'">
+      <v-dialog v-model="form" :persistent="formBusy" :width="mobile ? '100%' : '75%'">
         <v-card class="position-relative">
           <v-card-title>{{ formTitle }}</v-card-title>
           <v-card-text @mousedown.capture="handleFilterCardMouseDown">
@@ -308,7 +308,7 @@
               :options="formOptions"
               :data="formData"
               :t
-              :loading
+              :loading="formBusy"
               hide-actions
               @action="handleFormAction"
               @submit="handleFormSubmit"
@@ -320,7 +320,7 @@
               v-for="action in formDialogActions"
               :key="action.name"
               v-bind="action.props"
-              :disabled="loading || formOptions.disabled || action.disabled"
+              :disabled="formBusy || formOptions.disabled || action.disabled"
               @click="tableFormRef?.handleAction(action.name)"
             />
           </v-card-actions>
@@ -347,17 +347,7 @@
 </template>
 
 <script setup lang="ts">
-import {
-  ref,
-  computed,
-  nextTick,
-  onMounted,
-  watch,
-  inject,
-  useSlots,
-  onBeforeUnmount,
-  type Ref,
-} from 'vue'
+import { ref, computed, onMounted, watch, inject, useSlots, onBeforeUnmount, type Ref } from 'vue'
 import { useDisplay } from 'vuetify'
 import VOvDialog from '../overlays/VOvDialog.vue'
 import VOvForm from '../forms/VOvForm.vue'
@@ -392,7 +382,8 @@ import {
   type OvTablePage,
   type OvFormat,
   type OvViewOptions,
-  type OvFormFieldError,
+  type OvActionComplete,
+  type OvActionResult,
   type OvFormSelectionField,
   type OvFormSelectItem,
   OvActionFormat,
@@ -400,6 +391,7 @@ import {
 } from '../index'
 import { emptyRowCount, pageItems } from './pagination'
 import { useLoadingOverlay } from '../overlays/loading'
+import { useFormSubmission } from '../forms/submission'
 
 import { useI18n } from 'vue-i18n'
 const { t, locale } = useI18n()
@@ -492,13 +484,7 @@ const {
 }>()
 
 const emits = defineEmits<{
-  (
-    event: 'action',
-    name: string,
-    data: unknown,
-    value?: unknown,
-    callback?: (errors?: OvFormFieldError[], shouldRefetch?: boolean) => void,
-  ): void
+  (event: 'action', name: string, data: unknown, value?: unknown, complete?: OvActionComplete): void
   (event: 'fetch', request: OvTableFetchRequest): void
 }>()
 
@@ -526,7 +512,9 @@ const page = computed(() => pageItems(localData.value, itemsPerPage.value))
 const pageCursor = ref<string | undefined>(undefined)
 const cursorStack = ref<(string | undefined)[]>([])
 const fetching = ref(false)
-const busy = computed(() => loading || fetching.value)
+const { submitting, submit, completeOnce } = useFormSubmission()
+const formBusy = computed(() => loading || submitting.value)
+const busy = computed(() => formBusy.value || fetching.value)
 const loadingOverlay = useLoadingOverlay(busy)
 let fetchId = 0
 let finishFetch: (() => void) | undefined
@@ -910,32 +898,35 @@ async function handleSortUpdate(sortName: string, sortAction: string) {
 
 // actions
 
-const onActionComplete = async (
-  formErrors?: OvFormFieldError[],
-  shouldRefetch?: boolean,
-  submittedData = formData.value,
-) => {
-  if (formErrors && formErrors.length > 0) {
+function onActionComplete(result: OvActionResult, submittedData: OvFormData, rowIndex: number) {
+  if (result.status === 'invalid') {
     formOptions.value = {
       ...formOptions.value,
-      errors: formErrors,
+      errors: result.errors,
     }
     return
   }
+  if (result.status === 'error') return
 
-  if (!shouldRefetch) {
-    localData.value[formRowIndex.value] = submittedData
+  if (!result.refetch && rowIndex >= 0) {
+    localData.value[rowIndex] = submittedData
   }
   form.value = false
-  if (shouldRefetch) {
-    // Let the parent's loading prop settle before the fetch busy guard runs.
-    await nextTick()
-    await fetch()
-  }
+  if (result.refetch) requestPage()
 }
 
-async function handleFormAction(actionName: string, actionData: OvFormData) {
-  await emits('action', actionName, localData.value, actionData, onActionComplete)
+function handleFormAction(actionName: string, actionData: OvFormData) {
+  if (!form.value || formBusy.value || formOptions.value.disabled) return
+  const rowIndex = formRowIndex.value
+  formOptions.value = { ...formOptions.value, errors: [] }
+  submit(
+    (complete) => emits('action', actionName, localData.value, actionData, complete),
+    (result) => onActionComplete(result, actionData, rowIndex),
+  )
+}
+
+function onActionWithoutFormComplete(result: OvActionResult) {
+  if (result.status === 'success' && result.refetch) requestPage()
 }
 
 function handleFilterCardMouseDown(event: Event) {
@@ -977,17 +968,15 @@ async function handleFormSubmit(actionData: OvFormData) {
       }
     })
     form.value = false
-    await nextTick()
     await fetch('first')
     return
   }
 
-  emits('action', formActionName.value, localData.value, actionData, (errors, refetch) =>
-    onActionComplete(errors, refetch, actionData),
-  )
+  handleFormAction(formActionName.value, actionData)
 }
 
-async function handleRowAction(columnName: string, actionName: string, keyValue?: unknown) {
+function handleRowAction(columnName: string, actionName: string, keyValue?: unknown) {
+  if (busy.value) return
   const column = options.columns.find((col) =>
     typeof col === 'string' ? col === columnName : col.name === columnName,
   )
@@ -1012,10 +1001,17 @@ async function handleRowAction(columnName: string, actionName: string, keyValue?
     return
   }
 
-  await emits('action', actionName, localData.value, localData.value[rowIndex], onActionComplete)
+  emits(
+    'action',
+    actionName,
+    localData.value,
+    localData.value[rowIndex],
+    completeOnce(onActionWithoutFormComplete),
+  )
 }
 
-async function handleTableAction(actionName: string) {
+function handleTableAction(actionName: string) {
+  if (busy.value) return
   const tableAction = options.actions?.find(
     (act) => typeof act !== 'string' && act.name === actionName,
   )
@@ -1030,12 +1026,23 @@ async function handleTableAction(actionName: string) {
     formRowIndex.value = -1
     formActionName.value = tableAction.name
     form.value = true
-  } else await emits('action', actionName, localData.value, formData.value, onActionComplete)
+  } else
+    emits(
+      'action',
+      actionName,
+      localData.value,
+      formData.value,
+      completeOnce(onActionWithoutFormComplete),
+    )
 }
 
 function fetch(action?: 'first' | 'next' | 'prev'): Promise<boolean> {
-  if (disposed) return Promise.resolve(false)
   if (action !== 'first' && busy.value) return Promise.resolve(false)
+  return requestPage(action)
+}
+
+function requestPage(action?: 'first' | 'next' | 'prev'): Promise<boolean> {
+  if (disposed) return Promise.resolve(false)
   const limit = itemsPerPage.value
   if (!Number.isSafeInteger(limit) || limit < 1) {
     console.error('Table page limit must be a positive safe integer')

@@ -4,7 +4,12 @@
 </template>
 
 <script setup lang="ts">
-import type { OvTableData, OvTableOptions, OvTableFetchRequest } from '@/components'
+import type {
+  OvActionComplete,
+  OvTableData,
+  OvTableOptions,
+  OvTableFetchRequest,
+} from '@/components'
 
 definePage({
   meta: {
@@ -17,7 +22,12 @@ const loading = ref(false)
 
 import jsonData from './table.json'
 
-function action(actionName: string, actionData: unknown, value?: unknown) {
+function action(
+  actionName: string,
+  actionData: unknown,
+  value?: unknown,
+  complete?: OvActionComplete,
+) {
   const rows = (Array.isArray(actionData) ? actionData : []) as OvTableData[]
   const rowValue = value as OvTableData | undefined
 
@@ -27,11 +37,15 @@ function action(actionName: string, actionData: unknown, value?: unknown) {
   if (actionName == 'delete' && rowValue && 'status' in rowValue) rowValue.status = 'blocked'
   if (actionName === 'status-all') {
     const newStatus = rowValue?.status
-    if (!newStatus) return
+    if (!newStatus) {
+      console.error('Missing status for bulk status action')
+      return complete?.({ status: 'error' })
+    }
     rows.forEach((item) => {
       item.status = newStatus
     })
   }
+  complete?.({ status: 'success' })
 }
 
 async function fetch({

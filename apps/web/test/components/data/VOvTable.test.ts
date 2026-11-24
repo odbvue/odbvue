@@ -44,6 +44,22 @@ const baseOptions: OvTableOptions = {
   mobileItemsPerPage: 10,
 }
 
+const editableOptions: OvTableOptions = {
+  ...baseOptions,
+  columns: [{ name: 'name' }],
+  actions: [
+    {
+      name: 'edit',
+      form: {
+        fields: [{ name: 'name', type: 'text' }],
+        actions: ['save', 'cancel'],
+        actionSubmit: 'save',
+        actionCancel: 'cancel',
+      },
+    },
+  ],
+}
+
 type PageResponse = HttpResponse<{ items: OvTableData[]; nextCursor?: string }>
 const cursorPage = (name: string, nextCursor?: string): PageResponse => ({
   data: { items: [{ name }], nextCursor },
@@ -990,7 +1006,7 @@ describe('VOvTable', () => {
     expect(submission).toMatchObject({ name: 'Secret', replacement: 'test-replacement' })
     expect(complete).toBeTypeOf('function')
     if (typeof complete !== 'function') throw new Error('Missing action callback')
-    complete(undefined, true)
+    complete({ status: 'success', refetch: true })
     await flushPromises()
     expect(onFetch).toHaveBeenCalledTimes(2)
     request().complete({ items })
@@ -1001,23 +1017,9 @@ describe('VOvTable', () => {
     wrapper.unmount()
   })
 
-  it('keeps save feedback in the dialog and closes it before refetching with settled loading props', async () => {
+  it('closes the dialog and starts refetching even while external loading remains true', async () => {
     const items = [{ name: 'Original' }]
-    const { wrapper, onFetch, request } = mountManagedTable({
-      key: 'name',
-      columns: [{ name: 'name' }],
-      actions: [
-        {
-          name: 'edit',
-          form: {
-            fields: [{ name: 'name', type: 'text' }],
-            actions: ['save', 'cancel'],
-            actionSubmit: 'save',
-            actionCancel: 'cancel',
-          },
-        },
-      ],
-    })
+    const { wrapper, onFetch, request } = mountManagedTable(editableOptions)
     try {
       request().complete({ items })
       await flushPromises()
@@ -1025,6 +1027,8 @@ describe('VOvTable', () => {
       await flushPromises()
       const form = wrapper.getComponent(VOvForm)
       await form.vm.handleAction('save')
+      await flushPromises()
+      expect(form.props('loading')).toBe(true)
       const complete = wrapper.emitted('action')![0]![3]
       if (typeof complete !== 'function') throw new Error('Missing action callback')
       await wrapper.setProps({ loading: true })
@@ -1044,13 +1048,12 @@ describe('VOvTable', () => {
       expect(buttons.every((button) => !button.props('loading'))).toBe(true)
       expect(buttons.every((button) => button.props('disabled'))).toBe(true)
 
-      onFetch.mockImplementation(() => {
-        expect(wrapper.findComponent(VOvForm).exists()).toBe(false)
-      })
-      const settled = wrapper.setProps({ loading: false })
-      complete(undefined, true)
-      await settled
+      complete({ status: 'success', refetch: true })
+      expect(onFetch).toHaveBeenCalledTimes(2)
+      expect(wrapper.props('loading')).toBe(true)
+      await wrapper.setProps({ loading: false })
       await flushPromises()
+      expect(dialog.props('modelValue')).toBe(false)
       expect(onFetch).toHaveBeenCalledTimes(2)
       expect(
         wrapper.findAllComponents(VOverlay).filter((overlay) => overlay.props('modelValue')),
@@ -1063,6 +1066,114 @@ describe('VOvTable', () => {
         wrapper.findAllComponents(VOverlay).filter((overlay) => overlay.props('modelValue')),
       ).toHaveLength(0)
       expect(wrapper.text()).toContain('Original')
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('settles failed submissions without changing rows, clears validation errors on retry, and ignores stale completions', async () => {
+    const { wrapper, onFetch, request } = mountManagedTable({
+      ...editableOptions,
+      actions: [],
+      columns: [{ name: 'name' }, { name: 'actions', actions: editableOptions.actions }],
+    })
+    try {
+      request().complete({ items: [{ name: 'Original' }] })
+      await flushPromises()
+      await wrapper.get('button[name="edit"]').trigger('click')
+      await flushPromises()
+      const form = wrapper.getComponent(VOvForm)
+      const field = form.get<HTMLInputElement>('input')
+      await field.setValue('Draft')
+      await form.vm.handleAction('save')
+      form.vm.$emit('submit', { name: 'Duplicate' })
+      expect(wrapper.emitted('action')).toHaveLength(1)
+      const first = wrapper.emitted('action')![0]![3]
+      if (typeof first !== 'function') throw new Error('Missing action callback')
+      first({ status: 'invalid', errors: [{ name: 'name', message: 'Invalid name' }] })
+      await flushPromises()
+      expect(form.props('loading')).toBe(false)
+      expect(form.text()).toContain('Invalid name')
+      expect(field.element.value).toBe('Draft')
+      expect(wrapper.get('table').text()).toContain('Original')
+
+      await form.vm.handleAction('save')
+      await flushPromises()
+      expect(form.props('options').errors).toEqual([])
+      expect(form.props('loading')).toBe(true)
+      first({ status: 'success', refetch: true })
+      expect(onFetch).toHaveBeenCalledTimes(1)
+      const second = wrapper.emitted('action')![1]![3]
+      if (typeof second !== 'function') throw new Error('Missing action callback')
+      second({ status: 'error' })
+      await flushPromises()
+      expect(form.props('loading')).toBe(false)
+      expect(field.element.value).toBe('Draft')
+      expect(wrapper.get('table').text()).toContain('Original')
+      expect(wrapper.findAllComponents(VDialog).some((dialog) => dialog.props('modelValue'))).toBe(
+        true,
+      )
+
+      await form.vm.handleAction('save')
+      const third = wrapper.emitted('action')![2]![3]
+      if (typeof third !== 'function') throw new Error('Missing action callback')
+      third({ status: 'success' })
+      third({ status: 'success', refetch: true })
+      await flushPromises()
+      expect(wrapper.get('table').text()).toContain('Draft')
+      expect(onFetch).toHaveBeenCalledTimes(1)
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('supersedes a pre-mutation fetch on success and ignores completion after unmount', async () => {
+    const { wrapper, onFetch, request } = mountManagedTable(editableOptions)
+    request().complete({ items: [{ name: 'Original' }] })
+    await flushPromises()
+    await wrapper.get('button[name="edit"]').trigger('click')
+    await flushPromises()
+    await wrapper.getComponent(VOvForm).vm.handleAction('save')
+    const complete = wrapper.emitted('action')![0]![3]
+    if (typeof complete !== 'function') throw new Error('Missing action callback')
+    const oldFetch = wrapper.vm.fetch('first')
+    const oldRequest = request()
+    complete({ status: 'success', refetch: true })
+    expect(oldRequest.signal.aborted).toBe(true)
+    expect(await oldFetch).toBe(false)
+    expect(onFetch).toHaveBeenCalledTimes(3)
+    oldRequest.complete({ items: [{ name: 'Stale' }] })
+    request().complete({ items: [{ name: 'Saved' }] })
+    await flushPromises()
+    expect(wrapper.get('table').text()).toContain('Saved')
+    await wrapper.get('button[name="edit"]').trigger('click')
+    await flushPromises()
+    await wrapper.getComponent(VOvForm).vm.handleAction('save')
+    const late = wrapper.emitted('action')![1]![3]
+    if (typeof late !== 'function') throw new Error('Missing action callback')
+    wrapper.unmount()
+    late({ status: 'success', refetch: true })
+    expect(onFetch).toHaveBeenCalledTimes(3)
+  })
+
+  it('allows ordinary actions to optionally refetch without entering form submission loading', async () => {
+    const { wrapper, onFetch, request } = mountManagedTable({
+      ...baseOptions,
+      actions: [{ name: 'reload' }],
+    })
+    try {
+      request().complete({ items: [{ name: 'Original' }] })
+      await flushPromises()
+      await wrapper.get('button[name="reload"]').trigger('click')
+      expect(wrapper.get('[aria-busy]').attributes('aria-busy')).toBe('false')
+      const complete = wrapper.emitted('action')![0]![3]
+      if (typeof complete !== 'function') throw new Error('Missing action callback')
+      complete({ status: 'success', refetch: true })
+      complete({ status: 'success', refetch: true })
+      expect(onFetch).toHaveBeenCalledTimes(2)
+      request().complete({ items: [{ name: 'Updated' }] })
+      await flushPromises()
+      expect(wrapper.get('table').text()).toContain('Updated')
     } finally {
       wrapper.unmount()
     }

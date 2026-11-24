@@ -26,7 +26,7 @@ import {
   renderViewItem,
   type OvTableOptions,
   type OvTableFetchRequest,
-  type OvFormFieldError,
+  type OvActionComplete,
   type OvFormSelectionField,
 } from '@/components/api'
 
@@ -245,8 +245,6 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-type SettingActionComplete = (errors?: OvFormFieldError[], refetch?: boolean) => void
-
 describe('admin settings', () => {
   it('limits displayed values to 30 characters and marks secrets with a lock icon', async () => {
     const { wrapper } = await setup('settings')
@@ -313,19 +311,19 @@ describe('admin settings', () => {
       ],
       nextCursor: 'opaque-next',
     })
-    const saved = vi.fn<SettingActionComplete>()
+    const saved = vi.fn<OvActionComplete>()
     putRole.mockResolvedValueOnce({ data: null, error: null, status: 204, headers: null })
     settings.vm.$emit('action', 'admin.editSetting', page.items, { ...row, value: null }, saved)
     await flushPromises()
     expect(putRole).toHaveBeenCalledExactlyOnceWith('/admin/settings/SMTP_HOST', { value: null })
-    expect(saved).toHaveBeenCalledExactlyOnceWith(undefined, true)
+    expect(saved).toHaveBeenCalledExactlyOnceWith({ status: 'success', refetch: true })
   })
 
   it('saves a secret replacement and requests a refetch', async () => {
     const { wrapper } = await setup('settings')
     const settings = wrapper.findComponent(table)
     const row = { id: 'API_TOKEN', secret: 'Y', readonly: 'N', value: null }
-    const complete = vi.fn<SettingActionComplete>()
+    const complete = vi.fn<OvActionComplete>()
     putRole.mockResolvedValueOnce({ data: null, error: null, status: 204, headers: null })
     settings.vm.$emit(
       'action',
@@ -339,26 +337,27 @@ describe('admin settings', () => {
       value: 'new-test-value',
     })
 
-    expect(complete).toHaveBeenLastCalledWith(undefined, true)
+    expect(complete).toHaveBeenLastCalledWith({ status: 'success', refetch: true })
     expect(row.value).toBeNull()
   })
 
   it('reports malformed submissions without sending an update', async () => {
     const { wrapper } = await setup('settings')
     const settings = wrapper.findComponent(table)
-    const complete = vi.fn<SettingActionComplete>()
+    const complete = vi.fn<OvActionComplete>()
     settings.vm.$emit('action', 'admin.editSetting', [], { value: 'test' }, complete)
     expect(putRole).not.toHaveBeenCalled()
-    expect(complete).toHaveBeenCalledExactlyOnceWith([
-      { name: 'value', message: 'admin.updateSettingError' },
-    ])
+    expect(complete).toHaveBeenCalledExactlyOnceWith({
+      status: 'invalid',
+      errors: [{ name: 'value', message: 'admin.updateSettingError' }],
+    })
   })
 
   it.each(['Y', 'N'])(
     'passes the form value %s without consulting displayed rows',
     async (value) => {
       const { wrapper } = await setup('settings')
-      const complete = vi.fn<SettingActionComplete>()
+      const complete = vi.fn<OvActionComplete>()
       putRole.mockResolvedValueOnce({ data: null, error: null, status: 204, headers: null })
       wrapper
         .findComponent(table)
@@ -373,26 +372,30 @@ describe('admin settings', () => {
       expect(putRole).toHaveBeenCalledExactlyOnceWith('/admin/settings/AUTH_PASSWORD_ENABLED', {
         value,
       })
-      expect(complete).toHaveBeenCalledExactlyOnceWith(undefined, true)
+      expect(complete).toHaveBeenCalledExactlyOnceWith({ status: 'success', refetch: true })
     },
   )
 
-  it('leaves the form open when the backend rejects a readonly update', async () => {
-    const { wrapper } = await setup('settings')
-    const row = { id: 'CUSTOM_POLICY', secret: 'N', readonly: 'Y', value: 'Y' }
-    const complete = vi.fn<SettingActionComplete>()
-    putRole.mockResolvedValueOnce(failure(403))
-    wrapper.findComponent(table).vm.$emit('action', 'admin.editSetting', [row], row, complete)
-    await flushPromises()
-    expect(putRole).toHaveBeenCalledExactlyOnceWith('/admin/settings/CUSTOM_POLICY', {
-      value: 'Y',
-    })
-    expect(complete).not.toHaveBeenCalled()
-    expect(ui.notification.value).toMatchObject({
-      type: 'error',
-      message: 'admin.updateSettingError',
-    })
-  })
+  it.each(['response', 'rejection'])(
+    'explicitly completes with an error on HTTP %s',
+    async (kind) => {
+      const { wrapper } = await setup('settings')
+      const row = { id: 'CUSTOM_POLICY', secret: 'N', readonly: 'Y', value: 'Y' }
+      const complete = vi.fn<OvActionComplete>()
+      if (kind === 'response') putRole.mockResolvedValueOnce(failure(403))
+      else putRole.mockRejectedValueOnce(new Error('Network unavailable'))
+      wrapper.findComponent(table).vm.$emit('action', 'admin.editSetting', [row], row, complete)
+      await flushPromises()
+      expect(putRole).toHaveBeenCalledExactlyOnceWith('/admin/settings/CUSTOM_POLICY', {
+        value: 'Y',
+      })
+      expect(complete).toHaveBeenCalledExactlyOnceWith({ status: 'error' })
+      expect(ui.notification.value).toMatchObject({
+        type: 'error',
+        message: kind === 'response' ? 'admin.updateSettingError' : 'Network unavailable',
+      })
+    },
+  )
 })
 
 describe('admin page metadata', () => {

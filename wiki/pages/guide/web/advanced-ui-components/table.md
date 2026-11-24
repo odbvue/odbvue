@@ -31,27 +31,66 @@ const options = ref<OvTableOptions>({
 
 ### Props
 
-| Prop          | Type             | Default     | Description                                                                                                     |
-| ------------- | ---------------- | ----------- | --------------------------------------------------------------------------------------------------------------- |
-| `options`     | `OvTableOptions` | required    | Table layout, columns, search, filter, sort, and actions.                                                       |
-| `items`       | `OvTableData[]`  | `[]`        | Optional supplied rows; fetched pages are managed internally.                                                   |
-| `nextCursor`  | `string`         | `undefined` | Optional external continuation override.                                                                        |
-| `loading`     | `boolean`        | `false`     | External loading; shows one contained overlay on the table or its open form dialog. Fetch loading is automatic. |
-| `title`       | `string`         | -           | Optional title above the table.                                                                                 |
-| `description` | `string`         | -           | Optional description above the table.                                                                           |
-| `stateKey`    | `string`         | -           | Optional session preference key; overrides `options.stateKey`.                                                  |
+| Prop          | Type             | Default     | Description                                                                           |
+| ------------- | ---------------- | ----------- | ------------------------------------------------------------------------------------- |
+| `options`     | `OvTableOptions` | required    | Table layout, columns, search, filter, sort, and actions.                             |
+| `items`       | `OvTableData[]`  | `[]`        | Optional supplied rows; fetched pages are managed internally.                         |
+| `nextCursor`  | `string`         | `undefined` | Optional external continuation override.                                              |
+| `loading`     | `boolean`        | `false`     | Optional external loading. Fetch and generated-form submission loading are automatic. |
+| `title`       | `string`         | -           | Optional title above the table.                                                       |
+| `description` | `string`         | -           | Optional description above the table.                                                 |
+| `stateKey`    | `string`         | -           | Optional session preference key; overrides `options.stateKey`.                        |
 
 ### Emits
 
-| Event    | Payload                           | Description                                                      |
-| -------- | --------------------------------- | ---------------------------------------------------------------- |
-| `fetch`  | `OvTableFetchRequest`             | Requests a page; call `complete(page)` or `complete(undefined)`. |
-| `action` | `(name, data, value?, callback?)` | Emitted for table, row, and cell actions.                        |
+| Event    | Payload                           | Description                                                                              |
+| -------- | --------------------------------- | ---------------------------------------------------------------------------------------- |
+| `fetch`  | `OvTableFetchRequest`             | Requests a page; call `complete(page)` or `complete(undefined)`.                         |
+| `action` | `(name, data, value?, complete?)` | Emitted for table, row, and cell actions. Generated-form submissions provide completion. |
 
 `OvTableFetchRequest` is exported from `@/components` and contains `cursor?`, `limit`,
 `search?`, `filter?`, `sort?`, an abort `signal`, and a required
 `complete(page?: OvTablePage)` callback. `OvTablePage` is `{ items: OvTableData[], nextCursor?: string }`.
 Return the whole page through completion instead of maintaining page state in the parent.
+
+### Action completion
+
+Generated forms own submission loading: fields/actions are disabled and the dialog
+cannot be dismissed until the handler calls `complete(result)`. No parent `saving`
+ref or `loading` binding is needed for these submissions.
+
+`OvActionResult` and `OvActionComplete` are exported from `@/components`:
+
+```ts
+type OvActionResult =
+  | { status: 'success'; refetch?: boolean }
+  | { status: 'invalid'; errors: OvFormFieldError[] }
+  | { status: 'error' }
+
+type OvActionComplete = (result: OvActionResult) => void
+```
+
+- `complete({ status: 'success', refetch: true })` closes the dialog and reloads
+  the current page from the server. It does not copy the draft into table rows.
+- `complete({ status: 'success' })` closes the dialog and copies the submitted
+  data into the edited row, if this was a row form.
+- `complete({ status: 'invalid', errors })` ends submission, preserves the draft,
+  and supplies field errors. Previous field errors clear on the next submission.
+- `complete({ status: 'error' })` ends submission and preserves the open draft
+  without changing table rows. The handler remains responsible for notifying the user.
+
+Call completion on every outcome. Duplicate callbacks and callbacks after unmount
+are ignored; a completed submission cannot affect a later submission.
+Ordinary actions without a generated form do not enter submission loading or
+require completion. They can optionally complete with
+`{ status: 'success', refetch: true }` to request a reload.
+
+```ts
+const result = await ui.action('settings.save', () => saveSetting(submission))
+if (!result.ok) return complete({ status: 'error' })
+complete({ status: 'success', refetch: true })
+ui.success('settings.saved')
+```
 
 ### Exposed
 
@@ -110,7 +149,7 @@ Return the whole page through completion instead of maintaining page state in th
   errors appear under the relevant input, and invalid submissions do not fetch.
 - On mobile, the table switches to a stacked layout and uses `mobileItemsPerPage` when provided.
 - Column and action formatting use `OvFieldFormat` and `OvActionFormat` under the hood.
-- Use an action's `key` to select the row field tested by `format` rules, with a final `{ hidden: true }` fallback to hide nonmatching actions. Use `form` to open an editor initialized from the row. For write-only fields, use a separate field name and call the action callback with `(undefined, true)` after saving to reload from the server instead of copying submitted values into the table.
+- Use an action's `key` to select the row field tested by `format` rules, with a final `{ hidden: true }` fallback to hide nonmatching actions. Use `form` to open an editor initialized from the row. For write-only fields, use a separate field name and call `complete({ status: 'success', refetch: true })` after saving to reload from the server instead of copying submitted values into the table.
 - Row expansion only appears when the `expand` slot is provided.
 - Enable remote sorting only when the fetch handler and endpoint implement the requested ordering.
   name: 'add',
@@ -168,8 +207,11 @@ Navigation buttons appear in the table footer:
 
 Existing rows remain mounted during fetches behind a contained table overlay.
 An open action dialog owns the save overlay: fields/actions are disabled and the
-background table has no additional overlay. Clear external `loading` before calling `complete(undefined, true)` to
-close the form and refresh the current page; the table handles the render boundary.
+background table has no additional overlay. Successful action completion explicitly
+starts a requested refetch independently of external loading or Vue render timing.
+A pending pre-mutation fetch is superseded so it cannot publish stale rows afterward.
+A failed refetch retains the last successful page; it does not reopen the saved form
+or turn the successful mutation into a failed save.
 
 The fetch handler must call the supplied completion callback exactly once.
 Make the HTTP request inside `ui.action()` and return its page, then call

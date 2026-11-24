@@ -267,6 +267,13 @@ export type OvFormFieldError = {
   message: string
 }
 
+export type OvActionResult =
+  | { status: 'success'; refetch?: boolean }
+  | { status: 'invalid'; errors: OvFormFieldError[] }
+  | { status: 'error' }
+
+export type OvActionComplete = (result: OvActionResult) => void
+
 export type OvAlign = 'left' | 'center' | 'right'
 
 export type OvFormOptions = {
