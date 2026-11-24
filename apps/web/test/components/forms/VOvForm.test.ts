@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { VBtn, VOverlay } from 'vuetify/components'
 import VOvForm from '@/components/forms/VOvForm.vue'
+import { toBoolean, transformFormData } from '@/components/forms/transforms'
 import { globalPlugins } from '../../support/components.setup'
 import type { OvFormOptions } from '@/components'
 import { settingField } from '@/modules/admin/pages/settings/metadata'
@@ -15,6 +16,60 @@ function mountForm(options: OvFormOptions, data = {}, attachTo?: Element) {
 }
 
 describe('VOvForm', () => {
+  it.each([
+    [true, true],
+    [false, false],
+    ['Y', true],
+    ['n', false],
+    ['t', true],
+    ['F', false],
+    ['TrUe', true],
+    ['FALSE', false],
+    [1, true],
+    [0, false],
+    ['1', true],
+    ['0', false],
+  ])('converts the supported boolean value %s', (value, expected) => {
+    expect(toBoolean(value)).toBe(expected)
+  })
+
+  it.each(['enabled', 'maybe', 'invalid', '', ' true ', 2, -1, [], {}])(
+    'rejects unsupported switch values: %s',
+    (value) => {
+      expect(() => toBoolean(value)).toThrow(TypeError)
+      expect(() => transformFormData({ enabled: value }, [], ['enabled'])).toThrow(
+        'Unsupported switch or checkbox value for field "enabled"',
+      )
+    },
+  )
+
+  it('leaves unset switch values unchanged', () => {
+    expect(transformFormData({ a: null, b: undefined }, [], ['a', 'b'])).toEqual({
+      values: { a: null, b: undefined },
+      switchFieldFormats: {},
+    })
+  })
+
+  it.each(['switch', 'checkbox'] as const)(
+    'rejects invalid initial data for a %s',
+    async (type) => {
+      const errors: unknown[] = []
+      const wrapper = mount(VOvForm, {
+        props: { options: { fields: [{ type, name: 'enabled' }] }, data: { enabled: 'maybe' } },
+        global: { plugins: globalPlugins, config: { errorHandler: (error) => errors.push(error) } },
+      })
+      try {
+        await flushPromises()
+        expect(errors).toHaveLength(1)
+        expect(errors[0]).toEqual(
+          new TypeError('Unsupported switch or checkbox value for field "enabled"'),
+        )
+      } finally {
+        wrapper.unmount()
+      }
+    },
+  )
+
   it('disables edits and actions while saving with a contained overlay', async () => {
     const wrapper = mountForm(
       {
@@ -136,6 +191,8 @@ describe('VOvForm', () => {
     ['checkbox', false, true],
     ['switch', 0, 1],
     ['checkbox', '0', '1'],
+    ['switch', 'f', 'T'],
+    ['checkbox', 'FALSE', 'true'],
   ] as const)('preserves %s scalar format for %s', async (type, initial, expected) => {
     const wrapper = mountForm(
       { fields: [{ type, name: 'value' }], actions: ['save'], actionSubmit: 'save' },

@@ -242,14 +242,14 @@ const fromBoolean = (value: boolean, originalFormat?: BooleanFormat): string | n
 }
 
 const transformIncomingData = (incomingData: OvFormData): OvFormData => {
-  for (const name of getBooleanFieldNames()) {
-    if (Object.hasOwn(incomingData, name)) delete switchFieldFormats.value[name]
-  }
   const transformed = transformFormData(
     incomingData,
     getDurationFieldNames(),
     getBooleanFieldNames(),
   )
+  for (const name of getBooleanFieldNames()) {
+    if (Object.hasOwn(incomingData, name)) delete switchFieldFormats.value[name]
+  }
   Object.assign(switchFieldFormats.value, transformed.switchFieldFormats)
   return transformed.values
 }
@@ -767,8 +767,13 @@ function resetValues() {
       .filter((field) => field.value !== undefined)
       .map((field) => [field.name, field.value]),
   )
-  switchFieldFormats.value = {}
-  values.value = transformIncomingData({ ...fieldDefaults, ...data })
+  const transformed = transformFormData(
+    { ...fieldDefaults, ...data },
+    getDurationFieldNames(),
+    getBooleanFieldNames(),
+  )
+  switchFieldFormats.value = transformed.switchFieldFormats
+  values.value = transformed.values
   syncAsyncSelectedItems()
 }
 

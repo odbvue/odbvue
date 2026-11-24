@@ -112,7 +112,7 @@ Notable field-specific options:
 ### Notes
 
 - Duration fields are converted to and from compact duration strings.
-- Switch and checkbox fields are normalized to booleans internally and converted back to their original scalar format on submit. Without an initial value, switches submit `Y`/`N` and checkboxes submit booleans.
+- Switch and checkbox fields accept booleans, `Y`/`N`, `T`/`F`, `true`/`false`, and `0`/`1` (numbers or strings); strings are case-insensitive. They are normalized to booleans internally and converted back to their original scalar format on submit. Unsupported non-null values throw a `TypeError` identifying the field. Without an initial value, switches submit `Y`/`N` and checkboxes submit booleans.
 - Custom fields can be lazy-loaded components.
 - `actionSubmit`, `actionCancel`, `actionReset`, and `actionValidate` are matched by action name.
 - Pressing Enter in a single-line input submits through `actionSubmit`, validates the form, and emits `submit` with normalized values when valid. This also works with `hideActions`; Enter in a textarea or markdown editor retains its normal editing behavior.
