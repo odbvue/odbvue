@@ -49,10 +49,10 @@ describe('app-owned ORDS migrations', () => {
     const sandboxSql = sandbox.migration.compile()
     expect(sandboxSql.up().join('\n')).toContain("'FREQ=MINUTELY;INTERVAL=1'")
     expect(sandboxSql.up().join('\n')).toContain(
-      "ODBVUE.odb_scheduler.create_job('ODBVUE.SANDBOX_AUDIT_JOB', 'ODBVUE.PCK_SANDBOX.SCHEDULER_TICK'",
+      "ODBVUE.odb_scheduler.seed_job('SANDBOX_AUDIT_JOB', 'ODBVUE.PCK_SANDBOX.SCHEDULER_TICK'",
     )
     expect(sandboxSql.down().join('\n')).toContain(
-      "DBMS_SCHEDULER.DROP_JOB('ODBVUE.SANDBOX_AUDIT_JOB', TRUE)",
+      "ODBVUE.odb_scheduler.remove_seeded_job('SANDBOX_AUDIT_JOB')",
     )
     const sandboxEndpoints = compileApplicationEndpoints(
       sandbox.sandboxPackage.application(),

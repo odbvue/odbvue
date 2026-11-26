@@ -9,15 +9,22 @@ describe('scheduler migration seed', () => {
       schedule: 'FREQ=MINUTELY;INTERVAL=1',
       description: "Owner's demo",
     })
-    expect(seed.toSQLUp({ schema: 'app' })).toContain(
-      "APP.odb_scheduler.create_job('APP.DEMO_JOB', 'APP.DEMO_PKG.TICK', 'FREQ=MINUTELY;INTERVAL=1', 'Owner''s demo')",
+    const up = seed.toSQLUp({ schema: 'app' })
+    expect(up).toContain(
+      "APP.odb_scheduler.seed_job('DEMO_JOB', 'APP.DEMO_PKG.TICK', 'FREQ=MINUTELY;INTERVAL=1', 'Owner''s demo')",
     )
     const down = seed.toSQLDown({ schema: 'app' })
-    expect(down).toContain(
-      "FROM dba_scheduler_jobs WHERE (owner = 'APP' AND job_name = 'DEMO_JOB')",
-    )
-    expect(down).toContain('IF l_count > 0 THEN')
-    expect(down).toContain("DBMS_SCHEDULER.DROP_JOB('APP.DEMO_JOB', TRUE)")
+    expect(down).toContain("APP.odb_scheduler.remove_seeded_job('DEMO_JOB')")
+    expect(up).not.toContain('SELECT')
+    expect(down).not.toContain('SELECT')
+    const sql = odbScheduler.toSQLUp({ schema: 'APP' })
+    const start = sql.indexOf('PROCEDURE remove_seeded_job', sql.indexOf('PACKAGE BODY'))
+    const removal = sql.slice(start, sql.indexOf('END remove_seeded_job;', start))
+    expect(removal).toContain('FROM user_scheduler_jobs WHERE job_name = p_name')
+    expect(removal).toContain('IF l_count > 0 THEN')
+    expect(removal).toContain('DBMS_SCHEDULER.DROP_JOB(p_name, TRUE)')
+    expect(sql).not.toContain('dba_scheduler_jobs')
+    expect(sql).not.toContain('owner =')
   })
 
   it('rejects missing schemas and invalid identifiers rather than emitting unsafe SQL', () => {
@@ -38,23 +45,20 @@ describe('scheduler migration seed', () => {
   })
 
   it('validates existing definitions before repairing run logging without recreating or resetting enabled state', () => {
-    const sql = odbScheduler
-      .seed({
-        name: 'DEMO_JOB',
-        action: 'DEMO_PKG.TICK',
-        schedule: 'FREQ=MINUTELY;INTERVAL=1',
-        description: 'Demo',
-      })
-      .toSQLUp({ schema: 'APP' })
+    const packageSql = odbScheduler.toSQLUp({ schema: 'APP' })
+    const start = packageSql.indexOf('PROCEDURE seed_job', packageSql.indexOf('PACKAGE BODY'))
+    const sql = packageSql.slice(start, packageSql.indexOf('END seed_job;', start))
+    expect(sql).toContain('FROM user_scheduler_jobs WHERE job_name = p_name')
     expect(sql).toContain('IF l_count = 0 THEN')
     expect(sql).toContain('ELSE')
     expect(sql).toContain("job_type = 'STORED_PROCEDURE'")
-    expect(sql).toContain("job_action = 'APP.DEMO_PKG.TICK'")
+    expect(sql).toContain('job_action = p_action')
     expect(sql).toContain('number_of_arguments = 0')
     expect(sql).toContain('program_name IS NULL')
     expect(sql).toContain('schedule_name IS NULL')
-    expect(sql).toContain("repeat_interval = 'FREQ=MINUTELY;INTERVAL=1'")
-    expect(sql).toContain("comments = 'Demo'")
+    expect(sql).toContain('repeat_interval = p_schedule')
+    expect(sql).toContain('comments = p_description')
+    expect(sql).toContain('(comments IS NULL AND p_description IS NULL)')
     expect(sql).toContain("auto_drop = 'FALSE'")
     expect(sql).toContain('SCHEDULER_JOB_DRIFT')
     expect(sql).toContain("l_logging_level != 'RUNS' AND l_logging_level != 'FULL'")
@@ -64,6 +68,6 @@ describe('scheduler migration seed', () => {
     expect(sql).not.toContain('.enable_job')
     expect(sql).not.toContain('.disable_job')
     expect(sql).not.toContain('DROP_JOB')
-    expect(sql.match(/\.create_job\(/g)).toHaveLength(1)
+    expect(sql.match(/create_job\(/g)).toHaveLength(1)
   })
 })

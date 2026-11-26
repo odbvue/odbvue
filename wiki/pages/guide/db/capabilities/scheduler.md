@@ -35,8 +35,12 @@ schedule, description, auto-drop setting, style, class, and end date. A mismatch
 raises `SCHEDULER_JOB_DRIFT` without replacing the job. A matching job keeps its
 enabled state and start date; missing run logging is repaired, while `RUNS` or
 `FULL` logging is preserved. It accepts ordinary unquoted identifiers and a procedure or
-package-procedure in the migration schema. The migration executor needs access
-to `DBA_SCHEDULER_JOBS` and permission to drop the schema-owned job.
+package-procedure in the migration schema. Seed and rollback lookups use
+`USER_SCHEDULER_JOBS` inside the schema-owned, definer-rights `odb_scheduler`
+package, so they inspect the application schema even when migrations run as
+ADMIN. The migration executor needs permission to execute that package, not
+access to DBA Scheduler views. Keep the capability installed until seeded jobs
+have been removed on rollback.
 
 Use the typed calls in an ODB package body. `create(name, action, schedule,
 description)` creates a disabled, persistent `STORED_PROCEDURE` job without
