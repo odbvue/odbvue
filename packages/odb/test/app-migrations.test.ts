@@ -206,12 +206,14 @@ describe('app-owned ORDS migrations', () => {
       for (const app of (await loadModule()).migration.applications()) {
         for (const endpoint of compileApplicationEndpoints(app)) {
           const node = endpoint.toNode()
-          const [normalPath, exceptionPath] = node.source.split('EXCEPTION WHEN OTHERS THEN ')
+          const split = node.source.split(/; EXCEPTION WHEN OTHERS THEN /)
+          const normalPath = `${split[0]};`
+          const exceptionBody = split.slice(1).join('; EXCEPTION WHEN OTHERS THEN ')
           expect(normalPath).not.toContain('odb_audit.log(')
-          expect(exceptionPath.match(/odb_audit\.log\(/g)).toHaveLength(1)
+          expect(exceptionBody.match(/odb_audit\.log\(/g)).toHaveLength(1)
           const [audit] =
-            exceptionPath.match(
-              /IF :status_code BETWEEN 500 AND 599 THEN v_trace_id := LOWER\(RAWTOHEX\(SYS_GUID\(\)\)\); odb_audit\.log\([^;]+; END IF;/,
+            exceptionBody.match(
+              /IF :status_code BETWEEN 500 AND 599 THEN[\s\S]*?END IF;/,
             ) ?? []
           expect(audit).toBeDefined()
           const event = `${node.module}.${node.procedureName.toLowerCase()}`
@@ -229,10 +231,10 @@ describe('app-owned ORDS migrations', () => {
           expect(audit).toContain(`'http.request.method', '${node.method}'`)
           expect(audit).toContain("'http.response.status_code', TO_CHAR(:status_code)")
           expect(audit).toContain("'trace.id', v_trace_id")
-          expect(audit).toContain(
-            "'exception.stacktrace', SUBSTR(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, 1, 2000)",
-          )
-          const response = exceptionPath.slice(exceptionPath.indexOf(audit) + audit.length)
+          expect(audit).toContain("'exception.code', TO_CHAR(v_sqlcode)")
+          expect(audit).toContain("'exception.stack', v_error_stack")
+          expect(audit).toContain("'exception.stacktrace', v_error_backtrace")
+          const response = exceptionBody.slice(exceptionBody.indexOf(audit) + audit.length)
           expect(response).toContain("'code' VALUE v_error_code")
           expect(response).toContain("'traceId' VALUE v_trace_id")
           expect(response).not.toMatch(/SQLERRM|BACKTRACE|stacktrace/i)

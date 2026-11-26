@@ -39,6 +39,7 @@ import {
   ODB_ERROR_STATUS,
   odbErrorEnvelope,
   type OdbErrorKind,
+  type OdbLegacyValidationErrorDetail,
   type OdbValidationErrorDetail,
 } from './errors.js'
 
@@ -661,7 +662,11 @@ export class ProcedureBody {
    * Raise a transport-independent ODB error. Services translate the kind to
    * a transport status (HTTP for ORDS); `code` defaults to the kind.
    */
-  raiseError(kind: OdbErrorKind, code: string = kind, errors?: OdbValidationErrorDetail[]): this {
+  raiseError(
+    kind: OdbErrorKind,
+    code: string = kind,
+    errors?: Array<OdbValidationErrorDetail | OdbLegacyValidationErrorDetail>,
+  ): this {
     if (!Object.hasOwn(ODB_ERROR_STATUS, kind)) {
       throw new Error(`raiseError: unknown error kind ${kind}.`)
     }
@@ -675,8 +680,18 @@ export class ProcedureBody {
   }
 
   /** Raise a `VALIDATION_ERROR` ODB error. */
-  invalid(code?: string, errors?: OdbValidationErrorDetail[]): this {
-    return this.raiseError('VALIDATION_ERROR', code, errors)
+  invalid(
+    code?: string,
+    fieldOrErrors?: string | Array<OdbValidationErrorDetail | OdbLegacyValidationErrorDetail>,
+    params?: OdbValidationErrorDetail['params'],
+  ): this {
+    if (typeof fieldOrErrors === 'string') {
+      if (!code) code = 'VALIDATION_ERROR'
+      return this.raiseError('VALIDATION_ERROR', code, [
+        { field: fieldOrErrors, code, params },
+      ])
+    }
+    return this.raiseError('VALIDATION_ERROR', code, fieldOrErrors)
   }
 
   /** Raise an `UNAUTHORIZED` ODB error. */

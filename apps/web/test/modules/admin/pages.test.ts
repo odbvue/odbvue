@@ -1398,7 +1398,7 @@ describe('admin user details', () => {
       expect(wrapper.text()).not.toContain(messages['admin.userDisabled'])
       expect(ui.notification.value).toMatchObject({
         type: 'error',
-        message: 'Request failed',
+        message: 'errors.requestFailed',
       })
       expect(ui.loading.active.value).toBe(false)
       expect(
@@ -1419,7 +1419,7 @@ describe('admin user details', () => {
       .trigger('click')
     await wrapper.get('[role="dialog"]').findAll('button')[1]!.trigger('click')
     await flushPromises()
-    expect(ui.notification.value?.message).toBe('Request failed')
+    expect(ui.notification.value?.message).toBe('errors.requestFailed')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
     await wrapper
@@ -1436,7 +1436,7 @@ describe('admin user details', () => {
     )
     await wrapper.get('[role="dialog"]').findAll('button')[1]!.trigger('click')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
-    expect(ui.notification.value?.message).toBe('Request failed')
+    expect(ui.notification.value?.message).toBe('errors.requestFailed')
     expect(ui.loading.has('admin.users.status')).toBe(true)
     resolveMutation(result([{ ...user, enabled: false }]))
     await flushPromises()

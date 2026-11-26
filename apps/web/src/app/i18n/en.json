@@ -6,6 +6,7 @@
   "errors.requestFailed": "The request could not be completed. Please try again.",
   "errors.requestFailedReference": "The request could not be completed. Reference: {traceId}",
   "errors.invalidFields": "Some validation errors could not be shown on their fields.",
+  "errors.validationFailed": "Correct the highlighted value and try again.",
   "home.title": "Home",
   "home.description": "Welcome to OdbVue",
   "auth.login": "Login",

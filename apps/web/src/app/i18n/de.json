@@ -6,6 +6,7 @@
   "errors.requestFailed": "Die Anfrage konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.",
   "errors.requestFailedReference": "Die Anfrage konnte nicht abgeschlossen werden. Referenz: {traceId}",
   "errors.invalidFields": "Einige Validierungsfehler konnten nicht an ihren Feldern angezeigt werden.",
+  "errors.validationFailed": "Korrigieren Sie den hervorgehobenen Wert und versuchen Sie es erneut.",
   "home.title": "Startseite",
   "home.description": "Willkommen bei OdbVue",
   "auth.login": "Anmelden",

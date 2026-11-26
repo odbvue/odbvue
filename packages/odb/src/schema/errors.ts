@@ -17,6 +17,13 @@ export type OdbErrorKind = keyof typeof ODB_ERROR_STATUS
 export const ODB_ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]{0,99}$/
 
 export interface OdbValidationErrorDetail {
+  field: string
+  code: string
+  params?: Record<string, string | number | boolean | null>
+}
+
+/** @deprecated Use { field, code, params } for new field errors. */
+export type OdbLegacyValidationErrorDetail = {
   name: string
   message: string
   params?: Record<string, string | number | boolean | null>
@@ -26,7 +33,7 @@ export interface OdbValidationErrorDetail {
 export function odbErrorEnvelope(
   kind: OdbErrorKind,
   code: string,
-  errors?: OdbValidationErrorDetail[],
+  errors?: Array<OdbValidationErrorDetail | OdbLegacyValidationErrorDetail>,
 ): string {
   let envelope = `ODB_ERROR|${kind}|${code}`
   if (errors !== undefined) {
@@ -34,13 +41,22 @@ export function odbErrorEnvelope(
       throw new Error('Field errors require a nonempty validation error list.')
     }
     for (const error of errors) {
+      const field = 'field' in error ? error.field : error.name
+      const errorCode = 'code' in error ? error.code : ''
+      const translation = 'message' in error ? error.message : ''
       if (
-        !error.name.trim() ||
-        error.name.length > 128 ||
-        [...error.name].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127) ||
-        !/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)*$/.test(error.message)
+        !field.trim() ||
+        field.length > 128 ||
+        [...field].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)
       ) {
-        throw new Error('Invalid field error name or translation key.')
+        throw new Error('Invalid field error name.')
+      }
+      if ('message' in error) {
+        if (!/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)*$/.test(translation)) {
+          throw new Error('Invalid field error translation key.')
+        }
+      } else if (!ODB_ERROR_CODE_PATTERN.test(errorCode)) {
+        throw new Error('Invalid field error code.')
       }
       if (
         error.params &&

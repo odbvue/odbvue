@@ -34,9 +34,7 @@ const oneOf = (value: PlsqlValue, choices: readonly string[]) =>
   cond.or(choices.map((choice) => cond.eq(value, choice)))
 const invalid = (body: ProcedureBody) => body.invalid('SETTINGS_VALIDATION_INVALID')
 const invalidValue = (body: ProcedureBody) =>
-  body.invalid('SETTINGS_VALIDATION_INVALID', [
-    { name: 'value', message: 'admin.settingValidationError' },
-  ])
+  body.invalid('SETTINGS_VALIDATION_INVALID', 'value')
 const requireValid = (body: ProcedureBody, condition: PlsqlBooleanExpression) =>
   body.ifThen(condition, (valid) => valid.null(), invalid)
 const requireValidValue = (body: ProcedureBody, condition: PlsqlBooleanExpression) =>

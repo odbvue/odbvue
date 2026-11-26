@@ -93,7 +93,8 @@ async function fetchSettings({ cursor, limit, search, signal, complete }: OvTabl
       { query: { cursor, limit, search }, signal },
     )
     if (signal.aborted) return
-    if (error || !data) throw new Error('admin.loadSettingsError')
+    if (error) throw error
+    if (!data) throw new Error('admin.loadSettingsError')
     return {
       ...data,
       items: data.items.map((row) => {
@@ -126,16 +127,11 @@ async function saveSetting(
     })
   }
   const { id, value } = submission
-  const result = await ui.loading
-    .run('admin.settings.update', () =>
-      http.put(`/admin/settings/${encodeURIComponent(id)}`, { value }),
-    )
-    .then(
-      ({ error }) =>
-        error ? ui.mutationError(error) : { status: 'success' as const, refetch: true },
-      (error: unknown) => ui.mutationError(error),
-    )
-  complete(result)
-  if (result.status === 'success') ui.success('admin.settingSaved')
+  await ui.mutation(
+    'admin.settings.update',
+    () => http.put(`/admin/settings/${encodeURIComponent(id)}`, { value }),
+    complete,
+    'admin.settingSaved',
+  )
 }
 </script>

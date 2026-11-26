@@ -103,9 +103,7 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
           existingReadonly: settingsStore.readonly,
         })
       body.ifThen(cond.gt(odbOracle.length(value), VALUE_LENGTH), (invalid) =>
-        invalid.invalid('SETTINGS_VALUE_TOO_LONG', [
-          { name: 'value', message: 'admin.settingTooLong' },
-        ]),
+        invalid.invalid('SETTINGS_VALUE_TOO_LONG', 'value'),
       )
       body.block((existing) => {
         existing.query(
@@ -162,9 +160,7 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
         cond.eq(secret, 'Y'),
         (then) => {
           then.ifThen(cond.eq(value, '********'), (invalid) =>
-            invalid.invalid('SETTINGS_SECRET_MASKED_VALUE', [
-              { name: 'value', message: 'admin.settingSecretRequired' },
-            ]),
+            invalid.invalid('SETTINGS_SECRET_MASKED_VALUE', 'value'),
           )
           then.set(storedValue, encrypt.invoke(id, value))
         },
@@ -214,9 +210,7 @@ export const odbSettingsPackage = odbPackage(PACKAGE_NAME, (pkg) => {
       )
       body.when('NO_DATA_FOUND', (missing) => missing.notFound('SETTING_NOT_FOUND'))
       body.ifThen(cond.and([cond.eq(secret, 'Y'), cond.isNull(value)]), (invalid) =>
-        invalid.invalid('SETTINGS_SECRET_REPLACEMENT_REQUIRED', [
-          { name: 'value', message: 'admin.settingSecretRequired' },
-        ]),
+        invalid.invalid('SETTINGS_SECRET_REPLACEMENT_REQUIRED', 'value'),
       )
       body.call(write.invoke(id, value, 'NULL'))
     },

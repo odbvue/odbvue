@@ -533,9 +533,7 @@ export class OrdsEndpoint {
     const operation = toKebabCase(this.procedureName).replace(/-/g, ' ')
     const failureMessage = `${operation.charAt(0).toUpperCase()}${operation.slice(1)} failed`
     const auditServerError =
-      this._auth === undefined
-        ? ''
-        : `IF :status_code BETWEEN 500 AND 599 THEN v_trace_id := LOWER(RAWTOHEX(SYS_GUID())); odb_audit.log('ERROR', ${sqlStr(failureMessage)}, odb_audit.attributes('user.id', ${protectedEndpoint ? 'v_auth_user_id' : 'NULL'}, 'event.name', ${sqlStr(auditEvent)}, 'event.outcome', 'failure', 'http.request.method', ${sqlStr(this.effectiveMethod)}, 'http.response.status_code', TO_CHAR(:status_code), 'trace.id', v_trace_id, 'exception.stacktrace', SUBSTR(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, 1, 2000))); END IF; `
+      `IF :status_code BETWEEN 500 AND 599 THEN v_trace_id := LOWER(RAWTOHEX(SYS_GUID())); BEGIN odb_audit.log('ERROR', ${sqlStr(failureMessage)}, odb_audit.attributes('user.id', ${protectedEndpoint ? 'v_auth_user_id' : 'NULL'}, 'event.name', ${sqlStr(auditEvent)}, 'event.outcome', 'failure', 'http.request.method', ${sqlStr(this.effectiveMethod)}, 'http.response.status_code', TO_CHAR(:status_code), 'trace.id', v_trace_id, 'exception.code', TO_CHAR(v_sqlcode), 'exception.stack', v_error_stack, 'exception.stacktrace', v_error_backtrace)); EXCEPTION WHEN OTHERS THEN NULL; END; END IF; `
     const parseJsonBody = this._params.some(
       (param) =>
         this.paramSourceType(param) === 'BODY' &&
@@ -547,6 +545,9 @@ export class OrdsEndpoint {
       'v_error_details VARCHAR2(4000);',
       'v_field_errors VARCHAR2(4000);',
       'v_trace_id VARCHAR2(32);',
+      'v_sqlcode NUMBER;',
+      'v_error_stack VARCHAR2(4000);',
+      'v_error_backtrace VARCHAR2(4000);',
       ...(this._cursorPage
         ? [
             'v_page_limit NUMBER;',
@@ -675,6 +676,7 @@ export class OrdsEndpoint {
       .map(([kind, httpStatus]) => `WHEN '${kind}' THEN ${httpStatus}`)
       .join(' ')
     const errorResponse = [
+      `v_sqlcode := SQLCODE; v_error_stack := SUBSTR(DBMS_UTILITY.FORMAT_ERROR_STACK, 1, 4000); v_error_backtrace := SUBSTR(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, 1, 4000);`,
       `IF SQLCODE = -20999 AND ${status} IS NOT NULL THEN`,
       `:status_code := TO_NUMBER(${status}); v_error_code := ${code};`,
       `ELSIF SQLCODE = ${ODB_ERROR_NUMBER} AND ${odbCode} IS NOT NULL THEN`,

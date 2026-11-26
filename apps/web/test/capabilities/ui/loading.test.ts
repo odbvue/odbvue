@@ -27,8 +27,14 @@ describe('keyed UI loading', () => {
     if (result.status === 'invalid') expect(result.errors).toBe(fields)
     expect(notify).not.toHaveBeenCalled()
     fields.push({ name: 'other', message: 'missing.translation', params: { min: 1 } })
-    expect(mutationError(error, notify)).toEqual({ status: 'error' })
-    expect(notify).toHaveBeenCalledExactlyOnceWith('errors.requestFailed')
+    expect(mutationError(error, notify)).toEqual({
+      status: 'invalid',
+      errors: [
+        fields[0],
+        { name: 'other', message: 'errors.validationFailed', params: { min: 1 } },
+      ],
+    })
+    expect(notify).not.toHaveBeenCalled()
   })
 
   it('passes a decoded HTTP problem directly to form completion', async () => {
@@ -252,7 +258,10 @@ describe('keyed UI loading', () => {
       ok: false,
       error: undefined,
     })
-    expect(ui.notification.value).toMatchObject({ type: 'error', message: 'undefined' })
+    expect(ui.notification.value).toMatchObject({
+      type: 'error',
+      message: 'The request could not be completed. Please try again.',
+    })
     expect(ui.loading.active.value).toBe(false)
   })
 
