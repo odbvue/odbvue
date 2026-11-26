@@ -10,6 +10,7 @@ export * from './schema/errors.js'
 export {
   odbPackage,
   odbBlock,
+  odbBlockStatement,
   defineService,
   emitApplicationSql,
   odbType,

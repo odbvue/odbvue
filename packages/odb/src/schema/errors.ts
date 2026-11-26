@@ -17,6 +17,19 @@ export type OdbErrorKind = keyof typeof ODB_ERROR_STATUS
 
 export const ODB_ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]{0,99}$/
 
+export function validateHttpError(
+  status: number,
+  code: string,
+  caller: 'httpError' | 'odbHttp',
+): void {
+  if (!Number.isInteger(status) || status < 400 || status > 599) {
+    throw new Error(`${caller}: status must be an integer from 400 through 599.`)
+  }
+  if (!ODB_ERROR_CODE_PATTERN.test(code)) {
+    throw new Error(`${caller}: code must be uppercase alphanumeric with optional underscores.`)
+  }
+}
+
 export interface OdbValidationErrorDetail {
   field: string
   code: string

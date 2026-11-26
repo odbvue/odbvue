@@ -97,6 +97,32 @@ export function renderPlsql(value: PlsqlRenderable): string {
   return String(value)
 }
 
+/** Build a procedure call; string arguments are PL/SQL expressions, not literals. */
+export function plsqlCall(
+  name: string,
+  ...args: (PlsqlRenderable | number | boolean | null)[]
+): PlsqlStatement {
+  if (!/^[A-Za-z][A-Za-z0-9_$#]*(\.[A-Za-z][A-Za-z0-9_$#]*)*$/.test(name)) {
+    throw new Error('plsqlCall: invalid procedure name.')
+  }
+  const rendered = args.map((arg) =>
+    arg === null
+      ? 'NULL'
+      : typeof arg === 'boolean'
+        ? arg
+          ? 'TRUE'
+          : 'FALSE'
+        : renderPlsqlArg(arg),
+  )
+  return new PlsqlStatement(rendered.length ? `${name}(${rendered.join(', ')})` : name)
+}
+
+function renderPlsqlArg(value: PlsqlRenderable | number): string {
+  if (typeof value !== 'number') return renderPlsql(value)
+  if (!Number.isFinite(value)) throw new Error('plsqlCall: numeric arguments must be finite.')
+  return String(value)
+}
+
 /**
  * Build a typed PL/SQL literal expression. Strings are safely single-quoted
  * (embedded quotes doubled); numbers render as-is.

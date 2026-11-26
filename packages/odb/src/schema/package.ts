@@ -38,6 +38,7 @@ import {
   ODB_ERROR_NUMBER,
   ODB_ERROR_STATUS,
   odbErrorEnvelope,
+  validateHttpError,
   type OdbErrorKind,
   type OdbValidationErrorDetail,
 } from './errors.js'
@@ -139,9 +140,9 @@ function inputParameterName(key: string): string {
   return `p_${snakeCase}`
 }
 
-function localVariableName(key: string): string {
+function localVariableName(key: string, prefix = 'l'): string {
   const snakeCase = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()
-  return `l_${snakeCase}`
+  return `${prefix}_${snakeCase}`
 }
 
 function isPlsqlValue(value: unknown): value is { toSQL(): string } {
@@ -519,7 +520,11 @@ export class ProcedureBody {
    */
   variables<TInputs extends Record<string, LocalVariableInput>>(
     definitions: TInputs,
+    options: { prefix?: string } = {},
   ): LocalVariables<TInputs> {
+    if (options.prefix !== undefined && !/^[A-Za-z][A-Za-z0-9_$#]*$/.test(options.prefix)) {
+      throw new Error('variables: invalid name prefix.')
+    }
     const variables = {} as LocalVariables<TInputs>
     for (const [key, input] of Object.entries(definitions)) {
       const definition = input as LocalVariableInput
@@ -532,7 +537,7 @@ export class ProcedureBody {
           ? definition.length
           : undefined
       variables[key as keyof TInputs] = this.declareVariable(
-        localVariableName(key),
+        localVariableName(key, options.prefix),
         type,
         length,
       ) as LocalVariables<TInputs>[keyof TInputs]
@@ -648,12 +653,7 @@ export class ProcedureBody {
 
   /** Raise an explicit HTTP response; prefer the transport-independent `raiseError()` helpers. */
   httpError(status: number, code: string): this {
-    if (!Number.isInteger(status) || status < 400 || status > 599) {
-      throw new Error('httpError: status must be an integer from 400 through 599.')
-    }
-    if (!/^[A-Z][A-Z0-9_]{0,99}$/.test(code)) {
-      throw new Error('httpError: code must be uppercase alphanumeric with optional underscores.')
-    }
+    validateHttpError(status, code, 'httpError')
     return this.raw(`odb_http.raise_error(${status}, '${code}')`)
   }
 
@@ -2117,13 +2117,20 @@ export function odbBlock(build: (body: ProcedureBody) => void): string {
   return `${emitAnonymousBlock(body.toNode())}\n/`
 }
 
-function emitAnonymousBlock(body: ProcedureBodyNode): string {
+/** Build an anonymous block suitable for embedding as a procedure statement. */
+export function odbBlockStatement(build: (body: ProcedureBody) => void): PlsqlStatement {
+  const body = new ProcedureBody()
+  build(body)
+  return new PlsqlStatement(emitAnonymousBlock(body.toNode(), false))
+}
+
+function emitAnonymousBlock(body: ProcedureBodyNode, terminate = true): string {
   const lines: string[] = []
   emitBodyDeclarations(lines, body, '  ')
   if (lines.length > 0) lines.unshift('DECLARE')
   lines.push('BEGIN', ...emitStatementBlock(body.statements, '  '))
   emitExceptionSection(lines, body.exceptionHandlers, '')
-  lines.push('END;')
+  lines.push(terminate ? 'END;' : 'END')
   return lines.join('\n')
 }
 

@@ -304,6 +304,8 @@ const usersApi = odbPackage('pck_users', (pkg) => {
 ```
 
 This emits `p_user_id`, `p_display_name`, and `l_normalized_id`. `odbType` supplies descriptors for strings, numbers, GUIDs, booleans, dates, timestamps, LOBs, and result sets; pass a table column instead when the declaration should use `<table>.<column>%TYPE`.
+Use `body.variables(definitions, { prefix: 'v' })` when a different local-variable
+prefix is needed.
 
 For numeric PL/SQL loops, use `forRange()`. The callback receives the implicit `PLS_INTEGER` loop index and a nested typed statement body.
 
@@ -340,6 +342,12 @@ const secure = odbPackage('pck_secure', (pkg) => {
 ```
 
 Functions return typed expressions whose PL/SQL return type flows into `body.set()`, so type mismatches are caught at compile time. Algorithm constants (`odbDbmsCrypto.HASH_SH256`) and helpers (`odbDbmsCrypto.cipherSuite(...)`) are provided too. Procedures with `OUT` parameters return typed statements for `body.call(...)`; `body.raw()` remains the escape hatch for unsupported SQL.
+
+For a procedure without a dedicated wrapper, `plsqlCall('package.procedure', ...)`
+builds a statement for `body.call()`. String arguments are PL/SQL expressions;
+use `odbLiteral()` for string literals. `odbBlockStatement()` builds a nested
+anonymous block for `body.call()`, whereas `odbBlock()` produces a standalone
+SQL\*Plus block with its terminator.
 
 ```ts
 import { odbDbmsCrypto, odbOracle, odbUtlI18n, odbLiteral } from '@odbvue/odb'

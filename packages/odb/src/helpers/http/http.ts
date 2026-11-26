@@ -1,27 +1,49 @@
-import { ODB_ERROR_CODE_PATTERN, ODB_ERROR_NUMBER } from '../../schema/errors.js'
+import { ODB_ERROR_CODE_PATTERN, ODB_ERROR_NUMBER, validateHttpError } from '../../schema/errors.js'
 import {
+  cond,
   odbLiteral,
+  plsqlCall,
   plsqlExpr,
   renderPlsql,
   PlsqlExpression,
   PlsqlStatement,
   type PlsqlRenderable,
 } from '../../schema/attribute.js'
-import { dropPackageIfExists, qualify } from '../../schema/ddl.js'
-import { odbOracle } from '../../oracle/index.js'
+import { dropPackageIfExists } from '../../schema/ddl.js'
+import { odbBlockStatement, odbPackage, odbType } from '../../schema/package.js'
+import { odbDbmsLob, odbOracle, odbUtlUrl } from '../../oracle/index.js'
 
 const COOKIE_NAME_PATTERN = /^[A-Za-z0-9_-]+$/
 
-function validateStatus(status: number): void {
-  if (!Number.isInteger(status) || status < 400 || status > 599) {
-    throw new Error('odbHttp: status must be an integer from 400 through 599.')
-  }
-}
-
-function validateCode(code: string): void {
-  if (!ODB_ERROR_CODE_PATTERN.test(code)) {
-    throw new Error('odbHttp: code must be uppercase alphanumeric with optional underscores.')
-  }
+function httpPackage() {
+  return odbPackage('odb_http', (pkg) => ({
+    raiseError: pkg.proc(
+      'raise_error',
+      { in: { status: odbType.integer(), code: odbType.string() } },
+      ({ params: { status, code }, body }) => {
+        body.ifThen(
+          cond.or([cond.isNull(status), cond.lt(status, 400), cond.gt(status, 599)]),
+          (invalid) =>
+            invalid.raiseApplicationError(
+              -20000,
+              odbLiteral('HTTP status must be from 400 through 599'),
+            ),
+        )
+        body.ifThen(
+          cond.or([
+            cond.isNull(code),
+            cond.not(cond.regexpLike(code, ODB_ERROR_CODE_PATTERN.source)),
+          ]),
+          (invalid) =>
+            invalid.raiseApplicationError(-20000, odbLiteral('HTTP error code is invalid')),
+        )
+        body.raiseApplicationError(
+          ODB_ERROR_NUMBER,
+          plsqlExpr.concat('ODB_ERROR|', odbOracle.toChar(status), '|', code),
+        )
+      },
+    ),
+  }))
 }
 
 export type SetCookieOptions = {
@@ -37,34 +59,14 @@ export type SetCookieOptions = {
 /** Framework support for explicit HTTP errors from PL/SQL service bodies. */
 export const odbHttp = {
   toSQLUp(options: { schema?: string } = {}): string {
-    const name = qualify('odb_http', options.schema)
-    return [
-      `CREATE OR REPLACE PACKAGE ${name} AS`,
-      `  PROCEDURE raise_error(p_status IN PLS_INTEGER, p_code IN VARCHAR2);`,
-      `END odb_http;`,
-      `/`,
-      `CREATE OR REPLACE PACKAGE BODY ${name} AS`,
-      `  PROCEDURE raise_error(p_status IN PLS_INTEGER, p_code IN VARCHAR2) IS`,
-      `  BEGIN`,
-      `    IF p_status NOT BETWEEN 400 AND 599 THEN`,
-      `      raise_application_error(-20000, 'HTTP status must be from 400 through 599');`,
-      `    END IF;`,
-      `    IF NOT REGEXP_LIKE(p_code, '^[A-Z][A-Z0-9_]{0,99}$') THEN`,
-      `      raise_application_error(-20000, 'HTTP error code is invalid');`,
-      `    END IF;`,
-      `    raise_application_error(${ODB_ERROR_NUMBER}, 'ODB_ERROR|' || TO_CHAR(p_status) || '|' || p_code);`,
-      `  END raise_error;`,
-      `END odb_http;`,
-      `/`,
-    ].join('\n')
+    return httpPackage().toSQLUp(options)
   },
   toSQLDown(options: { schema?: string } = {}): string {
     return dropPackageIfExists('odb_http', options.schema)
   },
   error(status: number, code: string): PlsqlStatement {
-    validateStatus(status)
-    validateCode(code)
-    return new PlsqlStatement(`odb_http.raise_error(${status}, '${code}')`)
+    validateHttpError(status, code, 'odbHttp')
+    return httpPackage().raiseError(odbLiteral(status), odbLiteral(code))
   },
   unauthorized(code = 'UNAUTHORIZED'): PlsqlStatement {
     return this.error(401, code)
@@ -80,25 +82,47 @@ export const odbHttp = {
     fileName: PlsqlRenderable,
     mimeType: PlsqlRenderable,
   ): PlsqlStatement {
-    return new PlsqlStatement(
-      [
-        'DECLARE',
-        `  v_download_name VARCHAR2(255) := ${renderPlsql(fileName)};`,
-        `  v_download_mime VARCHAR2(200) := ${renderPlsql(mimeType)};`,
-        'BEGIN',
-        "  IF v_download_mime IS NULL OR NOT REGEXP_LIKE(v_download_mime, '^[a-zA-Z0-9!#$&^_.+-]+/[a-zA-Z0-9!#$&^_.+-]+$') THEN",
-        "    v_download_mime := 'application/octet-stream';",
-        '  END IF;',
-        '  owa_util.mime_header(v_download_mime, FALSE);',
-        `  htp.p('Content-Length: ' || DBMS_LOB.GETLENGTH(${renderPlsql(content)}));`,
-        `  htp.p('Content-Disposition: attachment; filename="' || REGEXP_REPLACE(v_download_name, '[^A-Za-z0-9._ -]', '_') || '"; filename*=UTF-8''''' || REPLACE(UTL_URL.ESCAPE(v_download_name, TRUE, 'AL32UTF8'), '''', '%27'));`,
-        "  htp.p('Cache-Control: private, no-store');",
-        "  htp.p('X-Content-Type-Options: nosniff');",
-        '  owa_util.http_header_close;',
-        `  wpg_docload.download_file(${renderPlsql(content)});`,
-        'END',
-      ].join('\n'),
-    )
+    return odbBlockStatement((body) => {
+      const { downloadName, downloadMime } = body.variables(
+        {
+          downloadName: odbType.string(255),
+          downloadMime: odbType.string(200),
+        },
+        { prefix: 'v' },
+      )
+      downloadName.initialize(new PlsqlExpression('VARCHAR2', renderPlsql(fileName)))
+      downloadMime.initialize(new PlsqlExpression('VARCHAR2', renderPlsql(mimeType)))
+      body.ifThen(
+        cond.or([
+          cond.isNull(downloadMime),
+          cond.not(cond.regexpLike(downloadMime, '^[a-zA-Z0-9!#$&^_.+-]+/[a-zA-Z0-9!#$&^_.+-]+$')),
+        ]),
+        (invalid) => invalid.set(downloadMime, 'application/octet-stream'),
+      )
+      body.call(plsqlCall('owa_util.mime_header', downloadMime, false))
+      body.call(
+        plsqlCall('htp.p', plsqlExpr.concat('Content-Length: ', odbDbmsLob.getLength(content))),
+      )
+      body.call(
+        plsqlCall(
+          'htp.p',
+          plsqlExpr.concat(
+            'Content-Disposition: attachment; filename="',
+            odbOracle.regexpReplace(downloadName, odbLiteral('[^A-Za-z0-9._ -]'), odbLiteral('_')),
+            `"; filename*=UTF-8''`,
+            odbOracle.replace(
+              odbUtlUrl.escape(downloadName, true, odbLiteral('AL32UTF8')),
+              odbLiteral("'"),
+              odbLiteral('%27'),
+            ),
+          ),
+        ),
+      )
+      body.call(plsqlCall('htp.p', odbLiteral('Cache-Control: private, no-store')))
+      body.call(plsqlCall('htp.p', odbLiteral('X-Content-Type-Options: nosniff')))
+      body.call(plsqlCall('owa_util.http_header_close'))
+      body.call(plsqlCall('wpg_docload.download_file', content))
+    })
   },
   setCookie(options: SetCookieOptions): PlsqlExpression<'VARCHAR2'> {
     if (!options.name) throw new Error('odbHttp.setCookie: name is required.')

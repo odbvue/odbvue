@@ -7,11 +7,17 @@ import { odbPackage, odbType, ProcedureBody } from '../../../src/schema/package.
 describe('odbHttp framework package', () => {
   it('streams a BLOB with attachment headers and safe filenames', () => {
     const sql = odbHttp.download('l_content', 'l_file_name', 'l_mime_type').toSQL()
+    expect(sql).toContain('v_download_name VARCHAR2(255) := l_file_name;')
+    expect(sql).toContain('v_download_mime VARCHAR2(200) := l_mime_type;')
+    expect(sql).toContain('v_download_mime IS NULL OR NOT (REGEXP_LIKE(')
+    expect(sql).toContain("v_download_mime := 'application/octet-stream';")
     expect(sql).toContain('owa_util.mime_header(v_download_mime, FALSE)')
     expect(sql).toContain("htp.p('Content-Length: ' || DBMS_LOB.GETLENGTH(l_content))")
     expect(sql).toContain('Content-Disposition: attachment; filename="')
     expect(sql).toContain("REGEXP_REPLACE(v_download_name, '[^A-Za-z0-9._ -]', '_')")
     expect(sql).toContain("UTL_URL.ESCAPE(v_download_name, TRUE, 'AL32UTF8')")
+    expect(sql).toContain(`'"; filename*=UTF-8''''' || REPLACE(`)
+    expect(sql).toContain("), '''', '%27')")
     expect(sql).toContain('Cache-Control: private, no-store')
     expect(sql).toContain('X-Content-Type-Options: nosniff')
     expect(sql.indexOf('owa_util.http_header_close')).toBeLessThan(
@@ -39,6 +45,10 @@ describe('odbHttp framework package', () => {
   it('installs a validated explicit HTTP error primitive', () => {
     const sql = odbHttp.toSQLUp({ schema: 'APP' })
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_http AS')
+    expect(sql).toContain('IF (p_status IS NULL OR p_status < 400 OR p_status > 599) THEN')
+    expect(sql).toContain(
+      "IF (p_code IS NULL OR NOT (REGEXP_LIKE(p_code, '^[A-Z][A-Z0-9_]{0,99}$'))) THEN",
+    )
     expect(sql).toContain('raise_application_error(-20998')
     expect(sql).toContain("'ODB_ERROR|' || TO_CHAR(p_status) || '|' || p_code")
   })
@@ -50,8 +60,29 @@ describe('odbHttp framework package', () => {
     expect(
       body.toNode().statements.map((statement) => ('sql' in statement ? statement.sql : '')),
     ).toEqual(["odb_http.raise_error(422, 'INVALID_INPUT')"])
-    expect(() => body.httpError(200, 'OK')).toThrow('status must be an integer')
-    expect(() => body.httpError(429, 'too-many')).toThrow('code must be uppercase')
+    expect(odbHttp.error(422, 'INVALID_INPUT').toSQL()).toBe(
+      "odb_http.raise_error(422, 'INVALID_INPUT')",
+    )
+    expect(odbHttp.unauthorized().toSQL()).toBe("odb_http.raise_error(401, 'UNAUTHORIZED')")
+    expect(odbHttp.forbidden().toSQL()).toBe("odb_http.raise_error(403, 'FORBIDDEN')")
+    expect(odbHttp.tooManyRequests().toSQL()).toBe("odb_http.raise_error(429, 'TOO_MANY_REQUESTS')")
+  })
+
+  it.each([
+    ['httpError', (status: number, code: string) => new ProcedureBody().httpError(status, code)],
+    ['odbHttp', (status: number, code: string) => odbHttp.error(status, code)],
+  ])('validates HTTP error arguments consistently for %s', (caller, raise) => {
+    for (const status of [400, 599]) expect(() => raise(status, 'A'.repeat(100))).not.toThrow()
+    for (const status of [399, 600, 400.5, NaN, Infinity]) {
+      expect(() => raise(status, 'VALID')).toThrow(
+        `${caller}: status must be an integer from 400 through 599.`,
+      )
+    }
+    for (const code of ['', 'too-many', '1CODE', 'A'.repeat(101)]) {
+      expect(() => raise(400, code)).toThrow(
+        `${caller}: code must be uppercase alphanumeric with optional underscores.`,
+      )
+    }
   })
 
   it('renders transport-independent ODB errors', () => {

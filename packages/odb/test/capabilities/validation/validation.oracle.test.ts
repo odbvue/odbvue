@@ -6,6 +6,7 @@ import { splitSqlStatements } from '../../../src/execution/sql.js'
 import { odbLiteral } from '../../../src/schema/attribute.js'
 import { odbPackage } from '../../../src/schema/package.js'
 import { odbOrdsEndpoint } from '../../../src/ords.js'
+import { odbHttp } from '../../../src/helpers/http/http.js'
 
 const connectString = process.env.ODB_TEST_CONNECT_STRING
 const wallet = process.env.ODB_TEST_WALLET_DIR
@@ -28,6 +29,30 @@ describe.skipIf(!connectString)('validation on Oracle', () => {
   const settingsValidator = declarations(settings)
     .replaceAll('odb_settings_store.meta%TYPE', 'CLOB')
     .replaceAll('odb_validation.', '')
+
+  it('rejects NULL and invalid HTTP error arguments at runtime', async () => {
+    await connection.execute(`DECLARE
+${declarations(odbHttp)}
+  PROCEDURE assert_error(p_status PLS_INTEGER, p_code VARCHAR2, p_number PLS_INTEGER, p_message VARCHAR2) IS
+  BEGIN
+    BEGIN
+      raise_error(p_status, p_code);
+      raise_application_error(-20001, 'Expected an error');
+    EXCEPTION WHEN OTHERS THEN
+      IF SQLCODE != p_number OR INSTR(SQLERRM, p_message) = 0 THEN RAISE; END IF;
+    END;
+  END;
+BEGIN
+  assert_error(NULL, 'VALID_CODE', -20000, 'HTTP status must');
+  assert_error(399, 'VALID_CODE', -20000, 'HTTP status must');
+  assert_error(600, 'VALID_CODE', -20000, 'HTTP status must');
+  assert_error(400, NULL, -20000, 'HTTP error code is invalid');
+  assert_error(400, '', -20000, 'HTTP error code is invalid');
+  assert_error(400, 'invalid', -20000, 'HTTP error code is invalid');
+  assert_error(400, 'VALID_CODE', -20998, 'ODB_ERROR|400|VALID_CODE');
+  assert_error(599, 'VALID_CODE', -20998, 'ODB_ERROR|599|VALID_CODE');
+END;`)
+  })
 
   it('transports a bounded validation envelope through the generated ORDS exception boundary', async () => {
     const handler = odbOrdsEndpoint('test', 'api', 'limited')

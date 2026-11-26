@@ -6,6 +6,7 @@ import {
   expr,
   odbLiteral,
   Param,
+  plsqlCall,
   PlsqlStatement,
   type PlsqlBooleanExpression,
   type PlsqlExpression,
@@ -15,6 +16,7 @@ import {
   defineService,
   emitApplicationSql,
   odbBlock,
+  odbBlockStatement,
   odbPackage,
   odbType,
   Procedure,
@@ -25,6 +27,23 @@ import { odbTable } from '../../src/schema/table.js'
 describe('odbBlock', () => {
   it('renders empty blocks with the SQL*Plus terminator', () => {
     expect(odbBlock(() => {})).toBe('BEGIN\n  NULL;\nEND;\n/')
+  })
+
+  it('builds embeddable blocks with explicit variable prefixes and calls', () => {
+    const block = odbBlockStatement((body) => {
+      const { result } = body.variables({ result: odbType.string(20) }, { prefix: 'v' })
+      body.set(result, "O'Brien")
+      body.call(plsqlCall('example.save', result, true, 42, null, odbLiteral("O'Brien")))
+      body.call(plsqlCall('example.finish'))
+    })
+    expect(block.toSQL()).toBe(
+      "DECLARE\n  v_result VARCHAR2(20);\nBEGIN\n  v_result := 'O''Brien';\n  example.save(v_result, TRUE, 42, NULL, 'O''Brien');\n  example.finish;\nEND",
+    )
+    expect(() => plsqlCall('example.save; COMMIT')).toThrow('invalid procedure name')
+    expect(() => plsqlCall('example.save', NaN)).toThrow('numeric arguments must be finite')
+    expect(() => odbBlockStatement((body) => body.variables({}, { prefix: 'bad name' }))).toThrow(
+      'invalid name prefix',
+    )
   })
 
   it('shares typed declarations, queries, nested handlers and transaction statements with packages', () => {

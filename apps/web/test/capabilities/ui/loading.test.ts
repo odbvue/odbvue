@@ -68,7 +68,7 @@ describe('keyed UI loading', () => {
   it('resolves problem and field translations through the configured fallback locale', () => {
     const previous = i18n.global.locale.value
     const fallback = i18n.global.fallbackLocale.value
-    i18n.global.locale.value = 'fr'
+    i18n.global.locale.value = 'de'
     i18n.global.fallbackLocale.value = 'en'
     i18n.global.mergeLocaleMessage('en', {
       errors: { FALLBACK_ONLY_TEST: 'Fallback message' },

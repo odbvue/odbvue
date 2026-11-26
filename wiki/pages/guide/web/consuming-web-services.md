@@ -55,7 +55,10 @@ constructed or arbitrarily long error lists. Existing code-only exceptions
 remain supported. Explicit HTTP errors and transport-independent errors share
 the `ODB_ERROR` exception envelope. When upgrading an existing deployment,
 redeploy `odb_http` and all generated ORDS handlers together; older handlers
-and the new package (or vice versa) use incompatible exception envelopes.
+and the new package (or vice versa) use incompatible exception envelopes and
+error numbers (`ODB_HTTP` / `-20999` versus `ODB_ERROR` / `-20998`). Quiesce
+requests during deployment so no request encounters a mixed version; Oracle DDL
+and ORDS registration are not an atomic transaction.
 
 The generated handler rolls back the current transaction when an exception
 escapes. A procedure that commits or uses an autonomous transaction can still
