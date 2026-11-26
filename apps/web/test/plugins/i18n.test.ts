@@ -159,6 +159,12 @@ describe('application locale discovery and collection', () => {
           'utf-8',
         ),
       )
+      const sandboxMessages = JSON.parse(
+        readFileSync(
+          new URL(`../../src/modules/sandbox/i18n/${locale}.json`, import.meta.url),
+          'utf-8',
+        ),
+      )
       for (const key of [
         'copy.to.clipboard',
         'close',
@@ -172,6 +178,10 @@ describe('application locale discovery and collection', () => {
       }
       expect(i18n.global.t('admin.audit', {}, { locale })).toBe(adminMessages['admin.audit'])
       expect(i18n.global.t('admin.audit', {}, { locale })).not.toBe('admin.audit')
+      for (const key of ['sandbox.scheduler', 'sandbox.schedulerDescription']) {
+        expect(i18n.global.t(key, {}, { locale })).toBe(sandboxMessages[key])
+        expect(i18n.global.t(key, {}, { locale })).not.toBe(key)
+      }
       for (const key of [
         'admin.settingValidationError',
         'admin.settingTooLong',

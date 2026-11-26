@@ -73,6 +73,20 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/admin/jobs/': RouteRecordInfo<
+      '/admin/jobs/',
+      '/admin/jobs',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/admin/jobs/[name]': RouteRecordInfo<
+      '/admin/jobs/[name]',
+      '/admin/jobs/:name',
+      { name: ParamValue<true> },
+      { name: ParamValue<false> },
+      | never
+    >,
     '/admin/roles/': RouteRecordInfo<
       '/admin/roles/',
       '/admin/roles',
@@ -315,6 +329,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/sandbox/capabilities/scheduler': RouteRecordInfo<
+      '/sandbox/capabilities/scheduler',
+      '/sandbox/capabilities/scheduler',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/sandbox/capabilities/settings': RouteRecordInfo<
       '/sandbox/capabilities/settings',
       '/sandbox/capabilities/settings',
@@ -439,6 +460,22 @@ declare module 'vue-router/auto-routes' {
         | never
       pathParamNames:
         | never
+    }
+    'src/modules/admin/pages/jobs/index.vue': {
+      routes:
+        | '/admin/jobs/'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/modules/admin/pages/jobs/[name].vue': {
+      routes:
+        | '/admin/jobs/[name]'
+      views:
+        | never
+      pathParamNames:
+        | 'name'
     }
     'src/modules/admin/pages/roles/index.vue': {
       routes:
@@ -712,6 +749,14 @@ declare module 'vue-router/auto-routes' {
     'src/modules/sandbox/pages/capabilities/routing.vue': {
       routes:
         | '/sandbox/capabilities/routing'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/modules/sandbox/pages/capabilities/scheduler.vue': {
+      routes:
+        | '/sandbox/capabilities/scheduler'
       views:
         | never
       pathParamNames:

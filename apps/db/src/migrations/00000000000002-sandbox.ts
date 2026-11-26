@@ -4,12 +4,14 @@ import {
   defineService,
   odbAudit,
   odbAuditPackage,
+  auditLogs,
   odbAuth,
   odbEnv,
   odbHttp,
   odbPackage,
   odbQuery,
   odbSettings,
+  odbScheduler,
   odbStorage,
   odbEmails,
   odbAcl,
@@ -31,6 +33,85 @@ const refreshCookie = odbHttp.defineCookie({
 
 // One application package: the HTTP layer (headers, cookies, routes) over the framework packages.
 export const sandboxPackage: Package<Record<never, never>> = odbPackage('pck_sandbox', (pkg) => {
+  pkg.proc('scheduler_tick', {}, ({ body }) => {
+    body.call(
+      odbAudit.info(
+        odbLiteral('Sandbox scheduled job'),
+        odbAuditPackage.attributes(
+          odbLiteral('event.name'),
+          odbLiteral('sandbox.scheduler.tick'),
+          odbLiteral('job.name'),
+          odbLiteral('SANDBOX_AUDIT_JOB'),
+        ),
+      ),
+    )
+  })
+
+  const readScheduler = pkg.proc(
+    'read_scheduler',
+    { out: { enabled: odbType.string(5), state: odbType.string(30) } },
+    ({ params: { enabled, state }, body }) => {
+      body.call(odbScheduler.read(odbLiteral('SANDBOX_AUDIT_JOB'), enabled, state))
+    },
+  )
+  defineService(readScheduler, {
+    auth: { roles: ['admin'] },
+    method: 'GET',
+    path: '/scheduler',
+    summary: 'Read the sandbox audit job status',
+    response: { enabled: readScheduler.parameters.enabled, state: readScheduler.parameters.state },
+  })
+
+  const listSchedulerAudit = pkg.proc(
+    'list_scheduler_audit',
+    {
+      in: { after: odbType.json(), limit: odbType.integer() },
+      out: { items: odbType.resultset() },
+    },
+    ({ params: { after, limit, items }, body }) => {
+      body.openFor(
+        items,
+        odbQuery()
+          .selectFrom(auditLogs)
+          .select([
+            auditLogs.id,
+            auditLogs.observedTimestamp,
+            auditLogs.eventTimestamp,
+            auditLogs.severityText,
+            auditLogs.body,
+            auditLogs.attributes,
+          ])
+          .where(cond.eq(auditLogs.eventName, odbLiteral('sandbox.scheduler.tick')))
+          .orderBy(auditLogs.observedTimestamp, 'desc')
+          .orderBy(auditLogs.id, 'desc')
+          .paginate({ cursor: after, limit }),
+      )
+    },
+  )
+  defineService(listSchedulerAudit, {
+    auth: { roles: ['admin'] },
+    method: 'GET',
+    path: '/scheduler/audit',
+    summary: 'List audit events written by the sandbox job',
+    query: {
+      cursor: listSchedulerAudit.parameters.after,
+      limit: listSchedulerAudit.parameters.limit,
+    },
+    response: { items: listSchedulerAudit.parameters.items },
+  })
+
+  for (const action of ['enable', 'disable'] as const) {
+    const operation = pkg.proc(`scheduler_${action}`, {}, ({ body }) => {
+      body.call(odbScheduler[action](odbLiteral('SANDBOX_AUDIT_JOB')))
+    })
+    defineService(operation, {
+      auth: { roles: ['admin'] },
+      method: 'POST',
+      path: `/scheduler/${action}`,
+      summary: `${action} the sandbox audit job`,
+    })
+  }
+
   const login = pkg.proc(
     'login',
     {
@@ -575,3 +656,11 @@ export const migration = defineMigration('00000000000002_sandbox', {
 })
   .install(odbSettings.seed({ id: 'SANDBOX_DEMO', value: 'Demo setting' }))
   .install(sandboxPackage)
+  .install(
+    odbScheduler.seed({
+      name: 'SANDBOX_AUDIT_JOB',
+      action: 'PCK_SANDBOX.SCHEDULER_TICK',
+      schedule: 'FREQ=MINUTELY;INTERVAL=1',
+      description: 'Sandbox audit demonstration',
+    }),
+  )

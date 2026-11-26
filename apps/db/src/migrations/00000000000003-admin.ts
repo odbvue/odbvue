@@ -14,6 +14,7 @@ import {
   odbPackage,
   odbQuery,
   odbSettings,
+  odbScheduler,
   odbTable,
   odbType,
   plsqlExpr,
@@ -41,6 +42,26 @@ const userQuery = () =>
       authUsers.createdAt,
       authUsers.updatedAt,
     ])
+
+const schedulerJobs = odbTable('user_scheduler_jobs', (t) => ({
+  jobName: t.string(128).primaryKey(),
+  jobSubname: t.string(128),
+  enabled: t.string(5),
+  state: t.string(30),
+  scheduleName: t.string(128),
+  repeatInterval: t.string(4000),
+  comments: t.string(4000),
+}))
+
+const schedulerRuns = odbTable('user_scheduler_job_run_details', (t) => ({
+  logId: t.number().primaryKey(),
+  jobName: t.string(261),
+  status: t.string(30),
+  actualStartDate: t.timestamp(),
+  runDuration: t.string(128),
+  errors: t.string(4000),
+  output: t.string(4000),
+}))
 
 export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin', (pkg) => {
   const listUsers = pkg.proc(
@@ -759,8 +780,6 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
       body.openFor(items, page)
     },
   )
-  const { after, limit, severity, search, from, to, messageType, userId, items } =
-    listAudit.parameters
   defineService(listAudit, {
     auth: { roles: ['admin'] },
     module: 'admin',
@@ -768,9 +787,151 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
     method: 'GET',
     path: '/audit/events',
     summary: 'List global audit activity, optionally filtered by actor or affected user',
-    query: { cursor: after, limit, severity, search, from, to, messageType, userId },
-    response: { items },
+    query: {
+      cursor: listAudit.parameters.after,
+      limit: listAudit.parameters.limit,
+      severity: listAudit.parameters.severity,
+      search: listAudit.parameters.search,
+      from: listAudit.parameters.from,
+      to: listAudit.parameters.to,
+      messageType: listAudit.parameters.messageType,
+      userId: listAudit.parameters.userId,
+    },
+    response: { items: listAudit.parameters.items },
   })
+
+  const listJobs = pkg.proc(
+    'list_jobs',
+    { in: searchPageInputs, out: { items: odbType.resultset() } },
+    ({ params: { after, limit, search, items }, body }) => {
+      const term = odbOracle.lower(odbOracle.trim(search))
+      body.openFor(
+        items,
+        odbQuery()
+          .selectFrom(schedulerJobs)
+          .select([
+            schedulerJobs.jobName,
+            schedulerJobs.enabled,
+            schedulerJobs.state,
+            schedulerJobs.scheduleName,
+            schedulerJobs.repeatInterval,
+            schedulerJobs.comments,
+          ])
+          .where(
+            cond.and([
+              cond.isNull(schedulerJobs.jobSubname),
+              cond.or([
+                cond.isNull(term),
+                cond.gt(odbOracle.instr(odbOracle.lower(schedulerJobs.jobName), term), 0),
+              ]),
+            ]),
+          )
+          .orderBy(schedulerJobs.jobName)
+          .paginate({ cursor: after, limit }),
+      )
+    },
+  )
+  defineService(listJobs, {
+    auth: { roles: ['admin'] },
+    module: 'admin',
+    basePath: '/admin',
+    method: 'GET',
+    path: '/jobs',
+    summary: 'List schema-owned Scheduler jobs',
+    query: {
+      cursor: listJobs.parameters.after,
+      limit: listJobs.parameters.limit,
+      search: listJobs.parameters.search,
+    },
+    response: { items: listJobs.parameters.items },
+  })
+
+  const listJobHistory = pkg.proc(
+    'list_job_history',
+    {
+      in: { name: odbType.string(128), after: odbType.json(), limit: odbType.integer() },
+      out: { items: odbType.resultset() },
+    },
+    ({ params: { name, after, limit, items }, body }) => {
+      body.openFor(
+        items,
+        odbQuery()
+          .selectFrom(schedulerRuns)
+          .select([
+            schedulerRuns.logId,
+            schedulerRuns.jobName,
+            schedulerRuns.status,
+            schedulerRuns.errors,
+            schedulerRuns.output,
+          ])
+          .selectAs(
+            plsqlExpr.call('TIMESTAMP', 'SYS_EXTRACT_UTC', schedulerRuns.actualStartDate),
+            schedulerRuns.actualStartDate,
+          )
+          .selectAs(
+            plsqlExpr.call('VARCHAR2', 'TO_CHAR', schedulerRuns.runDuration),
+            schedulerRuns.runDuration,
+          )
+          .where(cond.eq(schedulerRuns.jobName, name))
+          .orderBy(schedulerRuns.logId, 'desc')
+          .paginate({ cursor: after, limit }),
+      )
+    },
+  )
+  defineService(listJobHistory, {
+    auth: { roles: ['admin'] },
+    module: 'admin',
+    basePath: '/admin',
+    method: 'GET',
+    path: '/jobs/:name/history',
+    summary: 'List Scheduler runs for one schema-owned job',
+    uri: { name: listJobHistory.parameters.name },
+    query: { cursor: listJobHistory.parameters.after, limit: listJobHistory.parameters.limit },
+    response: { items: listJobHistory.parameters.items },
+  })
+
+  for (const action of ['enable', 'disable', 'run'] as const) {
+    const operation = pkg.proc(
+      `${action}_job`,
+      { in: { name: odbType.string(128), actorId: odbAuth.types.userId } },
+      ({ params: { name, actorId }, body }) => {
+        const { found } = body.variables({ found: odbType.string(128) })
+        body.ifThen(
+          cond.or([cond.isNull(name), cond.not(cond.regexpLike(name, '^[A-Z][A-Z0-9_$#]*$'))]),
+          (invalid) => invalid.invalid('ADMIN_JOB_NAME_INVALID'),
+        )
+        body.query(
+          odbQuery()
+            .selectFrom(schedulerJobs)
+            .select(schedulerJobs.jobName)
+            .into(found)
+            .where(
+              cond.and([
+                cond.eq(schedulerJobs.jobName, name),
+                cond.isNull(schedulerJobs.jobSubname),
+              ]),
+            ),
+        )
+        body.call(odbScheduler[action](name))
+        body.auditEvent('Scheduler job action', {
+          'user.id': actorId,
+          'event.name': odbLiteral(`admin.job.${action}`),
+          'job.name': name,
+        })
+        body.when('NO_DATA_FOUND', (missing) => missing.notFound('ADMIN_JOB_NOT_FOUND'))
+      },
+    )
+    defineService(operation, {
+      auth: { roles: ['admin'] },
+      module: 'admin',
+      basePath: '/admin',
+      method: 'POST',
+      path: `/jobs/:name/${action}`,
+      summary: `${action} a schema-owned Scheduler job`,
+      uri: { name: operation.parameters.name },
+      context: { userId: operation.parameters.actorId },
+    })
+  }
   return {}
 })
 

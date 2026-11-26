@@ -7,6 +7,8 @@ export interface CapabilityDefinition {
   provides?: string[]
   title: string
   description: string
+  titleKey?: string
+  descriptionKey?: string
   icon: string
 }
 
@@ -87,6 +89,15 @@ export const odbVueCapabilities: readonly CapabilityDefinition[] = [
     title: 'Audit',
     description: 'Audit event recording.',
     icon: '$mdiClipboardTextClock',
+  }),
+  defineCapabilityMetadata({
+    name: 'scheduler',
+    kind: 'feature',
+    title: 'Scheduler',
+    description: 'Schedule database jobs and inspect their runs.',
+    titleKey: 'sandbox.scheduler',
+    descriptionKey: 'sandbox.schedulerDescription',
+    icon: '$mdiCalendarClock',
   }),
   defineCapabilityMetadata({
     name: 'settings',

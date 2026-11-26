@@ -73,6 +73,7 @@ export default defineConfig({
                 { text: 'Settings', link: '/guide/db/capabilities/settings' },
                 { text: 'Storage', link: '/guide/db/capabilities/storage' },
                 { text: 'Emails', link: '/guide/db/capabilities/emails' },
+                { text: 'Scheduler', link: '/guide/db/capabilities/scheduler' },
               ],
             },
             { text: 'Under the hood', link: '/guide/db/under-the-hood' },

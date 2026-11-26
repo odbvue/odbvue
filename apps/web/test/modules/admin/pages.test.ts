@@ -20,8 +20,13 @@ import UserAuditTab from '@/modules/admin/pages/users/[id]/audit.vue'
 import Audit from '@/modules/admin/pages/audit/index.vue'
 import Roles from '@/modules/admin/pages/roles/index.vue'
 import Settings from '@/modules/admin/pages/settings/index.vue'
+import Jobs from '@/modules/admin/pages/jobs/index.vue'
+import JobHistory from '@/modules/admin/pages/jobs/[name].vue'
+import Admin from '@/modules/admin/pages/index.vue'
 import App from '@/app/App.vue'
 import messages from '@/modules/admin/i18n/en.json'
+import de from '@/modules/admin/i18n/de.json'
+import fr from '@/modules/admin/i18n/fr.json'
 import { i18n } from '@/capabilities/i18n'
 import {
   renderViewItem,
@@ -31,15 +36,16 @@ import {
   type OvFormSelectionField,
 } from '@/components/api'
 
-const { get, put, putRole, authUser } = vi.hoisted(() => ({
+const { get, post, put, putRole, authUser } = vi.hoisted(() => ({
   get: vi.fn<HttpClient['get']>(),
+  post: vi.fn<HttpClient['post']>(),
   put: vi.fn<HttpClient['putOrThrow']>(),
   putRole: vi.fn<HttpClient['put']>(),
   authUser: { value: { id: 'C'.repeat(32) } },
 }))
 vi.mock('@/capabilities/http', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/capabilities/http')>()),
-  useHttp: () => ({ get, put: putRole, putOrThrow: put }),
+  useHttp: () => ({ get, post, put: putRole, putOrThrow: put }),
 }))
 vi.mock('@/capabilities/client', () => ({ http: { get } }))
 vi.mock('@/capabilities/auth', () => ({ useAuth: () => ({ user: authUser }) }))
@@ -111,7 +117,15 @@ beforeEach(() => {
 })
 
 async function setup(
-  page: boolean | 'roles' | 'permissions' | 'audit' | 'global-audit' | 'settings' = false,
+  page:
+    | boolean
+    | 'roles'
+    | 'permissions'
+    | 'audit'
+    | 'global-audit'
+    | 'settings'
+    | 'jobs'
+    | 'job-history' = false,
 ) {
   const router = createRouter({
     history: createMemoryHistory(),
@@ -133,16 +147,20 @@ async function setup(
       { path: '/admin/roles', component: Roles },
       { path: '/admin/audit', component: Audit },
       { path: '/admin/settings', component: Settings },
+      { path: '/admin/jobs', component: Jobs },
+      { path: '/admin/jobs/:name', component: JobHistory },
     ],
   })
   await router.push(
-    page === 'global-audit'
-      ? '/admin/audit'
-      : page === 'roles' || page === 'settings'
-        ? `/admin/${page}`
-        : page
-          ? `/admin/users/${user.id}${page === 'permissions' || page === 'audit' ? `/${page}` : ''}`
-          : '/admin/users',
+    page === 'job-history'
+      ? '/admin/jobs/EXAMPLE_JOB'
+      : page === 'global-audit'
+        ? '/admin/audit'
+        : page === 'roles' || page === 'settings' || page === 'jobs'
+          ? `/admin/${page}`
+          : page
+            ? `/admin/users/${user.id}${page === 'permissions' || page === 'audit' ? `/${page}` : ''}`
+            : '/admin/users',
   )
   const wrapper = mount(App, {
     global: {
@@ -237,6 +255,7 @@ beforeEach(() => {
   ui.clear()
   vi.stubGlobal('definePage', vi.fn<() => void>())
   get.mockReset()
+  post.mockReset()
   get.mockImplementation(async () => result([{ ...user }]))
   put.mockReset()
   putRole.mockReset()
@@ -454,17 +473,108 @@ describe('admin settings', () => {
 })
 
 describe('admin page metadata', () => {
+  it.each([
+    ['en', messages],
+    ['de', de],
+    ['fr', fr],
+  ] as const)(
+    'shows a translated Jobs tile linking to the job list in %s',
+    (locale, translations) => {
+      const card = defineComponent({
+        props: ['to', 'title', 'text'],
+        template: '<a :href="to">{{ title }} {{ text }}</a>',
+      })
+      const wrapper = mount(Admin, {
+        global: {
+          plugins: [createI18n({ legacy: false, locale, messages: { [locale]: translations } })],
+          stubs: { VContainer: container, VRow: container, VCol: container, VCard: card },
+        },
+      })
+      wrappers.push(wrapper)
+      const tile = wrapper.get('a[href="/admin/jobs"]')
+      expect(tile.text()).toContain(translations['admin.jobs'])
+      expect(tile.text()).toContain(translations['admin.jobsDescription'])
+    },
+  )
+
   it('discovers the landing page, users list, user details, roles, audit, and settings', () => {
-    expect(Object.keys(pages)).toHaveLength(9)
+    expect(Object.keys(pages)).toHaveLength(11)
+  })
+
+  describe('admin jobs', () => {
+    it('passes search and opaque cursors through, and refreshes only after successful actions', async () => {
+      const { wrapper } = await setup('jobs')
+      const jobs = wrapper.findComponent(table)
+      const page = { items: [], nextCursor: 'opaque-next' }
+      const complete = vi.fn<OvTableFetchRequest['complete']>()
+      const { signal } = new AbortController()
+      get.mockResolvedValueOnce({ data: page, error: null, status: 200, headers: null })
+      jobs.vm.$emit('fetch', { cursor: 'opaque', limit: 5, search: 'demo', signal, complete })
+      await flushPromises()
+      expect(get).toHaveBeenCalledWith('/admin/jobs', {
+        query: { cursor: 'opaque', limit: 5, search: 'demo' },
+        signal,
+      })
+      expect(complete).toHaveBeenCalledWith(page)
+
+      post.mockResolvedValueOnce(failure(500))
+      jobs.vm.$emit('action', 'admin.runJob', [], { jobName: 'EXAMPLE_JOB' })
+      await flushPromises()
+      expect(refetchTable).not.toHaveBeenCalled()
+      post.mockResolvedValueOnce({ data: null, error: null, status: 204, headers: null })
+      jobs.vm.$emit('action', 'admin.runJob', [], { jobName: 'EXAMPLE_JOB' })
+      await flushPromises()
+      expect(post).toHaveBeenLastCalledWith('/admin/jobs/EXAMPLE_JOB/run')
+      expect(refetchTable).toHaveBeenCalledExactlyOnceWith('first')
+    })
+
+    it('passes the history cursor unchanged for the selected job', async () => {
+      const { wrapper } = await setup('job-history')
+      const page = { items: [], nextCursor: 'next' }
+      const complete = vi.fn<OvTableFetchRequest['complete']>()
+      const { signal } = new AbortController()
+      get.mockResolvedValueOnce({ data: page, error: null, status: 200, headers: null })
+      wrapper
+        .findComponent(table)
+        .vm.$emit('fetch', { cursor: 'opaque', limit: 5, signal, complete })
+      await flushPromises()
+      expect(get).toHaveBeenCalledWith('/admin/jobs/EXAMPLE_JOB/history', {
+        query: { cursor: 'opaque', limit: 5 },
+        signal,
+      })
+      expect(complete).toHaveBeenCalledWith(page)
+    })
+
+    it('asks for confirmation before disabling a job', async () => {
+      const { wrapper } = await setup('jobs')
+      post.mockResolvedValueOnce({ data: null, error: null, status: 204, headers: null })
+      wrapper
+        .findComponent(table)
+        .vm.$emit('action', 'admin.disableJob', [], { jobName: 'EXAMPLE_JOB' })
+      await flushPromises()
+      expect(post).not.toHaveBeenCalled()
+      const dialog = wrapper.find('[role="dialog"]')
+      expect(dialog.text()).toContain('EXAMPLE_JOB')
+      const submit = dialog.findAll('button').find((button) => button.text() === 'Disable job')
+      expect(submit).toBeDefined()
+      await submit!.trigger('click')
+      await flushPromises()
+      expect(post).toHaveBeenCalledExactlyOnceWith('/admin/jobs/EXAMPLE_JOB/disable')
+    })
   })
 
   it.each(Object.entries(pages))('restricts %s to administrators', (path, source) => {
     const metadata = source.match(/definePage\(\{\s*meta:\s*\{([\s\S]*?)\n\s*\},?\s*\}\)/)?.[1]
     expect(metadata).toMatch(/\baccess:\s*\[\s*'admin'\s*\]/)
     expect(metadata).toMatch(
-      path.includes('/[id]') ? /\bnavigation:\s*false/ : /\bnavigation:\s*true/,
+      path.includes('/[id]') || path.includes('/[name]')
+        ? /\bnavigation:\s*false/
+        : /\bnavigation:\s*true/,
     )
-    const policy = { access: ['admin'] as ['admin'], navigation: !path.includes('/[id]') }
+    const policy = {
+      access: ['admin'] as ['admin'],
+      navigation: !path.includes('/[id]') && !path.includes('/[name]'),
+    }
     const session = (authenticated: boolean, admin: boolean): PageAuth => ({
       authenticated: computed(() => authenticated),
       hasRole: (role) => admin && role === 'admin',

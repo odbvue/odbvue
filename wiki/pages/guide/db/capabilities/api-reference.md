@@ -1,5 +1,11 @@
 # API Reference
 
+## Scheduler
+
+`odbScheduler` installs a wrapper for creating and managing schema-owned
+Scheduler jobs. See the [Scheduler guide](./scheduler) for privileges, calls,
+transaction behavior, and the sandbox example.
+
 ## Network ACL
 
 `odbAcl` provides `addHttp(host, port?)`, `removeHttp(host, port?)`,

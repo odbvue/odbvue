@@ -1,0 +1,9 @@
+{
+  "sandbox.schedulerUnknown": "sandbox.schedulerUnknown",
+  "sandbox.schedulerRefresh": "sandbox.schedulerRefresh",
+  "sandbox.schedulerAudit": "sandbox.schedulerAudit",
+  "sandbox.schedulerTime": "sandbox.schedulerTime",
+  "sandbox.schedulerSeverity": "sandbox.schedulerSeverity",
+  "sandbox.schedulerMessage": "sandbox.schedulerMessage",
+  "sandbox.schedulerDetails": "sandbox.schedulerDetails"
+}

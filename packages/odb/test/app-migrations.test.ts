@@ -31,6 +31,68 @@ const loadUpSql = async () => {
 }
 
 describe('app-owned ORDS migrations', () => {
+  it('installs the scheduler and exposes admin-only cursor-paged jobs and run history', async () => {
+    const bootstrap = await migrations['00000000000000-bootstrap']()
+    const bootstrapSql = bootstrap.migration.compile().up().join('\n')
+    const grants = bootstrap.schema.toSQLUp()
+    expect(grants).toContain('GRANT CREATE JOB TO ODBVUE;')
+    expect(grants).toContain('GRANT MANAGE SCHEDULER TO ODBVUE;')
+    expect(grants).toContain('GRANT EXECUTE ON SYS.DBMS_SCHEDULER TO ODBVUE;')
+    expect(bootstrapSql).toContain("job_type => 'STORED_PROCEDURE'")
+    expect(bootstrapSql).toContain('auto_drop => FALSE')
+    expect(bootstrapSql).toContain('DBMS_SCHEDULER.LOGGING_RUNS')
+    expect(bootstrapSql).toContain('use_current_session => FALSE')
+    expect(bootstrapSql).toContain('force => TRUE')
+
+    const sandbox = await migrations['00000000000002-sandbox']()
+    const sandboxSql = sandbox.migration.compile()
+    expect(sandboxSql.up().join('\n')).toContain("'FREQ=MINUTELY;INTERVAL=1'")
+    expect(sandboxSql.up().join('\n')).toContain(
+      "ODBVUE.odb_scheduler.create_job('ODBVUE.SANDBOX_AUDIT_JOB', 'ODBVUE.PCK_SANDBOX.SCHEDULER_TICK'",
+    )
+    expect(sandboxSql.down().join('\n')).toContain(
+      "DBMS_SCHEDULER.DROP_JOB('ODBVUE.SANDBOX_AUDIT_JOB', TRUE)",
+    )
+    const sandboxEndpoints = compileApplicationEndpoints(
+      sandbox.sandboxPackage.application(),
+    ).filter(
+      (item) =>
+        item.effectivePattern === 'scheduler' || item.effectivePattern.startsWith('scheduler/'),
+    )
+    expect(sandboxEndpoints).toHaveLength(4)
+    for (const endpoint of sandboxEndpoints) {
+      expect(endpoint.toNode().source).toContain("odb_auth.has_role(v_auth_user_id, 'admin')")
+    }
+    expect(sandboxSql.up().join('\n')).toContain("event_name = 'sandbox.scheduler.tick'")
+    expect(sandboxSql.up().join('\n')).toContain("'event.name', 'sandbox.scheduler.tick'")
+    const schedulerAudit = sandboxEndpoints.find(
+      (item) => item.effectivePattern === 'scheduler/audit',
+    )!
+    expect(schedulerAudit.toNode().source).toContain("'nextCursor' VALUE")
+    expect(bootstrapSql).toContain(
+      'SELECT enabled, state INTO p_enabled, p_state FROM user_scheduler_jobs WHERE job_name = p_name',
+    )
+
+    const { adminPackage, migration } = await migrations['00000000000003-admin']()
+    const endpoints = compileApplicationEndpoints(adminPackage.application()).filter((item) =>
+      item.effectivePattern.startsWith('jobs'),
+    )
+    expect(endpoints).toHaveLength(5)
+    for (const endpoint of endpoints) {
+      expect(endpoint.toNode().source).toContain("odb_auth.has_role(v_auth_user_id, 'admin')")
+    }
+    const sql = migration.compile().up().join('\n')
+    expect(sql).toContain('FROM user_scheduler_jobs WHERE')
+    expect(sql).toContain('INSTR(LOWER(job_name), LOWER(TRIM(p_search)))')
+    expect(sql).toContain('ORDER BY job_name ASC FETCH FIRST NVL(p_limit, 25) + 1 ROWS ONLY')
+    expect(sql).toContain('FROM user_scheduler_job_run_details WHERE job_name = p_name')
+    expect(sql).toContain('SYS_EXTRACT_UTC(actual_start_date) AS "actualStartDate"')
+    expect(sql).toContain('ORDER BY log_id DESC FETCH FIRST NVL(p_limit, 25) + 1 ROWS ONLY')
+    expect(sql).toContain('ADMIN_JOB_NAME_INVALID')
+    expect(sql).toContain('ADMIN_JOB_NOT_FOUND')
+    expect(sql).toContain("'event.name', 'admin.job.run'")
+  })
+
   it('exposes admin user services with bounded search and safe typed fields', async () => {
     const { adminPackage, migration } = await migrations['00000000000003-admin']()
     const endpoints = compileApplicationEndpoints(adminPackage.application())
@@ -46,6 +108,11 @@ describe('app-owned ORDS migrations', () => {
       'PUT',
       'GET',
       'GET',
+      'GET',
+      'GET',
+      'POST',
+      'POST',
+      'POST',
     ])
     expect(new Set(endpoints.map((endpoint) => endpoint.toNode().module))).toEqual(
       new Set(['admin']),
@@ -94,6 +161,11 @@ describe('app-owned ORDS migrations', () => {
       '/admin/settings/{id}',
       '/admin/users/{id}/audit',
       '/admin/audit/events',
+      '/admin/jobs',
+      '/admin/jobs/{name}/history',
+      '/admin/jobs/{name}/enable',
+      '/admin/jobs/{name}/disable',
+      '/admin/jobs/{name}/run',
     ])
     expect(document.paths['/admin/users']?.get?.parameters.map((param) => param.name)).toEqual([
       'cursor',
@@ -1080,7 +1152,10 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toMatch(/WHEN OTHERS THEN\s+odb_audit.error\(p_message,[^\n]+;\s+RAISE;/)
     expect(sql).toContain('SANDBOX_AUDIT_ERROR')
     expect(sql).toContain('AUDIT_MESSAGE_REQUIRED')
-    expect(sql).not.toContain('odb_audit_logs')
+    const listStart = sql.indexOf('PROCEDURE list_audit', sql.indexOf('PACKAGE BODY'))
+    expect(sql.slice(listStart, sql.indexOf('END list_audit;', listStart))).not.toContain(
+      'odb_audit_logs',
+    )
     const openapi = generateApplicationOpenApi(migration.applications()[0]) as {
       paths: Record<
         string,

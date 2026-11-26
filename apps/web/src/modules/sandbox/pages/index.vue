@@ -22,9 +22,9 @@
         <v-card
           :to="`/sandbox/capabilities/${capability.name}`"
           :prepend-icon="capability.icon"
-          :title="capability.title"
+          :title="capability.titleKey ? t(capability.titleKey) : capability.title"
           :subtitle="capability.kind"
-          :text="capability.description"
+          :text="capability.descriptionKey ? t(capability.descriptionKey) : capability.description"
           class="h-100"
           hover
         />
@@ -44,6 +44,7 @@
 <script setup lang="ts">
 import { odbVueCapabilities } from '@/modules/sandbox/catalog'
 import { appConfig } from '@/capabilities/config'
+import { useI18n } from 'vue-i18n'
 
 definePage({
   meta: {
@@ -57,6 +58,7 @@ definePage({
 })
 
 const capabilities = odbVueCapabilities
+const { t } = useI18n()
 const routing = useRouting()
 const modules = computed(() =>
   [

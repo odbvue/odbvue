@@ -30,6 +30,15 @@
       </v-col>
       <v-col cols="12" md="6">
         <v-card
+          to="/admin/jobs"
+          prepend-icon="$mdiCalendarClock"
+          :title="t('admin.jobs')"
+          :text="t('admin.jobsDescription')"
+          hover
+        />
+      </v-col>
+      <v-col cols="12" md="6">
+        <v-card
           to="/admin/settings"
           prepend-icon="$mdiCog"
           :title="t('admin.settings')"

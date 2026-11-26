@@ -11,6 +11,7 @@ import {
   odbRateLimit,
   odbSchema,
   odbSettings,
+  odbScheduler,
   odbStorage,
   odbValidation,
 } from '@odbvue/odb'
@@ -29,6 +30,9 @@ export const schema = odbSchema(schemaName, odbEnv.schemaPassword, (definition) 
   definition.grant('EXECUTE ON UTL_URL')
   definition.grant('EXECUTE ON SYS.DBMS_NETWORK_ACL_ADMIN')
   definition.grant('SELECT ON SYS.DBA_HOST_ACES')
+  definition.grant('CREATE JOB')
+  definition.grant('MANAGE SCHEDULER')
+  definition.grant('EXECUTE ON SYS.DBMS_SCHEDULER')
 })
 
 export const migration = defineMigration('00000000000000_bootstrap', {
@@ -37,6 +41,7 @@ export const migration = defineMigration('00000000000000_bootstrap', {
   .install(odbHttp)
   .install(odbRateLimit)
   .install(odbAudit)
+  .install(odbScheduler)
   .install(odbValidation)
   .install(odbSettings)
   .install(odbLob)

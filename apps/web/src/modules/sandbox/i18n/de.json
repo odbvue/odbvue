@@ -1,1 +1,20 @@
-{}
+{
+  "sandbox.scheduler": "Zeitplanung",
+  "sandbox.schedulerDescription": "Starten Sie einen Job, der jede Minute einen Audit-Eintrag schreibt. Stoppen verhindert weitere Ausführungen; ein laufender Job kann zu Ende laufen.",
+  "sandbox.schedulerStart": "Starten",
+  "sandbox.schedulerStop": "Stoppen",
+  "sandbox.schedulerSuccess": "Zeitplanung aktualisiert.",
+  "sandbox.schedulerError": "Zeitplanung konnte nicht aktualisiert werden.",
+  "sandbox.schedulerEnabled": "Aktiviert",
+  "sandbox.schedulerDisabled": "Deaktiviert",
+  "sandbox.schedulerUnknown": "Status nicht verfügbar",
+  "sandbox.schedulerState": "Planungsstatus",
+  "sandbox.schedulerRefresh": "Aktualisieren",
+  "sandbox.schedulerAudit": "Job-Audit-Ereignisse",
+  "sandbox.schedulerTime": "Zeit",
+  "sandbox.schedulerSeverity": "Schweregrad",
+  "sandbox.schedulerMessage": "Nachricht",
+  "sandbox.schedulerDetails": "Details",
+  "sandbox.schedulerLoadError": "Der Jobstatus konnte nicht geladen werden. Aktualisieren Sie die Seite.",
+  "sandbox.schedulerAuditError": "Job-Audit-Ereignisse konnten nicht geladen werden."
+}

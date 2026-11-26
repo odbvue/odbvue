@@ -3,6 +3,8 @@ export type Grant =
   | 'INSERT'
   | 'UPDATE'
   | 'DELETE'
+  | 'CREATE JOB'
+  | 'MANAGE SCHEDULER'
   | `EXECUTE ON ${string}`
   | `SELECT ON ${string}`
 
