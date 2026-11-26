@@ -186,6 +186,7 @@ describe('application locale discovery and collection', () => {
         'admin.settingValidationError',
         'admin.settingTooLong',
         'admin.settingSecretRequired',
+        'admin.jobAuditWarning',
         'errors.SETTINGS_REQUIRE_TRUSTED_SETUP',
         'errors.SETTING_NOT_FOUND',
       ]) {

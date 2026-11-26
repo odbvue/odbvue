@@ -20,6 +20,7 @@
   "admin.loadJobHistoryError": "Der Jobverlauf konnte nicht geladen werden.",
   "admin.jobActionError": "Die Jobaktion ist fehlgeschlagen.",
   "admin.jobActionSuccess": "Jobaktion abgeschlossen.",
+  "admin.jobAuditWarning": "Die Jobaktion wurde ausgeführt, aber der Audit-Eintrag konnte nicht bestätigt werden. Wiederholen Sie die Aktion nicht.",
   "admin.settings": "Einstellungen",
   "admin.settingsDescription": "Anwendungseinstellungen suchen und bearbeiten. Gespeicherte Geheimwerte werden nie angezeigt.",
   "admin.searchSettings": "Nach Einstellungs-ID suchen",

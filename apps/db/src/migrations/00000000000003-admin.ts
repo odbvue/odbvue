@@ -893,8 +893,11 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
   for (const action of ['enable', 'disable', 'run'] as const) {
     const operation = pkg.proc(
       `${action}_job`,
-      { in: { name: odbType.string(128), actorId: odbAuth.types.userId } },
-      ({ params: { name, actorId }, body }) => {
+      {
+        in: { name: odbType.string(128), actorId: odbAuth.types.userId },
+        out: { auditRecorded: odbType.integer() },
+      },
+      ({ params: { name, actorId, auditRecorded }, body }) => {
         const { found } = body.variables({ found: odbType.string(128) })
         body.ifThen(
           cond.or([cond.isNull(name), cond.not(cond.regexpLike(name, '^[A-Z][A-Z0-9_$#]*$'))]),
@@ -913,10 +916,16 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
             ),
         )
         body.call(odbScheduler[action](name))
-        body.auditEvent('Scheduler job action', {
-          'user.id': actorId,
-          'event.name': odbLiteral(`admin.job.${action}`),
-          'job.name': name,
+        body.set(auditRecorded, 1)
+        body.block((audit) => {
+          audit.auditEvent('Scheduler job action', {
+            'user.id': actorId,
+            'event.name': odbLiteral(`admin.job.${action}`),
+            'job.name': name,
+          })
+          audit.whenOthers((failed) => {
+            failed.set(auditRecorded, 0)
+          })
         })
         body.when('NO_DATA_FOUND', (missing) => missing.notFound('ADMIN_JOB_NOT_FOUND'))
       },
@@ -930,6 +939,7 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
       summary: `${action} a schema-owned Scheduler job`,
       uri: { name: operation.parameters.name },
       context: { userId: operation.parameters.actorId },
+      response: { auditRecorded: operation.parameters.auditRecorded },
     })
   }
   return {}

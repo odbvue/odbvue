@@ -6,6 +6,18 @@ import { odbQuery } from '../../query/index.js'
 const schedulerJobs = odbTable('dba_scheduler_jobs', (table) => ({
   owner: table.string(128),
   jobName: table.string(128),
+  jobType: table.string(16),
+  jobAction: table.string(4000),
+  numberOfArguments: table.number(),
+  programName: table.string(4000),
+  scheduleName: table.string(128),
+  repeatInterval: table.string(4000),
+  comments: table.string(4000),
+  autoDrop: table.string(5),
+  jobStyle: table.string(17),
+  jobClass: table.string(128),
+  endDate: table.timestamp(),
+  loggingLevel: table.string(11),
 }))
 
 const ownedJobs = odbTable('user_scheduler_jobs', (table) => ({
@@ -39,14 +51,82 @@ function seedJob(job: { name: string; action: string; schedule: string; descript
     toSQLUp({ schema }: { schema?: string } = {}) {
       const owner = schemaName(schema)
       return odbBlock((body) => {
-        body.call(
-          plsqlCall(
-            `${owner}.odb_scheduler.create_job`,
-            odbLiteral(`${owner}.${name}`),
-            odbLiteral(`${owner}.${action}`),
-            odbLiteral(job.schedule),
-            odbLiteral(job.description),
-          ),
+        const { count, loggingLevel } = body.variables({
+          count: odbType.integer(),
+          loggingLevel: odbType.string(11),
+        })
+        const target = cond.and([
+          cond.eq(schedulerJobs.owner, odbLiteral(owner)),
+          cond.eq(schedulerJobs.jobName, odbLiteral(name)),
+        ])
+        body.query(
+          odbQuery().selectFrom(schedulerJobs).select('COUNT(*)').into(count).where(target),
+        )
+        body.ifThen(
+          cond.eq(count, 0),
+          (missing) =>
+            missing.call(
+              plsqlCall(
+                `${owner}.odb_scheduler.create_job`,
+                odbLiteral(`${owner}.${name}`),
+                odbLiteral(`${owner}.${action}`),
+                odbLiteral(job.schedule),
+                odbLiteral(job.description),
+              ),
+            ),
+          (existing) => {
+            existing.query(
+              odbQuery()
+                .selectFrom(schedulerJobs)
+                .select('COUNT(*)')
+                .into(count)
+                .where(
+                  cond.and([
+                    target,
+                    cond.eq(schedulerJobs.jobType, odbLiteral('STORED_PROCEDURE')),
+                    cond.eq(schedulerJobs.jobAction, odbLiteral(`${owner}.${action}`)),
+                    cond.eq(schedulerJobs.numberOfArguments, 0),
+                    cond.isNull(schedulerJobs.programName),
+                    cond.isNull(schedulerJobs.scheduleName),
+                    cond.eq(schedulerJobs.repeatInterval, odbLiteral(job.schedule)),
+                    cond.or([
+                      cond.eq(schedulerJobs.comments, odbLiteral(job.description)),
+                      cond.and([
+                        cond.isNull(schedulerJobs.comments),
+                        cond.isNull(odbLiteral(job.description)),
+                      ]),
+                    ]),
+                    cond.eq(schedulerJobs.autoDrop, odbLiteral('FALSE')),
+                    cond.eq(schedulerJobs.jobStyle, odbLiteral('REGULAR')),
+                    cond.eq(schedulerJobs.jobClass, odbLiteral('DEFAULT_JOB_CLASS')),
+                    cond.isNull(schedulerJobs.endDate),
+                  ]),
+                ),
+            )
+            existing.ifThen(cond.ne(count, 1), (drift) => drift.conflict('SCHEDULER_JOB_DRIFT'))
+            existing.query(
+              odbQuery()
+                .selectFrom(schedulerJobs)
+                .select(schedulerJobs.loggingLevel)
+                .into(loggingLevel)
+                .where(target),
+            )
+            existing.ifThen(
+              cond.or([
+                cond.isNull(loggingLevel),
+                cond.and([cond.ne(loggingLevel, 'RUNS'), cond.ne(loggingLevel, 'FULL')]),
+              ]),
+              (repair) =>
+                repair.call(
+                  plsqlCall(
+                    'DBMS_SCHEDULER.SET_ATTRIBUTE',
+                    odbLiteral(`${owner}.${name}`),
+                    odbLiteral('logging_level'),
+                    'DBMS_SCHEDULER.LOGGING_RUNS',
+                  ),
+                ),
+            )
+          },
         )
       })
     },

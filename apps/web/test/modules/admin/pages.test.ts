@@ -521,11 +521,17 @@ describe('admin page metadata', () => {
       jobs.vm.$emit('action', 'admin.runJob', [], { jobName: 'EXAMPLE_JOB' })
       await flushPromises()
       expect(refetchTable).not.toHaveBeenCalled()
-      post.mockResolvedValueOnce({ data: null, error: null, status: 204, headers: null })
+      post.mockResolvedValueOnce({
+        data: { auditRecorded: 1 },
+        error: null,
+        status: 200,
+        headers: null,
+      })
       jobs.vm.$emit('action', 'admin.runJob', [], { jobName: 'EXAMPLE_JOB' })
       await flushPromises()
       expect(post).toHaveBeenLastCalledWith('/admin/jobs/EXAMPLE_JOB/run')
       expect(refetchTable).toHaveBeenCalledExactlyOnceWith('first')
+      expect(ui.notification.value).toMatchObject({ type: 'success' })
     })
 
     it('passes the history cursor unchanged for the selected job', async () => {
@@ -547,7 +553,12 @@ describe('admin page metadata', () => {
 
     it('asks for confirmation before disabling a job', async () => {
       const { wrapper } = await setup('jobs')
-      post.mockResolvedValueOnce({ data: null, error: null, status: 204, headers: null })
+      post.mockResolvedValueOnce({
+        data: { auditRecorded: 1 },
+        error: null,
+        status: 200,
+        headers: null,
+      })
       wrapper
         .findComponent(table)
         .vm.$emit('action', 'admin.disableJob', [], { jobName: 'EXAMPLE_JOB' })
@@ -560,6 +571,26 @@ describe('admin page metadata', () => {
       await submit!.trigger('click')
       await flushPromises()
       expect(post).toHaveBeenCalledExactlyOnceWith('/admin/jobs/EXAMPLE_JOB/disable')
+    })
+
+    it('warns and refreshes when the action completed but its audit failed', async () => {
+      const { wrapper } = await setup('jobs')
+      post.mockResolvedValueOnce({
+        data: { auditRecorded: 0 },
+        error: null,
+        status: 200,
+        headers: null,
+      })
+      wrapper
+        .findComponent(table)
+        .vm.$emit('action', 'admin.runJob', [], { jobName: 'EXAMPLE_JOB' })
+      await flushPromises()
+      expect(post).toHaveBeenCalledExactlyOnceWith('/admin/jobs/EXAMPLE_JOB/run')
+      expect(refetchTable).toHaveBeenCalledExactlyOnceWith('first')
+      expect(ui.notification.value).toMatchObject({
+        type: 'warning',
+        message: 'admin.jobAuditWarning',
+      })
     })
   })
 

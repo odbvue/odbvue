@@ -36,4 +36,34 @@ describe('scheduler migration seed', () => {
     )
     expect(() => odbScheduler.seed({ ...job, schedule: ' ' })).toThrow('schedule is required')
   })
+
+  it('validates existing definitions before repairing run logging without recreating or resetting enabled state', () => {
+    const sql = odbScheduler
+      .seed({
+        name: 'DEMO_JOB',
+        action: 'DEMO_PKG.TICK',
+        schedule: 'FREQ=MINUTELY;INTERVAL=1',
+        description: 'Demo',
+      })
+      .toSQLUp({ schema: 'APP' })
+    expect(sql).toContain('IF l_count = 0 THEN')
+    expect(sql).toContain('ELSE')
+    expect(sql).toContain("job_type = 'STORED_PROCEDURE'")
+    expect(sql).toContain("job_action = 'APP.DEMO_PKG.TICK'")
+    expect(sql).toContain('number_of_arguments = 0')
+    expect(sql).toContain('program_name IS NULL')
+    expect(sql).toContain('schedule_name IS NULL')
+    expect(sql).toContain("repeat_interval = 'FREQ=MINUTELY;INTERVAL=1'")
+    expect(sql).toContain("comments = 'Demo'")
+    expect(sql).toContain("auto_drop = 'FALSE'")
+    expect(sql).toContain('SCHEDULER_JOB_DRIFT')
+    expect(sql).toContain("l_logging_level != 'RUNS' AND l_logging_level != 'FULL'")
+    expect(sql.indexOf('SCHEDULER_JOB_DRIFT')).toBeLessThan(
+      sql.indexOf('DBMS_SCHEDULER.SET_ATTRIBUTE'),
+    )
+    expect(sql).not.toContain('.enable_job')
+    expect(sql).not.toContain('.disable_job')
+    expect(sql).not.toContain('DROP_JOB')
+    expect(sql.match(/\.create_job\(/g)).toHaveLength(1)
+  })
 })

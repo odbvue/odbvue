@@ -20,6 +20,7 @@
   "admin.loadJobHistoryError": "Job history could not be loaded.",
   "admin.jobActionError": "The job action failed.",
   "admin.jobActionSuccess": "Job action completed.",
+  "admin.jobAuditWarning": "The job action completed, but its audit record could not be confirmed. Do not repeat the action.",
   "admin.settings": "Settings",
   "admin.settingsDescription": "Search and edit application settings. Stored secrets are never displayed.",
   "admin.searchSettings": "Search by setting ID",

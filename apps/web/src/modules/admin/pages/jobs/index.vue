@@ -142,12 +142,16 @@ async function perform(action: 'enable' | 'disable' | 'run', name: string) {
   saving.value = true
   try {
     const result = await ui.action('admin.jobs.action', async () => {
-      const { error } = await http.post(`/admin/jobs/${encodeURIComponent(name)}/${action}`)
+      const { data, error } = await http.post<components['schemas']['AdminRunJobResponse']>(
+        `/admin/jobs/${encodeURIComponent(name)}/${action}`,
+      )
       if (error) throw new Error('admin.jobActionError')
+      return data
     })
     if (!result.ok) return
     confirmDisable.value = false
-    ui.success('admin.jobActionSuccess')
+    if (result.data?.auditRecorded === 1) ui.success('admin.jobActionSuccess')
+    else ui.warning('admin.jobAuditWarning')
     await table.value?.fetch('first')
   } finally {
     saving.value = false

@@ -20,6 +20,7 @@
   "admin.loadJobHistoryError": "Impossible de charger l’historique.",
   "admin.jobActionError": "L’action sur la tâche a échoué.",
   "admin.jobActionSuccess": "Action sur la tâche terminée.",
+  "admin.jobAuditWarning": "L’action a été effectuée, mais son enregistrement d’audit n’a pas pu être confirmé. Ne répétez pas l’action.",
   "admin.settings": "Paramètres",
   "admin.settingsDescription": "Rechercher et modifier les paramètres de l’application. Les secrets enregistrés ne sont jamais affichés.",
   "admin.searchSettings": "Rechercher par identifiant de paramètre",

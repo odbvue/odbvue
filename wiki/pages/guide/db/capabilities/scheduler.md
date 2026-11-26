@@ -1,10 +1,11 @@
 # Scheduler
 
 `odbScheduler` installs the `odb_scheduler` package for schema-owned Oracle
-Scheduler jobs. Bootstrap grants `CREATE JOB`, `EXECUTE ON SYS.DBMS_SCHEDULER`
-and `MANAGE SCHEDULER` directly to the application schema. The last privilege
-also permits managing Scheduler windows and job classes and is not needed for
-ordinary jobs; remove it from your deployment if those privileges are unwanted.
+Scheduler jobs. Bootstrap grants only `CREATE JOB` and
+`EXECUTE ON SYS.DBMS_SCHEDULER` for this capability. `MANAGE SCHEDULER` and
+`CREATE ANY JOB` are not granted. The explicit package execution grant is kept
+so compilation does not depend on role-based access or a deployment retaining
+public execution grants. It does not authorize creating jobs in other schemas.
 
 ```ts
 import { defineMigration, odbScheduler } from '@odbvue/odb'
@@ -28,8 +29,12 @@ export const migration = defineMigration('reports', { schema: 'APP' })
   )
 ```
 
-`seed` creates the job disabled and removes it on rollback, even if it is
-running. It accepts ordinary unquoted identifiers and a procedure or
+`seed` creates a missing job disabled and removes it on rollback, even if it is
+running. On retry it validates an existing job's type, action, arguments,
+schedule, description, auto-drop setting, style, class, and end date. A mismatch
+raises `SCHEDULER_JOB_DRIFT` without replacing the job. A matching job keeps its
+enabled state and start date; missing run logging is repaired, while `RUNS` or
+`FULL` logging is preserved. It accepts ordinary unquoted identifiers and a procedure or
 package-procedure in the migration schema. The migration executor needs access
 to `DBA_SCHEDULER_JOBS` and permission to drop the schema-owned job.
 
@@ -57,8 +62,22 @@ body.call(odbScheduler.enable(odbLiteral('REPORT_JOB')))
 
 The target procedure must already exist and be accessible to the job owner.
 Creation and logging configuration are separate Scheduler operations: if the
-latter fails, the disabled job may remain and must be inspected or removed
-before retrying.
+latter fails, the disabled job may remain. Retry `seed` to validate the definition
+and finish configuring logging. Direct `create` calls still reject existing jobs.
+
+## Admin action audit policy
+
+Scheduler actions and audit writes cannot be made atomic. Admin enable, disable,
+and run endpoints therefore use **best-effort completion auditing**: Scheduler
+errors propagate normally; after a successful action, an audit-write failure is
+reported as `auditRecorded: 0` rather than a failed mutation. Successful audit
+writes return `auditRecorded: 1`. The flag explicitly surfaces the audit failure;
+no secondary logging operation is allowed to turn it back into a failed mutation.
+
+The UI warns that the action completed without a confirmed audit record and
+refreshes the jobs list. Do not repeat the action to repair auditing, especially
+for manual runs. For run requests, completion means asynchronous submission,
+not successful execution of the target procedure.
 
 Jobs created by this capability record runs (`LOGGING_RUNS`), subject to Oracle
 Scheduler log retention and database configuration. The admin jobs and history

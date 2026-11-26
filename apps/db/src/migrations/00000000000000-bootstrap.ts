@@ -31,7 +31,6 @@ export const schema = odbSchema(schemaName, odbEnv.schemaPassword, (definition) 
   definition.grant('EXECUTE ON SYS.DBMS_NETWORK_ACL_ADMIN')
   definition.grant('SELECT ON SYS.DBA_HOST_ACES')
   definition.grant('CREATE JOB')
-  definition.grant('MANAGE SCHEDULER')
   definition.grant('EXECUTE ON SYS.DBMS_SCHEDULER')
 })
 

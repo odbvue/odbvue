@@ -36,7 +36,8 @@ describe('app-owned ORDS migrations', () => {
     const bootstrapSql = bootstrap.migration.compile().up().join('\n')
     const grants = bootstrap.schema.toSQLUp()
     expect(grants).toContain('GRANT CREATE JOB TO ODBVUE;')
-    expect(grants).toContain('GRANT MANAGE SCHEDULER TO ODBVUE;')
+    expect(grants).not.toContain('MANAGE SCHEDULER')
+    expect(grants).not.toContain('CREATE ANY JOB')
     expect(grants).toContain('GRANT EXECUTE ON SYS.DBMS_SCHEDULER TO ODBVUE;')
     expect(bootstrapSql).toContain("job_type => 'STORED_PROCEDURE'")
     expect(bootstrapSql).toContain('auto_drop => FALSE')
@@ -91,6 +92,33 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain('ADMIN_JOB_NAME_INVALID')
     expect(sql).toContain('ADMIN_JOB_NOT_FOUND')
     expect(sql).toContain("'event.name', 'admin.job.run'")
+  })
+
+  it('reports best-effort audit failure without turning a completed scheduler action into a failed write', async () => {
+    const { adminPackage, migration } = await migrations['00000000000003-admin']()
+    const sql = migration.compile().up().join('\n')
+    for (const action of ['enable', 'disable', 'run']) {
+      const start = sql.indexOf(`PROCEDURE ${action}_job`, sql.indexOf('PACKAGE BODY'))
+      const procedure = sql.slice(start, sql.indexOf(`END ${action}_job;`, start))
+      const call = procedure.indexOf(`odb_scheduler.${action}_job(p_name)`)
+      const audit = procedure.indexOf("odb_audit.info('Scheduler job action'")
+      const failed = procedure.indexOf('p_audit_recorded := 0')
+      expect(call).toBeGreaterThan(-1)
+      expect(audit).toBeGreaterThan(call)
+      expect(failed).toBeGreaterThan(audit)
+      expect(procedure).toContain('p_audit_recorded := 1')
+      expect(procedure).toMatch(/WHEN OTHERS THEN\s+p_audit_recorded := 0;\s+END;/)
+      const endpoint = compileApplicationEndpoints(adminPackage.application()).find(
+        (item) => item.effectivePattern === `jobs/:name/${action}`,
+      )!
+      expect(endpoint.toNode().params).toContainEqual(
+        expect.objectContaining({
+          name: 'auditRecorded',
+          direction: 'OUT',
+        }),
+      )
+      expect(endpoint.toNode().source).not.toContain(':status_code := 204')
+    }
   })
 
   it('exposes admin user services with bounded search and safe typed fields', async () => {

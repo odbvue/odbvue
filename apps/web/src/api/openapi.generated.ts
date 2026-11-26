@@ -1285,9 +1285,15 @@ export interface components {
             /** @description Opaque continuation token; absent when pagination is exhausted. */
             nextCursor?: string;
         };
-        AdminEnableJobResponse: Record<string, never>;
-        AdminDisableJobResponse: Record<string, never>;
-        AdminRunJobResponse: Record<string, never>;
+        AdminEnableJobResponse: {
+            auditRecorded: number;
+        };
+        AdminDisableJobResponse: {
+            auditRecorded: number;
+        };
+        AdminRunJobResponse: {
+            auditRecorded: number;
+        };
     };
     responses: never;
     parameters: never;
