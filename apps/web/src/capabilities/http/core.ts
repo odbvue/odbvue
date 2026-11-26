@@ -21,14 +21,10 @@ export interface HttpError extends Error {
   data?: unknown
   request: string
   problem?: ApiProblem
-  /** @deprecated Use problem?.errors. */
-  fields?: ApiFieldError[]
 }
 export interface ApiFieldError {
-  field?: string
-  code?: string
-  name?: string
-  message?: string
+  field: string
+  code: string
   params?: Record<string, string | number | boolean | null>
 }
 export interface ApiProblem {
@@ -137,7 +133,6 @@ function createHttpError(error: unknown, request: string, status: number | null)
     request,
     data: response?.data,
     problem,
-    fields: status === 422 ? problem?.errors : undefined,
   })
 }
 
@@ -155,21 +150,16 @@ function normalizeProblem(data: unknown, status: number | null): ApiProblem | un
     for (const item of body.errors) {
       if (!item || typeof item !== 'object' || Array.isArray(item)) return problem
       const detail = item as Record<string, unknown>
-      const field = detail.field ?? detail.name
+      const field = detail.field
       const code = detail.code
-      const message = detail.message
       if (
         typeof field !== 'string' ||
         !field.trim() ||
         field.length > 128 ||
         [...field].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)
-      ) return problem
-      if (code !== undefined) {
-        if (typeof code !== 'string' || !/^[A-Z][A-Z0-9_]{0,99}$/.test(code)) return problem
-      } else if (
-        typeof message !== 'string' ||
-        !/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)*$/.test(message)
-      ) return problem
+      )
+        return problem
+      if (typeof code !== 'string' || !/^[A-Z][A-Z0-9_]{0,99}$/.test(code)) return problem
       const params = detail.params
       if (params !== undefined) {
         if (!params || typeof params !== 'object' || Array.isArray(params)) return problem
@@ -185,9 +175,8 @@ function normalizeProblem(data: unknown, status: number | null): ApiProblem | un
           return problem
       }
       errors.push({
-        ...(detail.field !== undefined ? { field: field as string } : { name: field as string }),
-        ...(code !== undefined ? { code: code as string } : {}),
-        ...(message !== undefined ? { message: message as string } : {}),
+        field,
+        code,
         ...(params === undefined ? {} : { params: params as ApiFieldError['params'] }),
       })
     }

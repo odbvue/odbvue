@@ -34,7 +34,7 @@ describe.skipIf(!connectString)('validation on Oracle', () => {
       .toNode()
       .source.replace(
         'api.limited();',
-        `raise_application_error(-20998, 'ODB_ERROR|VALIDATION_ERROR|VALUE_INVALID|{"errors":[{"name":"value","message":"validation.min","params":{"min":60}}]}');`,
+        `raise_application_error(-20998, 'ODB_ERROR|VALIDATION_ERROR|VALUE_INVALID|{"errors":[{"field":"value","code":"VALIDATION_MIN","params":{"min":60}}]}');`,
       )
       .replaceAll(':status_code', 'l_status')
     await connection.execute(`DECLARE
@@ -58,7 +58,7 @@ BEGIN
   END IF;
   l_errors := l_json.get_array('errors');
   l_field := TREAT(l_errors.get(0) AS JSON_OBJECT_T);
-  IF l_field.get_string('name') != 'value' OR l_field.get_string('message') != 'validation.min'
+  IF l_field.get_string('field') != 'value' OR l_field.get_string('code') != 'VALIDATION_MIN'
      OR l_field.get_object('params').get_number('min') != 60 THEN
     raise_application_error(-20000, 'Incorrect field details');
   END IF;

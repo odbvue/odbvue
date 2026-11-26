@@ -658,33 +658,33 @@ describe('ProcedureBody control flow and exceptions', () => {
     it('bounds and validates structured validation details before generating SQL', () => {
       const body = new ProcedureBody()
       body.invalid('VALUE_INVALID', [
-        { name: 'value', message: 'validation.min', params: { min: 60 } },
+        { field: 'value', code: 'VALIDATION_MIN', params: { min: 60 } },
       ])
       const pkg = odbPackage('test_errors', (p) => ({
         run: p.proc('run', {}, ({ body: target }) =>
           target.invalid('VALUE_INVALID', [
-            { name: 'value', message: 'validation.min', params: { min: 60 } },
+            { field: 'value', code: 'VALIDATION_MIN', params: { min: 60 } },
           ]),
         ),
       }))
       expect(pkg.toSQLUp()).toContain(
-        '{"errors":[{"name":"value","message":"validation.min","params":{"min":60}}]}',
+        '{"errors":[{"field":"value","code":"VALIDATION_MIN","params":{"min":60}}]}',
+      )
+      expect(() => body.invalid('BAD', [{ field: 'bad\nfield', code: 'VALIDATION_BAD' }])).toThrow(
+        'Invalid field',
       )
       expect(() =>
-        body.invalid('BAD', [{ name: 'bad\nfield', message: 'validation.bad' }]),
-      ).toThrow('Invalid field')
-      expect(() =>
         body.invalid('BAD', [
-          { name: 'value', message: 'validation.bad', params: { min: Infinity } },
+          { field: 'value', code: 'VALIDATION_BAD', params: { min: Infinity } },
         ]),
       ).toThrow('finite')
       expect(() =>
         body.invalid('BAD', [
-          { name: 'value', message: 'validation.bad', params: { text: 'x'.repeat(400) } },
+          { field: 'value', code: 'VALIDATION_BAD', params: { text: 'x'.repeat(400) } },
         ]),
       ).toThrow('400 bytes')
       expect(() =>
-        body.raiseError('CONFLICT', 'BAD', [{ name: 'value', message: 'validation.bad' }]),
+        body.raiseError('CONFLICT', 'BAD', [{ field: 'value', code: 'VALIDATION_BAD' }]),
       ).toThrow('validation')
     })
   })

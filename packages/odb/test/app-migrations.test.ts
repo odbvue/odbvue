@@ -212,28 +212,24 @@ describe('app-owned ORDS migrations', () => {
           expect(normalPath).not.toContain('odb_audit.log(')
           expect(exceptionBody.match(/odb_audit\.log\(/g)).toHaveLength(1)
           const [audit] =
-            exceptionBody.match(
-              /IF :status_code BETWEEN 500 AND 599 THEN[\s\S]*?END IF;/,
-            ) ?? []
+            exceptionBody.match(/IF :status_code BETWEEN 500 AND 599 THEN[\s\S]*?END IF;/) ?? []
           expect(audit).toBeDefined()
           const event = `${node.module}.${node.procedureName.toLowerCase()}`
           const failureMessage = failureMessages.get(event)
           if (failureMessage) {
             checkedEvents.add(event)
-            expect(audit).toContain(`odb_audit.log('ERROR', '${failureMessage}'`)
+            expect(audit).toContain(`USING '${failureMessage}'`)
           }
           expect(audit).not.toMatch(/v_body|:body|p_password|p_refresh_token|:cookie|:code/i)
-          expect(audit).toContain(
-            `'user.id', ${node.auth === 'anonymous' ? 'NULL' : 'v_auth_user_id'}`,
-          )
-          expect(audit).toContain(`'event.name', '${event}'`)
-          expect(audit).toContain("'event.outcome', 'failure'")
-          expect(audit).toContain(`'http.request.method', '${node.method}'`)
-          expect(audit).toContain("'http.response.status_code', TO_CHAR(:status_code)")
-          expect(audit).toContain("'trace.id', v_trace_id")
-          expect(audit).toContain("'exception.code', TO_CHAR(v_sqlcode)")
-          expect(audit).toContain("'exception.stack', v_error_stack")
-          expect(audit).toContain("'exception.stacktrace', v_error_backtrace")
+          expect(audit).toContain(`''user.id'', ${node.auth === 'anonymous' ? ':2' : ':2'}`)
+          expect(audit).toContain(`''event.name'', :3`)
+          expect(audit).toContain("''event.outcome'', ''failure''")
+          expect(audit).toContain(`''http.request.method'', :4`)
+          expect(audit).toContain("''http.response.status_code'', TO_CHAR(:5)")
+          expect(audit).toContain("''trace.id'', :6")
+          expect(audit).toContain("''exception.code'', TO_CHAR(:7)")
+          expect(audit).toContain("''exception.stack'', :8")
+          expect(audit).toContain("''exception.stacktrace'', :9")
           const response = exceptionBody.slice(exceptionBody.indexOf(audit) + audit.length)
           expect(response).toContain("'code' VALUE v_error_code")
           expect(response).toContain("'traceId' VALUE v_trace_id")

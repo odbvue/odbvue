@@ -4,8 +4,7 @@ import { pinia } from '../state'
 import { createLoading } from './loading'
 import { errorMessage, mutationError } from './mutation-error'
 import type { HttpResponse } from '../http/core'
-import { i18n } from '../i18n'
-import type { OvActionComplete } from '@/components/api'
+import type { OvActionComplete, OvActionResult } from '@/components/api'
 
 export interface AlertOptions {
   timeout?: number
@@ -212,27 +211,17 @@ export function useUi(state: Pinia = pinia) {
       complete: OvActionComplete,
       success?: string,
     ): Promise<void> => {
-      const response = await store.runLoading(key, operation).then(
-        (result) => result,
-        (error: unknown) =>
-          ({ data: null, error, status: null, headers: null }) as HttpResponse<T>,
-      )
-      if (response.error) {
-        complete(mutationError(response.error, (message) => store.show('error', message)))
-        return
+      let result: OvActionResult
+      try {
+        const response = await store.runLoading(key, operation)
+        if (response.error) throw response.error
+        if (response.status === null || response.status >= 400) throw new Error('Request failed')
+        result = { status: 'success', refetch: true } as const
+      } catch (error) {
+        result = mutationError(error, (message) => store.show('error', message))
       }
-      if (response.status && response.status >= 400) {
-        complete({ status: 'error' })
-        store.show('error', i18n.global.t('errors.requestFailed'))
-        return
-      }
-      if (response.status === null) {
-        complete({ status: 'error' })
-        store.show('error', i18n.global.t('errors.requestFailed'))
-        return
-      }
-      complete({ status: 'success', refetch: true })
-      if (success) store.show('success', success)
+      complete(result)
+      if (result.status === 'success' && success) store.show('success', success)
     },
     info: (message: string, options?: AlertOptions) => store.show('info', message, options),
     success: (message: string, options?: AlertOptions) => store.show('success', message, options),

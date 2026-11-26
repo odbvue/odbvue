@@ -26,7 +26,11 @@
           @submit.prevent="handleSubmit"
         >
           <v-alert v-if="hasUnmappedErrors" type="error" role="alert" class="mb-4">
-            {{ t('errors.invalidFields') }}
+            {{
+              unmappedErrorMessages.length
+                ? unmappedErrorMessages.join(' ')
+                : t('errors.invalidFields')
+            }}
           </v-alert>
           <v-row>
             <v-col
@@ -192,6 +196,16 @@ const hasUnmappedErrors = computed(
           (field) => field.name === error.name && !field.hidden && field.type !== 'custom',
         ),
     ) ?? false,
+)
+const unmappedErrorMessages = computed(() =>
+  (options.errors ?? [])
+    .filter(
+      (error) =>
+        !options.fields.some(
+          (field) => field.name === error.name && !field.hidden && field.type !== 'custom',
+        ),
+    )
+    .map((error) => t(error.message, error.params)),
 )
 const loadingOverlay = useLoadingOverlay(
   () => loading,

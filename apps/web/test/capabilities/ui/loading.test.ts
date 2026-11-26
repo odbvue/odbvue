@@ -16,29 +16,23 @@ beforeAll(() => {
 describe('keyed UI loading', () => {
   it('passes form-ready validation errors through unchanged', () => {
     const notify = vi.fn<(message: string) => void>()
-    const fields = [{ name: 'value', message: 'admin.settingValidationError', params: { min: 60 } }]
+    const fields = [{ field: 'value', code: 'SETTINGS_VALIDATION_INVALID', params: { min: 60 } }]
     const error = Object.assign(new Error('request'), {
       status: 422,
-      fields,
-      problem: { code: 'INVALID' },
+      problem: { code: 'INVALID', errors: fields },
     })
     const result = mutationError(error, notify)
-    expect(result).toEqual({ status: 'invalid', errors: fields })
-    if (result.status === 'invalid') expect(result.errors).toBe(fields)
-    expect(notify).not.toHaveBeenCalled()
-    fields.push({ name: 'other', message: 'missing.translation', params: { min: 1 } })
-    expect(mutationError(error, notify)).toEqual({
+    expect(result).toEqual({
       status: 'invalid',
       errors: [
-        fields[0],
-        { name: 'other', message: 'errors.validationFailed', params: { min: 1 } },
+        { name: 'value', message: 'errors.SETTINGS_VALIDATION_INVALID', params: { min: 60 } },
       ],
     })
     expect(notify).not.toHaveBeenCalled()
   })
 
   it('passes a decoded HTTP problem directly to form completion', async () => {
-    const fields = [{ name: 'value', message: 'admin.settingValidationError' }]
+    const fields = [{ field: 'value', code: 'SETTINGS_VALIDATION_INVALID' }]
     const client = createHttpClient({
       fetch: async () =>
         new Response(
@@ -53,8 +47,10 @@ describe('keyed UI loading', () => {
     const { error } = await client.put('/admin/settings/example', { value: 'bad' })
     const notify = vi.fn<(message: string) => void>()
     const result = mutationError(error, notify)
-    expect(result).toEqual({ status: 'invalid', errors: fields })
-    if (result.status === 'invalid') expect(result.errors).toBe(error?.fields)
+    expect(result).toEqual({
+      status: 'invalid',
+      errors: [{ name: 'value', message: 'errors.SETTINGS_VALIDATION_INVALID' }],
+    })
     expect(notify).not.toHaveBeenCalled()
   })
 

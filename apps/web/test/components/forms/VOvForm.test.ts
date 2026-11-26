@@ -136,7 +136,7 @@ describe('VOvForm', () => {
       fields: [{ type: 'text', name: 'value' }],
       errors: [{ name: 'missing', message: 'validation.min' }],
     })
-    expect(wrapper.get('[role="alert"]').text()).toContain('errors.invalidFields')
+    expect(wrapper.get('[role="alert"]').text()).toContain('validation.min')
     wrapper.unmount()
   })
 

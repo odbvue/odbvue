@@ -32,13 +32,14 @@ const fieldTypes = [
 
 const oneOf = (value: PlsqlValue, choices: readonly string[]) =>
   cond.or(choices.map((choice) => cond.eq(value, choice)))
-const invalid = (body: ProcedureBody) => body.invalid('SETTINGS_VALIDATION_INVALID')
-const invalidValue = (body: ProcedureBody) =>
-  body.invalid('SETTINGS_VALIDATION_INVALID', 'value')
-const requireValid = (body: ProcedureBody, condition: PlsqlBooleanExpression) =>
-  body.ifThen(condition, (valid) => valid.null(), invalid)
-const requireValidValue = (body: ProcedureBody, condition: PlsqlBooleanExpression) =>
-  body.ifThen(condition, (valid) => valid.null(), invalidValue)
+const requireValid = (body: ProcedureBody, condition: PlsqlBooleanExpression, field?: string) =>
+  body.ifThen(
+    condition,
+    (valid) => valid.null(),
+    field
+      ? (invalid) => invalid.invalid('SETTINGS_VALIDATION_INVALID', field)
+      : (invalid) => invalid.invalid('SETTINGS_VALIDATION_INVALID'),
+  )
 
 export function defineSettingsValidation(pkg: PackageImpl) {
   return pkg.privateProc('validate_setting', (proc) => {
@@ -96,7 +97,7 @@ export function defineSettingsValidation(pkg: PackageImpl) {
           cond.eq(memberIs.invoke(source, odbLiteral(key), odbLiteral(expected)), true),
         )
 
-      body.ifThen(cond.isNull(meta), invalid)
+      body.ifThen(cond.isNull(meta), (missing) => missing.invalid('SETTINGS_VALIDATION_INVALID'))
       body.set(element, odbJson.parseElement(meta))
       const isObject = () =>
         cond.and([cond.isNotNull(element), cond.eq(odbJson.isObject(element), true)])
@@ -107,12 +108,13 @@ export function defineSettingsValidation(pkg: PackageImpl) {
         typed.set(fieldType, odbJson.getString(object, odbLiteral('type')))
         typed.ifThen(
           cond.or([cond.isNull(fieldType), cond.not(oneOf(fieldType, fieldTypes))]),
-          invalid,
+          (invalidType) => invalidType.invalid('SETTINGS_VALIDATION_INVALID'),
         )
         typed.ifThen(cond.eq(fieldType, 'number'), (numeric) =>
-          requireValidValue(
+          requireValid(
             numeric,
             cond.or([cond.isNull(value), cond.eq(odbValidation.isNumber(value), true)]),
+            'value',
           ),
         )
         typed.ifThen(
@@ -120,19 +122,23 @@ export function defineSettingsValidation(pkg: PackageImpl) {
             oneOf(fieldType, ['switch', 'checkbox']),
             cond.or([cond.isNull(value), cond.not(oneOf(value, ['Y', 'N']))]),
           ]),
-          invalidValue,
+          (invalidSwitch) => invalidSwitch.invalid('SETTINGS_VALIDATION_INVALID', 'value'),
         )
         typed.ifThen(cond.eq(fieldType, 'select'), (select) => {
           checkMember(select, object, 'items', 'array')
           select.set(params, odbJson.getArray(object, odbLiteral('items')))
-          requireValidValue(select, cond.eq(odbValidation.inSet(value, params), true))
+          requireValid(select, cond.eq(odbValidation.inSet(value, params), true), 'value')
         })
       })
       body.ifThen(cond.eq(odbJson.has(object, odbLiteral('rules')), true), (hasRules) => {
         checkMember(hasRules, object, 'rules', 'array')
         hasRules.set(rules, odbJson.getArray(object, odbLiteral('rules')))
-        hasRules.ifThen(cond.isNull(rules), invalid)
-        hasRules.ifThen(cond.gt(odbJson.getSize(rules), 32), invalid)
+        hasRules.ifThen(cond.isNull(rules), (invalidRules) =>
+          invalidRules.invalid('SETTINGS_VALIDATION_INVALID'),
+        )
+        hasRules.ifThen(cond.gt(odbJson.getSize(rules), 32), (tooMany) =>
+          tooMany.invalid('SETTINGS_VALIDATION_INVALID'),
+        )
         hasRules.forRange(
           'ruleIndex',
           0,
@@ -158,7 +164,8 @@ export function defineSettingsValidation(pkg: PackageImpl) {
                         cond.isNull(value),
                         cond.not(cond.regexpLike(value, '^[0-9A-Fa-f]{64}$', 'c')),
                       ]),
-                      invalidValue,
+                      (invalidSecret) =>
+                        invalidSecret.invalid('SETTINGS_VALIDATION_INVALID', 'value'),
                     ),
                   )
                   validators.when(cond.eq(text, 'jwt-issuer'), (issuer) =>
@@ -167,11 +174,12 @@ export function defineSettingsValidation(pkg: PackageImpl) {
                         cond.isNull(value),
                         cond.not(cond.regexpLike(value, '^[!-~]{1,255}$', 'c')),
                       ]),
-                      invalidValue,
+                      (invalidIssuer) =>
+                        invalidIssuer.invalid('SETTINGS_VALIDATION_INVALID', 'value'),
                     ),
                   )
                   validators.when(cond.eq(text, 'port'), (port) =>
-                    requireValidValue(port, cond.eq(odbValidation.isPort(value), true)),
+                    requireValid(port, cond.eq(odbValidation.isPort(value), true), 'value'),
                   )
                   validators.when(cond.eq(text, 'jwt-expiration'), (bounded) => {
                     bounded.ifThen(
@@ -179,19 +187,27 @@ export function defineSettingsValidation(pkg: PackageImpl) {
                         cond.isNull(value),
                         cond.not(cond.regexpLike(value, '^[0-9]{1,5}$', 'c')),
                       ]),
-                      invalidValue,
+                      (invalidExpiration) =>
+                        invalidExpiration.invalid('SETTINGS_VALIDATION_INVALID', 'value'),
                     )
                     bounded.set(number, odbOracle.toNumber(value))
-                    requireValidValue(
+                    requireValid(
                       bounded,
                       cond.and([cond.gte(number, 1), cond.lte(number, 86400)]),
+                      'value',
                     )
                   })
-                  validators.else(invalid)
+                  validators.else((invalidRule) =>
+                    invalidRule.invalid('SETTINGS_VALIDATION_INVALID'),
+                  )
                 })
               },
               (portable) =>
-                requireValidValue(portable, cond.eq(odbValidation.checkRule(value, rule), true)),
+                requireValid(
+                  portable,
+                  cond.eq(odbValidation.checkRule(value, rule), true),
+                  'value',
+                ),
             )
           },
         )

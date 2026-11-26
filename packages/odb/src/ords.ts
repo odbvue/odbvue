@@ -532,8 +532,7 @@ export class OrdsEndpoint {
     const auditEvent = `${this.module}.${this.procedureName.toLowerCase()}`
     const operation = toKebabCase(this.procedureName).replace(/-/g, ' ')
     const failureMessage = `${operation.charAt(0).toUpperCase()}${operation.slice(1)} failed`
-    const auditServerError =
-      `IF :status_code BETWEEN 500 AND 599 THEN v_trace_id := LOWER(RAWTOHEX(SYS_GUID())); BEGIN odb_audit.log('ERROR', ${sqlStr(failureMessage)}, odb_audit.attributes('user.id', ${protectedEndpoint ? 'v_auth_user_id' : 'NULL'}, 'event.name', ${sqlStr(auditEvent)}, 'event.outcome', 'failure', 'http.request.method', ${sqlStr(this.effectiveMethod)}, 'http.response.status_code', TO_CHAR(:status_code), 'trace.id', v_trace_id, 'exception.code', TO_CHAR(v_sqlcode), 'exception.stack', v_error_stack, 'exception.stacktrace', v_error_backtrace)); EXCEPTION WHEN OTHERS THEN NULL; END; END IF; `
+    const auditServerError = `IF :status_code BETWEEN 500 AND 599 THEN v_trace_id := LOWER(RAWTOHEX(SYS_GUID())); BEGIN EXECUTE IMMEDIATE 'BEGIN odb_audit.log(''ERROR'', :1, odb_audit.attributes(''user.id'', :2, ''event.name'', :3, ''event.outcome'', ''failure'', ''http.request.method'', :4, ''http.response.status_code'', TO_CHAR(:5), ''trace.id'', :6, ''exception.code'', TO_CHAR(:7), ''exception.stack'', :8, ''exception.stacktrace'', :9)); END;' USING ${sqlStr(failureMessage)}, ${protectedEndpoint ? 'v_auth_user_id' : 'NULL'}, ${sqlStr(auditEvent)}, ${sqlStr(this.effectiveMethod)}, :status_code, v_trace_id, v_sqlcode, v_error_stack, v_error_backtrace; EXCEPTION WHEN OTHERS THEN NULL; END; END IF; `
     const parseJsonBody = this._params.some(
       (param) =>
         this.paramSourceType(param) === 'BODY' &&

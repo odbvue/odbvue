@@ -22,18 +22,11 @@ export interface OdbValidationErrorDetail {
   params?: Record<string, string | number | boolean | null>
 }
 
-/** @deprecated Use { field, code, params } for new field errors. */
-export type OdbLegacyValidationErrorDetail = {
-  name: string
-  message: string
-  params?: Record<string, string | number | boolean | null>
-}
-
 /** SQLERRM can truncate longer application messages; keep the entire envelope bounded. */
 export function odbErrorEnvelope(
   kind: OdbErrorKind,
   code: string,
-  errors?: Array<OdbValidationErrorDetail | OdbLegacyValidationErrorDetail>,
+  errors?: OdbValidationErrorDetail[],
 ): string {
   let envelope = `ODB_ERROR|${kind}|${code}`
   if (errors !== undefined) {
@@ -41,9 +34,8 @@ export function odbErrorEnvelope(
       throw new Error('Field errors require a nonempty validation error list.')
     }
     for (const error of errors) {
-      const field = 'field' in error ? error.field : error.name
-      const errorCode = 'code' in error ? error.code : ''
-      const translation = 'message' in error ? error.message : ''
+      const field = error.field
+      const errorCode = error.code
       if (
         !field.trim() ||
         field.length > 128 ||
@@ -51,11 +43,7 @@ export function odbErrorEnvelope(
       ) {
         throw new Error('Invalid field error name.')
       }
-      if ('message' in error) {
-        if (!/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)*$/.test(translation)) {
-          throw new Error('Invalid field error translation key.')
-        }
-      } else if (!ODB_ERROR_CODE_PATTERN.test(errorCode)) {
+      if (!ODB_ERROR_CODE_PATTERN.test(errorCode)) {
         throw new Error('Invalid field error code.')
       }
       if (
