@@ -129,7 +129,7 @@ describe('Settings', () => {
     expect(validator).toContain('p_value IS NULL OR odb_validation.is_number(p_value) = TRUE')
     expect(validator).toContain('odb_validation.is_port(p_value) = TRUE')
     expect(validator).toMatch(
-      /odb_validation\.check_rule\(p_value, l_rule\) = TRUE THEN\s+NULL;\s+ELSE\s+raise_application_error\(-20998, 'ODB_ERROR\|VALIDATION_ERROR\|SETTINGS_VALIDATION_INVALID'\)/,
+      /odb_validation\.check_rule\(p_value, l_rule\) = TRUE THEN\s+NULL;\s+ELSE\s+raise_application_error\(-20998, 'ODB_ERROR\|VALIDATION_ERROR\|SETTINGS_VALIDATION_INVALID\|\{"errors":\[\{"name":"value","message":"admin.settingValidationError"\}\]\}'\)/,
     )
     const writeStart = sql.indexOf(
       'PROCEDURE write(p_id IN odb_settings_store.id%TYPE, p_value IN VARCHAR2, p_meta IN odb_settings_store.meta%TYPE) IS',

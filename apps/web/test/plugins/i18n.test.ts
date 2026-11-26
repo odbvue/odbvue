@@ -159,12 +159,32 @@ describe('application locale discovery and collection', () => {
           'utf-8',
         ),
       )
-      for (const key of ['copy.to.clipboard', 'close', 'filter', 'attributes']) {
+      for (const key of [
+        'copy.to.clipboard',
+        'close',
+        'filter',
+        'attributes',
+        'errors.requestFailed',
+        'errors.invalidFields',
+      ]) {
         expect(i18n.global.t(key, {}, { locale })).toBe(appMessages[key])
         expect(i18n.global.t(key, {}, { locale })).not.toBe(key)
       }
       expect(i18n.global.t('admin.audit', {}, { locale })).toBe(adminMessages['admin.audit'])
       expect(i18n.global.t('admin.audit', {}, { locale })).not.toBe('admin.audit')
+      for (const key of [
+        'admin.settingValidationError',
+        'admin.settingTooLong',
+        'admin.settingSecretRequired',
+        'errors.SETTINGS_REQUIRE_TRUSTED_SETUP',
+        'errors.SETTING_NOT_FOUND',
+      ]) {
+        expect(i18n.global.t(key, {}, { locale })).toBe(adminMessages[key])
+        expect(i18n.global.t(key, {}, { locale })).not.toBe(key)
+      }
+      expect(i18n.global.t('errors.requestFailedReference', { traceId: 'ref' }, { locale })).toBe(
+        appMessages['errors.requestFailedReference'].replace('{traceId}', 'ref'),
+      )
     }
   })
 })

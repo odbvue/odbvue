@@ -41,6 +41,44 @@ describe('HTTP capability', () => {
     expect((await http.put('/status', {})).error?.status).toBe(403)
   })
 
+  it('decodes problem JSON and retains structured details without changing legacy data', async () => {
+    const data = {
+      type: 'urn:odbvue:error:validation',
+      title: 'Validation failed',
+      status: 422,
+      code: 'VALUE_INVALID',
+      errors: [{ name: 'value', message: 'validation.min', params: { min: 60 } }],
+    }
+    const http = useHttp({
+      fetch: vi.fn<FetchMock>(
+        async () =>
+          new Response(JSON.stringify(data), {
+            status: 422,
+            headers: { 'Content-Type': 'application/problem+json' },
+          }),
+      ),
+    })
+    const { error } = await http.put('/setting', {})
+    expect(error?.data).toEqual(data)
+    expect(error?.problem).toEqual({ code: data.code, errors: data.errors })
+    expect(error?.fields).toEqual(data.errors)
+    expect(error?.fields).toBe(error?.problem?.errors)
+  })
+
+  it('does not trust mismatched statuses or malformed field details', async () => {
+    const fetch = vi.fn<FetchMock>()
+    fetch.mockResolvedValueOnce(response(422, { status: 403, code: 'INVALID' }))
+    fetch.mockResolvedValueOnce(
+      response(422, {
+        code: 'INVALID',
+        errors: [{ name: 'value', message: 'validation.invalid', params: { x: {} } }],
+      }),
+    )
+    const http = useHttp({ fetch })
+    expect((await http.put('/setting', {})).error?.problem).toBeUndefined()
+    expect((await http.put('/setting', {})).error?.problem).toEqual({ code: 'INVALID' })
+  })
+
   it('forwards all verb helpers through the client while preserving options and bodies', async () => {
     const fetch = vi.fn<FetchMock>(() => Promise.resolve(response(200, { ok: true })))
     const http = useHttp({ fetch })

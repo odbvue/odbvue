@@ -25,6 +25,9 @@
           :fast-fail="options.fastFail"
           @submit.prevent="handleSubmit"
         >
+          <v-alert v-if="hasUnmappedErrors" type="error" role="alert" class="mb-4">
+            {{ t('errors.invalidFields') }}
+          </v-alert>
           <v-row>
             <v-col
               v-for="field in fields"
@@ -101,6 +104,7 @@
 
 <script setup lang="ts">
 import {
+  VAlert,
   VBtn,
   VTextField,
   VSelect,
@@ -172,7 +176,7 @@ const {
 } = defineProps<{
   options: OvFormOptions
   data?: OvFormData
-  t?: (text?: string) => string
+  t?: (text?: string, params?: Record<string, string | number | boolean | null>) => string
   loading?: boolean
   hideActions?: boolean
   title?: string
@@ -180,6 +184,15 @@ const {
   overlayBoundary?: symbol
 }>()
 provideLoadingOverlayBoundary(overlayBoundary)
+const hasUnmappedErrors = computed(
+  () =>
+    options.errors?.some(
+      (error) =>
+        !options.fields.some(
+          (field) => field.name === error.name && !field.hidden && field.type !== 'custom',
+        ),
+    ) ?? false,
+)
 const loadingOverlay = useLoadingOverlay(
   () => loading,
   () => overlayBoundary,
@@ -644,7 +657,9 @@ const fields = computed(() => {
       errors: options.errors
         ? options.errors
             .filter((error: OvFormFieldError) => error.name === field.name)
-            .map((error: OvFormFieldError) => t(error.message || ''))
+            .map((error: OvFormFieldError) =>
+              error.params ? t(error.message || '', error.params) : t(error.message || ''),
+            )
         : [],
       rules: (() => {
         const fieldRules = (field.rules || []).map((rule) => (value: unknown) => {

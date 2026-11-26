@@ -107,6 +107,13 @@ describe('ODB application contract', () => {
         '/native/state': {
           get: {
             responses: {
+              default: {
+                content: {
+                  'application/problem+json': {
+                    schema: { $ref: '#/components/schemas/OdbProblemDetails' },
+                  },
+                },
+              },
               '200': {
                 content: {
                   'application/json': {

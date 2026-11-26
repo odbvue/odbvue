@@ -22,6 +22,7 @@ import Roles from '@/modules/admin/pages/roles/index.vue'
 import Settings from '@/modules/admin/pages/settings/index.vue'
 import App from '@/app/App.vue'
 import messages from '@/modules/admin/i18n/en.json'
+import { i18n } from '@/capabilities/i18n'
 import {
   renderViewItem,
   type OvTableOptions,
@@ -104,6 +105,10 @@ const pages = import.meta.glob<string>('@/modules/admin/pages/**/*.vue', {
 })
 const wrappers: ReturnType<typeof mount>[] = []
 const ui = useUi()
+
+beforeEach(() => {
+  i18n.global.mergeLocaleMessage('en', messages)
+})
 
 async function setup(
   page: boolean | 'roles' | 'permissions' | 'audit' | 'global-audit' | 'settings' = false,
@@ -336,9 +341,46 @@ describe('admin settings', () => {
     expect(putRole).toHaveBeenCalledExactlyOnceWith('/admin/settings/API_TOKEN', {
       value: 'new-test-value',
     })
-
     expect(complete).toHaveBeenLastCalledWith({ status: 'success', refetch: true })
     expect(row.value).toBeNull()
+  })
+
+  it('shows server validation on the field without a global notification', async () => {
+    const { wrapper } = await setup('settings')
+    const complete = vi.fn<OvActionComplete>()
+    const error = Object.assign(new Error('Request failed'), {
+      status: 422,
+      request: '/admin/settings/SMTP_HOST',
+      problem: { code: 'SETTINGS_VALIDATION_INVALID' },
+      fields: [{ name: 'value', message: 'admin.settingValidationError' }],
+    })
+    putRole.mockResolvedValueOnce({ data: null, error, status: 422, headers: null })
+    wrapper
+      .findComponent(table)
+      .vm.$emit('action', 'admin.editSetting', [], { id: 'SMTP_HOST', value: 'bad' }, complete)
+    await flushPromises()
+    expect(complete).toHaveBeenCalledExactlyOnceWith({
+      status: 'invalid',
+      errors: [{ name: 'value', message: 'admin.settingValidationError' }],
+    })
+    expect(ui.notification.value).toBeUndefined()
+  })
+
+  it('shows a translated business error without closing the form', async () => {
+    const { wrapper } = await setup('settings')
+    const complete = vi.fn<OvActionComplete>()
+    const error = Object.assign(new Error('Request failed'), {
+      status: 403,
+      request: '/admin/settings/SMTP_HOST',
+      problem: { code: 'SETTINGS_REQUIRE_TRUSTED_SETUP' },
+    })
+    putRole.mockResolvedValueOnce({ data: null, error, status: 403, headers: null })
+    wrapper
+      .findComponent(table)
+      .vm.$emit('action', 'admin.editSetting', [], { id: 'SMTP_HOST', value: 'bad' }, complete)
+    await flushPromises()
+    expect(complete).toHaveBeenCalledExactlyOnceWith({ status: 'error' })
+    expect(ui.notification.value?.message).toBe('errors.SETTINGS_REQUIRE_TRUSTED_SETUP')
   })
 
   it('reports malformed submissions without sending an update', async () => {
@@ -384,14 +426,15 @@ describe('admin settings', () => {
     },
   )
 
-  it.each(['response', 'rejection'])(
+  it.each(['response', 'rejection', 'empty rejection'])(
     'explicitly completes with an error on HTTP %s',
     async (kind) => {
       const { wrapper } = await setup('settings')
       const row = { id: 'CUSTOM_POLICY', secret: 'N', readonly: 'Y', value: 'Y' }
       const complete = vi.fn<OvActionComplete>()
       if (kind === 'response') putRole.mockResolvedValueOnce(failure(403))
-      else putRole.mockRejectedValueOnce(new Error('Network unavailable'))
+      else if (kind === 'rejection') putRole.mockRejectedValueOnce(new Error('Network unavailable'))
+      else putRole.mockRejectedValueOnce(undefined)
       wrapper.findComponent(table).vm.$emit('action', 'admin.editSetting', [row], row, complete)
       await flushPromises()
       expect(putRole).toHaveBeenCalledExactlyOnceWith('/admin/settings/CUSTOM_POLICY', {
@@ -400,7 +443,7 @@ describe('admin settings', () => {
       expect(complete).toHaveBeenCalledExactlyOnceWith({ status: 'error' })
       expect(ui.notification.value).toMatchObject({
         type: 'error',
-        message: kind === 'response' ? 'admin.updateSettingError' : 'Network unavailable',
+        message: 'errors.requestFailed',
       })
     },
   )

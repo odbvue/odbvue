@@ -2,6 +2,7 @@ import { defineStore, acceptHMRUpdate, storeToRefs, type Pinia } from 'pinia'
 import { ref, computed, readonly, onScopeDispose } from 'vue'
 import { pinia } from '../state'
 import { createLoading } from './loading'
+import { mutationError } from './mutation-error'
 
 export interface AlertOptions {
   timeout?: number
@@ -207,6 +208,8 @@ export function useUi(state: Pinia = pinia) {
     warning: (message: string, options?: AlertOptions) => store.show('warning', message, options),
     error: (error: unknown, options?: AlertOptions) =>
       store.show('error', messageFrom(error), options),
+    mutationError: (error: unknown) =>
+      mutationError(error, (message) => store.show('error', message)),
     snack: (message: string, options?: AlertOptions) => store.show('info', message, options),
   }
 }

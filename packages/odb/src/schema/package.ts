@@ -37,7 +37,9 @@ import {
   ODB_ERROR_CODE_PATTERN,
   ODB_ERROR_NUMBER,
   ODB_ERROR_STATUS,
+  odbErrorEnvelope,
   type OdbErrorKind,
+  type OdbValidationErrorDetail,
 } from './errors.js'
 
 // ── Query builder integration ─────────────────────────────────────────────────
@@ -659,7 +661,7 @@ export class ProcedureBody {
    * Raise a transport-independent ODB error. Services translate the kind to
    * a transport status (HTTP for ORDS); `code` defaults to the kind.
    */
-  raiseError(kind: OdbErrorKind, code: string = kind): this {
+  raiseError(kind: OdbErrorKind, code: string = kind, errors?: OdbValidationErrorDetail[]): this {
     if (!Object.hasOwn(ODB_ERROR_STATUS, kind)) {
       throw new Error(`raiseError: unknown error kind ${kind}.`)
     }
@@ -668,13 +670,13 @@ export class ProcedureBody {
     }
     return this.raiseApplicationError(
       ODB_ERROR_NUMBER,
-      new PlsqlExpression('VARCHAR2', renderPlsqlLiteral(`ODB_ERROR|${kind}|${code}`)),
+      new PlsqlExpression('VARCHAR2', renderPlsqlLiteral(odbErrorEnvelope(kind, code, errors))),
     )
   }
 
   /** Raise a `VALIDATION_ERROR` ODB error. */
-  invalid(code?: string): this {
-    return this.raiseError('VALIDATION_ERROR', code)
+  invalid(code?: string, errors?: OdbValidationErrorDetail[]): this {
+    return this.raiseError('VALIDATION_ERROR', code, errors)
   }
 
   /** Raise an `UNAUTHORIZED` ODB error. */

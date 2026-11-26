@@ -8,6 +8,7 @@ import { odbVueComponentIcons } from './icons.js'
 
 export { usePreferencesStore } from './preferences.js'
 export { useUi } from './store.js'
+export { mutationError } from './mutation-error.js'
 export {
   useCardBackground,
   useNotificationMessage,

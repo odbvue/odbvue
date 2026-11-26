@@ -1,10 +1,68 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { isReadonly } from 'vue'
 import { createState } from '@/capabilities/state'
 import { createLoading } from '@/capabilities/ui/loading'
 import { useUi } from '@/capabilities/ui/store'
+import { mutationError } from '@/capabilities/ui/mutation-error'
+import { i18n } from '@/capabilities/i18n'
+import { createHttpClient } from '@/capabilities/http/core'
+import appMessages from '@/app/i18n/en.json'
+import adminMessages from '@/modules/admin/i18n/en.json'
+
+beforeAll(() => {
+  i18n.global.mergeLocaleMessage('en', { ...appMessages, ...adminMessages })
+})
 
 describe('keyed UI loading', () => {
+  it('passes form-ready validation errors through unchanged', () => {
+    const notify = vi.fn<(message: string) => void>()
+    const fields = [{ name: 'value', message: 'admin.settingValidationError', params: { min: 60 } }]
+    const error = Object.assign(new Error('request'), {
+      status: 422,
+      fields,
+      problem: { code: 'INVALID' },
+    })
+    const result = mutationError(error, notify)
+    expect(result).toEqual({ status: 'invalid', errors: fields })
+    if (result.status === 'invalid') expect(result.errors).toBe(fields)
+    expect(notify).not.toHaveBeenCalled()
+    fields.push({ name: 'other', message: 'missing.translation', params: { min: 1 } })
+    expect(mutationError(error, notify)).toEqual({ status: 'error' })
+    expect(notify).toHaveBeenCalledExactlyOnceWith('errors.requestFailed')
+  })
+
+  it('passes a decoded HTTP problem directly to form completion', async () => {
+    const fields = [{ name: 'value', message: 'admin.settingValidationError' }]
+    const client = createHttpClient({
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            status: 422,
+            code: 'SETTINGS_VALIDATION_INVALID',
+            errors: fields,
+          }),
+          { status: 422, headers: { 'Content-Type': 'application/problem+json' } },
+        ),
+    })
+    const { error } = await client.put('/admin/settings/example', { value: 'bad' })
+    const notify = vi.fn<(message: string) => void>()
+    const result = mutationError(error, notify)
+    expect(result).toEqual({ status: 'invalid', errors: fields })
+    if (result.status === 'invalid') expect(result.errors).toBe(error?.fields)
+    expect(notify).not.toHaveBeenCalled()
+  })
+
+  it('shows a trace reference for internal failures without exposing server text', () => {
+    const notify = vi.fn<(message: string) => void>()
+    const error = Object.assign(new Error('sensitive technical detail'), {
+      status: 500,
+      problem: { code: 'INTERNAL_SERVER_ERROR', traceId: '0123456789abcdef0123456789abcdef' },
+    })
+    expect(mutationError(error, notify)).toEqual({ status: 'error' })
+    expect(notify.mock.calls[0]?.[0]).toContain('0123456789abcdef0123456789abcdef')
+    expect(notify.mock.calls[0]?.[0]).not.toContain('sensitive technical detail')
+  })
+
   it('keeps a replaceable page alert independent of the snackbar queue and its lifecycle', async () => {
     const state = createState()
     const ui = useUi(state)

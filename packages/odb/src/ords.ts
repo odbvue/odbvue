@@ -535,12 +535,18 @@ export class OrdsEndpoint {
     const auditServerError =
       this._auth === undefined
         ? ''
-        : `IF :status_code BETWEEN 500 AND 599 THEN odb_audit.log('ERROR', ${sqlStr(failureMessage)}, odb_audit.attributes('user.id', ${protectedEndpoint ? 'v_auth_user_id' : 'NULL'}, 'event.name', ${sqlStr(auditEvent)}, 'event.outcome', 'failure', 'http.request.method', ${sqlStr(this.effectiveMethod)}, 'http.response.status_code', TO_CHAR(:status_code), 'exception.stacktrace', SUBSTR(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, 1, 2000))); END IF; `
+        : `IF :status_code BETWEEN 500 AND 599 THEN v_trace_id := LOWER(RAWTOHEX(SYS_GUID())); odb_audit.log('ERROR', ${sqlStr(failureMessage)}, odb_audit.attributes('user.id', ${protectedEndpoint ? 'v_auth_user_id' : 'NULL'}, 'event.name', ${sqlStr(auditEvent)}, 'event.outcome', 'failure', 'http.request.method', ${sqlStr(this.effectiveMethod)}, 'http.response.status_code', TO_CHAR(:status_code), 'trace.id', v_trace_id, 'exception.stacktrace', SUBSTR(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, 1, 2000))); END IF; `
     const parseJsonBody = this._params.some(
-      (param) => this.paramSourceType(param) === 'BODY' && param.odbType === 'clob',
+      (param) =>
+        this.paramSourceType(param) === 'BODY' &&
+        param.odbType !== 'blob' &&
+        param.plsqlArg.toUpperCase() !== 'P_BODY',
     )
     const declarations = [
       'v_error_code VARCHAR2(100);',
+      'v_error_details VARCHAR2(4000);',
+      'v_field_errors VARCHAR2(4000);',
+      'v_trace_id VARCHAR2(32);',
       ...(this._cursorPage
         ? [
             'v_page_limit NUMBER;',
@@ -625,7 +631,7 @@ export class OrdsEndpoint {
     const normalizeBody = binaryBody
       ? 'IF v_binary_body IS NULL THEN DBMS_LOB.CREATETEMPORARY(v_binary_body, TRUE, DBMS_LOB.CALL); END IF; '
       : parseJsonBody
-        ? 'v_body_json := JSON_OBJECT_T.parse(v_body); '
+        ? "IF v_body IS NULL THEN v_body_json := JSON_OBJECT_T(); ELSE DECLARE e_bad_json EXCEPTION; PRAGMA EXCEPTION_INIT(e_bad_json, -40441); e_bad_object EXCEPTION; PRAGMA EXCEPTION_INIT(e_bad_object, -40587); BEGIN v_body_json := JSON_OBJECT_T.parse(v_body); EXCEPTION WHEN e_bad_json OR e_bad_object THEN raise_application_error(-20999, 'ODB_HTTP|400|INVALID_REQUEST'); END; END IF; "
         : ''
     const jsonResponse = this.nativeJsonResponse
       ? [
@@ -663,6 +669,8 @@ export class OrdsEndpoint {
     const odbEnvelope = "'ODB_ERROR\\|([A-Z][A-Z0-9_]{0,99})\\|([A-Z][A-Z0-9_]{0,99})'"
     const odbKind = `REGEXP_SUBSTR(SQLERRM, ${odbEnvelope}, 1, 1, NULL, 1)`
     const odbCode = `REGEXP_SUBSTR(SQLERRM, ${odbEnvelope}, 1, 1, NULL, 2)`
+    const detailsEnvelope =
+      "'ODB_ERROR\\|([A-Z][A-Z0-9_]{0,99})\\|([A-Z][A-Z0-9_]{0,99})\\|(\\{.*\\})'"
     const odbStatus = Object.entries(ODB_ERROR_STATUS)
       .map(([kind, httpStatus]) => `WHEN '${kind}' THEN ${httpStatus}`)
       .join(' ')
@@ -671,10 +679,12 @@ export class OrdsEndpoint {
       `:status_code := TO_NUMBER(${status}); v_error_code := ${code};`,
       `ELSIF SQLCODE = ${ODB_ERROR_NUMBER} AND ${odbCode} IS NOT NULL THEN`,
       `:status_code := CASE ${odbKind} ${odbStatus} ELSE 500 END; v_error_code := ${odbCode};`,
+      `IF :status_code = 422 THEN v_error_details := REGEXP_SUBSTR(SQLERRM, ${detailsEnvelope}, 1, 1, NULL, 3);`,
+      `SELECT JSON_QUERY(v_error_details, '$.errors' RETURNING VARCHAR2(4000) NULL ON ERROR) INTO v_field_errors FROM dual; END IF;`,
       `ELSE :status_code := 500; v_error_code := 'INTERNAL_SERVER_ERROR'; END IF;`,
-      `${auditServerError}owa_util.mime_header('application/json', FALSE);`,
+      `ROLLBACK; ${auditServerError}owa_util.mime_header('application/problem+json', FALSE);`,
       'owa_util.http_header_close;',
-      `htp.p(JSON_OBJECT('code' VALUE v_error_code));`,
+      `htp.p(JSON_OBJECT('type' VALUE 'urn:odbvue:error:' || CASE :status_code WHEN 400 THEN 'invalid-request' WHEN 401 THEN 'authentication' WHEN 403 THEN 'authorization' WHEN 404 THEN 'not-found' WHEN 409 THEN 'conflict' WHEN 422 THEN 'validation' WHEN 429 THEN 'rate-limit' ELSE CASE WHEN :status_code < 500 THEN 'request-failed' ELSE 'internal' END END, 'title' VALUE CASE :status_code WHEN 400 THEN 'Invalid request' WHEN 401 THEN 'Authentication required' WHEN 403 THEN 'Forbidden' WHEN 404 THEN 'Not found' WHEN 409 THEN 'Conflict' WHEN 422 THEN 'Validation failed' WHEN 429 THEN 'Too many requests' ELSE CASE WHEN :status_code < 500 THEN 'Request failed' ELSE 'Internal server error' END END, 'status' VALUE :status_code, 'code' VALUE v_error_code, 'errors' VALUE v_field_errors FORMAT JSON, 'traceId' VALUE v_trace_id ABSENT ON NULL));`,
     ].join(' ')
     const closeCursors = this.nativeCursorOutputs
       .map((p) => {

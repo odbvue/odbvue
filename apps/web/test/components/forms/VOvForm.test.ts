@@ -116,6 +116,30 @@ describe('VOvForm', () => {
     expect(wrapper.text()).toContain('Email')
   })
 
+  it('translates server field errors with their parameters', () => {
+    const wrapper = mount(VOvForm, {
+      props: {
+        options: {
+          fields: [{ type: 'text', name: 'value' }],
+          errors: [{ name: 'value', message: 'validation.min', params: { min: 60 } }],
+        },
+        t: (key, params) => (key === 'validation.min' ? `Minimum ${params?.min}` : (key ?? '')),
+      },
+      global: { plugins: globalPlugins },
+    })
+    expect(wrapper.text()).toContain('Minimum 60')
+    wrapper.unmount()
+  })
+
+  it('shows a form-level warning when a server field is not present', () => {
+    const wrapper = mountForm({
+      fields: [{ type: 'text', name: 'value' }],
+      errors: [{ name: 'missing', message: 'validation.min' }],
+    })
+    expect(wrapper.get('[role="alert"]').text()).toContain('errors.invalidFields')
+    wrapper.unmount()
+  })
+
   it('renders with initial data', async () => {
     const wrapper = mountForm(
       {

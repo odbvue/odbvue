@@ -654,6 +654,39 @@ describe('ProcedureBody control flow and exceptions', () => {
       const { conn } = body.variables({ conn: odbType.custom('UTL_SMTP.CONNECTION') })
       expect(() => conn.field('bad.field', 'VARCHAR2')).toThrow('invalid record field')
     })
+
+    it('bounds and validates structured validation details before generating SQL', () => {
+      const body = new ProcedureBody()
+      body.invalid('VALUE_INVALID', [
+        { name: 'value', message: 'validation.min', params: { min: 60 } },
+      ])
+      const pkg = odbPackage('test_errors', (p) => ({
+        run: p.proc('run', {}, ({ body: target }) =>
+          target.invalid('VALUE_INVALID', [
+            { name: 'value', message: 'validation.min', params: { min: 60 } },
+          ]),
+        ),
+      }))
+      expect(pkg.toSQLUp()).toContain(
+        '{"errors":[{"name":"value","message":"validation.min","params":{"min":60}}]}',
+      )
+      expect(() =>
+        body.invalid('BAD', [{ name: 'bad\nfield', message: 'validation.bad' }]),
+      ).toThrow('Invalid field')
+      expect(() =>
+        body.invalid('BAD', [
+          { name: 'value', message: 'validation.bad', params: { min: Infinity } },
+        ]),
+      ).toThrow('finite')
+      expect(() =>
+        body.invalid('BAD', [
+          { name: 'value', message: 'validation.bad', params: { text: 'x'.repeat(400) } },
+        ]),
+      ).toThrow('400 bytes')
+      expect(() =>
+        body.raiseError('CONFLICT', 'BAD', [{ name: 'value', message: 'validation.bad' }]),
+      ).toThrow('validation')
+    })
   })
 
   it('derives named input parameter names and column anchored types', () => {

@@ -117,7 +117,7 @@ const {
 } = defineProps<{
   data: OvViewData
   options?: OvViewOptions
-  t?: (text?: string) => string
+  t?: (text?: string, params?: Record<string, string | number | boolean | null>) => string
   loading?: boolean
 }>()
 const { submitting, submit } = useFormSubmission()

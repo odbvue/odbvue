@@ -265,6 +265,7 @@ type OvFormField =
 export type OvFormFieldError = {
   name: string
   message: string
+  params?: Record<string, string | number | boolean | null>
 }
 
 export type OvActionResult =

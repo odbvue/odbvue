@@ -132,6 +132,8 @@ describe('app-owned ORDS migrations', () => {
       list.params.find((param) => param.resultColumns)?.resultColumns?.map((c) => c.name),
     ).toEqual(['id', 'secret', 'readonly', 'meta', 'value'])
     expect(update.source).toContain(':status_code := 204')
+    expect(update.source).toContain('v_body_json := JSON_OBJECT_T.parse(v_body)')
+    expect(update.source).toContain('ODB_HTTP|400|INVALID_REQUEST')
     expect(update.params.some((param) => param.sourceType === 'RESPONSE')).toBe(false)
     const sql = migration.compile().up().join('\n')
     expect(sql).toMatch(
@@ -209,7 +211,7 @@ describe('app-owned ORDS migrations', () => {
           expect(exceptionPath.match(/odb_audit\.log\(/g)).toHaveLength(1)
           const [audit] =
             exceptionPath.match(
-              /IF :status_code BETWEEN 500 AND 599 THEN odb_audit\.log\([^;]+; END IF;/,
+              /IF :status_code BETWEEN 500 AND 599 THEN v_trace_id := LOWER\(RAWTOHEX\(SYS_GUID\(\)\)\); odb_audit\.log\([^;]+; END IF;/,
             ) ?? []
           expect(audit).toBeDefined()
           const event = `${node.module}.${node.procedureName.toLowerCase()}`
@@ -226,11 +228,13 @@ describe('app-owned ORDS migrations', () => {
           expect(audit).toContain("'event.outcome', 'failure'")
           expect(audit).toContain(`'http.request.method', '${node.method}'`)
           expect(audit).toContain("'http.response.status_code', TO_CHAR(:status_code)")
+          expect(audit).toContain("'trace.id', v_trace_id")
           expect(audit).toContain(
             "'exception.stacktrace', SUBSTR(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, 1, 2000)",
           )
           const response = exceptionPath.slice(exceptionPath.indexOf(audit) + audit.length)
-          expect(response).toContain("htp.p(JSON_OBJECT('code' VALUE v_error_code))")
+          expect(response).toContain("'code' VALUE v_error_code")
+          expect(response).toContain("'traceId' VALUE v_trace_id")
           expect(response).not.toMatch(/SQLERRM|BACKTRACE|stacktrace/i)
         }
       }

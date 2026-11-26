@@ -781,6 +781,22 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        OdbProblemDetails: {
+            type: string;
+            title: string;
+            status: number;
+            code: string;
+            traceId?: string;
+            errors?: {
+                /** @description Form field name. */
+                name: string;
+                /** @description Translation key, not localized text. */
+                message: string;
+                params?: {
+                    [key: string]: string | number | boolean | null;
+                };
+            }[];
+        };
         AuthGoogleStartResponse: {
             authorizationUrl: string;
         };
@@ -1103,6 +1119,15 @@ export interface operations {
                     "application/json": components["schemas"]["AuthGoogleStartResponse"];
                 };
             };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
         };
     };
     auth_google_callback: {
@@ -1127,6 +1152,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthGoogleCallbackResponse"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
                 };
             };
         };
@@ -1165,7 +1199,18 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -1192,6 +1237,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthLoginResponse"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
                 };
             };
         };
@@ -1221,6 +1275,15 @@ export interface operations {
                     "application/json": components["schemas"]["AuthVerifyTwoFactorResponse"];
                 };
             };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
         };
     };
     auth_refresh: {
@@ -1241,6 +1304,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthRefreshResponse"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
                 };
             };
         };
@@ -1265,6 +1337,15 @@ export interface operations {
                     "application/json": components["schemas"]["AuthLogoutResponse"];
                 };
             };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
         };
     };
     auth_get_config: {
@@ -1283,6 +1364,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthGetConfigResponse"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
                 };
             };
         };
@@ -1310,7 +1400,18 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -1341,6 +1442,15 @@ export interface operations {
                     "application/json": components["schemas"]["AuthSignupResponse"];
                 };
             };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
         };
     };
     auth_confirm_signup: {
@@ -1365,6 +1475,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthConfirmSignupResponse"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
                 };
             };
         };
@@ -1393,6 +1512,15 @@ export interface operations {
                     "application/json": components["schemas"]["AuthRecoverPasswordResponse"];
                 };
             };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
         };
     };
     auth_reset_password: {
@@ -1419,6 +1547,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthResetPasswordResponse"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
                 };
             };
         };
@@ -1452,7 +1589,18 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -1481,7 +1629,18 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -1516,7 +1675,18 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -1543,6 +1713,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SandboxAuthLoginResponse"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
                 };
             };
         };
@@ -1572,6 +1751,15 @@ export interface operations {
                     "application/json": components["schemas"]["SandboxAuthVerifyTwoFactorResponse"];
                 };
             };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
         };
     };
     sandbox_auth_refresh: {
@@ -1594,6 +1782,15 @@ export interface operations {
                     "application/json": components["schemas"]["SandboxAuthRefreshResponse"];
                 };
             };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
         };
     };
     sandbox_auth_logout: {
@@ -1614,6 +1811,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SandboxAuthLogoutResponse"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
                 };
             };
         };
@@ -1641,7 +1847,18 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -1671,21 +1888,36 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Authentication required */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -1714,14 +1946,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -1756,14 +2001,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -1793,21 +2051,36 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Authentication required */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -1840,14 +2113,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -1880,14 +2166,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -1920,14 +2219,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -1957,14 +2269,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Authentication required */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -1999,7 +2324,18 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2028,7 +2364,18 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2057,7 +2404,18 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2087,21 +2445,36 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Authentication required */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2139,14 +2512,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2175,14 +2561,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2209,14 +2608,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2247,14 +2659,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2285,14 +2710,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2323,14 +2761,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2361,14 +2812,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2399,14 +2863,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2437,14 +2914,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2475,21 +2965,36 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Authentication required */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2518,14 +3023,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2560,14 +3078,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2598,21 +3129,36 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Authentication required */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2645,21 +3191,36 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Authentication required */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2695,14 +3256,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2735,21 +3309,36 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Authentication required */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2780,21 +3369,36 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Authentication required */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2829,14 +3433,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2873,21 +3490,36 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Authentication required */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };
@@ -2923,21 +3555,36 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Authentication required */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
             /** @description Insufficient authorization */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
             };
         };
     };

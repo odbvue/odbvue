@@ -20,6 +20,18 @@ export interface HttpError extends Error {
   status: number | null
   data?: unknown
   request: string
+  problem?: ApiProblem
+  fields?: ApiFieldError[]
+}
+export interface ApiFieldError {
+  name: string
+  message: string
+  params?: Record<string, string | number | boolean | null>
+}
+export interface ApiProblem {
+  code: string
+  errors?: ApiFieldError[]
+  traceId?: string
 }
 export interface HttpSlowRequestContext {
   request: string
@@ -115,12 +127,62 @@ function getErrorStatus(error: unknown): number | null {
 function createHttpError(error: unknown, request: string, status: number | null): HttpError {
   const source = error instanceof Error ? error : new Error(String(error))
   const response = error as { data?: unknown }
+  const problem = normalizeProblem(response?.data, status)
   return Object.assign(new Error(source.message), {
     name: source.name,
     status,
     request,
     data: response?.data,
+    problem,
+    fields: status === 422 ? problem?.errors : undefined,
   })
+}
+
+function normalizeProblem(data: unknown, status: number | null): ApiProblem | undefined {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return
+  const body = data as Record<string, unknown>
+  if (typeof body.code !== 'string' || !/^[A-Z][A-Z0-9_]{0,99}$/.test(body.code)) return
+  if (body.status !== undefined && body.status !== status) return
+  const problem: ApiProblem = { code: body.code }
+  if (typeof body.traceId === 'string' && /^[a-f0-9]{32}$/.test(body.traceId))
+    problem.traceId = body.traceId
+  if (body.errors !== undefined) {
+    if (!Array.isArray(body.errors) || body.errors.length === 0) return problem
+    const errors: ApiFieldError[] = []
+    for (const item of body.errors) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return problem
+      const { name, message, params } = item as Record<string, unknown>
+      if (
+        typeof name !== 'string' ||
+        !name.trim() ||
+        name.length > 128 ||
+        [...name].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127) ||
+        typeof message !== 'string' ||
+        !/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)*$/.test(message)
+      )
+        return problem
+      if (params !== undefined) {
+        if (!params || typeof params !== 'object' || Array.isArray(params)) return problem
+        if (
+          Object.values(params).some(
+            (value) =>
+              value !== null &&
+              typeof value !== 'string' &&
+              typeof value !== 'boolean' &&
+              (typeof value !== 'number' || !Number.isFinite(value)),
+          )
+        )
+          return problem
+      }
+      errors.push({
+        name,
+        message,
+        ...(params === undefined ? {} : { params: params as ApiFieldError['params'] }),
+      })
+    }
+    problem.errors = errors
+  }
+  return problem
 }
 
 function isAbortError(error: unknown): boolean {

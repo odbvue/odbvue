@@ -126,12 +126,16 @@ async function saveSetting(
     })
   }
   const { id, value } = submission
-  const result = await ui.action('admin.settings.update', async () => {
-    const { error } = await http.put(`/admin/settings/${encodeURIComponent(id)}`, { value })
-    if (error) throw new Error('admin.updateSettingError')
-  })
-  if (!result.ok) return complete({ status: 'error' })
-  complete({ status: 'success', refetch: true })
-  ui.success('admin.settingSaved')
+  const result = await ui.loading
+    .run('admin.settings.update', () =>
+      http.put(`/admin/settings/${encodeURIComponent(id)}`, { value }),
+    )
+    .then(
+      ({ error }) =>
+        error ? ui.mutationError(error) : { status: 'success' as const, refetch: true },
+      (error: unknown) => ui.mutationError(error),
+    )
+  complete(result)
+  if (result.status === 'success') ui.success('admin.settingSaved')
 }
 </script>

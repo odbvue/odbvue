@@ -33,8 +33,14 @@ const fieldTypes = [
 const oneOf = (value: PlsqlValue, choices: readonly string[]) =>
   cond.or(choices.map((choice) => cond.eq(value, choice)))
 const invalid = (body: ProcedureBody) => body.invalid('SETTINGS_VALIDATION_INVALID')
+const invalidValue = (body: ProcedureBody) =>
+  body.invalid('SETTINGS_VALIDATION_INVALID', [
+    { name: 'value', message: 'admin.settingValidationError' },
+  ])
 const requireValid = (body: ProcedureBody, condition: PlsqlBooleanExpression) =>
   body.ifThen(condition, (valid) => valid.null(), invalid)
+const requireValidValue = (body: ProcedureBody, condition: PlsqlBooleanExpression) =>
+  body.ifThen(condition, (valid) => valid.null(), invalidValue)
 
 export function defineSettingsValidation(pkg: PackageImpl) {
   return pkg.privateProc('validate_setting', (proc) => {
@@ -106,7 +112,7 @@ export function defineSettingsValidation(pkg: PackageImpl) {
           invalid,
         )
         typed.ifThen(cond.eq(fieldType, 'number'), (numeric) =>
-          requireValid(
+          requireValidValue(
             numeric,
             cond.or([cond.isNull(value), cond.eq(odbValidation.isNumber(value), true)]),
           ),
@@ -116,12 +122,12 @@ export function defineSettingsValidation(pkg: PackageImpl) {
             oneOf(fieldType, ['switch', 'checkbox']),
             cond.or([cond.isNull(value), cond.not(oneOf(value, ['Y', 'N']))]),
           ]),
-          invalid,
+          invalidValue,
         )
         typed.ifThen(cond.eq(fieldType, 'select'), (select) => {
           checkMember(select, object, 'items', 'array')
           select.set(params, odbJson.getArray(object, odbLiteral('items')))
-          requireValid(select, cond.eq(odbValidation.inSet(value, params), true))
+          requireValidValue(select, cond.eq(odbValidation.inSet(value, params), true))
         })
       })
       body.ifThen(cond.eq(odbJson.has(object, odbLiteral('rules')), true), (hasRules) => {
@@ -154,7 +160,7 @@ export function defineSettingsValidation(pkg: PackageImpl) {
                         cond.isNull(value),
                         cond.not(cond.regexpLike(value, '^[0-9A-Fa-f]{64}$', 'c')),
                       ]),
-                      invalid,
+                      invalidValue,
                     ),
                   )
                   validators.when(cond.eq(text, 'jwt-issuer'), (issuer) =>
@@ -163,11 +169,11 @@ export function defineSettingsValidation(pkg: PackageImpl) {
                         cond.isNull(value),
                         cond.not(cond.regexpLike(value, '^[!-~]{1,255}$', 'c')),
                       ]),
-                      invalid,
+                      invalidValue,
                     ),
                   )
                   validators.when(cond.eq(text, 'port'), (port) =>
-                    requireValid(port, cond.eq(odbValidation.isPort(value), true)),
+                    requireValidValue(port, cond.eq(odbValidation.isPort(value), true)),
                   )
                   validators.when(cond.eq(text, 'jwt-expiration'), (bounded) => {
                     bounded.ifThen(
@@ -175,16 +181,19 @@ export function defineSettingsValidation(pkg: PackageImpl) {
                         cond.isNull(value),
                         cond.not(cond.regexpLike(value, '^[0-9]{1,5}$', 'c')),
                       ]),
-                      invalid,
+                      invalidValue,
                     )
                     bounded.set(number, odbOracle.toNumber(value))
-                    requireValid(bounded, cond.and([cond.gte(number, 1), cond.lte(number, 86400)]))
+                    requireValidValue(
+                      bounded,
+                      cond.and([cond.gte(number, 1), cond.lte(number, 86400)]),
+                    )
                   })
                   validators.else(invalid)
                 })
               },
               (portable) =>
-                requireValid(portable, cond.eq(odbValidation.checkRule(value, rule), true)),
+                requireValidValue(portable, cond.eq(odbValidation.checkRule(value, rule), true)),
             )
           },
         )

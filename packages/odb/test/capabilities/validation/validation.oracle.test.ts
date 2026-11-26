@@ -5,6 +5,7 @@ import { connect } from '../../../src/execution/oracle.js'
 import { splitSqlStatements } from '../../../src/execution/sql.js'
 import { odbLiteral } from '../../../src/schema/attribute.js'
 import { odbPackage } from '../../../src/schema/package.js'
+import { odbOrdsEndpoint } from '../../../src/ords.js'
 
 const connectString = process.env.ODB_TEST_CONNECT_STRING
 const wallet = process.env.ODB_TEST_WALLET_DIR
@@ -27,6 +28,42 @@ describe.skipIf(!connectString)('validation on Oracle', () => {
   const settingsValidator = declarations(settings)
     .replaceAll('odb_settings_store.meta%TYPE', 'CLOB')
     .replaceAll('odb_validation.', '')
+
+  it('transports a bounded validation envelope through the generated ORDS exception boundary', async () => {
+    const handler = odbOrdsEndpoint('test', 'api', 'limited')
+      .toNode()
+      .source.replace(
+        'api.limited();',
+        `raise_application_error(-20998, 'ODB_ERROR|VALIDATION_ERROR|VALUE_INVALID|{"errors":[{"name":"value","message":"validation.min","params":{"min":60}}]}');`,
+      )
+      .replaceAll(':status_code', 'l_status')
+    await connection.execute(`DECLARE
+  l_status NUMBER;
+  l_names owa.vc_arr;
+  l_values owa.vc_arr;
+  l_lines owa.vc_arr;
+  l_count PLS_INTEGER := 100;
+  l_json JSON_OBJECT_T;
+  l_errors JSON_ARRAY_T;
+  l_field JSON_OBJECT_T;
+BEGIN
+  owa.init_cgi_env(0, l_names, l_values);
+  ${handler}
+  owa.get_page(l_lines, l_count);
+  FOR i IN 1..l_count LOOP
+    IF SUBSTR(l_lines(i), 1, 1) = '{' THEN l_json := JSON_OBJECT_T.parse(l_lines(i)); END IF;
+  END LOOP;
+  IF l_status != 422 OR l_json IS NULL OR l_json.get_string('code') != 'VALUE_INVALID' THEN
+    raise_application_error(-20000, 'Incorrect problem response');
+  END IF;
+  l_errors := l_json.get_array('errors');
+  l_field := TREAT(l_errors.get(0) AS JSON_OBJECT_T);
+  IF l_field.get_string('name') != 'value' OR l_field.get_string('message') != 'validation.min'
+     OR l_field.get_object('params').get_number('min') != 60 THEN
+    raise_application_error(-20000, 'Incorrect field details');
+  END IF;
+END;`)
+  })
 
   beforeAll(async () => {
     connection = await connect({

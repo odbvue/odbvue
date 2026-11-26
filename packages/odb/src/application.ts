@@ -91,14 +91,47 @@ export function generateApplicationOpenApi(
   })
 }
 
+const problemResponse = (description: string) => ({
+  description,
+  content: {
+    'application/problem+json': { schema: { $ref: '#/components/schemas/OdbProblemDetails' } },
+  },
+})
+
 /** Emit one OpenAPI 3.1 document for every service in the supplied applications. */
 export function generateApplicationsOpenApi(
   applications: ApplicationLike[],
   options: OpenApiOptions = {},
 ): Record<string, unknown> {
   const paths: Record<string, Record<string, unknown>> = {}
-  const schemas: Record<string, Record<string, unknown>> = {}
-
+  const schemas: Record<string, Record<string, unknown>> = {
+    OdbProblemDetails: {
+      type: 'object',
+      required: ['type', 'title', 'status', 'code'],
+      properties: {
+        type: { type: 'string' },
+        title: { type: 'string' },
+        status: { type: 'integer' },
+        code: { type: 'string' },
+        traceId: { type: 'string' },
+        errors: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['name', 'message'],
+            properties: {
+              name: { type: 'string', description: 'Form field name.' },
+              message: { type: 'string', description: 'Translation key, not localized text.' },
+              params: {
+                type: 'object',
+                additionalProperties: { type: ['string', 'number', 'boolean', 'null'] },
+              },
+            },
+          },
+        },
+      },
+    },
+  }
   for (const application of applications) {
     for (const endpoint of compileApplicationEndpoints(application).map((value) =>
       value.toNode(),
@@ -229,14 +262,15 @@ export function generateApplicationsOpenApi(
           : {}),
         responses: {
           ...(endpoint.cursorPage
-            ? { '400': { description: 'Invalid limit, cursor, or cursor query context' } }
+            ? { '400': problemResponse('Invalid limit, cursor, or cursor query context') }
             : {}),
           ...(endpoint.auth !== 'anonymous'
-            ? { '401': { description: 'Authentication required' } }
+            ? { '401': problemResponse('Authentication required') }
             : {}),
           ...(typeof endpoint.auth === 'object'
-            ? { '403': { description: 'Insufficient authorization' } }
+            ? { '403': problemResponse('Insufficient authorization') }
             : {}),
+          default: problemResponse('Request failed'),
           [String(endpoint.responseStatus ?? 200)]: {
             description: 'Successful response',
             content:
