@@ -158,10 +158,6 @@ const useUiStore = defineStore('ui', () => {
   }
 })
 
-function messageFrom(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
-
 /** Provides OdbVue's application-facing feedback API. */
 export function useUi(state: Pinia = pinia) {
   const store = useUiStore(state)
@@ -227,7 +223,7 @@ export function useUi(state: Pinia = pinia) {
     success: (message: string, options?: AlertOptions) => store.show('success', message, options),
     warning: (message: string, options?: AlertOptions) => store.show('warning', message, options),
     error: (error: unknown, options?: AlertOptions) =>
-      store.show('error', messageFrom(error), options),
+      store.show('error', typeof error === 'string' ? error : errorMessage(error), options),
     mutationError: (error: unknown) =>
       mutationError(error, (message) => store.show('error', message)),
     snack: (message: string, options?: AlertOptions) => store.show('info', message, options),

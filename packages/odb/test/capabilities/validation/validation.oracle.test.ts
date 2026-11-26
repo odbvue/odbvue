@@ -65,6 +65,45 @@ BEGIN
 END;`)
   })
 
+  it.each([
+    [-20998, 'ODB_ERROR|418|CUSTOM_FAILURE', 418, 'CUSTOM_FAILURE'],
+    [-20998, 'ODB_ERROR|500|CUSTOM_FAILURE', 500, 'CUSTOM_FAILURE'],
+    [-20000, 'unexpected failure', 500, 'INTERNAL_SERVER_ERROR'],
+  ])(
+    'maps anonymous failures even when the audit package is absent',
+    async (number, message, status, code) => {
+      const handler = odbOrdsEndpoint('test', 'api', 'limited')
+        .toNode()
+        .source.replace(
+          'api.limited();',
+          `raise_application_error(${number}, ${literal(message)});`,
+        )
+        .replaceAll('odb_audit.', 'odb_test_missing_audit.')
+        .replaceAll(':status_code', 'l_status')
+      await connection.execute(`DECLARE
+  l_status NUMBER;
+  l_names owa.vc_arr;
+  l_values owa.vc_arr;
+  l_lines owa.vc_arr;
+  l_count PLS_INTEGER := 100;
+  l_json JSON_OBJECT_T;
+BEGIN
+  owa.init_cgi_env(0, l_names, l_values);
+  ${handler}
+  owa.get_page(l_lines, l_count);
+  FOR i IN 1..l_count LOOP
+    IF SUBSTR(l_lines(i), 1, 1) = '{' THEN l_json := JSON_OBJECT_T.parse(l_lines(i)); END IF;
+  END LOOP;
+  IF l_status != ${status} OR l_json IS NULL OR l_json.get_string('code') != ${literal(code)} THEN
+    raise_application_error(-20000, 'Incorrect problem response');
+  END IF;
+  IF ${status} >= 500 AND l_json.get_string('traceId') IS NULL THEN
+    raise_application_error(-20000, 'Missing trace');
+  END IF;
+END;`)
+    },
+  )
+
   beforeAll(async () => {
     connection = await connect({
       connectString,

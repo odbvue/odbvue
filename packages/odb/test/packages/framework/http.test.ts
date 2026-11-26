@@ -8,8 +8,8 @@ describe('odbHttp framework package', () => {
   it('installs a validated explicit HTTP error primitive', () => {
     const sql = odbHttp.toSQLUp({ schema: 'APP' })
     expect(sql).toContain('CREATE OR REPLACE PACKAGE APP.odb_http AS')
-    expect(sql).toContain('raise_application_error(-20999')
-    expect(sql).toContain("'ODB_HTTP|' || TO_CHAR(p_status) || '|' || p_code")
+    expect(sql).toContain('raise_application_error(-20998')
+    expect(sql).toContain("'ODB_ERROR|' || TO_CHAR(p_status) || '|' || p_code")
   })
 
   it('renders validated error calls and convenience methods', () => {
@@ -70,11 +70,13 @@ describe('odbHttp framework package', () => {
   it('maps explicit errors and unexpected exceptions to JSON responses', () => {
     const source = odbOrdsEndpoint('test', 'api', 'limited').toNode().source
 
-    expect(source).toMatch(/IF SQLCODE = -20999 AND REGEXP_SUBSTR\(SQLERRM, .* IS NOT NULL THEN/)
-    expect(source).toContain(':status_code := TO_NUMBER(REGEXP_SUBSTR(SQLERRM')
+    expect(source).toContain('IF v_sqlcode = -20998 THEN')
+    expect(source).toContain(
+      "REGEXP_LIKE(v_error_kind, '^[4-5][0-9]{2}$') THEN TO_NUMBER(v_error_kind)",
+    )
     expect(source).toContain('v_error_code := REGEXP_SUBSTR(SQLERRM')
     expect(source).not.toContain('RETURNING CLOB')
-    expect(source).toMatch(/ELSIF SQLCODE = -20998 AND REGEXP_SUBSTR\(SQLERRM, .* IS NOT NULL THEN/)
+    expect(source).not.toContain('ODB_HTTP')
     expect(source).toContain("WHEN 'NOT_FOUND' THEN 404")
     expect(source).toContain("WHEN 'CONFLICT' THEN 409")
     expect(source).toContain("WHEN 'UNAUTHORIZED' THEN 401")

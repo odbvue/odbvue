@@ -10,7 +10,7 @@ const ui = useUi()
 ui.info('Ready')
 ui.success('Saved', { timeout: 3000 })
 ui.warning('Please review this change')
-ui.error(new Error('Save failed'))
+ui.error('Save failed')
 ui.snack('Copied', { timeout: 1500 })
 ui.alert('Maintenance is scheduled', { type: 'warning' })
 ui.clearAlert()
@@ -64,8 +64,11 @@ try {
 
 The default layout in `src/app/layouts` renders the page alert, snackbar queue, and a loading
 indicator. `useNotificationMessage()` from `@/capabilities/ui` translates known
-catalog keys and displays arbitrary errors as plain text. Runtime error messages
-are not submitted to the missing-translation collector.
+catalog keys and displays explicit message strings as plain text. `ui.error()`,
+`ui.action()`, and mutation failures use the same safe policy for exceptions: known
+client error codes and known exception message keys are translated using the configured
+locale fallback, server errors may show a trace reference, and other exceptions use a generic message.
+Runtime exception details are not displayed or submitted to the missing-translation collector.
 
 Loading is keyed and reference-counted. `start(key)` returns an idempotent release
 function: completing one operation cannot hide another, including operations with

@@ -28,20 +28,21 @@ arrive as JSON values, while ordinary string/CLOB columns remain strings.
 
 Generated handlers return `application/problem+json` with `type`, `title`, HTTP
 `status` and a stable `code`. A 422 validation response can also include
-`errors: [{ name, message, params? }]`, exactly matching form field errors.
-`message` is an application translation key, not localized text; `params`
-contains only scalar values.
+`errors: [{ field, code, params? }]`. The UI maps each code to the translation
+key `errors.<CODE>` for the corresponding form field; `params` contains only
+scalar values.
 Malformed typed JSON objects are rejected with 400 before the procedure runs.
 Unexpected failures return a generic code, not Oracle diagnostics. When an
-audited service fails with a 5xx, `traceId` identifies the corresponding audit
-record. Clients must not display server-provided titles or raw exceptions.
+service fails with a 5xx, `traceId` is a diagnostic reference; an audit record
+may be unavailable if logging fails or the audit package is not installed.
+Clients must not display server-provided titles or raw exceptions.
 
 ODB procedures use the existing transport-independent exception helpers. For
 example:
 
 ```ts
 body.invalid('ORDER_INVALID', [
-  { name: 'quantity', message: 'orders.minimumQuantity', params: { min: 1 } },
+  { field: 'quantity', code: 'ORDER_MINIMUM_QUANTITY', params: { min: 1 } },
 ])
 ```
 
@@ -51,7 +52,10 @@ escaping; oversized or invalid details fail generation. Do not put submitted
 values, secrets, or other sensitive information in error codes or parameters.
 This initial transport supports static details and parameters, not dynamically
 constructed or arbitrarily long error lists. Existing code-only exceptions
-remain supported.
+remain supported. Explicit HTTP errors and transport-independent errors share
+the `ODB_ERROR` exception envelope. When upgrading an existing deployment,
+redeploy `odb_http` and all generated ORDS handlers together; older handlers
+and the new package (or vice versa) use incompatible exception envelopes.
 
 The generated handler rolls back the current transaction when an exception
 escapes. A procedure that commits or uses an autonomous transaction can still
@@ -59,11 +63,9 @@ persist work before failing; such operations must manage their own boundaries.
 Authentication refresh remains the HTTP client's responsibility.
 
 For mutations, use `ui.loading.run()` and call `complete(ui.mutationError(error))`
-on failure. A recognized 422 passes `error.fields` directly as the form's
-`errors` without a snackbar. Other failures notify once and keep the form open.
-You can also pass `error.fields` directly to `complete({ status: 'invalid',
-errors: error.fields })` when you handle failures yourself. Define every field
-message key in the owning module's locales, and use names present in the form.
+on failure. A recognized 422 maps `error.problem.errors` to form errors without
+a snackbar. Other failures notify once and keep the form open. Define every field
+code's `errors.<CODE>` key in the owning module's locales, and use names present in the form.
 For business errors, add a translation under `errors.<CODE>`; otherwise a
 generic notification is used. Missing translations and malformed details also
 use a generic notification. Unknown form fields produce a form-level warning.

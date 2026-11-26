@@ -6,6 +6,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { createAuth, type Auth } from '@/capabilities/auth/core'
 import { createHttpClient, type HttpResponse } from '@/capabilities/http/core'
 import { createState } from '@/capabilities/state'
+import { i18n } from '@/capabilities/i18n'
 import { useUi } from '@/capabilities/ui/store'
 import { authConfig } from '../../auth-state'
 import DefaultLayout from '@/app/layouts/DefaultLayout.vue'
@@ -435,7 +436,10 @@ describe('default layout account navigation', () => {
       .find((entry) => entry.props('title') === 'Logout')!
       .trigger('click')
     await flushPromises()
-    expect(ui.notification.value).toMatchObject({ type: 'error', message: 'Logout failed' })
+    expect(ui.notification.value).toMatchObject({
+      type: 'error',
+      message: i18n.global.t('errors.requestFailed'),
+    })
     expect(router.currentRoute.value.path).toBe('/login')
     wrapper.unmount()
   })
@@ -448,7 +452,10 @@ describe('default layout account navigation', () => {
       .find((entry) => entry.props('title') === 'Logout')!
       .trigger('click')
     await flushPromises()
-    expect(ui.notification.value).toMatchObject({ type: 'error', message: 'Navigation failed' })
+    expect(ui.notification.value).toMatchObject({
+      type: 'error',
+      message: i18n.global.t('errors.requestFailed'),
+    })
     wrapper.unmount()
   })
 })

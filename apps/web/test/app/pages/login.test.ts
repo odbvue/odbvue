@@ -350,7 +350,7 @@ describe('login page using application auth', () => {
     context.fetch.mockRejectedValueOnce(new Error('Offline'))
     await context.wrapper.findComponent(form).trigger('click')
     await flushPromises()
-    expect(context.ui.notification.value?.message).toContain('Offline')
+    expect(context.ui.notification.value?.message).toBe(i18n.global.t('errors.requestFailed'))
     expect(context.ui.loading.has('auth')).toBe(false)
     expect(context.ui.loading.active.value).toBe(false)
     context.wrapper.unmount()

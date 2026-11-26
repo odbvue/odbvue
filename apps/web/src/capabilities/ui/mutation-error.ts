@@ -2,6 +2,7 @@ import type { HttpError } from '../http/core'
 import { i18n } from '../i18n'
 import type { OvActionResult } from '@/components/api'
 
+// Without an explicit locale, te follows the same locale fallback chain as t.
 const hasTranslation = (key: string) => i18n.global.te(key)
 
 export function errorMessage(error: unknown): string {
@@ -11,7 +12,7 @@ export function errorMessage(error: unknown): string {
     return i18n.global.t(codeKey)
   if (http?.problem?.traceId)
     return i18n.global.t('errors.requestFailedReference', { traceId: http.problem.traceId })
-  if (!http && error instanceof Error && error.message) return error.message
+  if (!http && error instanceof Error && hasTranslation(error.message)) return error.message
   return i18n.global.t('errors.requestFailed')
 }
 
@@ -30,6 +31,6 @@ export function mutationError(error: unknown, notify: (message: string) => void)
     })
     return { status: 'invalid', errors }
   }
-  notify(http ? errorMessage(error) : i18n.global.t('errors.requestFailed'))
+  notify(errorMessage(error))
   return { status: 'error' }
 }

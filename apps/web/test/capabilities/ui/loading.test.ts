@@ -65,6 +65,86 @@ describe('keyed UI loading', () => {
     expect(notify.mock.calls[0]?.[0]).not.toContain('sensitive technical detail')
   })
 
+  it('resolves problem and field translations through the configured fallback locale', () => {
+    const previous = i18n.global.locale.value
+    const fallback = i18n.global.fallbackLocale.value
+    i18n.global.locale.value = 'fr'
+    i18n.global.fallbackLocale.value = 'en'
+    i18n.global.mergeLocaleMessage('en', {
+      errors: { FALLBACK_ONLY_TEST: 'Fallback message' },
+    })
+    try {
+      const ui = useUi(createState())
+      const error = Object.assign(new Error('private details'), {
+        status: 422,
+        problem: {
+          code: 'FALLBACK_ONLY_TEST',
+          errors: [{ field: 'value', code: 'FALLBACK_ONLY_TEST' }],
+        },
+      })
+      expect(ui.mutationError(error)).toEqual({
+        status: 'invalid',
+        errors: [{ name: 'value', message: 'errors.FALLBACK_ONLY_TEST', params: undefined }],
+      })
+      ui.error(error)
+      expect(ui.notification.value?.message).toBe('Fallback message')
+    } finally {
+      i18n.global.locale.value = previous
+      i18n.global.fallbackLocale.value = fallback
+    }
+  })
+
+  it('does not select a translation that exists only outside the fallback chain', () => {
+    const previous = i18n.global.locale.value
+    const fallback = i18n.global.fallbackLocale.value
+    i18n.global.locale.value = 'en'
+    i18n.global.fallbackLocale.value = 'en'
+    i18n.global.mergeLocaleMessage('fr', { errors: { FRENCH_ONLY_TEST: 'Texte' } })
+    try {
+      const error = Object.assign(new Error('private details'), {
+        status: 422,
+        problem: {
+          code: 'FRENCH_ONLY_TEST',
+          errors: [{ field: 'value', code: 'FRENCH_ONLY_TEST' }],
+        },
+      })
+      expect(mutationError(error, vi.fn())).toEqual({
+        status: 'invalid',
+        errors: [{ name: 'value', message: 'errors.validationFailed', params: undefined }],
+      })
+    } finally {
+      i18n.global.locale.value = previous
+      i18n.global.fallbackLocale.value = fallback
+    }
+  })
+
+  it('uses the same safe error policy for actions, mutations and direct error reporting', async () => {
+    const ui = useUi(createState())
+    const error = new Error('private technical detail')
+    ui.error(error)
+    await ui.action('failed', () => {
+      throw error
+    })
+    expect(ui.mutationError(error)).toEqual({ status: 'error' })
+    expect(ui.notifications.value.map((item) => item.message)).toEqual(
+      Array(3).fill('The request could not be completed. Please try again.'),
+    )
+    ui.error('auth.invalid.credentials')
+    expect(ui.notification.value?.message).toBe('auth.invalid.credentials')
+  })
+
+  it('preserves explicit translated exception keys across all error paths', async () => {
+    const ui = useUi(createState())
+    const error = new Error('admin.loadUsersError')
+    const message = 'admin.loadUsersError'
+    ui.error(error)
+    await ui.action('failed', () => {
+      throw error
+    })
+    ui.mutationError(error)
+    expect(ui.notifications.value.map((item) => item.message)).toEqual([message, message, message])
+  })
+
   it('keeps a replaceable page alert independent of the snackbar queue and its lifecycle', async () => {
     const state = createState()
     const ui = useUi(state)
@@ -79,13 +159,18 @@ describe('keyed UI loading', () => {
       timeout: 0,
     })
     expect(same.snackbar.value).toBe(false)
-    expect(ui.notificationQueue.value.map((item) => item.text)).toEqual(['Saved', 'Failed'])
+    expect(ui.notificationQueue.value.map((item) => item.text)).toEqual([
+      'Saved',
+      'The request could not be completed. Please try again.',
+    ])
     ui.resetNotificationQueue()
     ui.notificationQueue.value = ui.notificationQueue.value.slice(1)
     expect(ui.notification.value?.message).toBe('Page warning')
     ui.alert('Replacement')
     expect(ui.notifications.value.some((item) => item.id === warning.id)).toBe(false)
-    expect(ui.notificationQueue.value.map((item) => item.text)).toEqual(['Failed'])
+    expect(ui.notificationQueue.value.map((item) => item.text)).toEqual([
+      'The request could not be completed. Please try again.',
+    ])
     ui.clearSnackbars()
     expect(ui.notification.value?.message).toBe('Replacement')
     expect(ui.notificationQueue.value).toEqual([])
@@ -239,7 +324,10 @@ describe('keyed UI loading', () => {
           return Promise.reject(error)
         }),
       ).resolves.toEqual({ ok: false, error })
-      expect(ui.notification.value).toMatchObject({ type: 'error', message: 'Save failed' })
+      expect(ui.notification.value).toMatchObject({
+        type: 'error',
+        message: 'The request could not be completed. Please try again.',
+      })
       expect(ui.loading.active.value).toBe(false)
     },
   )
@@ -333,7 +421,7 @@ describe('keyed UI loading', () => {
     const same = useUi(firstState)
     const other = useUi(createState())
     const finish = first.loading.start('auth.login')
-    first.error(new Error('Visible error'))
+    first.error('Visible error')
     expect(same.loading.has('auth.login')).toBe(true)
     expect(other.loading.active.value).toBe(false)
     expect(same.notification.value?.message).toBe('Visible error')

@@ -221,7 +221,7 @@ describe('query-owned cursor pagination', () => {
     expect(source).toContain('LENGTHB(v_page_boundary) > 1966')
     expect(source.indexOf('CURSOR_INVALID')).toBeLessThan(source.indexOf('pck_pages.list('))
     expect(source).toContain('v_page_limit <> TRUNC(v_page_limit)')
-    expect(source).toContain('ODB_HTTP|400|CURSOR_LIMIT_INVALID')
+    expect(source).toContain('ODB_ERROR|400|CURSOR_LIMIT_INVALID')
   })
 
   it('inherits shared and package limits while allowing service overrides', () => {

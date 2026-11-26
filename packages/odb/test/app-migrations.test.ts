@@ -133,7 +133,7 @@ describe('app-owned ORDS migrations', () => {
     ).toEqual(['id', 'secret', 'readonly', 'meta', 'value'])
     expect(update.source).toContain(':status_code := 204')
     expect(update.source).toContain('v_body_json := JSON_OBJECT_T.parse(v_body)')
-    expect(update.source).toContain('ODB_HTTP|400|INVALID_REQUEST')
+    expect(update.source).toContain('ODB_ERROR|400|INVALID_REQUEST')
     expect(update.params.some((param) => param.sourceType === 'RESPONSE')).toBe(false)
     const sql = migration.compile().up().join('\n')
     expect(sql).toMatch(
@@ -222,6 +222,8 @@ describe('app-owned ORDS migrations', () => {
           }
           expect(audit).not.toMatch(/v_body|:body|p_password|p_refresh_token|:cookie|:code/i)
           expect(audit).toContain(`''user.id'', ${node.auth === 'anonymous' ? ':2' : ':2'}`)
+          expect(node.source).toContain('v_auth_user_id VARCHAR2(32);')
+          expect(audit).toMatch(/USING '[^']+', v_auth_user_id,/)
           expect(audit).toContain(`''event.name'', :3`)
           expect(audit).toContain("''event.outcome'', ''failure''")
           expect(audit).toContain(`''http.request.method'', :4`)

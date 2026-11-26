@@ -25,12 +25,8 @@
           :fast-fail="options.fastFail"
           @submit.prevent="handleSubmit"
         >
-          <v-alert v-if="hasUnmappedErrors" type="error" role="alert" class="mb-4">
-            {{
-              unmappedErrorMessages.length
-                ? unmappedErrorMessages.join(' ')
-                : t('errors.invalidFields')
-            }}
+          <v-alert v-if="unmappedErrorMessages.length" type="error" role="alert" class="mb-4">
+            {{ unmappedErrorMessages.join(' ') }}
           </v-alert>
           <v-row>
             <v-col
@@ -188,15 +184,6 @@ const {
   overlayBoundary?: symbol
 }>()
 provideLoadingOverlayBoundary(overlayBoundary)
-const hasUnmappedErrors = computed(
-  () =>
-    options.errors?.some(
-      (error) =>
-        !options.fields.some(
-          (field) => field.name === error.name && !field.hidden && field.type !== 'custom',
-        ),
-    ) ?? false,
-)
 const unmappedErrorMessages = computed(() =>
   (options.errors ?? [])
     .filter(

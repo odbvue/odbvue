@@ -1,5 +1,6 @@
 // Transport-independent ODB errors. PL/SQL raises `ODB_ERROR|<KIND>|<CODE>` with this
 // application error number; the service layer (ORDS handler) translates the kind to HTTP.
+// Explicit transport errors use an HTTP status in place of KIND.
 export const ODB_ERROR_NUMBER = -20998
 
 /** Standard error kinds and the HTTP status a service maps each one to. */

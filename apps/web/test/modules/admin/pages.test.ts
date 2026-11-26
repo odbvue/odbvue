@@ -351,8 +351,10 @@ describe('admin settings', () => {
     const error = Object.assign(new Error('Request failed'), {
       status: 422,
       request: '/admin/settings/SMTP_HOST',
-      problem: { code: 'SETTINGS_VALIDATION_INVALID' },
-      fields: [{ name: 'value', message: 'admin.settingValidationError' }],
+      problem: {
+        code: 'SETTINGS_VALIDATION_INVALID',
+        errors: [{ field: 'value', code: 'SETTINGS_VALIDATION_INVALID' }],
+      },
     })
     putRole.mockResolvedValueOnce({ data: null, error, status: 422, headers: null })
     wrapper
@@ -361,7 +363,7 @@ describe('admin settings', () => {
     await flushPromises()
     expect(complete).toHaveBeenCalledExactlyOnceWith({
       status: 'invalid',
-      errors: [{ name: 'value', message: 'admin.settingValidationError' }],
+      errors: [{ name: 'value', message: 'errors.SETTINGS_VALIDATION_INVALID', params: undefined }],
     })
     expect(ui.notification.value).toBeUndefined()
   })
@@ -380,7 +382,9 @@ describe('admin settings', () => {
       .vm.$emit('action', 'admin.editSetting', [], { id: 'SMTP_HOST', value: 'bad' }, complete)
     await flushPromises()
     expect(complete).toHaveBeenCalledExactlyOnceWith({ status: 'error' })
-    expect(ui.notification.value?.message).toBe('errors.SETTINGS_REQUIRE_TRUSTED_SETUP')
+    expect(ui.notification.value?.message).toBe(
+      i18n.global.t('errors.SETTINGS_REQUIRE_TRUSTED_SETUP'),
+    )
   })
 
   it('reports malformed submissions without sending an update', async () => {
@@ -443,7 +447,7 @@ describe('admin settings', () => {
       expect(complete).toHaveBeenCalledExactlyOnceWith({ status: 'error' })
       expect(ui.notification.value).toMatchObject({
         type: 'error',
-        message: 'errors.requestFailed',
+        message: i18n.global.t('errors.requestFailed'),
       })
     },
   )
@@ -829,7 +833,7 @@ describe('admin users list', () => {
     const { complete } = fetchUsers(wrapper)
     await flushPromises()
     expect(complete).toHaveBeenCalledExactlyOnceWith(undefined)
-    expect(ui.notification.value?.message).toBe('Network failed')
+    expect(ui.notification.value?.message).toBe(i18n.global.t('errors.requestFailed'))
     expect(ui.loading.active.value).toBe(false)
   })
 })
@@ -1280,7 +1284,7 @@ describe('admin user details', () => {
       }
       request.reject(new Error('Late network failure'))
       await flushPromises()
-      expect(ui.notification.value?.message).toBe('Late network failure')
+      expect(ui.notification.value?.message).toBe(i18n.global.t('errors.requestFailed'))
       expect(ui.loading.active.value).toBe(false)
       if (change === 'route change') {
         expect(wrapper.findComponent(view).props('data').id).toBe('B'.repeat(32))
@@ -1323,7 +1327,10 @@ describe('admin user details', () => {
   it('reports thrown detail requests and releases app loading', async () => {
     get.mockRejectedValue(new Error('Network failed'))
     const { wrapper } = await setup(true)
-    expect(ui.notification.value).toMatchObject({ type: 'error', message: 'Network failed' })
+    expect(ui.notification.value).toMatchObject({
+      type: 'error',
+      message: i18n.global.t('errors.requestFailed'),
+    })
     expect(ui.loading.active.value).toBe(false)
     expect(wrapper.findComponent(view).exists()).toBe(false)
   })
@@ -1398,7 +1405,7 @@ describe('admin user details', () => {
       expect(wrapper.text()).not.toContain(messages['admin.userDisabled'])
       expect(ui.notification.value).toMatchObject({
         type: 'error',
-        message: 'errors.requestFailed',
+        message: i18n.global.t('errors.requestFailed'),
       })
       expect(ui.loading.active.value).toBe(false)
       expect(
@@ -1419,7 +1426,7 @@ describe('admin user details', () => {
       .trigger('click')
     await wrapper.get('[role="dialog"]').findAll('button')[1]!.trigger('click')
     await flushPromises()
-    expect(ui.notification.value?.message).toBe('errors.requestFailed')
+    expect(ui.notification.value?.message).toBe(i18n.global.t('errors.requestFailed'))
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
     await wrapper
@@ -1436,7 +1443,7 @@ describe('admin user details', () => {
     )
     await wrapper.get('[role="dialog"]').findAll('button')[1]!.trigger('click')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
-    expect(ui.notification.value?.message).toBe('errors.requestFailed')
+    expect(ui.notification.value?.message).toBe(i18n.global.t('errors.requestFailed'))
     expect(ui.loading.has('admin.users.status')).toBe(true)
     resolveMutation(result([{ ...user, enabled: false }]))
     await flushPromises()
@@ -1471,7 +1478,7 @@ describe('admin user details', () => {
     await flushPromises()
     expect(ui.notification.value).toMatchObject({
       type: 'error',
-      message: 'Network failed',
+      message: i18n.global.t('errors.requestFailed'),
     })
     expect(ui.loading.active.value).toBe(false)
     expect(wrapper.findComponent(view).props('data').enabled).toBe(false)
@@ -1549,7 +1556,10 @@ describe('admin user details', () => {
     rejectMutation(new Error('Network failed'))
     await flushPromises()
     expect(ui.loading.active.value).toBe(false)
-    expect(ui.notification.value).toMatchObject({ type: 'error', message: 'Network failed' })
+    expect(ui.notification.value).toMatchObject({
+      type: 'error',
+      message: i18n.global.t('errors.requestFailed'),
+    })
     ui.clear()
   })
 })

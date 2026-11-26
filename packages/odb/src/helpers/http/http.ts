@@ -1,5 +1,4 @@
-const HTTP_ERROR_NUMBER = -20999
-const ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]{0,99}$/
+import { ODB_ERROR_CODE_PATTERN, ODB_ERROR_NUMBER } from '../../schema/errors.js'
 import {
   odbLiteral,
   plsqlExpr,
@@ -20,7 +19,7 @@ function validateStatus(status: number): void {
 }
 
 function validateCode(code: string): void {
-  if (!ERROR_CODE_PATTERN.test(code)) {
+  if (!ODB_ERROR_CODE_PATTERN.test(code)) {
     throw new Error('odbHttp: code must be uppercase alphanumeric with optional underscores.')
   }
 }
@@ -53,7 +52,7 @@ export const odbHttp = {
       `    IF NOT REGEXP_LIKE(p_code, '^[A-Z][A-Z0-9_]{0,99}$') THEN`,
       `      raise_application_error(-20000, 'HTTP error code is invalid');`,
       `    END IF;`,
-      `    raise_application_error(${HTTP_ERROR_NUMBER}, 'ODB_HTTP|' || TO_CHAR(p_status) || '|' || p_code);`,
+      `    raise_application_error(${ODB_ERROR_NUMBER}, 'ODB_ERROR|' || TO_CHAR(p_status) || '|' || p_code);`,
       `  END raise_error;`,
       `END odb_http;`,
       `/`,

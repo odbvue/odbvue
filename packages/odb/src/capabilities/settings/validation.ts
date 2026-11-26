@@ -32,14 +32,10 @@ const fieldTypes = [
 
 const oneOf = (value: PlsqlValue, choices: readonly string[]) =>
   cond.or(choices.map((choice) => cond.eq(value, choice)))
+const invalid = (field?: string) => (body: ProcedureBody) =>
+  body.invalid('SETTINGS_VALIDATION_INVALID', field)
 const requireValid = (body: ProcedureBody, condition: PlsqlBooleanExpression, field?: string) =>
-  body.ifThen(
-    condition,
-    (valid) => valid.null(),
-    field
-      ? (invalid) => invalid.invalid('SETTINGS_VALIDATION_INVALID', field)
-      : (invalid) => invalid.invalid('SETTINGS_VALIDATION_INVALID'),
-  )
+  body.ifThen(condition, (valid) => valid.null(), invalid(field))
 
 export function defineSettingsValidation(pkg: PackageImpl) {
   return pkg.privateProc('validate_setting', (proc) => {
@@ -97,7 +93,7 @@ export function defineSettingsValidation(pkg: PackageImpl) {
           cond.eq(memberIs.invoke(source, odbLiteral(key), odbLiteral(expected)), true),
         )
 
-      body.ifThen(cond.isNull(meta), (missing) => missing.invalid('SETTINGS_VALIDATION_INVALID'))
+      body.ifThen(cond.isNull(meta), invalid())
       body.set(element, odbJson.parseElement(meta))
       const isObject = () =>
         cond.and([cond.isNotNull(element), cond.eq(odbJson.isObject(element), true)])
@@ -108,7 +104,7 @@ export function defineSettingsValidation(pkg: PackageImpl) {
         typed.set(fieldType, odbJson.getString(object, odbLiteral('type')))
         typed.ifThen(
           cond.or([cond.isNull(fieldType), cond.not(oneOf(fieldType, fieldTypes))]),
-          (invalidType) => invalidType.invalid('SETTINGS_VALIDATION_INVALID'),
+          invalid(),
         )
         typed.ifThen(cond.eq(fieldType, 'number'), (numeric) =>
           requireValid(
@@ -122,7 +118,7 @@ export function defineSettingsValidation(pkg: PackageImpl) {
             oneOf(fieldType, ['switch', 'checkbox']),
             cond.or([cond.isNull(value), cond.not(oneOf(value, ['Y', 'N']))]),
           ]),
-          (invalidSwitch) => invalidSwitch.invalid('SETTINGS_VALIDATION_INVALID', 'value'),
+          invalid('value'),
         )
         typed.ifThen(cond.eq(fieldType, 'select'), (select) => {
           checkMember(select, object, 'items', 'array')
@@ -133,12 +129,8 @@ export function defineSettingsValidation(pkg: PackageImpl) {
       body.ifThen(cond.eq(odbJson.has(object, odbLiteral('rules')), true), (hasRules) => {
         checkMember(hasRules, object, 'rules', 'array')
         hasRules.set(rules, odbJson.getArray(object, odbLiteral('rules')))
-        hasRules.ifThen(cond.isNull(rules), (invalidRules) =>
-          invalidRules.invalid('SETTINGS_VALIDATION_INVALID'),
-        )
-        hasRules.ifThen(cond.gt(odbJson.getSize(rules), 32), (tooMany) =>
-          tooMany.invalid('SETTINGS_VALIDATION_INVALID'),
-        )
+        hasRules.ifThen(cond.isNull(rules), invalid())
+        hasRules.ifThen(cond.gt(odbJson.getSize(rules), 32), invalid())
         hasRules.forRange(
           'ruleIndex',
           0,
@@ -164,8 +156,7 @@ export function defineSettingsValidation(pkg: PackageImpl) {
                         cond.isNull(value),
                         cond.not(cond.regexpLike(value, '^[0-9A-Fa-f]{64}$', 'c')),
                       ]),
-                      (invalidSecret) =>
-                        invalidSecret.invalid('SETTINGS_VALIDATION_INVALID', 'value'),
+                      invalid('value'),
                     ),
                   )
                   validators.when(cond.eq(text, 'jwt-issuer'), (issuer) =>
@@ -174,8 +165,7 @@ export function defineSettingsValidation(pkg: PackageImpl) {
                         cond.isNull(value),
                         cond.not(cond.regexpLike(value, '^[!-~]{1,255}$', 'c')),
                       ]),
-                      (invalidIssuer) =>
-                        invalidIssuer.invalid('SETTINGS_VALIDATION_INVALID', 'value'),
+                      invalid('value'),
                     ),
                   )
                   validators.when(cond.eq(text, 'port'), (port) =>
@@ -187,8 +177,7 @@ export function defineSettingsValidation(pkg: PackageImpl) {
                         cond.isNull(value),
                         cond.not(cond.regexpLike(value, '^[0-9]{1,5}$', 'c')),
                       ]),
-                      (invalidExpiration) =>
-                        invalidExpiration.invalid('SETTINGS_VALIDATION_INVALID', 'value'),
+                      invalid('value'),
                     )
                     bounded.set(number, odbOracle.toNumber(value))
                     requireValid(
@@ -197,9 +186,7 @@ export function defineSettingsValidation(pkg: PackageImpl) {
                       'value',
                     )
                   })
-                  validators.else((invalidRule) =>
-                    invalidRule.invalid('SETTINGS_VALIDATION_INVALID'),
-                  )
+                  validators.else(invalid())
                 })
               },
               (portable) =>

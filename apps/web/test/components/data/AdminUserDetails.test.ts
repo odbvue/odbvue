@@ -5,6 +5,7 @@ import { createI18n } from 'vue-i18n'
 import { VBtn, VDialog, VSelect, VTab } from 'vuetify/components'
 import type { HttpClient, HttpResponse } from '@/capabilities/http'
 import { useUi } from '@/capabilities/ui'
+import { i18n } from '@/capabilities/i18n'
 import UserDetails from '@/modules/admin/pages/users/[id].vue'
 import UserAudit from '@/modules/admin/pages/users/[id]/audit.vue'
 import UserDetailsTab from '@/modules/admin/pages/users/[id]/index.vue'
@@ -26,6 +27,7 @@ vi.mock('@/capabilities/auth', () => ({
 }))
 
 beforeEach(() => {
+  i18n.global.mergeLocaleMessage('en', messages)
   sessionStorage.clear()
   vi.stubGlobal('definePage', vi.fn<() => void>())
 })

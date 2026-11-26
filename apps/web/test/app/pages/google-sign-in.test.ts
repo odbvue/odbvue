@@ -92,7 +92,7 @@ describe('shared Google sign-in button', () => {
     const { wrapper, ui } = await setup(true, '/', true)
     expect(wrapper.find('button').exists()).toBe(false)
     expect(ui.notification.value?.type).toBe('error')
-    expect(ui.notification.value?.message).toContain('authentication configuration')
+    expect(ui.notification.value?.message).toBe(i18n.global.t('errors.requestFailed'))
     wrapper.unmount()
   })
 
@@ -151,7 +151,7 @@ describe('shared Google sign-in button', () => {
     await wrapper.find('button').trigger('click')
     await flushPromises()
     expect(assign).not.toHaveBeenCalled()
-    expect(ui.notification.value?.message).toBe('Invalid Google authorization URL.')
+    expect(ui.notification.value?.message).toBe(i18n.global.t('errors.requestFailed'))
     expect(ui.loading.active.value).toBe(false)
     expect(wrapper.find('button').attributes('disabled')).toBeUndefined()
     fetch.mockResolvedValueOnce(json({}, 503))
