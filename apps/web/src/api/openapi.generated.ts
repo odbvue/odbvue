@@ -674,6 +674,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/emails": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List email history filtered by subject, recipient address and creation interval */
+        get: operations["admin_list_emails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/emails/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read an email body, delivery details and addresses */
+        get: operations["admin_get_email"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/users": {
         parameters: {
             query?: never;
@@ -1133,6 +1167,49 @@ export interface components {
         SandboxRemoveSmtpAclResponse: Record<string, never>;
         SandboxAddLdapAclResponse: Record<string, never>;
         SandboxRemoveLdapAclResponse: Record<string, never>;
+        AdminListEmailsItemsItem: {
+            id: string;
+            subject: string;
+            status: string;
+            /** Format: date-time */
+            created: string;
+            /** Format: date-time */
+            delivered?: string | null;
+            attempts: number;
+            error?: string | null;
+            toRecipients?: string | null;
+            ccRecipients?: string | null;
+            bccRecipients?: string | null;
+        };
+        AdminListEmailsResponse: {
+            items: components["schemas"]["AdminListEmailsItemsItem"][];
+            /** @description Opaque continuation token; absent when pagination is exhausted. */
+            nextCursor?: string;
+        };
+        AdminGetEmailItemsItem: {
+            id: string;
+            subject: string;
+            content: string;
+            priority: number;
+            status: string;
+            /** Format: date-time */
+            created: string;
+            /** Format: date-time */
+            delivered?: string | null;
+            attempts: number;
+            /** Format: date-time */
+            postponed?: string | null;
+            error?: string | null;
+        };
+        AdminGetEmailAddressesItem: {
+            addrType: string;
+            addrAddr: string;
+            addrName?: string | null;
+        };
+        AdminGetEmailResponse: {
+            items: components["schemas"]["AdminGetEmailItemsItem"][];
+            addresses: components["schemas"]["AdminGetEmailAddressesItem"][];
+        };
         AdminListUsersItemsItem: {
             id: string;
             username: string;
@@ -3318,6 +3395,118 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SandboxRemoveLdapAclResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Insufficient authorization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+        };
+    };
+    admin_list_emails: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                search?: string;
+                address?: string;
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminListEmailsResponse"];
+                };
+            };
+            /** @description Invalid limit, cursor, or cursor query context */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Insufficient authorization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+            /** @description Request failed */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OdbProblemDetails"];
+                };
+            };
+        };
+    };
+    admin_get_email: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminGetEmailResponse"];
                 };
             };
             /** @description Authentication required */

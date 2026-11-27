@@ -22,6 +22,7 @@ import Roles from '@/modules/admin/pages/roles/index.vue'
 import Settings from '@/modules/admin/pages/settings/index.vue'
 import Jobs from '@/modules/admin/pages/jobs/index.vue'
 import JobHistory from '@/modules/admin/pages/jobs/[name].vue'
+import Emails from '@/modules/admin/pages/emails/index.vue'
 import Admin from '@/modules/admin/pages/index.vue'
 import App from '@/app/App.vue'
 import messages from '@/modules/admin/i18n/en.json'
@@ -125,7 +126,8 @@ async function setup(
     | 'global-audit'
     | 'settings'
     | 'jobs'
-    | 'job-history' = false,
+    | 'job-history'
+    | 'emails' = false,
 ) {
   const router = createRouter({
     history: createMemoryHistory(),
@@ -149,6 +151,7 @@ async function setup(
       { path: '/admin/settings', component: Settings },
       { path: '/admin/jobs', component: Jobs },
       { path: '/admin/jobs/:name', component: JobHistory },
+      { path: '/admin/emails', component: Emails },
     ],
   })
   await router.push(
@@ -156,7 +159,7 @@ async function setup(
       ? '/admin/jobs/EXAMPLE_JOB'
       : page === 'global-audit'
         ? '/admin/audit'
-        : page === 'roles' || page === 'settings' || page === 'jobs'
+        : page === 'roles' || page === 'settings' || page === 'jobs' || page === 'emails'
           ? `/admin/${page}`
           : page
             ? `/admin/users/${user.id}${page === 'permissions' || page === 'audit' ? `/${page}` : ''}`
@@ -498,7 +501,185 @@ describe('admin page metadata', () => {
   )
 
   it('discovers the landing page, users list, user details, roles, audit, and settings', () => {
-    expect(Object.keys(pages)).toHaveLength(11)
+    expect(Object.keys(pages)).toHaveLength(12)
+  })
+
+  describe('admin emails', () => {
+    it('passes subject, recipient and UTC date filters with opaque cursors unchanged', async () => {
+      const { wrapper } = await setup('emails')
+      const recipients = 'ada@example.test, grace@example.test, linus@example.test'
+      const page = {
+        items: [
+          {
+            id: user.id,
+            toRecipients: recipients,
+            ccRecipients: 'cc@example.test',
+            bccRecipients: 'bcc@example.test',
+          },
+        ],
+        nextCursor: 'opaque-next',
+      }
+      const complete = vi.fn<OvTableFetchRequest['complete']>()
+      const { signal } = new AbortController()
+      const from = '2026-11-01T10:00:00.000Z'
+      const to = '2026-11-27T18:00:00.000Z'
+      get.mockResolvedValueOnce({ data: page, error: null, status: 200, headers: null })
+      wrapper.findComponent(table).vm.$emit('fetch', {
+        cursor: 'opaque',
+        limit: 5,
+        search: 'receipt',
+        filter: { address: [' cc@example.test '], from: [from], to: [to] },
+        signal,
+        complete,
+      })
+      await flushPromises()
+      expect(get).toHaveBeenCalledWith('/admin/emails', {
+        query: {
+          cursor: 'opaque',
+          limit: 5,
+          search: 'receipt',
+          address: 'cc@example.test',
+          from,
+          to,
+        },
+        signal,
+      })
+      expect(complete.mock.calls[0]?.[0]).toBe(page)
+      const options: OvTableOptions = wrapper.findComponent(table).props('options')
+      expect(options.columns).toEqual(
+        expect.arrayContaining([
+          { name: 'toRecipients', label: 'admin.emailTo', maxLength: 40 },
+          { name: 'ccRecipients', label: 'admin.emailCc', maxLength: 40 },
+          { name: 'bccRecipients', label: 'admin.emailBcc', maxLength: 40 },
+        ]),
+      )
+      expect(options.filter?.fields).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'from', filterUtc: true }),
+          expect.objectContaining({
+            name: 'to',
+            filterUtc: true,
+            rules: expect.arrayContaining([
+              { type: 'date-on-or-after', params: 'from', message: 'admin.emailInvalidInterval' },
+            ]),
+          }),
+        ]),
+      )
+      const emit = vi.fn<(event: string, ...args: unknown[]) => void>()
+      const row = mount(
+        {
+          render: renderViewItem(
+            recipients,
+            { name: 'toRecipients', maxLength: 40 },
+            {},
+            { items: [] },
+            emit,
+          ),
+        },
+        {
+          global: {
+            stubs: {
+              VChip: { template: '<span><slot /></span>' },
+              VBtn: { template: '<button />' },
+            },
+          },
+        },
+      )
+      wrappers.push(row)
+      await row.get('button').trigger('click')
+      expect(emit).toHaveBeenCalledWith('details', 'toRecipients', recipients)
+    })
+
+    it('clears recipient and date filters without retaining previous values', async () => {
+      const { wrapper } = await setup('emails')
+      const complete = vi.fn<OvTableFetchRequest['complete']>()
+      const { signal } = new AbortController()
+      wrapper.findComponent(table).vm.$emit('fetch', {
+        limit: 5,
+        filter: { address: [' '] },
+        signal,
+        complete,
+      })
+      await flushPromises()
+      expect(get).toHaveBeenCalledWith('/admin/emails', {
+        query: {
+          cursor: undefined,
+          limit: 5,
+          search: undefined,
+          address: undefined,
+          from: undefined,
+          to: undefined,
+        },
+        signal,
+      })
+    })
+
+    it('shows only message content in the dialog and keeps list state unchanged', async () => {
+      const { wrapper, router } = await setup('emails')
+      get.mockResolvedValueOnce({
+        data: {
+          items: [
+            {
+              id: user.id,
+              subject: 'Receipt',
+              status: 'S',
+              content:
+                '<style>p{color:red}</style><p>Hello</p><a href="https://example.test">link</a><script>alert(1)</script><img src="https://example.test/pixel">',
+              created: '2026-01-01T10:00:00Z',
+              priority: 3,
+              attempts: 1,
+            },
+          ],
+          addresses: [{ addrType: 'To', addrAddr: 'ada@example.test' }],
+        },
+        error: null,
+        status: 200,
+        headers: null,
+      })
+      wrapper.findComponent(table).vm.$emit('action', 'admin.details', [], { id: user.id })
+      await flushPromises()
+      expect(wrapper.get('[role="dialog"]').text()).toContain('Receipt')
+      expect(wrapper.findComponent(view).exists()).toBe(false)
+      expect(wrapper.get('[role="dialog"]').text()).not.toContain('ada@example.test')
+      const iframe = wrapper.get('iframe')
+      expect(iframe.attributes('sandbox')).toBe('')
+      expect(iframe.attributes('referrerpolicy')).toBe('no-referrer')
+      const doc = iframe.attributes('srcdoc')
+      expect(doc).toContain("default-src 'none'")
+      expect(doc).toContain('img-src data:')
+      expect(doc).toContain('<style>p{color:red}</style>')
+      expect(doc).toContain('<p>Hello</p>')
+      expect(doc).not.toContain('<script>')
+      expect(doc).not.toContain('href=')
+      expect(wrapper.find('p').text()).not.toContain('Hello')
+      expect(router.currentRoute.value.path).toBe('/admin/emails')
+      await wrapper.get('[role="dialog"] button').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('iframe').exists()).toBe(false)
+      expect(refetchTable).not.toHaveBeenCalled()
+    })
+
+    it('reports details failures in the dialog and discards requests after closing', async () => {
+      const { wrapper } = await setup('emails')
+      get.mockResolvedValueOnce(failure(404))
+      wrapper.findComponent(table).vm.$emit('action', 'admin.details', [], { id: user.id })
+      await flushPromises()
+      expect(wrapper.get('[role="dialog"]').text()).toContain(messages['admin.emailNotFound'])
+      expect(wrapper.find('iframe').exists()).toBe(false)
+      await wrapper.get('[role="dialog"] button').trigger('click')
+      const pending = Promise.withResolvers<HttpResponse<never>>()
+      get.mockReturnValueOnce(pending.promise)
+      wrapper.findComponent(table).vm.$emit('action', 'admin.details', [], { id: user.id })
+      await flushPromises()
+      const signal = get.mock.calls.at(-1)?.[1]?.signal
+      await wrapper.get('[role="dialog"] button').trigger('click')
+      expect(signal?.aborted).toBe(true)
+      pending.resolve(failure(500))
+      await flushPromises()
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+      expect(ui.notification.value).toBeUndefined()
+      expect(refetchTable).not.toHaveBeenCalled()
+    })
   })
 
   describe('admin jobs', () => {

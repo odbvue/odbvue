@@ -17,6 +17,7 @@ export const emails = odbTable('odb_emails_queue', (t) => ({
   .check('odb_emails_chk_priority', 'priority BETWEEN 1 AND 5')
   .check('odb_emails_chk_attempts', 'attempts >= 0')
   .index('odb_emails_ix_queue', (c) => [c.status, c.postponed, c.priority, c.created])
+  .index('odb_emails_ix_history', (c) => [c.created, c.id])
 
 export const emailsAddr = odbTable('odb_emails_addr', (t) => ({
   idEmail: t.guid().primaryKey(),

@@ -184,3 +184,20 @@ The Emails page sends HTML with an optional file (up to the Storage limit of
 remains in history even when the send request fails. Use **Retry** for that entry
 instead of submitting the form again, which would create a new message.
 Uploaded attachments remain in Storage, including after delivery or failed sends.
+
+## Admin history
+
+The administrator-only Emails page lists delivery history, searchable by subject
+and filterable by recipient email address (case-insensitive substring across To,
+Cc, and Bcc) and an inclusive creation-time interval. Local date/time selections
+are sent as UTC. Invalid dates and reversed intervals are rejected by the API.
+The list shows To, Cc, and Bcc recipients, delivery information, and errors.
+Long recipient cells can be expanded; exceptionally large recipient groups are
+truncated by Oracle's `LISTAGG` limit with an omitted-recipient count. Address
+filtering checks every stored recipient, including those omitted from display.
+Its Details
+action opens a scrollable dialog containing only the HTML body, with the subject
+as its title, without leaving the list or changing its pagination.
+The preview runs in a sandboxed iframe:
+scripts, links, and external resources are disabled. SMTP acceptance does not
+guarantee delivery to the recipient.

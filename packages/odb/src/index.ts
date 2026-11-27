@@ -15,6 +15,7 @@ export {
   emitApplicationSql,
   odbType,
   type ProcedureDefinition,
+  type ProcedureBody,
   type OdbPackageOptions,
   type OrdsServiceDefinition,
   type ProcedureServiceDefinition,

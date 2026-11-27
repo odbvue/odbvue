@@ -31,6 +31,67 @@ const loadUpSql = async () => {
 }
 
 describe('app-owned ORDS migrations', () => {
+  it('exposes admin-only paged email history and full email details', async () => {
+    const { adminPackage, migration } = await migrations['00000000000003-admin']()
+    const endpoints = compileApplicationEndpoints(adminPackage.application()).filter(
+      (endpoint) =>
+        endpoint.effectivePattern === 'emails' || endpoint.effectivePattern === 'emails/:id',
+    )
+    expect(endpoints).toHaveLength(2)
+    for (const endpoint of endpoints) {
+      expect(endpoint.toNode().source).toContain("odb_auth.has_role(v_auth_user_id, 'admin')")
+    }
+    const list = endpoints.find((endpoint) => endpoint.effectivePattern === 'emails')!.toNode()
+    expect(list.source).toContain("'nextCursor' VALUE")
+    const details = endpoints
+      .find((endpoint) => endpoint.effectivePattern === 'emails/:id')!
+      .toNode()
+    expect(details.source).toContain("'addresses' VALUE")
+    const sql = migration.compile().up().join('\n')
+    const listStart = sql.indexOf('PROCEDURE list_emails', sql.indexOf('PACKAGE BODY'))
+    const listSql = sql.slice(listStart, sql.indexOf('END list_emails;', listStart))
+    for (const [type, name] of [
+      ['To', 'toRecipients'],
+      ['Cc', 'ccRecipients'],
+      ['Bcc', 'bccRecipients'],
+    ]) {
+      expect(listSql).toContain(`candidate.addr_type = '${type}'`)
+      expect(listSql).toContain(`AS "${name}"`)
+    }
+    expect(listSql).toContain("ON OVERFLOW TRUNCATE '...' WITH COUNT")
+    expect(listSql).not.toContain('MIN(candidate.addr_addr)')
+    expect(listSql).toContain('INSTR(LOWER(subject), LOWER(TRIM(p_search)))')
+    expect(listSql).toContain(
+      "candidate.addr_type = 'To' OR candidate.addr_type = 'Cc' OR candidate.addr_type = 'Bcc'",
+    )
+    expect(listSql).toContain('EXISTS (SELECT 1 FROM odb_emails_addr candidate')
+    expect(listSql).toContain('INSTR(LOWER(candidate.addr_addr), LOWER(TRIM(p_address)))')
+    expect(listSql).toContain('created >= l_from_timestamp')
+    expect(listSql).toContain('created <= l_to_timestamp')
+    expect(listSql).toContain('ADMIN_EMAIL_DATE_INVALID')
+    expect(listSql).toContain('l_from_timestamp > l_to_timestamp')
+    expect(listSql).toContain('ADMIN_EMAIL_INTERVAL_INVALID')
+    expect(listSql).toContain('FXYYYY-MM-DD"T"HH24:MI:SS.FF3"Z"')
+    expect(listSql.indexOf('created >= l_from_timestamp')).toBeLessThan(
+      listSql.indexOf('ORDER BY created DESC'),
+    )
+    for (const name of ['address', 'from', 'to', 'search']) {
+      expect(list.params).toContainEqual(expect.objectContaining({ name }))
+      expect(list.source).toContain(`'${name}' VALUE :${name}`)
+    }
+    expect(listSql).toContain(
+      'ORDER BY created DESC, id DESC FETCH FIRST NVL(p_limit, 25) + 1 ROWS ONLY',
+    )
+    expect(listSql).not.toContain('content AS')
+    const bootstrapSql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
+    expect(bootstrapSql).toContain('odb_emails_ix_history')
+    const detailStart = sql.indexOf('PROCEDURE get_email', sql.indexOf('PACKAGE BODY'))
+    const detailSql = sql.slice(detailStart, sql.indexOf('END get_email;', detailStart))
+    expect(detailSql).toContain('content AS "content"')
+    expect(detailSql).toContain('FROM odb_emails_addr WHERE id_email = p_id')
+    expect(detailSql).toContain('ADMIN_EMAIL_NOT_FOUND')
+  })
+
   it('installs the scheduler and exposes admin-only cursor-paged jobs and run history', async () => {
     const bootstrap = await migrations['00000000000000-bootstrap']()
     const bootstrapSql = bootstrap.migration.compile().up().join('\n')
@@ -127,6 +188,8 @@ describe('app-owned ORDS migrations', () => {
     expect(endpoints.map((endpoint) => endpoint.toNode().method)).toEqual([
       'GET',
       'GET',
+      'GET',
+      'GET',
       'PUT',
       'GET',
       'GET',
@@ -145,7 +208,7 @@ describe('app-owned ORDS migrations', () => {
     expect(new Set(endpoints.map((endpoint) => endpoint.toNode().module))).toEqual(
       new Set(['admin']),
     )
-    for (const endpoint of endpoints.slice(0, 3)) {
+    for (const endpoint of endpoints.slice(2, 5)) {
       const node = endpoint.toNode()
       expect(node.source).toContain("odb_auth.has_role(v_auth_user_id, 'admin')")
       const columns = node.params.find((param) => param.resultColumns?.length)?.resultColumns
@@ -179,6 +242,8 @@ describe('app-owned ORDS migrations', () => {
       paths: Record<string, Record<string, { security: unknown; parameters: { name: string }[] }>>
     }
     expect(Object.keys(document.paths)).toEqual([
+      '/admin/emails',
+      '/admin/emails/{id}',
       '/admin/users',
       '/admin/users/{id}',
       '/admin/users/{id}/status',
@@ -362,7 +427,7 @@ describe('app-owned ORDS migrations', () => {
     const [catalog, grants, available, mutation] = compileApplicationEndpoints(
       adminPackage.application(),
     )
-      .slice(3)
+      .slice(5)
       .map((endpoint) => endpoint.toNode())
     for (const node of [catalog, grants, available, mutation]) {
       expect(node?.source).toContain("odb_auth.has_role(v_auth_user_id, 'admin')")

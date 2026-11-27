@@ -46,6 +46,15 @@
           hover
         />
       </v-col>
+      <v-col cols="12" md="6">
+        <v-card
+          to="/admin/emails"
+          prepend-icon="$mdiEmail"
+          :title="t('admin.emails')"
+          :text="t('admin.emailsDescription')"
+          hover
+        />
+      </v-col>
     </v-row>
   </v-container>
 </template>

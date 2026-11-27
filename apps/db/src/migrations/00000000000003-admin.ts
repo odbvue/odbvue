@@ -4,6 +4,8 @@ import {
   authRoles,
   authUserRoles,
   auditLogs,
+  emails,
+  emailsAddr,
   cond,
   defineMigration,
   defineService,
@@ -18,14 +20,62 @@ import {
   odbTable,
   odbType,
   plsqlExpr,
+  PlsqlExpression,
   settingsStore,
   type Package,
+  type PlsqlValue,
+  type ProcedureBody,
 } from '@odbvue/odb'
 
 const searchPageInputs = {
   after: odbType.json(),
   limit: odbType.integer(),
   search: odbType.string(256),
+}
+
+function timestampRange(
+  body: ProcedureBody,
+  from: PlsqlValue<'VARCHAR2'>,
+  to: PlsqlValue<'VARCHAR2'>,
+  errorPrefix: string,
+) {
+  const { fromTimestamp, toTimestamp } = body.variables({
+    fromTimestamp: odbType.timestamp(),
+    toTimestamp: odbType.timestamp(),
+  })
+  body.block((dates) => {
+    for (const [value, target] of [
+      [from, fromTimestamp],
+      [to, toTimestamp],
+    ] as const) {
+      dates.ifThen(
+        cond.and([
+          cond.isNotNull(value),
+          cond.not(
+            cond.regexpLike(
+              value,
+              '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.][0-9]{3}Z$',
+            ),
+          ),
+        ]),
+        (invalid) => invalid.invalid(`${errorPrefix}_DATE_INVALID`),
+      )
+      dates.set(
+        target,
+        plsqlExpr.call(
+          'TIMESTAMP',
+          'TO_TIMESTAMP',
+          value,
+          odbLiteral('FXYYYY-MM-DD"T"HH24:MI:SS.FF3"Z"'),
+        ),
+      )
+    }
+    dates.whenOthers((invalid) => invalid.invalid(`${errorPrefix}_DATE_INVALID`))
+  })
+  body.ifThen(cond.gt(fromTimestamp, toTimestamp), (invalid) =>
+    invalid.invalid(`${errorPrefix}_INTERVAL_INVALID`),
+  )
+  return { fromTimestamp, toTimestamp }
 }
 
 const findUserId = (id: Parameters<typeof cond.eq>[1]) =>
@@ -63,7 +113,170 @@ const schedulerRuns = odbTable('user_scheduler_job_run_details', (t) => ({
   output: t.string(4000),
 }))
 
+const emailListing = odbTable('odb_emails_queue', (t) => ({
+  id: t.guid().primaryKey(),
+  subject: t.string(240).notNull(),
+  status: t.string(1).notNull(),
+  created: t.timestamp().notNull(),
+  delivered: t.timestamp(),
+  attempts: t.number().notNull(),
+  error: t.string(2000),
+  toRecipients: t.string(4000),
+  ccRecipients: t.string(4000),
+  bccRecipients: t.string(4000),
+}))
+
 export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin', (pkg) => {
+  const listEmails = pkg.proc(
+    'list_emails',
+    {
+      in: {
+        ...searchPageInputs,
+        address: odbType.string(240),
+        from: odbType.string(24),
+        to: odbType.string(24),
+      },
+      out: { items: odbType.resultset() },
+    },
+    ({ params: { after, limit, search, address, from, to, items }, body }) => {
+      const { fromTimestamp, toTimestamp } = timestampRange(body, from, to, 'ADMIN_EMAIL')
+      const candidate = emailsAddr.as('candidate')
+      const recipients = (type: 'To' | 'Cc' | 'Bcc') =>
+        new PlsqlExpression(
+          'VARCHAR2',
+          `(${odbQuery()
+            .selectFrom(candidate)
+            .select(
+              new PlsqlExpression(
+                'VARCHAR2',
+                `LISTAGG(${candidate.addrAddr.toSQL()}, ', ' ON OVERFLOW TRUNCATE '...' WITH COUNT) WITHIN GROUP (ORDER BY ${candidate.addrAddr.toSQL()})`,
+              ),
+            )
+            .where(
+              cond.and([
+                cond.eq(candidate.idEmail, emailListing.id),
+                cond.eq(candidate.addrType, type),
+              ]),
+            )
+            .toSQL()})`,
+        )
+      const term = odbOracle.lower(odbOracle.trim(search))
+      const addressTerm = odbOracle.lower(odbOracle.trim(address))
+      const matchingAddress = odbQuery()
+        .selectFrom(candidate)
+        .select('1')
+        .where(
+          cond.and([
+            cond.eq(candidate.idEmail, emailListing.id),
+            cond.or(['To', 'Cc', 'Bcc'].map((type) => cond.eq(candidate.addrType, type))),
+            cond.gt(odbOracle.instr(odbOracle.lower(candidate.addrAddr), addressTerm), 0),
+          ]),
+        )
+      body.openFor(
+        items,
+        odbQuery()
+          .selectFrom(emailListing)
+          .select([
+            emailListing.id,
+            emailListing.subject,
+            emailListing.status,
+            emailListing.created,
+            emailListing.delivered,
+            emailListing.attempts,
+            emailListing.error,
+          ])
+          .selectAs(recipients('To'), emailListing.toRecipients)
+          .selectAs(recipients('Cc'), emailListing.ccRecipients)
+          .selectAs(recipients('Bcc'), emailListing.bccRecipients)
+          .where(
+            cond.or([
+              cond.isNull(term),
+              cond.gt(odbOracle.instr(odbOracle.lower(emailListing.subject), term), 0),
+            ]),
+          )
+          .where({
+            toSQL: () => `(${addressTerm.toSQL()} IS NULL OR EXISTS (${matchingAddress.toSQL()}))`,
+          })
+          .where(
+            cond.or([cond.isNull(fromTimestamp), cond.gte(emailListing.created, fromTimestamp)]),
+          )
+          .where(cond.or([cond.isNull(toTimestamp), cond.lte(emailListing.created, toTimestamp)]))
+          .orderBy(emailListing.created, 'desc')
+          .orderBy(emailListing.id, 'desc')
+          .paginate({ cursor: after, limit }),
+      )
+    },
+  )
+  defineService(listEmails, {
+    auth: { roles: ['admin'] },
+    module: 'admin',
+    basePath: '/admin',
+    method: 'GET',
+    path: '/emails',
+    summary: 'List email history filtered by subject, recipient address and creation interval',
+    query: {
+      cursor: listEmails.parameters.after,
+      limit: listEmails.parameters.limit,
+      search: listEmails.parameters.search,
+      address: listEmails.parameters.address,
+      from: listEmails.parameters.from,
+      to: listEmails.parameters.to,
+    },
+    response: { items: listEmails.parameters.items },
+  })
+
+  const getEmail = pkg.proc(
+    'get_email',
+    {
+      in: { id: odbType.guid() },
+      out: { items: odbType.resultset(), addresses: odbType.resultset() },
+    },
+    ({ params: { id, items, addresses }, body }) => {
+      const { foundId } = body.variables({ foundId: emails.id })
+      body.query(
+        odbQuery().selectFrom(emails).select(emails.id).into(foundId).where(cond.eq(emails.id, id)),
+      )
+      body.openFor(
+        items,
+        odbQuery()
+          .selectFrom(emails)
+          .select([
+            emails.id,
+            emails.subject,
+            emails.content,
+            emails.priority,
+            emails.status,
+            emails.created,
+            emails.delivered,
+            emails.attempts,
+            emails.postponed,
+            emails.error,
+          ])
+          .where(cond.eq(emails.id, id)),
+      )
+      body.openFor(
+        addresses,
+        odbQuery()
+          .selectFrom(emailsAddr)
+          .select([emailsAddr.addrType, emailsAddr.addrAddr, emailsAddr.addrName])
+          .where(cond.eq(emailsAddr.idEmail, id))
+          .orderBy(emailsAddr.addrType)
+          .orderBy(emailsAddr.addrAddr),
+      )
+      body.when('NO_DATA_FOUND', (missing) => missing.notFound('ADMIN_EMAIL_NOT_FOUND'))
+    },
+  )
+  defineService(getEmail, {
+    auth: { roles: ['admin'] },
+    module: 'admin',
+    basePath: '/admin',
+    method: 'GET',
+    path: '/emails/:id',
+    summary: 'Read an email body, delivery details and addresses',
+    uri: { id: getEmail.parameters.id },
+    response: { items: getEmail.parameters.items, addresses: getEmail.parameters.addresses },
+  })
+
   const listUsers = pkg.proc(
     'list_users',
     {
@@ -695,10 +908,6 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
       params: { after, limit, userId, severity, from, to, messageType, search, items },
       body,
     }) => {
-      const { fromTimestamp, toTimestamp } = body.variables({
-        fromTimestamp: odbType.timestamp(),
-        toTimestamp: odbType.timestamp(),
-      })
       body.ifThen(
         cond.and([
           cond.isNotNull(severity),
@@ -706,38 +915,7 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
         ]),
         (invalid) => invalid.invalid('ADMIN_AUDIT_SEVERITY_INVALID'),
       )
-      body.block((dates) => {
-        for (const [value, target] of [
-          [from, fromTimestamp],
-          [to, toTimestamp],
-        ] as const) {
-          dates.ifThen(
-            cond.and([
-              cond.isNotNull(value),
-              cond.not(
-                cond.regexpLike(
-                  value,
-                  '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.][0-9]{3}Z$',
-                ),
-              ),
-            ]),
-            (invalid) => invalid.invalid('ADMIN_AUDIT_DATE_INVALID'),
-          )
-          dates.set(
-            target,
-            plsqlExpr.call(
-              'TIMESTAMP',
-              'TO_TIMESTAMP',
-              value,
-              odbLiteral('FXYYYY-MM-DD"T"HH24:MI:SS.FF3"Z"'),
-            ),
-          )
-        }
-        dates.whenOthers((invalid) => invalid.invalid('ADMIN_AUDIT_DATE_INVALID'))
-      })
-      body.ifThen(cond.gt(fromTimestamp, toTimestamp), (invalid) =>
-        invalid.invalid('ADMIN_AUDIT_INTERVAL_INVALID'),
-      )
+      const { fromTimestamp, toTimestamp } = timestampRange(body, from, to, 'ADMIN_AUDIT')
       const term = odbOracle.lower(odbOracle.trim(search))
       const type = odbOracle.lower(odbOracle.trim(messageType))
       const page = odbQuery()
