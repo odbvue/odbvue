@@ -14,13 +14,7 @@
       scrollable
     >
       <template #content>
-        <pre v-if="email" class="email-details">{{ detailsJson }}</pre>
-        <v-progress-linear
-          v-else-if="loadingDetails"
-          indeterminate
-          :aria-label="t('admin.emailDetails')"
-        />
-        <v-alert v-else-if="detailsError" type="error" :text="t(detailsError)" />
+        <v-ov-json :data="detailsData" :loading="loadingDetails" :error="detailsError" />
       </template>
     </v-ov-dialog>
   </v-container>
@@ -49,34 +43,30 @@ const { t } = useI18n()
 const detailsOpen = ref(false)
 const selectedId = ref<string>()
 const email = ref<components['schemas']['AdminGetEmailResponse']>()
-const detailsJson = computed(() => {
+const detailsData = computed(() => {
   const item = email.value?.items[0]
-  if (!item || !email.value) return ''
-  return JSON.stringify(
-    {
-      id: item.id,
-      subject: item.subject,
-      priority: item.priority,
-      status: item.status,
-      created: item.created,
-      delivered: item.delivered,
-      attempts: item.attempts,
-      postponed: item.postponed,
-      error: item.error,
-      bodyLength: item.bodyLength,
-      addresses: email.value.addresses.map(({ addrType, addrAddr, addrName }) => ({
-        addrType,
-        addrAddr,
-        addrName,
-      })),
-      attachments: email.value.attachments.map(({ fileName, fileSize }) => ({
-        fileName,
-        fileSize,
-      })),
-    },
-    null,
-    2,
-  )
+  if (!item || !email.value) return undefined
+  return {
+    id: item.id,
+    subject: item.subject,
+    priority: item.priority,
+    status: item.status,
+    created: item.created,
+    ...(item.delivered !== undefined ? { delivered: item.delivered } : {}),
+    attempts: item.attempts,
+    ...(item.postponed !== undefined ? { postponed: item.postponed } : {}),
+    ...(item.error !== undefined ? { error: item.error } : {}),
+    bodyLength: item.bodyLength,
+    addresses: email.value.addresses.map(({ addrType, addrAddr, addrName }) => ({
+      addrType,
+      addrAddr,
+      ...(addrName !== undefined ? { addrName } : {}),
+    })),
+    attachments: email.value.attachments.map(({ fileName, fileSize }) => ({
+      fileName,
+      fileSize,
+    })),
+  }
 })
 const loadingDetails = ref(false)
 const detailsError = ref<string>()
@@ -242,10 +232,3 @@ async function fetchEmails({ cursor, limit, filter, signal, complete }: OvTableF
   complete(result.data)
 }
 </script>
-
-<style scoped>
-.email-details {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-</style>

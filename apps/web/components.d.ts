@@ -11,6 +11,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    JsonNodeView: typeof import('./src/components/data/JsonNodeView.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     VOvChart: typeof import('./src/components/data/VOvChart.vue')['default']
@@ -18,6 +19,7 @@ declare module 'vue' {
     VOvEditor: typeof import('./src/components/forms/VOvEditor.vue')['default']
     VOvForm: typeof import('./src/components/forms/VOvForm.vue')['default']
     VOvGoogleSignIn: typeof import('./src/components/auth/VOvGoogleSignIn.vue')['default']
+    VOvJson: typeof import('./src/components/data/VOvJson.vue')['default']
     VOvMap: typeof import('./src/components/content/VOvMap.vue')['default']
     VOvMedia: typeof import('./src/components/content/VOvMedia.vue')['default']
     VOvPad: typeof import('./src/components/forms/VOvPad.vue')['default']

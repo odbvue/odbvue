@@ -4,6 +4,44 @@ OdbVue uses [Vuetify](https://vuetifyjs.com/) as its UI implementation. `apps/we
 
 Use the [Vuetify documentation](https://vuetifyjs.com/components/all/) for component APIs. Extend the existing application setup rather than installing a second Vuetify instance.
 
+## JSON viewer
+
+Use `VOvJson` to display JSON without a schema or display configuration:
+
+```vue
+<v-ov-json :data="data" />
+```
+
+It automatically renders objects as key/value tables and nested containers as
+named sections. Arrays of flat objects with the same keys become data tables
+with inferred columns; key order may differ between records. All records are
+displayed without paging. Primitive arrays become compact lists; mixed or complex
+arrays become recursive panels with zero-based indices. Nested containers use
+Vuetify expansion panels: the first two levels start open, and deeper sections
+start collapsed and render their contents on expansion.
+
+Booleans use check/cross icons and translated text. Strings and numbers appear as
+plain text, multiline strings preserve line breaks, and null and empty containers
+are muted. Exact property names are preserved, including table headers. Strings
+are never interpreted as HTML or translation keys.
+
+A raw JSON toggle and copy button always provide the complete original document.
+
+Optional loading and error inputs keep request handling in the page:
+
+```vue
+<v-ov-json :data="data" :loading="loading" :error="error" />
+```
+
+Loading takes precedence over errors and data. Errors may be translation keys or
+plain messages. An absent (`undefined`) input displays an empty state; `null` is
+a JSON value. Pass parsed JSON, not serialized text: strings are displayed as strings.
+Unsupported values (including circular references, nested `undefined`, non-finite
+numbers, functions, and class instances) show an error. Clipboard failures are
+also shown explicitly. Both raw display and copying include the whole document,
+independent of expanded branches. Select only fields appropriate for display
+before passing sensitive API responses.
+
 ## Themes
 
 Keep substantial palettes in an application-owned file, then register them through configuration.

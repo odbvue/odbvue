@@ -72,6 +72,11 @@ const view = defineComponent({
   props: ['options', 'data'],
   template: '<div data-testid="user-details" />',
 })
+const jsonViewer = defineComponent({
+  name: 'VOvJson',
+  props: ['data', 'loading', 'error'],
+  template: '<div><span v-if="error">{{ $t(error) }}</span></div>',
+})
 const tabs = defineComponent({
   name: 'VTabs',
   props: ['modelValue'],
@@ -171,6 +176,7 @@ async function setup(
       stubs: {
         VOvTable: table,
         VOvView: view,
+        VOvJson: jsonViewer,
         VTabs: tabs,
         VTab: {
           props: ['to', 'disabled'],
@@ -676,7 +682,7 @@ describe('admin page metadata', () => {
       await flushPromises()
       expect(wrapper.get('[role="dialog"]').text()).toContain('Receipt')
       expect(wrapper.findComponent(view).exists()).toBe(false)
-      const details = JSON.parse(wrapper.get('[role="dialog"] pre').text())
+      const details = wrapper.findComponent(jsonViewer).props('data')
       expect(details).toMatchObject({
         id: user.id,
         subject: 'Receipt',
@@ -694,7 +700,7 @@ describe('admin page metadata', () => {
       expect(router.currentRoute.value.path).toBe('/admin/emails')
       await wrapper.get('[role="dialog"] button').trigger('click')
       await flushPromises()
-      expect(wrapper.find('pre').exists()).toBe(false)
+      expect(wrapper.findComponent(jsonViewer).exists()).toBe(false)
       expect(refetchTable).not.toHaveBeenCalled()
     })
 
@@ -702,7 +708,17 @@ describe('admin page metadata', () => {
       const { wrapper } = await setup('emails')
       get.mockResolvedValueOnce({
         data: {
-          items: [{ id: user.id, subject: 'Notice', bodyLength: 0 }],
+          items: [
+            {
+              id: user.id,
+              subject: 'Notice',
+              priority: 3,
+              status: 'N',
+              created: '2026-01-01T10:00:00Z',
+              attempts: 0,
+              bodyLength: 0,
+            },
+          ],
           addresses: [],
           attachments: [],
         },
@@ -712,7 +728,7 @@ describe('admin page metadata', () => {
       })
       wrapper.findComponent(table).vm.$emit('action', 'admin.details', [], { id: user.id })
       await flushPromises()
-      expect(JSON.parse(wrapper.get('[role="dialog"] pre').text())).toMatchObject({
+      expect(wrapper.findComponent(jsonViewer).props('data')).toMatchObject({
         bodyLength: 0,
         attachments: [],
       })
