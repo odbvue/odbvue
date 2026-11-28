@@ -1186,21 +1186,6 @@ export interface components {
             /** @description Opaque continuation token; absent when pagination is exhausted. */
             nextCursor?: string;
         };
-        AdminGetEmailItemsItem: {
-            id: string;
-            subject: string;
-            priority: number;
-            status: string;
-            /** Format: date-time */
-            created: string;
-            /** Format: date-time */
-            delivered?: string | null;
-            attempts: number;
-            /** Format: date-time */
-            postponed?: string | null;
-            error?: string | null;
-            bodyLength: number;
-        };
         AdminGetEmailAddressesItem: {
             addrType: string;
             addrAddr: string;
@@ -1211,7 +1196,16 @@ export interface components {
             fileSize: number;
         };
         AdminGetEmailResponse: {
-            items: components["schemas"]["AdminGetEmailItemsItem"][];
+            id: string;
+            subject: string;
+            priority: number;
+            status: string;
+            created: string;
+            delivered: string | null;
+            attempts: number;
+            postponed: string | null;
+            error: string | null;
+            bodyLength: number;
             addresses: components["schemas"]["AdminGetEmailAddressesItem"][];
             attachments: components["schemas"]["AdminGetEmailAttachmentsItem"][];
         };

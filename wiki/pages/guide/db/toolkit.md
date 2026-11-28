@@ -178,6 +178,11 @@ The CLI writes `apps/db/dist/openapi.json` after every successful database migra
 
 `SYS_REFCURSOR` outputs opened through a typed ODB query become reusable OpenAPI row schemas. The response preserves column types and nullability, so OpenAPI client generators can produce typed result arrays.
 
+For a nullable scalar response, declare its output with
+`{ ...odbType.string(240), nullable: true }` (or another scalar type). This
+marks the response property as nullable in OpenAPI; the procedure must still
+produce the corresponding value or null.
+
 `body.openFor()` automatically renders typed columns with quoted camelCase aliases,
 such as `severity_text AS "severityText"`. This also applies to `selectAs()` expressions
 and an implicit selection of all columns from a single typed table. Database column

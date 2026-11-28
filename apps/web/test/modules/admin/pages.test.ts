@@ -653,27 +653,26 @@ describe('admin page metadata', () => {
 
     it('shows email metadata without the body and keeps list state unchanged', async () => {
       const { wrapper, router } = await setup('emails')
+      const email = {
+        id: user.id,
+        subject: 'Receipt',
+        status: 'S',
+        bodyLength: 42,
+        created: '2026-01-01T10:00:00Z',
+        delivered: null,
+        postponed: null,
+        error: null,
+        priority: 3,
+        attempts: 1,
+        addresses: [
+          { addrType: 'To', addrAddr: 'ada@example.test', addrName: 'Ada' },
+          { addrType: 'Cc', addrAddr: 'cc@example.test', addrName: null },
+          { addrType: 'Bcc', addrAddr: 'bcc@example.test', addrName: null },
+        ],
+        attachments: [{ fileName: 'receipt.pdf', fileSize: 1234 }],
+      }
       get.mockResolvedValueOnce({
-        data: {
-          items: [
-            {
-              id: user.id,
-              subject: 'Receipt',
-              status: 'S',
-              content: 'sensitive body from an outdated server',
-              bodyLength: 42,
-              created: '2026-01-01T10:00:00Z',
-              priority: 3,
-              attempts: 1,
-            },
-          ],
-          addresses: [
-            { addrType: 'To', addrAddr: 'ada@example.test', addrName: 'Ada' },
-            { addrType: 'Cc', addrAddr: 'cc@example.test', addrName: null },
-            { addrType: 'Bcc', addrAddr: 'bcc@example.test', addrName: null },
-          ],
-          attachments: [{ fileName: 'receipt.pdf', fileSize: 1234 }],
-        },
+        data: email,
         error: null,
         status: 200,
         headers: null,
@@ -683,17 +682,7 @@ describe('admin page metadata', () => {
       expect(wrapper.get('[role="dialog"]').text()).toContain('Receipt')
       expect(wrapper.findComponent(view).exists()).toBe(false)
       const details = wrapper.findComponent(jsonViewer).props('data')
-      expect(details).toMatchObject({
-        id: user.id,
-        subject: 'Receipt',
-        bodyLength: 42,
-        addresses: [
-          { addrType: 'To', addrAddr: 'ada@example.test', addrName: 'Ada' },
-          { addrType: 'Cc', addrAddr: 'cc@example.test', addrName: null },
-          { addrType: 'Bcc', addrAddr: 'bcc@example.test', addrName: null },
-        ],
-        attachments: [{ fileName: 'receipt.pdf', fileSize: 1234 }],
-      })
+      expect(details).toEqual(email)
       expect(details).not.toHaveProperty('content')
       expect(wrapper.get('[role="dialog"]').text()).not.toContain('sensitive body')
       expect(wrapper.find('iframe').exists()).toBe(false)
@@ -708,17 +697,16 @@ describe('admin page metadata', () => {
       const { wrapper } = await setup('emails')
       get.mockResolvedValueOnce({
         data: {
-          items: [
-            {
-              id: user.id,
-              subject: 'Notice',
-              priority: 3,
-              status: 'N',
-              created: '2026-01-01T10:00:00Z',
-              attempts: 0,
-              bodyLength: 0,
-            },
-          ],
+          id: user.id,
+          subject: 'Notice',
+          priority: 3,
+          status: 'N',
+          created: '2026-01-01T10:00:00Z',
+          delivered: null,
+          postponed: null,
+          error: null,
+          attempts: 0,
+          bodyLength: 0,
           addresses: [],
           attachments: [],
         },

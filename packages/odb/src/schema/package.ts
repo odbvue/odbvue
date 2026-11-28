@@ -64,6 +64,8 @@ export type OdbTypeDescriptor<TType extends PlsqlType | string> = {
   odbType?: OdbType
   /** Parameter default expression. Ignored when the descriptor is used as a local variable. */
   default?: PlsqlExpressionValue
+  /** Whether a scalar response parameter may be null. */
+  nullable?: boolean
 }
 
 type ParameterInput =
@@ -168,11 +170,16 @@ function inputParameterOdbType(input: ParameterInput): OdbType {
     : (input.odbType ?? odbTypeFromPlsql(inputParameterType(input)))
 }
 
-function parameterOptions(input: ParameterInput): { length?: number; default?: string } {
+function parameterOptions(input: ParameterInput): {
+  length?: number
+  default?: string
+  nullable?: boolean
+} {
   if (input instanceof Column) return {}
   const value = input.default
   return {
     length: input.length,
+    ...(input.nullable !== undefined ? { nullable: input.nullable } : {}),
     default:
       value === undefined
         ? undefined
@@ -1368,6 +1375,7 @@ function buildOrdsEndpoint(
             : transport?.transport === 'response'
               ? 'RESPONSE'
               : undefined,
+      param.options.nullable,
     )
   }
 

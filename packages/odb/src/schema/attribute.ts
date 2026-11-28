@@ -303,6 +303,7 @@ export const expr = plsqlExpr
 export type ParamOptions = {
   length?: number
   default?: string
+  nullable?: boolean
 }
 
 export type ParamNode = {

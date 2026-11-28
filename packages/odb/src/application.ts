@@ -216,7 +216,10 @@ export function generateApplicationsOpenApi(
             'x-odb-oracle': { plsqlType: 'SYS_REFCURSOR', ordsType: param.paramType },
           }
         } else {
-          outputs[outputName] = openApiSchema(param.paramType, param.odbType)
+          outputs[outputName] = nullableSchema(
+            openApiSchema(param.paramType, param.odbType),
+            param.nullable === true,
+          )
         }
       }
 

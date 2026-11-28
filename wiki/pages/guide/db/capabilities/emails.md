@@ -199,6 +199,8 @@ filtering checks every stored recipient, including those omitted from display.
 Its Details action opens a scrollable JSON dialog with delivery metadata, all
 addresses (including Bcc), attachment names and sizes in bytes, and the HTML
 body length as measured by Oracle's `DBMS_LOB.GETLENGTH` for a CLOB. The admin
-API does not return the body; it remains stored in the queue for sending and
+`GET /admin/emails/:id` response is that same metadata object, with `addresses`
+and `attachments` arrays. Missing emails return 404. The API does not return
+the body; it remains stored in the queue for sending and
 retries. Details do not change the list's pagination. SMTP acceptance does not
 guarantee delivery to the recipient.

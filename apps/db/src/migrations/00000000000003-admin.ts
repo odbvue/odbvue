@@ -241,18 +241,44 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
     {
       in: { id: odbType.guid() },
       out: {
-        items: odbType.resultset(),
+        emailId: odbType.guid(),
+        subject: odbType.string(240),
+        priority: odbType.number(),
+        status: odbType.string(1),
+        created: odbType.string(32),
+        delivered: { ...odbType.string(32), nullable: true },
+        attempts: odbType.number(),
+        postponed: { ...odbType.string(32), nullable: true },
+        error: { ...odbType.string(2000), nullable: true },
+        bodyLength: odbType.number(),
         addresses: odbType.resultset(),
         attachments: odbType.resultset(),
       },
     },
-    ({ params: { id, items, addresses, attachments }, body }) => {
-      const { foundId } = body.variables({ foundId: emails.id })
+    ({
+      params: {
+        id,
+        emailId,
+        subject,
+        priority,
+        status,
+        created,
+        delivered,
+        attempts,
+        postponed,
+        error,
+        bodyLength,
+        addresses,
+        attachments,
+      },
+      body,
+    }) => {
+      const utcTimestamp = (column: { toSQL(): string }) =>
+        new PlsqlExpression(
+          'VARCHAR2',
+          `TO_CHAR(${column.toSQL()}, 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"')`,
+        )
       body.query(
-        odbQuery().selectFrom(emails).select(emails.id).into(foundId).where(cond.eq(emails.id, id)),
-      )
-      body.openFor(
-        items,
         odbQuery()
           .selectFrom(emails)
           .select([
@@ -260,15 +286,24 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
             emails.subject,
             emails.priority,
             emails.status,
-            emails.created,
-            emails.delivered,
+            utcTimestamp(emails.created),
+            utcTimestamp(emails.delivered),
             emails.attempts,
-            emails.postponed,
+            utcTimestamp(emails.postponed),
             emails.error,
-          ])
-          .selectAs(
             odbDbmsLob.getLength(emails.content),
-            resultField('bodyLength', 'number', { nullable: false }),
+          ])
+          .into(
+            emailId,
+            subject,
+            priority,
+            status,
+            created,
+            delivered,
+            attempts,
+            postponed,
+            error,
+            bodyLength,
           )
           .where(cond.eq(emails.id, id)),
       )
@@ -305,7 +340,16 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
     summary: 'Read email delivery metadata, addresses and attachment details',
     uri: { id: getEmail.parameters.id },
     response: {
-      items: getEmail.parameters.items,
+      id: getEmail.parameters.emailId,
+      subject: getEmail.parameters.subject,
+      priority: getEmail.parameters.priority,
+      status: getEmail.parameters.status,
+      created: getEmail.parameters.created,
+      delivered: getEmail.parameters.delivered,
+      attempts: getEmail.parameters.attempts,
+      postponed: getEmail.parameters.postponed,
+      error: getEmail.parameters.error,
+      bodyLength: getEmail.parameters.bodyLength,
       addresses: getEmail.parameters.addresses,
       attachments: getEmail.parameters.attachments,
     },

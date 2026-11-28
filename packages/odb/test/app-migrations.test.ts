@@ -61,9 +61,23 @@ describe('app-owned ORDS migrations', () => {
     expect(details.source).toContain("'fileName' VALUE")
     expect(details.source).toContain("'fileSize' VALUE")
     expect(details.source).not.toContain("'content' VALUE")
-    const itemColumns = details.params.find((param) => param.name === 'items')?.resultColumns
-    expect(itemColumns).toContainEqual({ name: 'body_length', type: 'number', nullable: false })
-    expect(itemColumns?.map((column) => column.name)).not.toContain('content')
+    const responseNames = details.params
+      .filter((param) => param.sourceType === 'RESPONSE')
+      .map((param) => param.name)
+    expect(responseNames).toEqual([
+      'id',
+      'subject',
+      'priority',
+      'status',
+      'created',
+      'delivered',
+      'attempts',
+      'postponed',
+      'error',
+      'bodyLength',
+      'addresses',
+      'attachments',
+    ])
     const attachmentColumns = details.params.find(
       (param) => param.name === 'attachments',
     )?.resultColumns
@@ -121,7 +135,8 @@ describe('app-owned ORDS migrations', () => {
     )
     const detailStart = sql.indexOf('PROCEDURE get_email', sql.indexOf('PACKAGE BODY'))
     const detailSql = sql.slice(detailStart, sql.indexOf('END get_email;', detailStart))
-    expect(detailSql).toContain('DBMS_LOB.GETLENGTH(content) AS "bodyLength"')
+    expect(detailSql).toContain('DBMS_LOB.GETLENGTH(content)')
+    expect(detailSql).toContain(`TO_CHAR(created, 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"')`)
     expect(detailSql).not.toContain('content AS "content"')
     expect(detailSql).toContain('FROM odb_emails_addr WHERE id_email = p_id')
     expect(detailSql).toContain('FROM odb_emails_attc a')
@@ -141,9 +156,14 @@ describe('app-owned ORDS migrations', () => {
               bccRecipients: { type: ['string', 'null'] },
             },
           },
-          AdminGetEmailItemsItem: {
-            properties: { bodyLength: { type: 'number' } },
-            required: expect.arrayContaining(['bodyLength']),
+          AdminGetEmailResponse: {
+            properties: {
+              bodyLength: { type: 'number' },
+              delivered: { type: ['string', 'null'] },
+              postponed: { type: ['string', 'null'] },
+              error: { type: ['string', 'null'] },
+            },
+            required: expect.arrayContaining(['id', 'bodyLength', 'addresses', 'attachments']),
           },
         },
       },

@@ -9,12 +9,12 @@
     />
     <v-ov-dialog
       v-model="detailsOpen"
-      :title="email?.items[0]?.subject || t('admin.emailDetails')"
+      :title="email?.subject || t('admin.emailDetails')"
       :closeable="true"
       scrollable
     >
       <template #content>
-        <v-ov-json :data="detailsData" :loading="loadingDetails" :error="detailsError" />
+        <v-ov-json :data="email" :loading="loadingDetails" :error="detailsError" />
       </template>
     </v-ov-dialog>
   </v-container>
@@ -43,31 +43,6 @@ const { t } = useI18n()
 const detailsOpen = ref(false)
 const selectedId = ref<string>()
 const email = ref<components['schemas']['AdminGetEmailResponse']>()
-const detailsData = computed(() => {
-  const item = email.value?.items[0]
-  if (!item || !email.value) return undefined
-  return {
-    id: item.id,
-    subject: item.subject,
-    priority: item.priority,
-    status: item.status,
-    created: item.created,
-    ...(item.delivered !== undefined ? { delivered: item.delivered } : {}),
-    attempts: item.attempts,
-    ...(item.postponed !== undefined ? { postponed: item.postponed } : {}),
-    ...(item.error !== undefined ? { error: item.error } : {}),
-    bodyLength: item.bodyLength,
-    addresses: email.value.addresses.map(({ addrType, addrAddr, addrName }) => ({
-      addrType,
-      addrAddr,
-      ...(addrName !== undefined ? { addrName } : {}),
-    })),
-    attachments: email.value.attachments.map(({ fileName, fileSize }) => ({
-      fileName,
-      fileSize,
-    })),
-  }
-})
 const loadingDetails = ref(false)
 const detailsError = ref<string>()
 
@@ -95,7 +70,6 @@ watch(
       if (controller.signal.aborted) return
       if (error || !data)
         throw new Error(status === 404 ? 'admin.emailNotFound' : 'admin.loadEmailError')
-      if (!data.items[0]) throw new Error('admin.emailNotFound')
       email.value = data
     } catch (error) {
       if (controller.signal.aborted) return

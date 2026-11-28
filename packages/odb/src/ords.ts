@@ -72,6 +72,7 @@ export type OrdsParamNode = {
   sourceType: 'BODY' | 'HEADER' | 'RESPONSE' | 'URI'
   comment?: string
   resultColumns?: OrdsResultColumnNode[]
+  nullable?: boolean
 }
 
 export type OrdsEndpointNode = {
@@ -125,6 +126,7 @@ export class OrdsParam {
     readonly odbType?: OdbType,
     private readonly nameOverride?: string,
     private readonly sourceTypeOverride?: 'BODY' | 'HEADER' | 'RESPONSE' | 'URI',
+    readonly nullable?: boolean,
   ) {}
 
   /**
@@ -160,6 +162,7 @@ export class OrdsParam {
       sourceType,
       comment: this.comment,
       resultColumns: this.resultColumns?.map((column) => ({ ...column })),
+      ...(this.nullable ? { nullable: true } : {}),
     }
   }
 }
@@ -323,6 +326,7 @@ export class OrdsEndpoint {
     odbType?: OdbType,
     nameOverride?: string,
     sourceTypeOverride?: 'BODY' | 'HEADER' | 'RESPONSE' | 'URI',
+    nullable?: boolean,
   ): this {
     this._params.push(
       new OrdsParam(
@@ -334,6 +338,7 @@ export class OrdsEndpoint {
         odbType,
         nameOverride,
         sourceTypeOverride,
+        nullable,
       ),
     )
     return this
