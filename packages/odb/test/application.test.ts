@@ -5,7 +5,7 @@ import {
   generateApplicationsOpenApi,
   generateApplicationOpenApi,
 } from '../src/application.js'
-import { odbQuery } from '../src/query/index.js'
+import { odbQuery, resultField } from '../src/query/index.js'
 import {
   compileApplicationEndpoints,
   defineService,
@@ -55,6 +55,47 @@ const application = odbPackage('PCK_USERS', (p) => {
 })
 
 describe('ODB application contract', () => {
+  it('carries standalone computed fields through cursor serialization and OpenAPI', () => {
+    const pkg = odbPackage('pck_projection', (builder) => {
+      const read = builder.proc(
+        'read',
+        { out: { items: odbType.resultset() } },
+        ({ params, body }) =>
+          body.openFor(
+            params.items,
+            odbQuery()
+              .selectFrom(users)
+              .select(users.id)
+              .selectAs('1', resultField('bodyLength', 'number', { nullable: false }))
+              .selectAs("JSON_OBJECT('ok' VALUE 1)", resultField('metadata', 'json')),
+          ),
+      )
+      defineService(read, {
+        auth: 'anonymous',
+        method: 'GET',
+        path: '/projection',
+        response: { items: read.parameters.items },
+      })
+    })
+    const node = compileApplicationEndpoints(pkg.application())[0]!.toNode()
+    expect(node.source).toContain("'metadata' VALUE v_output_0_column_2 FORMAT JSON")
+    expect(node.source).toContain("'bodyLength' VALUE v_output_0_column_1")
+    expect(pkg.toSQLUp()).toContain(`JSON_OBJECT('ok' VALUE 1) AS "{}metadata"`)
+    expect(generateApplicationOpenApi(pkg.application())).toMatchObject({
+      components: {
+        schemas: {
+          ProjectionReadItemsItem: {
+            properties: {
+              bodyLength: { type: 'number' },
+              metadata: { 'x-odb-type': 'json' },
+            },
+            required: ['id', 'bodyLength'],
+          },
+        },
+      },
+    })
+  })
+
   it('preserves explicit redirect status through serialization, handler generation and OpenAPI', () => {
     const pkg = odbPackage('pck_redirects', (builder) => {
       const callback = builder.proc(

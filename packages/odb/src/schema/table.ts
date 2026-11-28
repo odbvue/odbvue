@@ -5,7 +5,7 @@ import {
   type ColumnType,
   type ColumnValueForType,
 } from './column.js'
-import { emitOracleType } from '../model.js'
+import { emitOracleType, toSnakeCase } from '../model.js'
 import {
   odbExpr,
   renderExpression,
@@ -717,13 +717,6 @@ function collectExpressionColumns(expression: ExpressionNode): TableIndexColumn[
 
   visit(expression)
   return [...columns.values()]
-}
-
-function toSnakeCase(name: string): string {
-  return name
-    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
-    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-    .toLowerCase()
 }
 
 function generatedObjectName(

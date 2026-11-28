@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { cond, Param } from '../../src/schema/attribute.js'
-import { type SelectQuery, odbQuery } from '../../src/query/index.js'
+import { type SelectQuery, odbQuery, resultField } from '../../src/query/index.js'
 import { type Column } from '../../src/schema/column.js'
 import {
   type Insertable,
@@ -122,6 +122,41 @@ describe('odbQuery', () => {
     const aliasedQuery = odbQuery().selectFrom(aliased).selectAs('s.value', aliased.value)
     expect(aliasedQuery.toSQL()).toBe('SELECT s.value AS value FROM settings s')
     expect(aliasedQuery.selectedColumns()?.[0]?.name).toBe('value')
+  })
+
+  it('selects standalone typed result fields alongside physical columns', () => {
+    const emails = odbTable('emails', (t) => ({ id: t.guid().primaryKey() }))
+    const query = odbQuery()
+      .selectFrom(emails)
+      .select(emails.id)
+      .selectAs('COUNT(*)', resultField('bodyLength', 'number', { nullable: false }))
+      .selectAs('NULL', resultField('toRecipients', 'string'))
+      .selectAs("JSON_OBJECT('ok' VALUE 1)", resultField('metadata', 'json'))
+
+    expect(query.toSQL()).toBe(
+      `SELECT id, COUNT(*) AS "BODY_LENGTH", NULL AS "TO_RECIPIENTS", JSON_OBJECT('ok' VALUE 1) AS "METADATA" FROM emails`,
+    )
+    expect(query.toCursorSQL()).toBe(
+      `SELECT id AS "id", COUNT(*) AS "bodyLength", NULL AS "toRecipients", JSON_OBJECT('ok' VALUE 1) AS "{}metadata" FROM emails`,
+    )
+    expect(query.selectedColumns()).toMatchObject([
+      { name: 'id', type: 'guid', options: { nullable: false } },
+      { name: 'body_length', type: 'number', options: { nullable: false } },
+      { name: 'to_recipients', type: 'string', options: { nullable: true } },
+      { name: 'metadata', type: 'json', options: { nullable: true } },
+    ])
+    expect(
+      odbQuery()
+        .selectFrom(emails)
+        .select('1')
+        .selectAs('NULL', resultField('x', 'number'))
+        .selectedColumns(),
+    ).toBeUndefined()
+    expect(() => resultField('invalid_name', 'string')).toThrow('camelCase Oracle identifiers')
+    expect(() => resultField('x;DROP', 'string')).toThrow('camelCase Oracle identifiers')
+    expect(
+      odbQuery().selectFrom(emails).selectAs('1', resultField('order', 'number')).toSQL(),
+    ).toBe('SELECT 1 AS "ORDER" FROM emails')
   })
   it('emits NOWAIT consistently for inline and bound queries without changing default locks', () => {
     const queue = odbTable('queue', (t) => ({ id: t.guid().primaryKey() }))

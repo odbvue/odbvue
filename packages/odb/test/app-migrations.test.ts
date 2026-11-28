@@ -45,6 +45,13 @@ describe('app-owned ORDS migrations', () => {
     expect(list.source).toContain("'nextCursor' VALUE")
     expect(list.source).toContain(`TO_CHAR(`)
     expect(list.source).toContain(`YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"`)
+    expect(list.params.find((param) => param.name === 'items')?.resultColumns).toEqual(
+      expect.arrayContaining([
+        { name: 'to_recipients', type: 'string', nullable: true },
+        { name: 'cc_recipients', type: 'string', nullable: true },
+        { name: 'bcc_recipients', type: 'string', nullable: true },
+      ]),
+    )
     const details = endpoints
       .find((endpoint) => endpoint.effectivePattern === 'emails/:id')!
       .toNode()
@@ -55,7 +62,7 @@ describe('app-owned ORDS migrations', () => {
     expect(details.source).toContain("'fileSize' VALUE")
     expect(details.source).not.toContain("'content' VALUE")
     const itemColumns = details.params.find((param) => param.name === 'items')?.resultColumns
-    expect(itemColumns?.map((column) => column.name)).toContain('body_length')
+    expect(itemColumns).toContainEqual({ name: 'body_length', type: 'number', nullable: false })
     expect(itemColumns?.map((column) => column.name)).not.toContain('content')
     const attachmentColumns = details.params.find(
       (param) => param.name === 'attachments',
@@ -123,6 +130,24 @@ describe('app-owned ORDS migrations', () => {
     expect(detailSql).toContain('s.file_size AS "fileSize"')
     expect(detailSql).not.toContain('s.content')
     expect(detailSql).toContain('ADMIN_EMAIL_NOT_FOUND')
+    const document = generateApplicationOpenApi(adminPackage.application())
+    expect(document).toMatchObject({
+      components: {
+        schemas: {
+          AdminListEmailsItemsItem: {
+            properties: {
+              toRecipients: { type: ['string', 'null'] },
+              ccRecipients: { type: ['string', 'null'] },
+              bccRecipients: { type: ['string', 'null'] },
+            },
+          },
+          AdminGetEmailItemsItem: {
+            properties: { bodyLength: { type: 'number' } },
+            required: expect.arrayContaining(['bodyLength']),
+          },
+        },
+      },
+    })
   })
 
   it('installs the scheduler and exposes admin-only cursor-paged jobs and run history', async () => {

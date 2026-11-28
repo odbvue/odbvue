@@ -24,6 +24,7 @@ import {
   odbType,
   plsqlExpr,
   PlsqlExpression,
+  resultField,
   settingsStore,
   type Package,
   type PlsqlValue,
@@ -120,23 +121,6 @@ const schedulerRuns = odbTable('user_scheduler_job_run_details', (t) => ({
   output: t.string(4000),
 }))
 
-const emailListing = odbTable('odb_emails_queue', (t) => ({
-  id: t.guid().primaryKey(),
-  subject: t.string(240).notNull(),
-  content: t.column('content', 'clob').notNull(),
-  bodyLength: t.number().notNull(),
-  priority: t.number().notNull(),
-  status: t.string(1).notNull(),
-  created: t.timestamp().notNull(),
-  delivered: t.timestamp(),
-  attempts: t.number().notNull(),
-  postponed: t.timestamp(),
-  error: t.string(2000),
-  toRecipients: t.string(4000),
-  ccRecipients: t.string(4000),
-  bccRecipients: t.string(4000),
-}))
-
 export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin', (pkg) => {
   const listEmails = pkg.proc(
     'list_emails',
@@ -171,10 +155,7 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
               ),
             )
             .where(
-              cond.and([
-                cond.eq(candidate.idEmail, emailListing.id),
-                cond.eq(candidate.addrType, type),
-              ]),
+              cond.and([cond.eq(candidate.idEmail, emails.id), cond.eq(candidate.addrType, type)]),
             )
             .toSQL()})`,
         )
@@ -185,7 +166,7 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
         .select('1')
         .where(
           cond.and([
-            cond.eq(candidate.idEmail, emailListing.id),
+            cond.eq(candidate.idEmail, emails.id),
             cond.or(['To', 'Cc', 'Bcc'].map((type) => cond.eq(candidate.addrType, type))),
             cond.gt(odbOracle.instr(odbOracle.lower(candidate.addrAddr), addressTerm), 0),
           ]),
@@ -193,46 +174,44 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
       body.openFor(
         items,
         odbQuery()
-          .selectFrom(emailListing)
+          .selectFrom(emails)
           .select([
-            emailListing.id,
-            emailListing.subject,
-            emailListing.status,
-            emailListing.created,
-            emailListing.delivered,
-            emailListing.attempts,
-            emailListing.error,
+            emails.id,
+            emails.subject,
+            emails.status,
+            emails.created,
+            emails.delivered,
+            emails.attempts,
+            emails.error,
           ])
-          .selectAs(recipients('To'), emailListing.toRecipients)
-          .selectAs(recipients('Cc'), emailListing.ccRecipients)
-          .selectAs(recipients('Bcc'), emailListing.bccRecipients)
+          .selectAs(recipients('To'), resultField('toRecipients', 'string'))
+          .selectAs(recipients('Cc'), resultField('ccRecipients', 'string'))
+          .selectAs(recipients('Bcc'), resultField('bccRecipients', 'string'))
           .where(
             cond.or([
               cond.isNull(term),
-              cond.gt(odbOracle.instr(odbOracle.lower(emailListing.subject), term), 0),
+              cond.gt(odbOracle.instr(odbOracle.lower(emails.subject), term), 0),
             ]),
           )
           .where({
             toSQL: () => `(${addressTerm.toSQL()} IS NULL OR EXISTS (${matchingAddress.toSQL()}))`,
           })
-          .where(
-            cond.or([cond.isNull(fromTimestamp), cond.gte(emailListing.created, fromTimestamp)]),
-          )
-          .where(cond.or([cond.isNull(toTimestamp), cond.lte(emailListing.created, toTimestamp)]))
+          .where(cond.or([cond.isNull(fromTimestamp), cond.gte(emails.created, fromTimestamp)]))
+          .where(cond.or([cond.isNull(toTimestamp), cond.lte(emails.created, toTimestamp)]))
           .where(
             cond.or([
               cond.isNull(deliveredFromTimestamp),
-              cond.gte(emailListing.delivered, deliveredFromTimestamp),
+              cond.gte(emails.delivered, deliveredFromTimestamp),
             ]),
           )
           .where(
             cond.or([
               cond.isNull(deliveredToTimestamp),
-              cond.lte(emailListing.delivered, deliveredToTimestamp),
+              cond.lte(emails.delivered, deliveredToTimestamp),
             ]),
           )
-          .orderBy(emailListing.created, 'desc')
-          .orderBy(emailListing.id, 'desc')
+          .orderBy(emails.created, 'desc')
+          .orderBy(emails.id, 'desc')
           .paginate({ cursor: after, limit }),
       )
     },
@@ -275,20 +254,23 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
       body.openFor(
         items,
         odbQuery()
-          .selectFrom(emailListing)
+          .selectFrom(emails)
           .select([
-            emailListing.id,
-            emailListing.subject,
-            emailListing.priority,
-            emailListing.status,
-            emailListing.created,
-            emailListing.delivered,
-            emailListing.attempts,
-            emailListing.postponed,
-            emailListing.error,
+            emails.id,
+            emails.subject,
+            emails.priority,
+            emails.status,
+            emails.created,
+            emails.delivered,
+            emails.attempts,
+            emails.postponed,
+            emails.error,
           ])
-          .selectAs(odbDbmsLob.getLength(emailListing.content), emailListing.bodyLength)
-          .where(cond.eq(emailListing.id, id)),
+          .selectAs(
+            odbDbmsLob.getLength(emails.content),
+            resultField('bodyLength', 'number', { nullable: false }),
+          )
+          .where(cond.eq(emails.id, id)),
       )
       body.openFor(
         addresses,

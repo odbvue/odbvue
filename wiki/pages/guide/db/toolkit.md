@@ -112,6 +112,21 @@ camelCase keys and native JSON values. Ordinary SQL queries and database column
 names are unchanged. Raw SQL projections must supply their own aliases and
 cannot infer typed response metadata.
 
+For a computed field that is not a table column, use `resultField()` with
+`selectAs()`. Field names are camelCase; the declared type and nullability
+describe the expression's result, so choose them to match the SQL. Fields are
+nullable by default.
+
+```ts
+odbQuery()
+  .selectFrom(emails)
+  .select(emails.id)
+  .selectAs(
+    odbDbmsLob.getLength(emails.content),
+    resultField('bodyLength', 'number', { nullable: false }),
+  )
+```
+
 ```ts
 const settings = odbPackage('PCK_SETTINGS', (p) => ({
   getValue: p.func('GET_VALUE', odbType.string(), (fn) => {

@@ -1,5 +1,10 @@
-import { Column, type ColumnNode, type ColumnType } from '../schema/column.js'
-import { toCamelCase } from '../model.js'
+import {
+  Column,
+  type ColumnNode,
+  type ColumnType,
+  type ColumnValueForType,
+} from '../schema/column.js'
+import { toCamelCase, toSnakeCase } from '../model.js'
 import { Param } from '../schema/attribute.js'
 import { CURSOR_PAGE_DEFAULTS } from '../constants.js'
 import { cursorValueSql, type CursorQueryMetadata } from '../pagination.js'
@@ -61,6 +66,43 @@ export type NamedRef = { readonly name: string }
 
 /** A column/select expression: a raw string or anything that renders to SQL. */
 export type SqlExpr = string | { toSQL(): string }
+
+/** Metadata for a computed result field that is not a physical table column. */
+export type ResultField<
+  TName extends string = string,
+  TType extends ColumnType = ColumnType,
+  TNullable extends boolean = boolean,
+> = {
+  readonly name: TName
+  readonly type: TType
+  readonly nullable: TNullable
+}
+
+export function resultField<TName extends string, TType extends ColumnType>(
+  name: TName,
+  type: TType,
+): ResultField<TName, TType, true>
+export function resultField<
+  TName extends string,
+  TType extends ColumnType,
+  const TNullable extends boolean,
+>(name: TName, type: TType, options: { nullable: TNullable }): ResultField<TName, TType, TNullable>
+export function resultField(
+  name: string,
+  type: ColumnType,
+  options?: { nullable: boolean },
+): ResultField {
+  resultFieldSqlName(name)
+  return { name, type, nullable: options?.nullable ?? true }
+}
+
+function resultFieldSqlName(name: string): string {
+  const sqlName = toSnakeCase(name)
+  if (!/^[a-z][a-zA-Z0-9]*$/.test(name) || sqlName.length > 128 || toCamelCase(sqlName) !== name) {
+    throw new Error('Result field names must be camelCase Oracle identifiers.')
+  }
+  return sqlName
+}
 
 /** Resolve the identifier name from a raw string or a named reference. */
 function refName(ref: string | NamedRef): string {
@@ -227,7 +269,7 @@ export class SelectQueryBuilder<
     return this as SelectQueryBuilder<TTable, unknown, true>
   }
 
-  /** Select an expression under a typed column's name, preserving cursor row metadata. */
+  /** Select an expression under a typed column or computed result field's name. */
   selectAs<TColumn extends TableColumn<TTable>>(
     expression: SqlExpr,
     column: TColumn,
@@ -235,16 +277,41 @@ export class SelectQueryBuilder<
     TTable,
     AccumulatedRow<TResult, SelectedRow<TTable, [TColumn]>, THasSelection>,
     true
-  > {
-    const name = column.name.slice(column.name.lastIndexOf('.') + 1)
-    this._columns.push(`${exprSql(expression)} AS ${name}`)
-    this._cursorColumns.push(cursorColumnSql(exprSql(expression), name, column.type))
-    this._selectedColumns?.push({ ...column.toNode(), name })
-    return this as SelectQueryBuilder<
-      TTable,
-      AccumulatedRow<TResult, SelectedRow<TTable, [TColumn]>, THasSelection>,
-      true
-    >
+  >
+  selectAs<TName extends string, TType extends ColumnType, TNullable extends boolean>(
+    expression: SqlExpr,
+    field: ResultField<TName, TType, TNullable>,
+  ): SelectQueryBuilder<
+    TTable,
+    AccumulatedRow<
+      TResult,
+      Record<
+        TName,
+        TNullable extends true ? ColumnValueForType<TType> | null : ColumnValueForType<TType>
+      >,
+      THasSelection
+    >,
+    true
+  >
+  selectAs(
+    expression: SqlExpr,
+    column: ColumnLike | ResultField,
+  ): SelectQueryBuilder<TTable, unknown, true> {
+    const node: ColumnNode =
+      column instanceof Column
+        ? column.toNode()
+        : {
+            kind: 'column',
+            name: resultFieldSqlName(column.name),
+            type: column.type,
+            options: { nullable: column.nullable },
+          }
+    const name = node.name.slice(node.name.lastIndexOf('.') + 1)
+    const alias = column instanceof Column ? name : `"${name.toUpperCase()}"`
+    this._columns.push(`${exprSql(expression)} AS ${alias}`)
+    this._cursorColumns.push(cursorColumnSql(exprSql(expression), name, node.type))
+    this._selectedColumns?.push({ ...node, name })
+    return this as SelectQueryBuilder<TTable, unknown, true>
   }
 
   /** Selected typed columns, when the row shape can be inferred without parsing SQL. */
