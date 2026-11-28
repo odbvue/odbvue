@@ -98,7 +98,7 @@ export function defineAuthTwoFactor(
         tokenVersion,
         tokenHash: odbAuthCrypto.hashToken(challenge),
         secret: encrypted,
-        expiresAt: odbOracle.plus(odbOracle.sysTimestamp(), odbOracle.interval.seconds(300)),
+        expiresAt: odbOracle.plus(odbOracle.utcNow(), odbOracle.interval.seconds(300)),
       })
       body.auditEvent('Two-factor challenge started', {
         'user.id': userId,
@@ -185,7 +185,7 @@ export function defineAuthTwoFactor(
       const validChallenge = () =>
         cond.and([
           cond.eq(authChallenges.tokenHash, odbAuthCrypto.hashToken(challenge)),
-          cond.gt(authChallenges.expiresAt, odbOracle.sysTimestamp()),
+          cond.gt(authChallenges.expiresAt, odbOracle.utcNow()),
         ])
       body.query(
         odbQuery()
@@ -244,14 +244,14 @@ export function defineAuthTwoFactor(
               .updateTable(authUsers)
               .set({
                 tokenVersion: plsqlExpr.add(authUsers.tokenVersion, 1),
-                updatedAt: odbOracle.sysTimestamp(),
+                updatedAt: odbOracle.utcNow(),
               })
               .where(cond.eq(authUsers.id, userId)),
           )
           enroll.query(
             odbQuery()
               .updateTable(authSessions)
-              .set({ revokedAt: odbOracle.sysTimestamp() })
+              .set({ revokedAt: odbOracle.utcNow() })
               .where(
                 cond.and([
                   cond.eq(authSessions.userId, userId),
@@ -326,10 +326,7 @@ export function defineAuthTwoFactor(
                   .set({
                     tokenHash: odbAuthCrypto.hashToken(nextChallenge),
                     secret: pendingSecret,
-                    expiresAt: odbOracle.plus(
-                      odbOracle.sysTimestamp(),
-                      odbOracle.interval.seconds(300),
-                    ),
+                    expiresAt: odbOracle.plus(odbOracle.utcNow(), odbOracle.interval.seconds(300)),
                   })
                   .where(cond.eq(authChallenges.userId, userId)),
               )

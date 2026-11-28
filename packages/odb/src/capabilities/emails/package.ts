@@ -629,7 +629,7 @@ export const odbEmailsPackage = odbPackage('odb_emails', (pkg) => {
               .updateTable(emails)
               .set({
                 status: 'S',
-                delivered: odbOracle.sysTimestamp(),
+                delivered: odbOracle.utcNow(),
                 postponed: null,
                 error: null,
               })
@@ -657,7 +657,7 @@ export const odbEmailsPackage = odbPackage('odb_emails', (pkg) => {
                     status: 'E',
                     error,
                     postponed: odbOracle.plus(
-                      odbOracle.sysTimestamp(),
+                      odbOracle.utcNow(),
                       odbOracle.interval.seconds(postpone),
                     ),
                   })

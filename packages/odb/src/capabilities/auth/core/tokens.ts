@@ -32,10 +32,7 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => {
         meta: odbSettings.types.meta,
       })
       body.ifThen(
-        cond.and([
-          cond.isNotNull(cacheExpiresAt),
-          cond.lt(odbOracle.sysTimestamp(), cacheExpiresAt),
-        ]),
+        cond.and([cond.isNotNull(cacheExpiresAt), cond.lt(odbOracle.utcNow(), cacheExpiresAt)]),
         (hit) => hit.return(),
       )
       body.set(cacheExpiresAt, null)
@@ -79,7 +76,7 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => {
       body.set(
         cacheExpiresAt,
         odbOracle.plus(
-          odbOracle.sysTimestamp(),
+          odbOracle.utcNow(),
           odbOracle.interval.seconds(authJwtSettings.cacheSeconds),
         ),
       )
@@ -321,7 +318,7 @@ export const odbAuthJwt = odbPackage('odb_auth_jwt', (pkg) => {
                 cond.eq(sessions.id, sessionId),
                 cond.eq(sessions.userId, subject),
                 cond.isNull(sessions.revokedAt),
-                cond.gt(sessions.expiresAt, odbOracle.sysTimestamp()),
+                cond.gt(sessions.expiresAt, odbOracle.utcNow()),
                 cond.eq(users.enabled, true),
                 cond.eq(users.tokenVersion, tokenVersion),
               ]),

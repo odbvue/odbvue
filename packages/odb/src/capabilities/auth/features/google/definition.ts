@@ -143,7 +143,7 @@ export function defineAuthGoogle(
               cond.eq(authSessions.userId, userId),
               cond.eq(authSessions.refreshTokenHash, odbAuthCrypto.hashToken(refreshToken)),
               cond.isNull(authSessions.revokedAt),
-              cond.gt(authSessions.expiresAt, odbOracle.sysTimestamp()),
+              cond.gt(authSessions.expiresAt, odbOracle.utcNow()),
             ]),
           )
           .forUpdate(),

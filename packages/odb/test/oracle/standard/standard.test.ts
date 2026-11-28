@@ -113,6 +113,7 @@ describe('odbOracle', () => {
   it('renders RAW conversion and timestamp expressions', () => {
     expect(odbOracle.hexToRaw(odbLiteral('00000001')).toSQL()).toBe("HEXTORAW('00000001')")
     expect(odbOracle.sysTimestamp().toSQL()).toBe('SYSTIMESTAMP')
+    expect(odbOracle.utcNow().toSQL()).toBe('SYS_EXTRACT_UTC(SYSTIMESTAMP)')
   })
 
   it('renders typed string and numeric functions', () => {

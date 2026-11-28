@@ -1,5 +1,5 @@
 import { type PackageImpl, odbType } from '../../../../schema/package.js'
-import { cond, odbLiteral, PlsqlExpression } from '../../../../schema/attribute.js'
+import { cond, odbLiteral } from '../../../../schema/attribute.js'
 import { odbQuery } from '../../../../query/index.js'
 import { odbOracle } from '../../../../oracle/index.js'
 import { odbRateLimitApi } from '../../../rate-limit/rate-limit.js'
@@ -128,12 +128,12 @@ export function defineAuthSignup(
           .on((target, source) => cond.eq(target.userId, source.userId))
           .whenMatched({
             tokenHash: odbAuthCrypto.hashToken(confirmationToken),
-            expiresAt: odbOracle.plus(odbOracle.sysTimestamp(), odbOracle.interval.days(1)),
+            expiresAt: odbOracle.plus(odbOracle.utcNow(), odbOracle.interval.days(1)),
           })
           .whenNotMatched({
             userId,
             tokenHash: odbAuthCrypto.hashToken(confirmationToken),
-            expiresAt: odbOracle.plus(odbOracle.sysTimestamp(), odbOracle.interval.days(1)),
+            expiresAt: odbOracle.plus(odbOracle.utcNow(), odbOracle.interval.days(1)),
           }),
       )
       body.auditEvent('Signup requested', {
@@ -167,10 +167,7 @@ export function defineAuthSignup(
       const validToken = () =>
         cond.and([
           cond.eq(authConfirmations.tokenHash, odbAuthCrypto.hashToken(token)),
-          cond.gt(
-            authConfirmations.expiresAt,
-            new PlsqlExpression('TIMESTAMP', 'CAST(SYSTIMESTAMP AS TIMESTAMP)'),
-          ),
+          cond.gt(authConfirmations.expiresAt, odbOracle.utcNow()),
         ])
       body.query(
         odbQuery()
@@ -199,7 +196,7 @@ export function defineAuthSignup(
       body.query(
         odbQuery()
           .updateTable(authUsers)
-          .set({ enabled: true, updatedAt: odbOracle.sysTimestamp() })
+          .set({ enabled: true, updatedAt: odbOracle.utcNow() })
           .where(cond.eq(authUsers.id, userId)),
       )
       body.query(

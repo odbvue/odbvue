@@ -381,7 +381,7 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
         changed.query(
           odbQuery()
             .updateTable(authUsers)
-            .set({ enabled: requestedEnabled, updatedAt: odbOracle.sysTimestamp() })
+            .set({ enabled: requestedEnabled, updatedAt: odbOracle.utcNow() })
             .where(cond.eq(authUsers.id, id)),
         )
         changed.ifThen(cond.eq(enabled, false), (disabled) => {
@@ -394,7 +394,7 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
           disabled.query(
             odbQuery()
               .updateTable(authSessions)
-              .set({ revokedAt: odbOracle.sysTimestamp() })
+              .set({ revokedAt: odbOracle.utcNow() })
               .where(
                 cond.and([cond.eq(authSessions.userId, id), cond.isNull(authSessions.revokedAt)]),
               ),

@@ -1,5 +1,5 @@
 import { type PackageImpl, odbType } from '../../../../schema/package.js'
-import { cond, odbLiteral, plsqlExpr, PlsqlExpression } from '../../../../schema/attribute.js'
+import { cond, odbLiteral, plsqlExpr } from '../../../../schema/attribute.js'
 import { odbQuery } from '../../../../query/index.js'
 import { odbOracle } from '../../../../oracle/index.js'
 import { odbRateLimitApi } from '../../../rate-limit/rate-limit.js'
@@ -76,12 +76,12 @@ export function defineAuthPassword(
           .on((target, source) => cond.eq(target.userId, source.userId))
           .whenMatched({
             tokenHash: odbAuthCrypto.hashToken(resetToken),
-            expiresAt: odbOracle.plus(odbOracle.sysTimestamp(), odbOracle.interval.seconds(3600)),
+            expiresAt: odbOracle.plus(odbOracle.utcNow(), odbOracle.interval.seconds(3600)),
           })
           .whenNotMatched({
             userId,
             tokenHash: odbAuthCrypto.hashToken(resetToken),
-            expiresAt: odbOracle.plus(odbOracle.sysTimestamp(), odbOracle.interval.seconds(3600)),
+            expiresAt: odbOracle.plus(odbOracle.utcNow(), odbOracle.interval.seconds(3600)),
           }),
       )
       body.auditEvent('Password recovery requested', {
@@ -119,10 +119,7 @@ export function defineAuthPassword(
       const validToken = () =>
         cond.and([
           cond.eq(authPasswordResets.tokenHash, odbAuthCrypto.hashToken(token)),
-          cond.gt(
-            authPasswordResets.expiresAt,
-            new PlsqlExpression('TIMESTAMP', 'CAST(SYSTIMESTAMP AS TIMESTAMP)'),
-          ),
+          cond.gt(authPasswordResets.expiresAt, odbOracle.utcNow()),
         ])
       body.query(
         odbQuery()
@@ -156,7 +153,7 @@ export function defineAuthPassword(
           .updateTable(authUsers)
           .set({
             tokenVersion: plsqlExpr.add(authUsers.tokenVersion, 1),
-            updatedAt: odbOracle.sysTimestamp(),
+            updatedAt: odbOracle.utcNow(),
           })
           .where(cond.eq(authUsers.id, userId)),
       )
@@ -174,7 +171,7 @@ export function defineAuthPassword(
       body.query(
         odbQuery()
           .updateTable(authSessions)
-          .set({ revokedAt: odbOracle.sysTimestamp() })
+          .set({ revokedAt: odbOracle.utcNow() })
           .where(
             cond.and([cond.eq(authSessions.userId, userId), cond.isNull(authSessions.revokedAt)]),
           ),
@@ -256,14 +253,14 @@ export function defineAuthPassword(
           .updateTable(authUsers)
           .set({
             tokenVersion: plsqlExpr.add(authUsers.tokenVersion, 1),
-            updatedAt: odbOracle.sysTimestamp(),
+            updatedAt: odbOracle.utcNow(),
           })
           .where(cond.eq(authUsers.id, userId)),
       )
       body.query(
         odbQuery()
           .updateTable(authSessions)
-          .set({ revokedAt: odbOracle.sysTimestamp() })
+          .set({ revokedAt: odbOracle.utcNow() })
           .where(
             cond.and([cond.eq(authSessions.userId, userId), cond.isNull(authSessions.revokedAt)]),
           ),

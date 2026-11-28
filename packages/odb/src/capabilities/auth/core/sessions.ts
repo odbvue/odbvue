@@ -35,10 +35,7 @@ export function defineAuthSessions(pkg: PackageImpl) {
         id: sessionId,
         userId,
         refreshTokenHash: odbAuthCrypto.hashToken(newRefreshToken),
-        expiresAt: odbOracle.plus(
-          odbOracle.sysTimestamp(),
-          odbOracle.interval.days(REFRESH_TOKEN_DAYS),
-        ),
+        expiresAt: odbOracle.plus(odbOracle.utcNow(), odbOracle.interval.days(REFRESH_TOKEN_DAYS)),
       })
       body.set(accessToken, odbAuthJwt.createAccessToken(userId, sessionId, tokenVersion))
       body.set(refreshToken, newRefreshToken)
@@ -93,7 +90,7 @@ export function defineAuthSessions(pkg: PackageImpl) {
                 cond.eq(sessions.previousRefreshTokenHash, presentedRefreshTokenHash),
               ]),
               cond.isNull(sessions.revokedAt),
-              cond.gt(sessions.expiresAt, odbOracle.sysTimestamp()),
+              cond.gt(sessions.expiresAt, odbOracle.utcNow()),
             ]),
           )
           .forUpdate(),
@@ -109,7 +106,7 @@ export function defineAuthSessions(pkg: PackageImpl) {
         then.query(
           odbQuery()
             .updateTable(authSessions)
-            .set({ revokedAt: odbOracle.sysTimestamp() })
+            .set({ revokedAt: odbOracle.utcNow() })
             .where(cond.eq(authSessions.id, sessionId)),
         )
         then.auditWarn('Refresh token replay rejected', {
@@ -126,7 +123,7 @@ export function defineAuthSessions(pkg: PackageImpl) {
           .set({
             previousRefreshTokenHash: presentedRefreshTokenHash,
             refreshTokenHash: odbAuthCrypto.hashToken(newRefreshToken),
-            lastUsedAt: odbOracle.sysTimestamp(),
+            lastUsedAt: odbOracle.utcNow(),
           })
           .where(cond.eq(authSessions.id, sessionId)),
       )
@@ -170,7 +167,7 @@ export function defineAuthSessions(pkg: PackageImpl) {
         then.query(
           odbQuery()
             .updateTable(authSessions)
-            .set({ revokedAt: odbOracle.sysTimestamp() })
+            .set({ revokedAt: odbOracle.utcNow() })
             .where(
               cond.and([
                 cond.eq(authSessions.refreshTokenHash, odbAuthCrypto.hashToken(refreshToken)),

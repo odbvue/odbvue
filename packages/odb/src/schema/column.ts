@@ -162,6 +162,13 @@ export class Column<
     return this as Column<TValue, TName, TNullable, true, TGenerated, TPrimaryKey, TType>
   }
 
+  /** Default an application instant to the current UTC timestamp. */
+  defaultUtcTimestamp(
+    this: Column<TValue, TName, TNullable, TDefault, TGenerated, TPrimaryKey, 'timestamp'>,
+  ): Column<TValue, TName, TNullable, true, TGenerated, TPrimaryKey, 'timestamp'> {
+    return this.defaultSql('SYS_EXTRACT_UTC(SYSTIMESTAMP)')
+  }
+
   generated(): Column<TValue, TName, TNullable, TDefault, true, TPrimaryKey, TType> {
     this.options.generated = true
     return this as Column<TValue, TName, TNullable, TDefault, true, TPrimaryKey, TType>

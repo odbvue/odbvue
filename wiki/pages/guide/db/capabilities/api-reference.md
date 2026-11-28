@@ -99,7 +99,7 @@ odbAudit.toSQLDown({ schema: 'APP_USER' })
 
 ```ts
 odbAudit.log("'INFO'", "'started'")
-odbAudit.log("'INFO'", "'started'", 'v_attributes', 'systimestamp')
+odbAudit.log("'INFO'", "'started'", 'v_attributes', 'SYS_EXTRACT_UTC(SYSTIMESTAMP)')
 odbAudit.debug("'msg'")
 odbAudit.info("'msg'", 'v_attributes')
 odbAudit.warn("'msg'")

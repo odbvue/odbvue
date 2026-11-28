@@ -13,6 +13,7 @@ describe('Emails', () => {
 
   it('installs a queue, constrained recipients, storage attachments and a transport-independent package', () => {
     expect(sql).toContain('CREATE TABLE APP.odb_emails_queue')
+    expect(sql).toContain('created TIMESTAMP(6) DEFAULT SYS_EXTRACT_UTC(SYSTIMESTAMP) NOT NULL')
     expect(sql).toContain('CREATE TABLE APP.odb_emails_addr')
     expect(sql).toContain('CREATE TABLE APP.odb_emails_attc')
     expect(sql).toContain("status IN ('N', 'S', 'E')")
@@ -140,7 +141,10 @@ describe('Emails', () => {
     expect(sql).toContain("SET status = 'E', error = l_error")
     expect(sql).toContain("NUMTODSINTERVAL(p_postpone, 'SECOND')")
     expect(sql).toContain(
-      "SET status = 'S', delivered = SYSTIMESTAMP, postponed = NULL, error = NULL",
+      "postponed = SYS_EXTRACT_UTC(SYSTIMESTAMP) + NUMTODSINTERVAL(p_postpone, 'SECOND')",
+    )
+    expect(sql).toContain(
+      "SET status = 'S', delivered = SYS_EXTRACT_UTC(SYSTIMESTAMP), postponed = NULL, error = NULL",
     )
     expect(sql).toContain('DBMS_UTILITY.FORMAT_ERROR_BACKTRACE')
     expect(sql).toContain('DBMS_LOB.FREETEMPORARY(l_content)')

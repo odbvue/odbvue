@@ -111,7 +111,7 @@ const users = odbTable('app_users', (t) => ({
   uuid: t.guid().defaultSysGuid(),
   status: t.string(1).default('N').notNull(),
   displayName: t.string(240).notNull(),
-  created: t.timestamp().defaultSysTimestamp().notNull(),
+  created: t.timestamp().defaultUtcTimestamp().notNull(),
 }))
   .comment('Application users')
   .unique((columns) => [columns.uuid])
@@ -133,6 +133,7 @@ Explicit Oracle names remain available when mapping an existing schema, for exam
 Column defaults accept JavaScript values and quote them for the column type: `.default('N')`, `.default(0)`, and `.default(true)`. Use `.defaultSql('1 + 1')` only for an Oracle expression. Typed helpers cover common Oracle defaults:
 
 - `.defaultSysGuid()` on `t.guid()` emits `CHAR(32 CHAR) DEFAULT LOWER(SYS_GUID()) NOT NULL`.
+- `.defaultUtcTimestamp()` on `t.timestamp()` emits `DEFAULT SYS_EXTRACT_UTC(SYSTIMESTAMP)`.
 - `.defaultSysTimestamp()` emits `DEFAULT SYSTIMESTAMP`.
 - `.defaultCurrentTimestamp()` emits `DEFAULT CURRENT_TIMESTAMP`.
 

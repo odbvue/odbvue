@@ -30,7 +30,7 @@ export function defineAuthAuthorization(pkg: PackageImpl) {
       in: {
         userId: authUsers.id,
         role: authRoles.role,
-        validFrom: { ...odbType.timestamp(), default: 'SYSTIMESTAMP' },
+        validFrom: { ...odbType.timestamp(), default: 'SYS_EXTRACT_UTC(SYSTIMESTAMP)' },
         validTo: { ...odbType.timestamp(), default: 'NULL' },
       },
     },
@@ -109,11 +109,8 @@ export function defineAuthAuthorization(pkg: PackageImpl) {
   const activeGrant = () =>
     cond.and([
       cond.eq(users.enabled, true),
-      cond.lte(userRoles.validFrom, odbOracle.sysTimestamp()),
-      cond.or([
-        cond.isNull(userRoles.validTo),
-        cond.gt(userRoles.validTo, odbOracle.sysTimestamp()),
-      ]),
+      cond.lte(userRoles.validFrom, odbOracle.utcNow()),
+      cond.or([cond.isNull(userRoles.validTo), cond.gt(userRoles.validTo, odbOracle.utcNow())]),
     ])
 
   const hasRole = pkg.func('has_role', odbType.boolean(), (fn) => {

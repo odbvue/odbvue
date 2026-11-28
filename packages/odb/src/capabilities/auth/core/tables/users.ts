@@ -9,8 +9,8 @@ export const authUsers = odbTable('odb_auth_users', (t) => ({
   googleAvatarUrl: t.string(2048),
   enabled: t.boolean().notNull().default(true),
   tokenVersion: t.number().notNull().default(0),
-  createdAt: t.timestamp().notNull().defaultSysTimestamp(),
-  updatedAt: t.timestamp().notNull().defaultSysTimestamp(),
+  createdAt: t.timestamp().notNull().defaultUtcTimestamp(),
+  updatedAt: t.timestamp().notNull().defaultUtcTimestamp(),
 }))
   .unique('odb_auth_users_uq_username', (columns) => [columns.username])
   .unique('odb_auth_users_uq_email', ['LOWER(TRIM(username))'])

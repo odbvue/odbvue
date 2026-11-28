@@ -15,10 +15,10 @@ import { odbDbmsCrypto, odbOracle } from '@odbvue/odb'
 
 body.set(salt, odbOracle.rawToHex(odbDbmsCrypto.randomBytes(16)))
 body.set(sessionId, odbOracle.lower(odbOracle.rawToHex(odbOracle.sysGuid())))
-body.set(now, odbOracle.sysTimestamp())
+body.set(now, odbOracle.utcNow())
 ```
 
-Includes `rawToHex`, `hexToRaw`, `sysGuid`, `sysTimestamp`, `sysContext`, `lower`, `trim`, `nvl`, numeric `trunc`, `toNumber`, `regexpReplace`, and `regexpSubstr`.
+Includes `rawToHex`, `hexToRaw`, `sysGuid`, `utcNow`, `sysTimestamp`, `sysContext`, `lower`, `trim`, `nvl`, numeric `trunc`, `toNumber`, `regexpReplace`, and `regexpSubstr`.
 
 ```ts
 odbOracle.sysContext(odbLiteral('USERENV'), odbLiteral('CURRENT_USER'))

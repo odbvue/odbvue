@@ -154,8 +154,8 @@ describe('odbAuth framework package', () => {
     expect(sql).toContain('PRIMARY KEY (user_id, role)')
     expect(sql).toContain('CHECK (valid_to > valid_from)')
     expect(sql).toContain('FOREIGN KEY (user_id) REFERENCES APP.odb_auth_users (id)')
-    expect(sql).toContain('ur.valid_from <= SYSTIMESTAMP')
-    expect(sql).toContain('ur.valid_to > SYSTIMESTAMP')
+    expect(sql).toContain('ur.valid_from <= SYS_EXTRACT_UTC(SYSTIMESTAMP)')
+    expect(sql).toContain('ur.valid_to > SYS_EXTRACT_UTC(SYSTIMESTAMP)')
     expect(sql).toContain('u.enabled = 1')
     expect(sql).toContain('JOIN odb_auth_role_permissions rp ON rp.role = ur.role')
     expect(sql).toContain('JOIN odb_auth_users u ON u.id = ur.user_id')
@@ -183,7 +183,7 @@ describe('odbAuth framework package', () => {
     ).toContain("APP.odb_auth.grant_permission('admin', 'settings.read')")
     expect(
       odbAuth.role.seedGrant({ username: 'admin', role: 'admin' }).toSQLUp({ schema: 'APP' }),
-    ).toContain("APP.odb_auth.grant_role(l_user_id, 'admin', SYSTIMESTAMP, NULL)")
+    ).toContain("APP.odb_auth.grant_role(l_user_id, 'admin', SYS_EXTRACT_UTC(SYSTIMESTAMP), NULL)")
   })
   it('exposes permission helpers with unchanged SQL calls', () => {
     expect(odbAuth.permission.has('l_id', 'p_permission').toSQL()).toBe(
@@ -380,7 +380,7 @@ describe('odbAuth framework package', () => {
     const sql = odbAuthJwt.toSQLUp()
     const start = sql.indexOf('PROCEDURE load_config IS')
     const load = sql.slice(start, sql.indexOf('FUNCTION base64url_encode', start))
-    expect(load.indexOf('SYSTIMESTAMP < g_config_expires_at')).toBeLessThan(
+    expect(load.indexOf('SYS_EXTRACT_UTC(SYSTIMESTAMP) < g_config_expires_at')).toBeLessThan(
       load.indexOf('odb_settings.read'),
     )
     expect(load).toContain('RETURN;')
@@ -388,7 +388,7 @@ describe('odbAuth framework package', () => {
     expect(load).toContain("odb_settings.read('AUTH_JWT_EXPIRATION_SECONDS', l_expiration, l_meta)")
     expect(load).toContain("REGEXP_LIKE(l_secret, '^[0-9A-Fa-f]{64}$')")
     expect(load).toContain('TO_NUMBER(l_expiration) > 86400')
-    expect(load).toContain("SYSTIMESTAMP + NUMTODSINTERVAL(30, 'SECOND')")
+    expect(load).toContain("SYS_EXTRACT_UTC(SYSTIMESTAMP) + NUMTODSINTERVAL(30, 'SECOND')")
     expect(load.indexOf('AUTH_JWT_EXPIRATION_INVALID')).toBeLessThan(
       load.indexOf('g_jwt_secret := l_secret'),
     )

@@ -6,7 +6,7 @@ export const authIdentities = odbTable('odb_auth_identities', (t) => ({
   subject: t.string(255).notNull(),
   userId: t.guid().notNull(),
   passwordHash: t.string(512),
-  createdAt: t.timestamp().notNull().defaultSysTimestamp(),
+  createdAt: t.timestamp().notNull().defaultUtcTimestamp(),
 }))
   .unique('odb_auth_identities_uq', (columns) => [columns.issuer, columns.subject])
   .unique('odb_auth_identities_uq_local', ["CASE WHEN issuer = 'password' THEN user_id END"])

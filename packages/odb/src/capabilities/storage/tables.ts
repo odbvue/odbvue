@@ -9,7 +9,7 @@ export const storageFiles = odbTable('odb_storage_files', (table) => ({
   fileSize: table.number().precision(19).notNull(),
   content: table.column('content', 'blob').notNull(),
   meta: table.json().default({}).notNull(),
-  createdAt: table.timestamp().notNull().defaultSysTimestamp(),
+  createdAt: table.timestamp().notNull().defaultUtcTimestamp(),
 }))
   .check('odb_storage_files_chk_size', `file_size BETWEEN 0 AND ${MAX_FILE_BYTES}`)
   .index('odb_storage_files_ix_owner', (columns) => [columns.ownerId, columns.id])

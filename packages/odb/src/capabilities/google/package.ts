@@ -20,7 +20,7 @@ import { ODB_ERROR_NUMBER } from '../../schema/errors.js'
 import { odbAudit } from '../audit/audit.js'
 
 const text = odbType.string
-const now = new PlsqlExpression('TIMESTAMP', 'CAST(SYSTIMESTAMP AS TIMESTAMP)')
+const now = odbOracle.utcNow()
 
 /** Requires Oracle JSON object types, UTL_HTTP request contexts and DBMS_CRYPTO RSA VERIFY. */
 export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
@@ -61,10 +61,7 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
   const storeKeys = pkg.privateProc('store_keys', (proc) => {
     const { document } = proc.parameters({ in: { document: odbType.clob() } })
     proc.body((body) => {
-      const expiry = new PlsqlExpression(
-        'TIMESTAMP',
-        "CAST(SYSTIMESTAMP AS TIMESTAMP) + INTERVAL '300' SECOND",
-      )
+      const expiry = odbOracle.plus(now, odbOracle.interval.seconds(300))
       body.query(
         odbQuery()
           .mergeInto(googleKeys.as('target'))
@@ -365,10 +362,7 @@ export const odbGooglePackage = odbPackage('odb_google', (pkg) => {
         userId,
         sessionId,
         tokenVersion,
-        expiresAt: new PlsqlExpression(
-          'TIMESTAMP',
-          "CAST(SYSTIMESTAMP AS TIMESTAMP) + INTERVAL '5' MINUTE",
-        ),
+        expiresAt: odbOracle.plus(now, odbOracle.interval.seconds(300)),
       })
     })
   })

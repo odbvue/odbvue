@@ -444,11 +444,13 @@ describe('odbQuery', () => {
       id: t.guid('ID').defaultSysGuid(),
       created: t.timestamp('CREATED').defaultCurrentTimestamp(),
       observed: t.timestamp('OBSERVED').defaultSysTimestamp(),
+      utc: t.timestamp('UTC_TIME').defaultUtcTimestamp(),
     }))
 
     expect(table.toSQLUp()).toContain('ID CHAR(32 CHAR) DEFAULT LOWER(SYS_GUID()) NOT NULL')
     expect(table.toSQLUp()).toContain('CREATED TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP')
     expect(table.toSQLUp()).toContain('OBSERVED TIMESTAMP(6) DEFAULT SYSTIMESTAMP')
+    expect(table.toSQLUp()).toContain('UTC_TIME TIMESTAMP(6) DEFAULT SYS_EXTRACT_UTC(SYSTIMESTAMP)')
 
     expect(() =>
       odbTable('INVALID_DEFAULTS', (t) => ({
@@ -460,6 +462,8 @@ describe('odbQuery', () => {
         flag: t.boolean('FLAG').defaultCurrentTimestamp(),
         // @ts-expect-error SYSTIMESTAMP is only valid for date/timestamp columns
         count: t.number('COUNT').defaultSysTimestamp(),
+        // @ts-expect-error UTC instant defaults require timestamp columns
+        day: t.date('DAY').defaultUtcTimestamp(),
       })),
     ).toThrow('Number column defaults must be finite numbers.')
   })

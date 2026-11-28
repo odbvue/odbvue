@@ -21,7 +21,7 @@ const users = odbTable('APP_USERS', (t) => ({
   uuid: t.guid().defaultSysGuid(),
   email: t.string(255),
   status: t.string(1).default('N').notNull(),
-  createdAt: t.timestamp().defaultSysTimestamp().notNull(),
+  createdAt: t.timestamp().defaultUtcTimestamp().notNull(),
 }))
   .unique((columns) => [columns.uuid])
   .check((columns, expression) => expression.in(columns.status, ['A', 'D', 'N']))
@@ -34,6 +34,19 @@ type User = Selectable<typeof users>
 type NewUser = Insertable<typeof users>
 type UserUpdate = Updateable<typeof users>
 ```
+
+Application-owned timezone-less `TIMESTAMP` values representing instants are UTC.
+Use `defaultUtcTimestamp()` for column defaults and `odbOracle.utcNow()` for
+writes and comparisons; both extract UTC from the timezone-aware system clock.
+Convert external instants to UTC before passing them to timestamp parameters.
+Date-only values and timezone-aware Oracle system fields are not covered by this
+convention. The existing `defaultSysTimestamp()`, `defaultCurrentTimestamp()`,
+and `odbOracle.sysTimestamp()` retain their Oracle clock semantics.
+
+Existing databases require an explicit data and schema upgrade before adopting
+this convention. Previously stored timezone-less values do not record their
+original time zone and can be ambiguous across daylight-saving transitions.
+Rebuilding migrations does not convert existing tables or rows.
 
 Omitted names are inferred from object keys, so `createdAt` maps to `created_at`. Explicit names are supported for existing schemas. Table-level selectors provide autocomplete and reject unknown columns:
 

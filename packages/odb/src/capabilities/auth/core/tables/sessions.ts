@@ -7,7 +7,7 @@ export const authSessions = odbTable('odb_auth_sessions', (t) => ({
   previousRefreshTokenHash: t.string(128),
   expiresAt: t.timestamp().notNull(),
   revokedAt: t.timestamp(),
-  createdAt: t.timestamp().notNull().defaultSysTimestamp(),
+  createdAt: t.timestamp().notNull().defaultUtcTimestamp(),
   lastUsedAt: t.timestamp(),
   userAgent: t.string(512),
   ipAddress: t.string(64),

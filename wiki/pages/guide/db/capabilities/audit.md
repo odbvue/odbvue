@@ -46,8 +46,10 @@ For full control over severity text and event time, call the package directly wi
 
 ```ts
 // Inside a proc() callback, `body` is the statement builder:
-body.raw(odbAudit.log("'INFO'", "'job finished'", 'v_attributes', 'systimestamp'))
+body.raw(odbAudit.log("'INFO'", "'job finished'", 'v_attributes', 'SYS_EXTRACT_UTC(SYSTIMESTAMP)'))
 ```
+
+Explicit event timestamps, including bulk records, must represent UTC instants.
 
 ## The `odb_audit_logs` Table
 

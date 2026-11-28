@@ -252,7 +252,7 @@ describe('Google OIDC local SQL generation', () => {
     expect(start).toContain('hash_value(l_state)')
     expect(start).toContain('hash_value(p_browser_token)')
     expect(start).toContain('hash_value(l_nonce)')
-    expect(start).toContain("INTERVAL '5' MINUTE")
+    expect(start).toContain("NUMTODSINTERVAL(300, 'SECOND')")
     expect(start).toContain('DELETE FROM odb_google_transactions')
     expect(start).toContain('scope=openid%20email%20profile')
     expect(start).toContain('response_type=code')
@@ -270,7 +270,7 @@ describe('Google OIDC local SQL generation', () => {
     expect(consume).toContain('FOR UPDATE')
     expect(consume).toContain('l_browser_hash := hash_value(p_browser_token)')
     expect(consume).toContain('browser_hash = l_browser_hash')
-    expect(consume).toContain('expires_at > CAST(SYSTIMESTAMP AS TIMESTAMP)')
+    expect(consume).toContain('expires_at > SYS_EXTRACT_UTC(SYSTIMESTAMP)')
     expect(consume.indexOf('FOR UPDATE')).toBeLessThan(consume.indexOf('DELETE FROM'))
     expect(consume.indexOf('DELETE FROM')).toBeLessThan(consume.indexOf('COMMIT'))
     expect(consume).toContain('ROLLBACK')
@@ -328,8 +328,8 @@ describe('Google OIDC local SQL generation', () => {
   })
 
   it('uses only live public-key cache entries with bounded refresh and expiry', () => {
-    expect(routine('read_keys')).toContain('expires_at > CAST(SYSTIMESTAMP AS TIMESTAMP)')
-    expect(routine('store_keys')).toContain("INTERVAL '300' SECOND")
+    expect(routine('read_keys')).toContain('expires_at > SYS_EXTRACT_UTC(SYSTIMESTAMP)')
+    expect(routine('store_keys')).toContain("NUMTODSINTERVAL(300, 'SECOND')")
     const key = routine('signing_key')
     expect(key).toContain('FOR l_attempt IN 1..2 LOOP')
     expect(key).toContain('IF l_attempt = 1 THEN')

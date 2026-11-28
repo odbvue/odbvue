@@ -140,7 +140,7 @@ describe('trusted Google identities', () => {
       'user_id = p_user_id',
       'refresh_token_hash = odb_auth_crypto.hash_token(p_refresh_token)',
       'revoked_at IS NULL',
-      'expires_at > SYSTIMESTAMP',
+      'expires_at > SYS_EXTRACT_UTC(SYSTIMESTAMP)',
       'FOR UPDATE',
     ])
       expect(session).toContain(guard)

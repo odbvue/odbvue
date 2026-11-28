@@ -33,7 +33,7 @@ describe('odbAudit (framework package odb_audit)', () => {
       expect(sql).toContain('GENERATED ALWAYS AS')
       expect(sql).toContain('CREATE INDEX odb_audit_logs_ix_event')
       expect(sql).toContain('p_attributes IN CLOB DEFAULT NULL')
-      expect(sql).toContain('p_event_timestamp IN TIMESTAMP DEFAULT SYSTIMESTAMP')
+      expect(sql).toContain('p_event_timestamp IN TIMESTAMP DEFAULT SYS_EXTRACT_UTC(SYSTIMESTAMP)')
     })
 
     it('toSQLUp({ schema }) qualifies the table and package names', () => {

@@ -153,7 +153,7 @@ function registryMergeSql(
       object_type: merge.sourceRef('objectType'),
       active_color: merge.sourceRef('activeColor'),
       migration_name: merge.sourceRef('migrationName'),
-      updated: odbOracle.sysTimestamp(),
+      updated: odbOracle.utcNow(),
     })
     .whenNotMatched({
       object_name: merge.sourceRef('objectName'),

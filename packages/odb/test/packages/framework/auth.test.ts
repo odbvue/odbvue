@@ -47,7 +47,9 @@ describe('odbAuth framework package', () => {
     expect(change).toContain("odb_rate_limit.enforce('AUTH_PASSWORD_CHANGE_USER', p_user_id)")
     expect(change).toContain('password_hash = odb_auth_crypto.hash_password(p_password)')
     expect(change).toContain('token_version = token_version + 1')
-    expect(change).toContain('UPDATE odb_auth_sessions SET revoked_at = SYSTIMESTAMP')
+    expect(change).toContain(
+      'UPDATE odb_auth_sessions SET revoked_at = SYS_EXTRACT_UTC(SYSTIMESTAMP)',
+    )
     expect(change).toContain('DELETE FROM odb_auth_password_resets WHERE user_id = p_user_id')
     expect(change).not.toContain('COMMIT')
   })
@@ -95,14 +97,16 @@ describe('odbAuth framework package', () => {
     expect(reset).toContain('LENGTH(p_password) < 8')
     expect(reset).toContain('LENGTH(p_password) > 256')
     expect(reset.match(/FROM odb_auth_password_resets/g)).toHaveLength(3)
-    expect(reset).toContain('expires_at > CAST(SYSTIMESTAMP AS TIMESTAMP)')
+    expect(reset).toContain('expires_at > SYS_EXTRACT_UTC(SYSTIMESTAMP)')
     expect(reset).toContain('enabled = 1')
     const lock = reset.indexOf('FROM odb_auth_users')
     expect(lock).toBeGreaterThan(reset.indexOf('FROM odb_auth_password_resets'))
     expect(lock).toBeLessThan(reset.lastIndexOf('SELECT user_id'))
     expect(reset).toContain('password_hash = odb_auth_crypto.hash_password(p_password)')
     expect(reset).toContain('token_version = token_version + 1')
-    expect(reset).toContain('UPDATE odb_auth_sessions SET revoked_at = SYSTIMESTAMP')
+    expect(reset).toContain(
+      'UPDATE odb_auth_sessions SET revoked_at = SYS_EXTRACT_UTC(SYSTIMESTAMP)',
+    )
     expect(reset).toContain('DELETE FROM odb_auth_password_resets WHERE user_id = l_user_id')
     expect(reset).toContain("odb_rate_limit.success('AUTH_LOGIN_USERNAME', LOWER(l_email))")
     expect(reset).toContain('ODB_ERROR|VALIDATION_ERROR|PASSWORD_RESET_INVALID')
@@ -134,11 +138,11 @@ describe('odbAuth framework package', () => {
     expect(sql).toContain('l_email := LOWER(TRIM(p_username))')
     expect(sql).toContain('p_confirmation_token := odb_auth_crypto.random_token(32)')
     expect(sql).toContain('odb_auth_crypto.hash_token(p_confirmation_token)')
-    expect(sql).toContain("SYSTIMESTAMP + NUMTODSINTERVAL(1, 'DAY')")
+    expect(sql).toContain("SYS_EXTRACT_UTC(SYSTIMESTAMP) + NUMTODSINTERVAL(1, 'DAY')")
     expect(sql).toContain('l_enabled = 1')
     expect(sql).not.toContain('l_enabled = TRUE')
     expect(sql).toContain('TRIM(p_display_name), 0)')
-    expect(sql).toContain('expires_at > CAST(SYSTIMESTAMP AS TIMESTAMP)')
+    expect(sql).toContain('expires_at > SYS_EXTRACT_UTC(SYSTIMESTAMP)')
     expect(sql).toContain('DELETE FROM odb_auth_confirmations')
     expect(sql).toContain('ODB_ERROR|VALIDATION_ERROR|CONFIRMATION_INVALID')
     expect(odbAuth.signup('p_email', 'p_password', 'p_name', 'l_token').toSQL()).toBe(

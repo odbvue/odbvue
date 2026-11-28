@@ -345,7 +345,7 @@ export const odbAuth = {
       return odbAuthPackage.grantRole(
         userId,
         role,
-        options.validFrom ?? odbOracle.sysTimestamp(),
+        options.validFrom ?? odbOracle.utcNow(),
         options.validTo ?? odbOracle.null(),
       )
     },
@@ -405,7 +405,7 @@ export const odbAuth = {
                 odbAuthPackage.grantRole(
                   userId,
                   odbLiteral(grant.role),
-                  odbOracle.sysTimestamp(),
+                  odbOracle.utcNow(),
                   odbOracle.null(),
                 ),
                 options.schema,
@@ -499,7 +499,7 @@ export const odbAuth = {
               displayName: odbLiteral(user.displayName ?? user.username),
               enabled: true,
               tokenVersion: plsqlExpr.add(users.tokenVersion, 1),
-              updatedAt: odbOracle.sysTimestamp(),
+              updatedAt: odbOracle.utcNow(),
             })
             .whenNotMatched({
               username: sourceUsername,

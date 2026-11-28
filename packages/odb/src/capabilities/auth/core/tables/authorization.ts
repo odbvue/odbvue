@@ -9,7 +9,7 @@ export const authRoles = odbTable('odb_auth_roles', (t) => ({
 export const authUserRoles = odbTable('odb_auth_user_roles', (t) => ({
   userId: t.guid().primaryKey(),
   role: t.string(200).primaryKey(),
-  validFrom: t.timestamp().notNull().defaultSysTimestamp(),
+  validFrom: t.timestamp().notNull().defaultUtcTimestamp(),
   validTo: t.timestamp(),
 }))
   .index('odb_auth_user_roles_ix_role', (columns) => [columns.role])

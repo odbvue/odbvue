@@ -25,4 +25,12 @@ describe('odbRateLimit framework package', () => {
     expect(sql).toContain('l_subject_hash := hash_subject(p_subject);')
     expect(sql).not.toContain('odb_rate_limit.hash_subject')
   })
+
+  it('uses UTC for both bucket timestamps and expiration checks', () => {
+    const sql = odbRateLimit.toSQLUp()
+    expect(sql).toContain('l_blocked_until > SYS_EXTRACT_UTC(SYSTIMESTAMP)')
+    expect(sql).toContain('l_window_started_at := SYS_EXTRACT_UTC(SYSTIMESTAMP)')
+    expect(sql).toContain('window_started_at, failure_count')
+    expect(sql).toContain('SYS_EXTRACT_UTC(SYSTIMESTAMP) + NUMTODSINTERVAL')
+  })
 })

@@ -43,6 +43,8 @@ describe('app-owned ORDS migrations', () => {
     }
     const list = endpoints.find((endpoint) => endpoint.effectivePattern === 'emails')!.toNode()
     expect(list.source).toContain("'nextCursor' VALUE")
+    expect(list.source).toContain(`TO_CHAR(`)
+    expect(list.source).toContain(`YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"`)
     const details = endpoints
       .find((endpoint) => endpoint.effectivePattern === 'emails/:id')!
       .toNode()
@@ -85,6 +87,9 @@ describe('app-owned ORDS migrations', () => {
     expect(listSql).not.toContain('content AS')
     const bootstrapSql = (await load('00000000000000-bootstrap')).compile().up().join('\n')
     expect(bootstrapSql).toContain('odb_emails_ix_history')
+    expect(bootstrapSql).toContain(
+      'created TIMESTAMP(6) DEFAULT SYS_EXTRACT_UTC(SYSTIMESTAMP) NOT NULL',
+    )
     const detailStart = sql.indexOf('PROCEDURE get_email', sql.indexOf('PACKAGE BODY'))
     const detailSql = sql.slice(detailStart, sql.indexOf('END get_email;', detailStart))
     expect(detailSql).toContain('content AS "content"')
@@ -324,6 +329,7 @@ describe('app-owned ORDS migrations', () => {
     expect(procedure).toContain("INSTR(',' || p_severity || ',', ',' || severity_text || ',') > 0")
     expect(procedure).toContain('event_timestamp >= l_from_timestamp')
     expect(procedure).toContain('event_timestamp <= l_to_timestamp')
+    expect(procedure).toContain('FXYYYY-MM-DD"T"HH24:MI:SS.FF3"Z"')
     expect(procedure).toContain('INSTR(LOWER(event_name), LOWER(TRIM(p_message_type)))')
     expect(procedure).toContain('INSTR(LOWER(body), LOWER(TRIM(p_search)))')
     expect(procedure).toContain('ADMIN_AUDIT_SEVERITY_INVALID')
@@ -347,6 +353,7 @@ describe('app-owned ORDS migrations', () => {
     expect(node.source).toContain("'username' VALUE")
     expect(node.source).toContain("'displayName' VALUE")
     expect(node.source).toContain("'nextCursor' VALUE")
+    expect(node.source).toContain(`YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"`)
     const sql = migration.compile().up().join('\n')
     expect(sql).not.toContain('CREATE OR REPLACE VIEW')
     expect(sql).toContain('FROM (SELECT logs.id, logs.observed_timestamp')
@@ -476,11 +483,11 @@ describe('app-owned ORDS migrations', () => {
     expect(sql).toContain('l_requested_enabled := 1')
     expect(sql).toContain('l_requested_enabled := 0')
     expect(sql).toContain('enabled = l_requested_enabled')
-    expect(sql).toContain('updated_at = SYSTIMESTAMP')
+    expect(sql).toContain('updated_at = SYS_EXTRACT_UTC(SYSTIMESTAMP)')
     expect(sql).toContain('IF p_enabled = FALSE THEN')
     expect(sql).toContain('token_version = token_version + 1')
     expect(sql).toContain('UPDATE odb_auth_sessions')
-    expect(sql).toContain('revoked_at = SYSTIMESTAMP')
+    expect(sql).toContain('revoked_at = SYS_EXTRACT_UTC(SYSTIMESTAMP)')
     expect(sql).toContain('user_id = p_id AND revoked_at IS NULL')
     const document = generateApplicationOpenApi(adminPackage.application()) as {
       paths: Record<
@@ -896,7 +903,7 @@ describe('app-owned ORDS migrations', () => {
     expect(grants).toHaveLength(1)
     expect(grants?.[0]).toContain("'owner@example.com'")
     expect(grants?.[0]).toContain(
-      "ODBVUE.odb_auth.grant_role(l_user_id, 'admin', SYSTIMESTAMP, NULL)",
+      "ODBVUE.odb_auth.grant_role(l_user_id, 'admin', SYS_EXTRACT_UTC(SYSTIMESTAMP), NULL)",
     )
     expect(sql).not.toContain("'admin@odbvue.com'")
   })
@@ -1296,7 +1303,9 @@ describe('app-owned ORDS migrations', () => {
     const sql = await loadUpSql()
     expect(sql).toContain('CREATE TABLE ODBVUE.odb_auth_user_roles')
     expect(sql).toContain("ODBVUE.odb_auth.define_role('admin'")
-    expect(sql).toContain("ODBVUE.odb_auth.grant_role(l_user_id, 'admin', SYSTIMESTAMP, NULL)")
+    expect(sql).toContain(
+      "ODBVUE.odb_auth.grant_role(l_user_id, 'admin', SYS_EXTRACT_UTC(SYSTIMESTAMP), NULL)",
+    )
     expect(sql).not.toContain("'test@odbvue.com'")
     expect(sql).toContain("ODBVUE.odb_auth_crypto.hash_password('CustomSecure123!')")
     expect(sql.match(/ODBVUE\.odb_auth\.grant_role\(/g)).toHaveLength(1)

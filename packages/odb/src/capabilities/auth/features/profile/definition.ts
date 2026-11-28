@@ -121,7 +121,7 @@ export function defineAuthProfile(pkg: PackageImpl) {
       body.query(
         odbQuery()
           .updateTable(authUsers)
-          .set({ avatar: avatarId, updatedAt: odbOracle.sysTimestamp() })
+          .set({ avatar: avatarId, updatedAt: odbOracle.utcNow() })
           .where(cond.eq(authUsers.id, userId)),
       )
       body.ifThen(cond.isNotNull(previousAvatar), (then) =>

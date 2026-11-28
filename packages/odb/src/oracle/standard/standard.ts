@@ -83,6 +83,11 @@ export const odbOracle = {
     return new PlsqlExpression('TIMESTAMP', 'SYSTIMESTAMP')
   },
 
+  /** Current instant as a timezone-less UTC TIMESTAMP. */
+  utcNow(): PlsqlExpression<'TIMESTAMP'> {
+    return new PlsqlExpression('TIMESTAMP', 'SYS_EXTRACT_UTC(SYSTIMESTAMP)')
+  },
+
   /** `SYS_CONTEXT(<namespace>, <parameter>[, <length>])` -> VARCHAR2 */
   sysContext(
     namespace: PlsqlRenderable,

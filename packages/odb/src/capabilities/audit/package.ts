@@ -133,7 +133,7 @@ export const odbAuditPackage = odbPackage('odb_audit', (pkg) => {
           severityText: auditTypes.severityText,
           body: auditTypes.body,
           attributes: withDefault(auditTypes.attributes, 'NULL'),
-          eventTimestamp: withDefault(auditTypes.eventTimestamp, 'SYSTIMESTAMP'),
+          eventTimestamp: withDefault(auditTypes.eventTimestamp, 'SYS_EXTRACT_UTC(SYSTIMESTAMP)'),
         },
       },
       ({ params, body }) => {
@@ -293,7 +293,7 @@ export const odbAuditPackage = odbPackage('odb_audit', (pkg) => {
             rec.column('severity_text'),
             rec.column('body'),
             rec.column('attributes', 'CLOB'),
-            odbOracle.nvl(rec.column('event_timestamp', 'TIMESTAMP'), odbOracle.sysTimestamp()),
+            odbOracle.nvl(rec.column('event_timestamp', 'TIMESTAMP'), odbOracle.utcNow()),
           ),
         )
       },

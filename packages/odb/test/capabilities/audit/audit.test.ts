@@ -48,6 +48,12 @@ describe('odbAudit (framework package odb_audit)', () => {
     it('toSQLUp() emits the table, spec and body under the odb_audit name', () => {
       const sql = odbAudit.toSQLUp()
       expect(sql).toContain('CREATE TABLE odb_audit_logs (')
+      expect(sql).toContain(
+        'observed_timestamp TIMESTAMP(6) DEFAULT SYS_EXTRACT_UTC(SYSTIMESTAMP) NOT NULL',
+      )
+      expect(sql).toContain(
+        'event_timestamp TIMESTAMP(6) DEFAULT SYS_EXTRACT_UTC(SYSTIMESTAMP) NOT NULL',
+      )
       expect(sql).toContain('CREATE OR REPLACE PACKAGE odb_audit AS')
       expect(sql).toContain('CREATE OR REPLACE PACKAGE BODY odb_audit AS')
       expect(sql).not.toContain('pck_api_audit')
@@ -74,7 +80,8 @@ describe('odbAudit (framework package odb_audit)', () => {
       expect(sql).toContain('GENERATED ALWAYS AS')
       expect(sql).toContain('CREATE INDEX odb_audit_logs_ix_event')
       expect(sql).toContain('p_attributes IN CLOB DEFAULT NULL')
-      expect(sql).toContain('p_event_timestamp IN TIMESTAMP DEFAULT SYSTIMESTAMP')
+      expect(sql).toContain('p_event_timestamp IN TIMESTAMP DEFAULT SYS_EXTRACT_UTC(SYSTIMESTAMP)')
+      expect(sql).toContain('NVL(rec.event_timestamp, SYS_EXTRACT_UTC(SYSTIMESTAMP))')
     })
 
     it('toSQLUp({ schema }) qualifies the table and package names', () => {

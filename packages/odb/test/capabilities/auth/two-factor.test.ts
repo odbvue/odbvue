@@ -85,7 +85,7 @@ describe('auth policy and two-factor SQL', () => {
     expect(verify).toContain("odb_rate_limit.enforce('AUTH_2FA_USER', l_user_id)")
     expect(verify).toContain("odb_rate_limit.failure('AUTH_2FA_USER', l_user_id)")
     expect(verify).toContain('l_token_version != l_challenge_version')
-    expect(verify.match(/expires_at > SYSTIMESTAMP/g)).toHaveLength(2)
+    expect(verify.match(/expires_at > SYS_EXTRACT_UTC\(SYSTIMESTAMP\)/g)).toHaveLength(2)
     const lockUser = verify.indexOf('FROM odb_auth_users')
     const lockChallenge = verify.lastIndexOf('FROM odb_auth_challenges')
     expect(lockUser).toBeLessThan(lockChallenge)
@@ -118,7 +118,9 @@ describe('auth policy and two-factor SQL', () => {
     expect(verify).not.toMatch(/\b(?:UPDATE|INSERT|SELECT)\b[^\n]*\bencrypt_value\(/)
     expect(verify).toContain('last_counter = l_counter')
     expect(verify).toContain('token_version = token_version + 1')
-    expect(verify).toContain('UPDATE odb_auth_sessions SET revoked_at = SYSTIMESTAMP')
+    expect(verify).toContain(
+      'UPDATE odb_auth_sessions SET revoked_at = SYS_EXTRACT_UTC(SYSTIMESTAMP)',
+    )
     expect(verify).toContain('SAVEPOINT odb_auth_verify_factor')
     expect(verify).toContain('ROLLBACK TO odb_auth_verify_factor')
   })

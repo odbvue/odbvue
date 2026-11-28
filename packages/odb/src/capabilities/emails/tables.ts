@@ -7,7 +7,7 @@ export const emails = odbTable('odb_emails_queue', (t) => ({
   content: t.column('content', 'clob').notNull(),
   priority: t.number().precision(1).notNull().default(3),
   status: t.string(1).notNull().default('N'),
-  created: t.timestamp().notNull().defaultSysTimestamp(),
+  created: t.timestamp().notNull().defaultUtcTimestamp(),
   delivered: t.timestamp(),
   attempts: t.number().precision(10).notNull().default(0),
   postponed: t.timestamp(),

@@ -4,7 +4,7 @@ export const ODB_MIGRATIONS_TABLE = 'odb_migrations'
 export const ODB_MIGRATION_OBJECTS_TABLE = 'odb_migration_objects'
 
 const odbMigrationsTable = odbTable(ODB_MIGRATIONS_TABLE, (table) => ({
-  created: table.timestamp().defaultCurrentTimestamp().notNull(),
+  created: table.timestamp().defaultUtcTimestamp().notNull(),
   migrationName: table.string(200).notNull(),
 })).unique((columns) => [columns.migrationName])
 
@@ -13,7 +13,7 @@ const odbMigrationObjectsTable = odbTable(ODB_MIGRATION_OBJECTS_TABLE, (table) =
   objectType: table.string(30).notNull(),
   activeColor: table.string(10).notNull(),
   migrationName: table.string(200),
-  created: table.timestamp().defaultCurrentTimestamp().notNull(),
+  created: table.timestamp().defaultUtcTimestamp().notNull(),
   updated: table.timestamp(),
 }))
 

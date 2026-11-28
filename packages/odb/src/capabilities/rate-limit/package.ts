@@ -39,7 +39,7 @@ export const odbRateLimitApi = odbPackage(PACKAGE_NAME, (pkg) => {
             ]),
           ),
       )
-      body.ifThen(cond.gt(blockedUntil, odbOracle.sysTimestamp()), (then) => then.tooManyRequests())
+      body.ifThen(cond.gt(blockedUntil, odbOracle.utcNow()), (then) => then.tooManyRequests())
       body.when('NO_DATA_FOUND', (handler) => handler.null())
     },
   )
@@ -71,10 +71,10 @@ export const odbRateLimitApi = odbPackage(PACKAGE_NAME, (pkg) => {
         body.ifThen(
           cond.lte(
             odbOracle.plus(windowStartedAt, odbOracle.interval.seconds(WINDOW_SECONDS)),
-            odbOracle.sysTimestamp(),
+            odbOracle.utcNow(),
           ),
           (then) => {
-            then.set(windowStartedAt, odbOracle.sysTimestamp())
+            then.set(windowStartedAt, odbOracle.utcNow())
             then.set(failureCount, 1)
           },
           (otherwise) => otherwise.set(failureCount, odbOracle.plus(failureCount, 1)),
@@ -87,7 +87,7 @@ export const odbRateLimitApi = odbPackage(PACKAGE_NAME, (pkg) => {
               failureCount,
               blockedUntil: odbOracle.caseWhen(
                 cond.gte(failureCount, FAILURE_LIMIT),
-                odbOracle.plus(odbOracle.sysTimestamp(), odbOracle.interval.seconds(BLOCK_SECONDS)),
+                odbOracle.plus(odbOracle.utcNow(), odbOracle.interval.seconds(BLOCK_SECONDS)),
                 odbOracle.null(),
                 'TIMESTAMP',
               ),
@@ -105,7 +105,7 @@ export const odbRateLimitApi = odbPackage(PACKAGE_NAME, (pkg) => {
             .insertInto(rateLimitBuckets, {
               scope,
               subjectHash,
-              windowStartedAt: odbOracle.sysTimestamp(),
+              windowStartedAt: odbOracle.utcNow(),
               failureCount: 1,
             })
             .commit(),

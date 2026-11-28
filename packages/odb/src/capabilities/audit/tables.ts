@@ -14,8 +14,8 @@ function serviceAttribute(key: string): string {
 /** OpenTelemetry LogRecord store. Logs only — no spans or traces. */
 export const auditLogs = odbTable('odb_audit_logs', (t) => ({
   id: t.guid().primaryKey().defaultSysGuid(),
-  observedTimestamp: t.timestamp().notNull().defaultSysTimestamp(),
-  eventTimestamp: t.timestamp().notNull().defaultSysTimestamp(),
+  observedTimestamp: t.timestamp().notNull().defaultUtcTimestamp(),
+  eventTimestamp: t.timestamp().notNull().defaultUtcTimestamp(),
   severityNumber: t.number().precision(2).notNull().default(SEVERITY_NUMBERS.INFO),
   severityText: t.string(SEVERITY_TEXT_LENGTH).notNull().default('INFO'),
   body: t.string(BODY_LENGTH).notNull(),
