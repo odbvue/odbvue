@@ -11,6 +11,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AuditTable: typeof import('./src/modules/admin/components/AuditTable.vue')['default']
     EmailsTable: typeof import('./src/modules/admin/components/EmailsTable.vue')['default']
     JsonNodeView: typeof import('./src/components/data/JsonNodeView.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
