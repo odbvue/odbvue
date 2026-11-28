@@ -3432,6 +3432,7 @@ export interface operations {
                 limit?: number;
                 search?: string;
                 address?: string;
+                recipient?: string;
                 from?: string;
                 to?: string;
                 deliveredFrom?: string;

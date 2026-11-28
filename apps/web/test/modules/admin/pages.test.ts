@@ -17,6 +17,7 @@ import UserDetails from '@/modules/admin/pages/users/[id].vue'
 import UserDetailsTab from '@/modules/admin/pages/users/[id]/index.vue'
 import UserPermissionsTab from '@/modules/admin/pages/users/[id]/permissions.vue'
 import UserAuditTab from '@/modules/admin/pages/users/[id]/audit.vue'
+import UserEmailsTab from '@/modules/admin/pages/users/[id]/emails.vue'
 import Audit from '@/modules/admin/pages/audit/index.vue'
 import Roles from '@/modules/admin/pages/roles/index.vue'
 import Settings from '@/modules/admin/pages/settings/index.vue'
@@ -128,6 +129,7 @@ async function setup(
     | 'roles'
     | 'permissions'
     | 'audit'
+    | 'user-emails'
     | 'global-audit'
     | 'settings'
     | 'jobs'
@@ -149,6 +151,7 @@ async function setup(
             component: UserPermissionsTab,
           },
           { path: 'audit', name: '/admin/users/[id]/audit', component: UserAuditTab },
+          { path: 'emails', name: '/admin/users/[id]/emails', component: UserEmailsTab },
         ],
       },
       { path: '/admin/roles', component: Roles },
@@ -167,7 +170,7 @@ async function setup(
         : page === 'roles' || page === 'settings' || page === 'jobs' || page === 'emails'
           ? `/admin/${page}`
           : page
-            ? `/admin/users/${user.id}${page === 'permissions' || page === 'audit' ? `/${page}` : ''}`
+            ? `/admin/users/${user.id}${page === 'user-emails' ? '/emails' : page === 'permissions' || page === 'audit' ? `/${page}` : ''}`
             : '/admin/users',
   )
   const wrapper = mount(App, {
@@ -507,7 +510,7 @@ describe('admin page metadata', () => {
   )
 
   it('discovers the landing page, users list, user details, roles, audit, and settings', () => {
-    expect(Object.keys(pages)).toHaveLength(12)
+    expect(Object.keys(pages)).toHaveLength(13)
   })
 
   describe('admin emails', () => {
@@ -1281,15 +1284,79 @@ describe('admin roles list', () => {
 })
 
 describe('admin user details', () => {
-  it.each(['permissions', 'audit'] as const)(
+  it.each(['permissions', 'audit', 'user-emails'] as const)(
     'opens %s directly and loads only its content',
     async (selected) => {
       const { wrapper } = await setup(selected)
-      expect(wrapper.findComponent(tabs).props('modelValue')).toBe(selected)
+      expect(wrapper.findComponent(tabs).props('modelValue')).toBe(
+        selected === 'user-emails' ? 'emails' : selected,
+      )
       expect(wrapper.findAllComponents(table)).toHaveLength(1)
       expect(get).toHaveBeenCalledExactlyOnceWith(`/admin/users/${user.id}`)
     },
   )
+
+  it('filters user emails by exact recipient alongside the normal filters and cursor', async () => {
+    const { wrapper } = await setup('user-emails')
+    const emails = wrapper.findComponent(table)
+    expect(emails.props('options').stateKey).toBe(`admin.users.${user.id}.emails`)
+    expect(emails.props('title')).toBeUndefined()
+    const page = { items: [], nextCursor: 'opaque-next' }
+    const complete = vi.fn<OvTableFetchRequest['complete']>()
+    const { signal } = new AbortController()
+    get.mockResolvedValueOnce({ data: page, error: null, status: 200, headers: null })
+    emails.vm.$emit('fetch', {
+      cursor: 'opaque',
+      limit: 5,
+      filter: { subject: [' notice '], address: [' other@example.test '] },
+      signal,
+      complete,
+    })
+
+    await flushPromises()
+    expect(get).toHaveBeenLastCalledWith('/admin/emails', {
+      query: {
+        cursor: 'opaque',
+        limit: 5,
+        search: 'notice',
+        address: 'other@example.test',
+        recipient: user.username,
+        from: undefined,
+        to: undefined,
+        deliveredFrom: undefined,
+        deliveredTo: undefined,
+      },
+      signal,
+    })
+    expect(complete).toHaveBeenCalledExactlyOnceWith(page)
+    get.mockResolvedValueOnce({
+      data: { id: user.id, subject: 'Notice', addresses: [], attachments: [] },
+      error: null,
+      status: 200,
+      headers: null,
+    })
+    emails.vm.$emit('action', 'admin.details', [], { id: user.id })
+    await flushPromises()
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Notice')
+    expect(get).toHaveBeenLastCalledWith(`/admin/emails/${user.id}`, {
+      signal: expect.any(AbortSignal),
+    })
+  })
+
+  it('does not request unfiltered email history when the username is blank', async () => {
+    get.mockResolvedValueOnce(result([{ ...user, username: ' ' }]))
+    const { wrapper } = await setup('user-emails')
+    const complete = vi.fn<OvTableFetchRequest['complete']>()
+    wrapper.findComponent(table).vm.$emit('fetch', {
+      limit: 5,
+      signal: new AbortController().signal,
+      complete,
+    })
+    await flushPromises()
+    expect(get).toHaveBeenCalledTimes(1)
+    expect(complete).toHaveBeenCalledExactlyOnceWith()
+    expect(ui.notification.value?.message).toBe('admin.loadEmailsError')
+  })
 
   it('updates the URL and follows browser back and forward', async () => {
     const { wrapper, router } = await setup(true)
@@ -1366,6 +1433,7 @@ describe('admin user details', () => {
       messages['admin.details'],
       messages['admin.permissions'],
       messages['admin.audit'],
+      messages['admin.emails'],
     ])
     expect(get).toHaveBeenCalledTimes(1)
     expect(component.props('options').items).toHaveLength(6)

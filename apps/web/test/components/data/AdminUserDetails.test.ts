@@ -195,6 +195,7 @@ describe('admin user details view', () => {
               component: UserPermissionsTab,
             },
             { path: 'audit', name: '/admin/users/[id]/audit', component: UserAudit },
+            { path: 'emails', name: '/admin/users/[id]/emails', component: {} },
           ],
         },
       ],
@@ -225,7 +226,12 @@ describe('admin user details view', () => {
       expect(wrapper.findComponent(VOvForm).exists()).toBe(false)
       expect(wrapper.get('h3').text()).toBe(user.username)
       const tabs = wrapper.findAllComponents(VTab)
-      expect(tabs.map((tab) => tab.props('value'))).toEqual(['details', 'permissions', 'audit'])
+      expect(tabs.map((tab) => tab.props('value'))).toEqual([
+        'details',
+        'permissions',
+        'audit',
+        'emails',
+      ])
       expect(tabs[0]?.text()).toBe(messages['admin.details'])
       expect(tabs[1]?.attributes('href')).toBe(`/admin/users/${user.id}/permissions`)
       expect(tabs[1]?.attributes('disabled')).toBeUndefined()

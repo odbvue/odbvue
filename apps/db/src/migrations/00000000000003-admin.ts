@@ -128,6 +128,7 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
       in: {
         ...searchPageInputs,
         address: odbType.string(240),
+        recipient: odbType.string(240),
         from: odbType.string(24),
         to: odbType.string(24),
         deliveredFrom: odbType.string(24),
@@ -136,7 +137,18 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
       out: { items: odbType.resultset() },
     },
     ({
-      params: { after, limit, search, address, from, to, deliveredFrom, deliveredTo, items },
+      params: {
+        after,
+        limit,
+        search,
+        address,
+        recipient,
+        from,
+        to,
+        deliveredFrom,
+        deliveredTo,
+        items,
+      },
       body,
     }) => {
       const { fromTimestamp, toTimestamp } = timestampRange(body, from, to, 'ADMIN_EMAIL')
@@ -171,6 +183,19 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
             cond.gt(odbOracle.instr(odbOracle.lower(candidate.addrAddr), addressTerm), 0),
           ]),
         )
+      const matchingRecipient = odbQuery()
+        .selectFrom(candidate)
+        .select('1')
+        .where(
+          cond.and([
+            cond.eq(candidate.idEmail, emails.id),
+            cond.or(['To', 'Cc', 'Bcc'].map((type) => cond.eq(candidate.addrType, type))),
+            cond.eq(
+              odbOracle.lower(candidate.addrAddr),
+              odbOracle.lower(odbOracle.trim(recipient)),
+            ),
+          ]),
+        )
       body.openFor(
         items,
         odbQuery()
@@ -195,6 +220,10 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
           )
           .where({
             toSQL: () => `(${addressTerm.toSQL()} IS NULL OR EXISTS (${matchingAddress.toSQL()}))`,
+          })
+          .where({
+            toSQL: () =>
+              `(TRIM(${recipient.toSQL()}) IS NULL OR EXISTS (${matchingRecipient.toSQL()}))`,
           })
           .where(cond.or([cond.isNull(fromTimestamp), cond.gte(emails.created, fromTimestamp)]))
           .where(cond.or([cond.isNull(toTimestamp), cond.lte(emails.created, toTimestamp)]))
@@ -228,6 +257,7 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
       limit: listEmails.parameters.limit,
       search: listEmails.parameters.search,
       address: listEmails.parameters.address,
+      recipient: listEmails.parameters.recipient,
       from: listEmails.parameters.from,
       to: listEmails.parameters.to,
       deliveredFrom: listEmails.parameters.deliveredFrom,

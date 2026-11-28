@@ -101,6 +101,13 @@ describe('app-owned ORDS migrations', () => {
     )
     expect(listSql).toContain('EXISTS (SELECT 1 FROM odb_emails_addr candidate')
     expect(listSql).toContain('INSTR(LOWER(candidate.addr_addr), LOWER(TRIM(p_address)))')
+    expect(listSql).toContain('LOWER(candidate.addr_addr) = LOWER(TRIM(p_recipient))')
+    expect(listSql).toMatch(
+      /TRIM\(p_recipient\) IS NULL OR EXISTS \(SELECT 1 FROM odb_emails_addr candidate WHERE .*candidate\.addr_type = 'To' OR candidate\.addr_type = 'Cc' OR candidate\.addr_type = 'Bcc'.*LOWER\(candidate\.addr_addr\) = LOWER\(TRIM\(p_recipient\)\)/,
+    )
+    expect(listSql.indexOf('LOWER(candidate.addr_addr) = LOWER(TRIM(p_recipient))')).toBeLessThan(
+      listSql.indexOf('ORDER BY created DESC'),
+    )
     expect(listSql).toContain('created >= l_from_timestamp')
     expect(listSql).toContain('created <= l_to_timestamp')
     expect(listSql).toContain(
@@ -120,7 +127,15 @@ describe('app-owned ORDS migrations', () => {
     expect(listSql.indexOf('delivered >= l_delivered_from_timestamp')).toBeLessThan(
       listSql.indexOf('ORDER BY created DESC'),
     )
-    for (const name of ['address', 'from', 'to', 'deliveredFrom', 'deliveredTo', 'search']) {
+    for (const name of [
+      'address',
+      'recipient',
+      'from',
+      'to',
+      'deliveredFrom',
+      'deliveredTo',
+      'search',
+    ]) {
       expect(list.params).toContainEqual(expect.objectContaining({ name }))
       expect(list.source).toContain(`'${name}' VALUE :${name}`)
     }

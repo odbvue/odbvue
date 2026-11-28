@@ -9,6 +9,9 @@
       <v-tab value="audit" :to="tabLocation('audit')" :disabled="!user" exact>
         {{ t('admin.audit') }}
       </v-tab>
+      <v-tab value="emails" :to="tabLocation('emails')" :disabled="!user" exact>
+        {{ t('admin.emails') }}
+      </v-tab>
     </v-tabs>
     <RouterView v-slot="{ Component }">
       <component
@@ -52,14 +55,16 @@ const tabRoutes = {
   details: '/admin/users/[id]/',
   permissions: '/admin/users/[id]/permissions',
   audit: '/admin/users/[id]/audit',
+  emails: '/admin/users/[id]/emails',
 } as const
 const tab = computed(() => {
   if (route.name === tabRoutes.permissions) return 'permissions'
   if (route.name === tabRoutes.audit) return 'audit'
+  if (route.name === tabRoutes.emails) return 'emails'
   return 'details'
 })
 
-function tabLocation(value: 'details' | 'permissions' | 'audit') {
+function tabLocation(value: 'details' | 'permissions' | 'audit' | 'emails') {
   return {
     name: tabRoutes[value],
     params: { id: id.value },

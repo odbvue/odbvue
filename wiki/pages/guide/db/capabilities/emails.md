@@ -196,6 +196,10 @@ accepted. The list shows To, Cc, and Bcc recipients and delivery information.
 Long recipient cells can be expanded; exceptionally large recipient groups are
 truncated by Oracle's `LISTAGG` limit with an omitted-recipient count. Address
 filtering checks every stored recipient, including those omitted from display.
+The Emails tab on a user account shows the same history and filters, restricted
+to messages whose To, Cc, or Bcc address exactly matches that user's username
+case-insensitively. The admin list API accepts the optional `recipient` query
+parameter for this exact match, independently of the substring `address` filter.
 Its Details action opens a scrollable JSON dialog with delivery metadata, all
 addresses (including Bcc), attachment names and sizes in bytes, and the HTML
 body length as measured by Oracle's `DBMS_LOB.GETLENGTH` for a CLOB. The admin

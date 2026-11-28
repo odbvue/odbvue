@@ -122,6 +122,7 @@ declare module 'vue-router/auto-routes' {
       { id: ParamValue<false> },
       | '/admin/users/[id]/'
       | '/admin/users/[id]/audit'
+      | '/admin/users/[id]/emails'
       | '/admin/users/[id]/permissions'
     >,
     '/admin/users/[id]/': RouteRecordInfo<
@@ -134,6 +135,13 @@ declare module 'vue-router/auto-routes' {
     '/admin/users/[id]/audit': RouteRecordInfo<
       '/admin/users/[id]/audit',
       '/admin/users/:id/audit',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
+      | never
+    >,
+    '/admin/users/[id]/emails': RouteRecordInfo<
+      '/admin/users/[id]/emails',
+      '/admin/users/:id/emails',
       { id: ParamValue<true> },
       { id: ParamValue<false> },
       | never
@@ -521,6 +529,7 @@ declare module 'vue-router/auto-routes' {
         | '/admin/users/[id]'
         | '/admin/users/[id]/'
         | '/admin/users/[id]/audit'
+        | '/admin/users/[id]/emails'
         | '/admin/users/[id]/permissions'
       views:
         | 'default'
@@ -538,6 +547,14 @@ declare module 'vue-router/auto-routes' {
     'src/modules/admin/pages/users/[id]/audit.vue': {
       routes:
         | '/admin/users/[id]/audit'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/modules/admin/pages/users/[id]/emails.vue': {
+      routes:
+        | '/admin/users/[id]/emails'
       views:
         | never
       pathParamNames:
