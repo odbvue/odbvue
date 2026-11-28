@@ -523,12 +523,21 @@ describe('admin page metadata', () => {
       const { signal } = new AbortController()
       const from = '2026-11-01T10:00:00.000Z'
       const to = '2026-11-27T18:00:00.000Z'
+      const deliveredFrom = '2026-11-02T10:00:00.000Z'
+      const deliveredTo = '2026-11-28T18:00:00.000Z'
       get.mockResolvedValueOnce({ data: page, error: null, status: 200, headers: null })
       wrapper.findComponent(table).vm.$emit('fetch', {
         cursor: 'opaque',
         limit: 5,
-        search: 'receipt',
-        filter: { address: [' cc@example.test '], from: [from], to: [to] },
+        search: 'stale table search',
+        filter: {
+          subject: [' receipt '],
+          address: [' cc@example.test '],
+          from: [from],
+          to: [to],
+          deliveredFrom: [deliveredFrom],
+          deliveredTo: [deliveredTo],
+        },
         signal,
         complete,
       })
@@ -541,26 +550,45 @@ describe('admin page metadata', () => {
           address: 'cc@example.test',
           from,
           to,
+          deliveredFrom,
+          deliveredTo,
         },
         signal,
       })
       expect(complete.mock.calls[0]?.[0]).toBe(page)
       const options: OvTableOptions = wrapper.findComponent(table).props('options')
+      expect(options.search).toBeUndefined()
       expect(options.columns).toEqual(
         expect.arrayContaining([
+          { name: 'delivered', label: 'admin.emailDelivered', format: { tsFormat: 'datetime' } },
           { name: 'toRecipients', label: 'admin.emailTo', maxLength: 40 },
           { name: 'ccRecipients', label: 'admin.emailCc', maxLength: 40 },
           { name: 'bccRecipients', label: 'admin.emailBcc', maxLength: 40 },
         ]),
       )
+      expect(options.columns.map((column) => column.name)).not.toContain('attempts')
+      expect(options.columns.map((column) => column.name)).not.toContain('error')
       expect(options.filter?.fields).toEqual(
         expect.arrayContaining([
+          expect.objectContaining({ name: 'subject', type: 'text' }),
           expect.objectContaining({ name: 'from', filterUtc: true }),
           expect.objectContaining({
             name: 'to',
             filterUtc: true,
             rules: expect.arrayContaining([
               { type: 'date-on-or-after', params: 'from', message: 'admin.emailInvalidInterval' },
+            ]),
+          }),
+          expect.objectContaining({ name: 'deliveredFrom', filterUtc: true }),
+          expect.objectContaining({
+            name: 'deliveredTo',
+            filterUtc: true,
+            rules: expect.arrayContaining([
+              {
+                type: 'date-on-or-after',
+                params: 'deliveredFrom',
+                message: 'admin.emailInvalidInterval',
+              },
             ]),
           }),
         ]),
@@ -590,13 +618,14 @@ describe('admin page metadata', () => {
       expect(emit).toHaveBeenCalledWith('details', 'toRecipients', recipients)
     })
 
-    it('clears recipient and date filters without retaining previous values', async () => {
+    it('clears subject, recipient and date filters without retaining previous values', async () => {
       const { wrapper } = await setup('emails')
       const complete = vi.fn<OvTableFetchRequest['complete']>()
       const { signal } = new AbortController()
       wrapper.findComponent(table).vm.$emit('fetch', {
         limit: 5,
-        filter: { address: [' '] },
+        search: 'stale table search',
+        filter: { subject: [' '], address: [' '] },
         signal,
         complete,
       })
@@ -609,12 +638,14 @@ describe('admin page metadata', () => {
           address: undefined,
           from: undefined,
           to: undefined,
+          deliveredFrom: undefined,
+          deliveredTo: undefined,
         },
         signal,
       })
     })
 
-    it('shows only message content in the dialog and keeps list state unchanged', async () => {
+    it('shows email metadata without the body and keeps list state unchanged', async () => {
       const { wrapper, router } = await setup('emails')
       get.mockResolvedValueOnce({
         data: {
@@ -623,14 +654,19 @@ describe('admin page metadata', () => {
               id: user.id,
               subject: 'Receipt',
               status: 'S',
-              content:
-                '<style>p{color:red}</style><p>Hello</p><a href="https://example.test">link</a><script>alert(1)</script><img src="https://example.test/pixel">',
+              content: 'sensitive body from an outdated server',
+              bodyLength: 42,
               created: '2026-01-01T10:00:00Z',
               priority: 3,
               attempts: 1,
             },
           ],
-          addresses: [{ addrType: 'To', addrAddr: 'ada@example.test' }],
+          addresses: [
+            { addrType: 'To', addrAddr: 'ada@example.test', addrName: 'Ada' },
+            { addrType: 'Cc', addrAddr: 'cc@example.test', addrName: null },
+            { addrType: 'Bcc', addrAddr: 'bcc@example.test', addrName: null },
+          ],
+          attachments: [{ fileName: 'receipt.pdf', fileSize: 1234 }],
         },
         error: null,
         status: 200,
@@ -640,23 +676,46 @@ describe('admin page metadata', () => {
       await flushPromises()
       expect(wrapper.get('[role="dialog"]').text()).toContain('Receipt')
       expect(wrapper.findComponent(view).exists()).toBe(false)
-      expect(wrapper.get('[role="dialog"]').text()).not.toContain('ada@example.test')
-      const iframe = wrapper.get('iframe')
-      expect(iframe.attributes('sandbox')).toBe('')
-      expect(iframe.attributes('referrerpolicy')).toBe('no-referrer')
-      const doc = iframe.attributes('srcdoc')
-      expect(doc).toContain("default-src 'none'")
-      expect(doc).toContain('img-src data:')
-      expect(doc).toContain('<style>p{color:red}</style>')
-      expect(doc).toContain('<p>Hello</p>')
-      expect(doc).not.toContain('<script>')
-      expect(doc).not.toContain('href=')
-      expect(wrapper.find('p').text()).not.toContain('Hello')
+      const details = JSON.parse(wrapper.get('[role="dialog"] pre').text())
+      expect(details).toMatchObject({
+        id: user.id,
+        subject: 'Receipt',
+        bodyLength: 42,
+        addresses: [
+          { addrType: 'To', addrAddr: 'ada@example.test', addrName: 'Ada' },
+          { addrType: 'Cc', addrAddr: 'cc@example.test', addrName: null },
+          { addrType: 'Bcc', addrAddr: 'bcc@example.test', addrName: null },
+        ],
+        attachments: [{ fileName: 'receipt.pdf', fileSize: 1234 }],
+      })
+      expect(details).not.toHaveProperty('content')
+      expect(wrapper.get('[role="dialog"]').text()).not.toContain('sensitive body')
+      expect(wrapper.find('iframe').exists()).toBe(false)
       expect(router.currentRoute.value.path).toBe('/admin/emails')
       await wrapper.get('[role="dialog"] button').trigger('click')
       await flushPromises()
-      expect(wrapper.find('iframe').exists()).toBe(false)
+      expect(wrapper.find('pre').exists()).toBe(false)
       expect(refetchTable).not.toHaveBeenCalled()
+    })
+
+    it('shows an empty attachment list for messages without attachments', async () => {
+      const { wrapper } = await setup('emails')
+      get.mockResolvedValueOnce({
+        data: {
+          items: [{ id: user.id, subject: 'Notice', bodyLength: 0 }],
+          addresses: [],
+          attachments: [],
+        },
+        error: null,
+        status: 200,
+        headers: null,
+      })
+      wrapper.findComponent(table).vm.$emit('action', 'admin.details', [], { id: user.id })
+      await flushPromises()
+      expect(JSON.parse(wrapper.get('[role="dialog"] pre').text())).toMatchObject({
+        bodyLength: 0,
+        attachments: [],
+      })
     })
 
     it('reports details failures in the dialog and discards requests after closing', async () => {

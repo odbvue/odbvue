@@ -187,17 +187,18 @@ Uploaded attachments remain in Storage, including after delivery or failed sends
 
 ## Admin history
 
-The administrator-only Emails page lists delivery history, searchable by subject
-and filterable by recipient email address (case-insensitive substring across To,
-Cc, and Bcc) and an inclusive creation-time interval. Local date/time selections
-are sent as UTC. Invalid dates and reversed intervals are rejected by the API.
-The list shows To, Cc, and Bcc recipients, delivery information, and errors.
+The administrator-only Emails page lists delivery history, with filters for
+subject, recipient email address (case-insensitive substring across To, Cc, and
+Bcc), and inclusive creation and SMTP acceptance intervals. Local date/time
+selections are sent as UTC. Invalid dates and reversed intervals are rejected by
+the API. Filtering by SMTP acceptance excludes messages that have not been
+accepted. The list shows To, Cc, and Bcc recipients and delivery information.
 Long recipient cells can be expanded; exceptionally large recipient groups are
 truncated by Oracle's `LISTAGG` limit with an omitted-recipient count. Address
 filtering checks every stored recipient, including those omitted from display.
-Its Details
-action opens a scrollable dialog containing only the HTML body, with the subject
-as its title, without leaving the list or changing its pagination.
-The preview runs in a sandboxed iframe:
-scripts, links, and external resources are disabled. SMTP acceptance does not
+Its Details action opens a scrollable JSON dialog with delivery metadata, all
+addresses (including Bcc), attachment names and sizes in bytes, and the HTML
+body length as measured by Oracle's `DBMS_LOB.GETLENGTH` for a CLOB. The admin
+API does not return the body; it remains stored in the queue for sending and
+retries. Details do not change the list's pagination. SMTP acceptance does not
 guarantee delivery to the recipient.

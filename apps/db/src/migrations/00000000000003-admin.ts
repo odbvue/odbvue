@@ -6,11 +6,14 @@ import {
   auditLogs,
   emails,
   emailsAddr,
+  emailsAttc,
+  storageFiles,
   cond,
   defineMigration,
   defineService,
   odbEnv,
   odbAuth,
+  odbDbmsLob,
   odbOracle,
   odbLiteral,
   odbPackage,
@@ -38,11 +41,15 @@ function timestampRange(
   from: PlsqlValue<'VARCHAR2'>,
   to: PlsqlValue<'VARCHAR2'>,
   errorPrefix: string,
+  variablePrefix = 'l',
 ) {
-  const { fromTimestamp, toTimestamp } = body.variables({
-    fromTimestamp: odbType.timestamp(),
-    toTimestamp: odbType.timestamp(),
-  })
+  const { fromTimestamp, toTimestamp } = body.variables(
+    {
+      fromTimestamp: odbType.timestamp(),
+      toTimestamp: odbType.timestamp(),
+    },
+    { prefix: variablePrefix },
+  )
   body.block((dates) => {
     for (const [value, target] of [
       [from, fromTimestamp],
@@ -116,10 +123,14 @@ const schedulerRuns = odbTable('user_scheduler_job_run_details', (t) => ({
 const emailListing = odbTable('odb_emails_queue', (t) => ({
   id: t.guid().primaryKey(),
   subject: t.string(240).notNull(),
+  content: t.column('content', 'clob').notNull(),
+  bodyLength: t.number().notNull(),
+  priority: t.number().notNull(),
   status: t.string(1).notNull(),
   created: t.timestamp().notNull(),
   delivered: t.timestamp(),
   attempts: t.number().notNull(),
+  postponed: t.timestamp(),
   error: t.string(2000),
   toRecipients: t.string(4000),
   ccRecipients: t.string(4000),
@@ -135,11 +146,18 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
         address: odbType.string(240),
         from: odbType.string(24),
         to: odbType.string(24),
+        deliveredFrom: odbType.string(24),
+        deliveredTo: odbType.string(24),
       },
       out: { items: odbType.resultset() },
     },
-    ({ params: { after, limit, search, address, from, to, items }, body }) => {
+    ({
+      params: { after, limit, search, address, from, to, deliveredFrom, deliveredTo, items },
+      body,
+    }) => {
       const { fromTimestamp, toTimestamp } = timestampRange(body, from, to, 'ADMIN_EMAIL')
+      const { fromTimestamp: deliveredFromTimestamp, toTimestamp: deliveredToTimestamp } =
+        timestampRange(body, deliveredFrom, deliveredTo, 'ADMIN_EMAIL', 'l_delivered')
       const candidate = emailsAddr.as('candidate')
       const recipients = (type: 'To' | 'Cc' | 'Bcc') =>
         new PlsqlExpression(
@@ -201,6 +219,18 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
             cond.or([cond.isNull(fromTimestamp), cond.gte(emailListing.created, fromTimestamp)]),
           )
           .where(cond.or([cond.isNull(toTimestamp), cond.lte(emailListing.created, toTimestamp)]))
+          .where(
+            cond.or([
+              cond.isNull(deliveredFromTimestamp),
+              cond.gte(emailListing.delivered, deliveredFromTimestamp),
+            ]),
+          )
+          .where(
+            cond.or([
+              cond.isNull(deliveredToTimestamp),
+              cond.lte(emailListing.delivered, deliveredToTimestamp),
+            ]),
+          )
           .orderBy(emailListing.created, 'desc')
           .orderBy(emailListing.id, 'desc')
           .paginate({ cursor: after, limit }),
@@ -213,7 +243,7 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
     basePath: '/admin',
     method: 'GET',
     path: '/emails',
-    summary: 'List email history filtered by subject, recipient address and creation interval',
+    summary: 'List email history filtered by subject, recipient address and timestamp intervals',
     query: {
       cursor: listEmails.parameters.after,
       limit: listEmails.parameters.limit,
@@ -221,6 +251,8 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
       address: listEmails.parameters.address,
       from: listEmails.parameters.from,
       to: listEmails.parameters.to,
+      deliveredFrom: listEmails.parameters.deliveredFrom,
+      deliveredTo: listEmails.parameters.deliveredTo,
     },
     response: { items: listEmails.parameters.items },
   })
@@ -229,9 +261,13 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
     'get_email',
     {
       in: { id: odbType.guid() },
-      out: { items: odbType.resultset(), addresses: odbType.resultset() },
+      out: {
+        items: odbType.resultset(),
+        addresses: odbType.resultset(),
+        attachments: odbType.resultset(),
+      },
     },
-    ({ params: { id, items, addresses }, body }) => {
+    ({ params: { id, items, addresses, attachments }, body }) => {
       const { foundId } = body.variables({ foundId: emails.id })
       body.query(
         odbQuery().selectFrom(emails).select(emails.id).into(foundId).where(cond.eq(emails.id, id)),
@@ -239,20 +275,20 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
       body.openFor(
         items,
         odbQuery()
-          .selectFrom(emails)
+          .selectFrom(emailListing)
           .select([
-            emails.id,
-            emails.subject,
-            emails.content,
-            emails.priority,
-            emails.status,
-            emails.created,
-            emails.delivered,
-            emails.attempts,
-            emails.postponed,
-            emails.error,
+            emailListing.id,
+            emailListing.subject,
+            emailListing.priority,
+            emailListing.status,
+            emailListing.created,
+            emailListing.delivered,
+            emailListing.attempts,
+            emailListing.postponed,
+            emailListing.error,
           ])
-          .where(cond.eq(emails.id, id)),
+          .selectAs(odbDbmsLob.getLength(emailListing.content), emailListing.bodyLength)
+          .where(cond.eq(emailListing.id, id)),
       )
       body.openFor(
         addresses,
@@ -263,6 +299,18 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
           .orderBy(emailsAddr.addrType)
           .orderBy(emailsAddr.addrAddr),
       )
+      const attachment = emailsAttc.as('a')
+      const file = storageFiles.as('s')
+      body.openFor(
+        attachments,
+        odbQuery()
+          .selectFrom(attachment)
+          .join(file, cond.eq(file.id, attachment.idStorage))
+          .selectAs(file.fileName, file.fileName)
+          .selectAs(file.fileSize, file.fileSize)
+          .where(cond.eq(attachment.idEmail, id))
+          .orderBy(attachment.idStorage),
+      )
       body.when('NO_DATA_FOUND', (missing) => missing.notFound('ADMIN_EMAIL_NOT_FOUND'))
     },
   )
@@ -272,9 +320,13 @@ export const adminPackage: Package<Record<never, never>> = odbPackage('pck_admin
     basePath: '/admin',
     method: 'GET',
     path: '/emails/:id',
-    summary: 'Read an email body, delivery details and addresses',
+    summary: 'Read email delivery metadata, addresses and attachment details',
     uri: { id: getEmail.parameters.id },
-    response: { items: getEmail.parameters.items, addresses: getEmail.parameters.addresses },
+    response: {
+      items: getEmail.parameters.items,
+      addresses: getEmail.parameters.addresses,
+      attachments: getEmail.parameters.attachments,
+    },
   })
 
   const listUsers = pkg.proc(

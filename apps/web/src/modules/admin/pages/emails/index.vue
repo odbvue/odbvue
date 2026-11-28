@@ -9,21 +9,12 @@
     />
     <v-ov-dialog
       v-model="detailsOpen"
-      :title="email?.subject || t('admin.emailDetails')"
+      :title="email?.items[0]?.subject || t('admin.emailDetails')"
       :closeable="true"
       scrollable
     >
       <template #content>
-        <template v-if="email">
-          <p class="mb-3">{{ t('admin.emailPreviewNotice') }}</p>
-          <iframe
-            class="email-preview"
-            :title="t('admin.emailBody')"
-            :srcdoc="preview"
-            sandbox=""
-            referrerpolicy="no-referrer"
-          />
-        </template>
+        <pre v-if="email" class="email-details">{{ detailsJson }}</pre>
         <v-progress-linear
           v-else-if="loadingDetails"
           indeterminate
@@ -42,7 +33,6 @@ import { useHttp } from '@/capabilities/http'
 import { useUi } from '@/capabilities/ui'
 import type { components } from '@/api/openapi.generated'
 import type { OvTableFetchRequest, OvTableOptions } from '@/components/api'
-import { emailPreviewDocument } from '../../components/emailPreview'
 
 definePage({
   meta: {
@@ -58,8 +48,36 @@ const ui = useUi()
 const { t } = useI18n()
 const detailsOpen = ref(false)
 const selectedId = ref<string>()
-const email = ref<components['schemas']['AdminGetEmailItemsItem']>()
-const preview = computed(() => emailPreviewDocument(email.value?.content ?? ''))
+const email = ref<components['schemas']['AdminGetEmailResponse']>()
+const detailsJson = computed(() => {
+  const item = email.value?.items[0]
+  if (!item || !email.value) return ''
+  return JSON.stringify(
+    {
+      id: item.id,
+      subject: item.subject,
+      priority: item.priority,
+      status: item.status,
+      created: item.created,
+      delivered: item.delivered,
+      attempts: item.attempts,
+      postponed: item.postponed,
+      error: item.error,
+      bodyLength: item.bodyLength,
+      addresses: email.value.addresses.map(({ addrType, addrAddr, addrName }) => ({
+        addrType,
+        addrAddr,
+        addrName,
+      })),
+      attachments: email.value.attachments.map(({ fileName, fileSize }) => ({
+        fileName,
+        fileSize,
+      })),
+    },
+    null,
+    2,
+  )
+})
 const loadingDetails = ref(false)
 const detailsError = ref<string>()
 
@@ -88,7 +106,7 @@ watch(
       if (error || !data)
         throw new Error(status === 404 ? 'admin.emailNotFound' : 'admin.loadEmailError')
       if (!data.items[0]) throw new Error('admin.emailNotFound')
-      email.value = data.items[0]
+      email.value = data
     } catch (error) {
       if (controller.signal.aborted) return
       detailsError.value =
@@ -103,9 +121,9 @@ watch(
 const options = computed<OvTableOptions>(() => ({
   key: 'id',
   stateKey: 'admin.emails',
-  search: { placeholder: t('admin.searchEmails') },
   columns: [
     { name: 'created', label: 'admin.createdAt', format: { tsFormat: 'datetime' } },
+    { name: 'delivered', label: 'admin.emailDelivered', format: { tsFormat: 'datetime' } },
     { name: 'toRecipients', label: 'admin.emailTo', maxLength: 40 },
     { name: 'ccRecipients', label: 'admin.emailCc', maxLength: 40 },
     { name: 'bccRecipients', label: 'admin.emailBcc', maxLength: 40 },
@@ -134,8 +152,6 @@ const options = computed<OvTableOptions>(() => ({
         },
       ],
     },
-    { name: 'attempts', label: 'admin.emailAttempts' },
-    { name: 'error', label: 'admin.emailError' },
     {
       name: 'actions',
       label: 'admin.details',
@@ -151,6 +167,7 @@ const options = computed<OvTableOptions>(() => ({
   ],
   filter: {
     fields: [
+      { type: 'text', name: 'subject', label: 'admin.emailSubject' },
       { type: 'text', name: 'address', label: 'admin.emailAddress' },
       {
         type: 'datetime',
@@ -169,6 +186,27 @@ const options = computed<OvTableOptions>(() => ({
           { type: 'date-on-or-after', params: 'from', message: 'admin.emailInvalidInterval' },
         ],
       },
+      {
+        type: 'datetime',
+        name: 'deliveredFrom',
+        label: 'admin.emailDeliveredFrom',
+        filterUtc: true,
+        rules: [{ type: 'date', params: undefined, message: 'admin.emailInvalidInterval' }],
+      },
+      {
+        type: 'datetime',
+        name: 'deliveredTo',
+        label: 'admin.emailDeliveredTo',
+        filterUtc: true,
+        rules: [
+          { type: 'date', params: undefined, message: 'admin.emailInvalidInterval' },
+          {
+            type: 'date-on-or-after',
+            params: 'deliveredFrom',
+            message: 'admin.emailInvalidInterval',
+          },
+        ],
+      },
     ],
     actions: [{ name: 'admin.apply' }, { name: 'admin.cancel', format: { variant: 'outlined' } }],
     actionSubmit: 'admin.apply',
@@ -177,14 +215,7 @@ const options = computed<OvTableOptions>(() => ({
   },
 }))
 
-async function fetchEmails({
-  cursor,
-  limit,
-  search,
-  filter,
-  signal,
-  complete,
-}: OvTableFetchRequest) {
+async function fetchEmails({ cursor, limit, filter, signal, complete }: OvTableFetchRequest) {
   if (signal.aborted) return complete()
   const result = await ui.action('admin.emails.list', async () => {
     const { data, error } = await http.get<components['schemas']['AdminListEmailsResponse']>(
@@ -193,10 +224,12 @@ async function fetchEmails({
         query: {
           cursor,
           limit,
-          search,
+          search: filter?.subject?.[0]?.trim() || undefined,
           address: filter?.address?.[0]?.trim() || undefined,
           from: filter?.from?.[0],
           to: filter?.to?.[0],
+          deliveredFrom: filter?.deliveredFrom?.[0],
+          deliveredTo: filter?.deliveredTo?.[0],
         },
         signal,
       },
@@ -211,10 +244,8 @@ async function fetchEmails({
 </script>
 
 <style scoped>
-.email-preview {
-  width: 100%;
-  height: 18rem;
-  border: 1px solid rgb(var(--v-theme-on-surface), 0.2);
-  background: white;
+.email-details {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 </style>

@@ -681,7 +681,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List email history filtered by subject, recipient address and creation interval */
+        /** List email history filtered by subject, recipient address and timestamp intervals */
         get: operations["admin_list_emails"];
         put?: never;
         post?: never;
@@ -698,7 +698,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read an email body, delivery details and addresses */
+        /** Read email delivery metadata, addresses and attachment details */
         get: operations["admin_get_email"];
         put?: never;
         post?: never;
@@ -1189,7 +1189,6 @@ export interface components {
         AdminGetEmailItemsItem: {
             id: string;
             subject: string;
-            content: string;
             priority: number;
             status: string;
             /** Format: date-time */
@@ -1200,15 +1199,21 @@ export interface components {
             /** Format: date-time */
             postponed?: string | null;
             error?: string | null;
+            bodyLength: number;
         };
         AdminGetEmailAddressesItem: {
             addrType: string;
             addrAddr: string;
             addrName?: string | null;
         };
+        AdminGetEmailAttachmentsItem: {
+            fileName: string;
+            fileSize: number;
+        };
         AdminGetEmailResponse: {
             items: components["schemas"]["AdminGetEmailItemsItem"][];
             addresses: components["schemas"]["AdminGetEmailAddressesItem"][];
+            attachments: components["schemas"]["AdminGetEmailAttachmentsItem"][];
         };
         AdminListUsersItemsItem: {
             id: string;
@@ -3435,6 +3440,8 @@ export interface operations {
                 address?: string;
                 from?: string;
                 to?: string;
+                deliveredFrom?: string;
+                deliveredTo?: string;
             };
             header?: never;
             path?: never;

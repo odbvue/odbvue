@@ -31,7 +31,7 @@ const loadUpSql = async () => {
 }
 
 describe('app-owned ORDS migrations', () => {
-  it('exposes admin-only paged email history and full email details', async () => {
+  it('exposes admin-only email history and metadata without message content', async () => {
     const { adminPackage, migration } = await migrations['00000000000003-admin']()
     const endpoints = compileApplicationEndpoints(adminPackage.application()).filter(
       (endpoint) =>
@@ -49,6 +49,18 @@ describe('app-owned ORDS migrations', () => {
       .find((endpoint) => endpoint.effectivePattern === 'emails/:id')!
       .toNode()
     expect(details.source).toContain("'addresses' VALUE")
+    expect(details.source).toContain("'attachments' VALUE")
+    expect(details.source).toContain("'bodyLength' VALUE")
+    expect(details.source).toContain("'fileName' VALUE")
+    expect(details.source).toContain("'fileSize' VALUE")
+    expect(details.source).not.toContain("'content' VALUE")
+    const itemColumns = details.params.find((param) => param.name === 'items')?.resultColumns
+    expect(itemColumns?.map((column) => column.name)).toContain('body_length')
+    expect(itemColumns?.map((column) => column.name)).not.toContain('content')
+    const attachmentColumns = details.params.find(
+      (param) => param.name === 'attachments',
+    )?.resultColumns
+    expect(attachmentColumns?.map((column) => column.name)).toEqual(['file_name', 'file_size'])
     const sql = migration.compile().up().join('\n')
     const listStart = sql.indexOf('PROCEDURE list_emails', sql.indexOf('PACKAGE BODY'))
     const listSql = sql.slice(listStart, sql.indexOf('END list_emails;', listStart))
@@ -70,6 +82,13 @@ describe('app-owned ORDS migrations', () => {
     expect(listSql).toContain('INSTR(LOWER(candidate.addr_addr), LOWER(TRIM(p_address)))')
     expect(listSql).toContain('created >= l_from_timestamp')
     expect(listSql).toContain('created <= l_to_timestamp')
+    expect(listSql).toContain(
+      'l_delivered_from_timestamp IS NULL OR delivered >= l_delivered_from_timestamp',
+    )
+    expect(listSql).toContain(
+      'l_delivered_to_timestamp IS NULL OR delivered <= l_delivered_to_timestamp',
+    )
+    expect(listSql).toContain('l_delivered_from_timestamp > l_delivered_to_timestamp')
     expect(listSql).toContain('ADMIN_EMAIL_DATE_INVALID')
     expect(listSql).toContain('l_from_timestamp > l_to_timestamp')
     expect(listSql).toContain('ADMIN_EMAIL_INTERVAL_INVALID')
@@ -77,7 +96,10 @@ describe('app-owned ORDS migrations', () => {
     expect(listSql.indexOf('created >= l_from_timestamp')).toBeLessThan(
       listSql.indexOf('ORDER BY created DESC'),
     )
-    for (const name of ['address', 'from', 'to', 'search']) {
+    expect(listSql.indexOf('delivered >= l_delivered_from_timestamp')).toBeLessThan(
+      listSql.indexOf('ORDER BY created DESC'),
+    )
+    for (const name of ['address', 'from', 'to', 'deliveredFrom', 'deliveredTo', 'search']) {
       expect(list.params).toContainEqual(expect.objectContaining({ name }))
       expect(list.source).toContain(`'${name}' VALUE :${name}`)
     }
@@ -92,8 +114,14 @@ describe('app-owned ORDS migrations', () => {
     )
     const detailStart = sql.indexOf('PROCEDURE get_email', sql.indexOf('PACKAGE BODY'))
     const detailSql = sql.slice(detailStart, sql.indexOf('END get_email;', detailStart))
-    expect(detailSql).toContain('content AS "content"')
+    expect(detailSql).toContain('DBMS_LOB.GETLENGTH(content) AS "bodyLength"')
+    expect(detailSql).not.toContain('content AS "content"')
     expect(detailSql).toContain('FROM odb_emails_addr WHERE id_email = p_id')
+    expect(detailSql).toContain('FROM odb_emails_attc a')
+    expect(detailSql).toContain('JOIN odb_storage_files s ON s.id = a.id_storage')
+    expect(detailSql).toContain('s.file_name AS "fileName"')
+    expect(detailSql).toContain('s.file_size AS "fileSize"')
+    expect(detailSql).not.toContain('s.content')
     expect(detailSql).toContain('ADMIN_EMAIL_NOT_FOUND')
   })
 
